@@ -1,7 +1,9 @@
 export type RGB = { r: number; g: number; b: number };
 
+/** Upper bound on palette size — a small palette keeps the result pixel-art-like. */
+const MAX_COLORS = 16;
+
 export type QuantizeOpts = {
-  colors?: number;
   bgTolerance?: number;
   bgRounds?: number;
   keepBackground?: boolean;
@@ -313,8 +315,6 @@ export function imageToSprite(
   dh: number,
   opts: QuantizeOpts = {},
 ): Quantized {
-  const maxColors = Math.max(2, Math.min(opts.colors ?? 12, 62));
-
   let source = rgba;
   let removed = 0;
 
@@ -355,7 +355,7 @@ export function imageToSprite(
   };
 
   const bins = histogram(source, sw, sh);
-  const palette = buildPalette(bins, maxColors);
+  const palette = buildPalette(bins, MAX_COLORS);
   if (palette.length === 0) {
     return { buf: new Uint8ClampedArray(dw * dh * 4), palette: [], removed };
   }

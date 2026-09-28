@@ -1,5 +1,6 @@
 "use server";
 
+import { buildImagePrompt } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/lib/ai/types";
 import { requireUser } from "@/lib/auth/session";
@@ -12,8 +13,11 @@ export async function sendMessage(
   const ai = getAiProvider();
   const last = messages.at(-1)?.content ?? "";
 
-  if ((await ai.route(last)) === "generate") {
-    const { mimeType, base64 } = await ai.generate(last);
+  const route = await ai.route(last);
+  if (route.intent === "generate") {
+    const { mimeType, base64 } = await ai.generate(
+      buildImagePrompt(route.subject),
+    );
     return {
       role: "assistant",
       content: "Here is your picture.",

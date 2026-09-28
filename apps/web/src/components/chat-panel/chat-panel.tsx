@@ -8,7 +8,12 @@ import { ChatHeader } from "./components/chat-header";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
 
-export function ChatPanel() {
+type Props = {
+  /** Called with a generated picture so it can be placed on the canvas. */
+  onImage: (dataUrl: string) => Promise<void>;
+};
+
+export function ChatPanel({ onImage }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +31,7 @@ export function ChatPanel() {
       const reply = await sendMessage(
         conversation.map(({ role, content }) => ({ role, content })),
       );
+      if (reply.image) await onImage(reply.image);
       setMessages([...conversation, reply]);
     } catch {
       setError("The assistant could not answer. Try again.");
