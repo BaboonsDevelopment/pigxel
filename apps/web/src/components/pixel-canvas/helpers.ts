@@ -68,6 +68,29 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/**
+ * A copy of `image` where pixels of the tile's solid background colour count
+ * as transparent, so emptiness checks work on white or black tiles too.
+ */
+export function withoutBackground(
+  image: ImageData,
+  background: [number, number, number] | null,
+): ImageData {
+  if (!background) return image;
+  const [r, g, b] = background;
+  const copy = new ImageData(
+    new Uint8ClampedArray(image.data),
+    image.width,
+    image.height,
+  );
+  const data = copy.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] === r && data[i + 1] === g && data[i + 2] === b)
+      data[i + 3] = 0;
+  }
+  return copy;
+}
+
 /** True when every pixel is transparent. */
 export function isBlank(image: ImageData): boolean {
   for (let i = 3; i < image.data.length; i += 4) {
