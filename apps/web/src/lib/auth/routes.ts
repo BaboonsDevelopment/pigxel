@@ -8,3 +8,16 @@ export function isProtectedPath(pathname: string) {
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 }
+
+const returnPaths = [
+  "/tiles",
+  "/tiles/new",
+  "/tiles/edit",
+  "/account",
+  "/auth/update-password",
+];
+
+/** Where to go after sign-in or linking; unknown targets fall back to HOME_PATH. */
+export function safeNext(next: string | null | undefined) {
+  return next && returnPaths.includes(next) ? next : HOME_PATH;
+}

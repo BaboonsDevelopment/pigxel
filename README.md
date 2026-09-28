@@ -60,6 +60,29 @@ Successful authentication opens `/tiles`, which has the **Create tile** button; 
 
 Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs).
 
+## .pigxel files and Google Drive
+
+`/tiles/new` sets up a tile: name, size (up to 256×256), background (transparent, white or black) and where to keep it: **Google Drive**, which creates the file in Drive and autosaves every change, or **Don’t store it**, which keeps it in the browser until it is downloaded or saved to Drive. The editor at `/tiles/edit` works on that tile and keeps it as a per-user draft in `localStorage`, so it survives navigation and reloads. On a white or black tile the eraser paints the background.
+
+The editor opens and saves `.pigxel` files: versioned JSON with the tile size and base64 RGBA pixels (see `apps/web/src/lib/pigxel-file/format.ts`). **Open** reads a file from the computer or Google Drive; **Save** downloads it or saves it to Google Drive. `Ctrl/⌘+S` saves back to where the tile came from, and `Ctrl/⌘+O` opens a file from the computer.
+
+### Google sign-in and Google Drive
+
+People connect **their own** Google Drive through Supabase Auth: **Continue with Google** on the login page signs in and connects Drive at once, and people who signed up with email use **Connect Google Drive** (on the account page, the new-tile form or the editor) to link a Google account. Pigxel asks only for `drive.file`, so it can reach just the files it creates, and Google doesn’t require a security review.
+
+Supabase hands over Google’s access token only once and doesn’t renew it, so `/auth/callback` stores the Google refresh token in `google_drive_connections` (RLS on, no policies: only the server’s secret key can read it). The browser asks `POST /api/google-drive/token` for a short-lived access token and talks to Drive directly, so autosave keeps working across reloads. **Disconnect Google Drive** on the account page deletes the token and revokes Pigxel’s access at Google.
+
+One-time setup:
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create a project and enable the **Google Drive API**.
+2. Configure the OAuth consent screen (External) and add the `.../auth/drive.file` scope, then **Publish app** (Audience → Publish app) so any Google account can connect. `drive.file` is non-sensitive, so publishing needs no security review, and it avoids Testing mode’s test-user list and 7-day token expiry.
+3. Create an **OAuth client ID** (Web application). Add `https://<project-ref>.supabase.co/auth/v1/callback` (and `http://127.0.0.1:54321/auth/v1/callback` for local Supabase) as an authorized redirect URI.
+4. In Supabase, enable **Authentication → Sign In / Providers → Google** with that client ID and secret, turn on **Allow manual linking**, and add `http://localhost:3000/auth/callback` (and each deployed `/auth/callback`) to the redirect URLs.
+5. Apply `supabase/migrations/20260928160000_google_drive_connections.sql` (SQL editor, or `supabase db push`).
+6. Set `SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `apps/web/.env.local` and restart `pnpm dev`.
+
+"Open from Google Drive" lists the `.pigxel` files Pigxel saved in the person’s Drive. Files uploaded to Drive by hand aren’t visible under `drive.file`; download them and open them from the computer.
+
 ## Checks
 
 ```sh

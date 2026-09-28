@@ -1,6 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
+import {
+  backgroundColor,
+  type Background,
+  type PigxelImage,
+} from "@/lib/pigxel-file/format";
 import {
   CHECKER_STYLE,
   DEFAULT_SIZE,
@@ -28,8 +39,40 @@ type Stroke = {
   before: ImageData;
 };
 
-export function PixelCanvas({ pen }: { pen: PenSettings }) {
-  const [size, setSize] = useState<Size>(DEFAULT_SIZE);
+/** Lets the editor read the pixels for saving and replace them when opening a file. */
+export type PixelCanvasHandle = {
+  getImage: () => PigxelImage;
+  setImage: (image: PigxelImage) => void;
+};
+
+export function PixelCanvas({
+  pen,
+  background = "transparent",
+  ref,
+  initialImage,
+  onChange,
+}: {
+  pen: PenSettings;
+  /** What the eraser paints and what fills new space when the tile grows. */
+  background?: Background;
+  ref?: Ref<PixelCanvasHandle>;
+  /** Pixels to start from, such as a restored draft. */
+  initialImage?: PigxelImage | null;
+  /** Called after the drawing or the tile size changes. */
+  onChange?: () => void;
+}) {
+  const [initial] = useState(() =>
+    initialImage
+      ? new ImageData(
+          new Uint8ClampedArray(initialImage.data),
+          initialImage.width,
+          initialImage.height,
+        )
+      : null,
+  );
+  const [size, setSize] = useState<Size>(() =>
+    initial ? { w: initial.width, h: initial.height } : DEFAULT_SIZE,
+  );
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,21 +81,54 @@ export function PixelCanvas({ pen }: { pen: PenSettings }) {
   const lastPoint = useRef<Point>(null);
   const drag = useRef<ResizeDrag>(null);
   // Changing a canvas's size wipes it, so the pixels are carried over here.
-  const carried = useRef<ImageData | null>(null);
+  const carried = useRef<ImageData | null>(initial);
+
+  const fill = backgroundColor(background);
 
   useLayoutEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
-    if (ctx && carried.current) ctx.putImageData(carried.current, 0, 0);
+    if (ctx && carried.current) {
+      if (fill) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(0, 0, size.w, size.h);
+      }
+      ctx.putImageData(carried.current, 0, 0);
+    }
     carried.current = null;
-  }, [size]);
+  }, [size, fill]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getImage: () => {
+        const ctx = canvasRef.current?.getContext("2d");
+        const data =
+          ctx?.getImageData(0, 0, size.w, size.h).data ??
+          new Uint8ClampedArray(size.w * size.h * 4);
+        return { width: size.w, height: size.h, data, background };
+      },
+      setImage: ({ width, height, data }) => {
+        // Applied by the layout effect once the canvas has its new size.
+        carried.current = new ImageData(
+          new Uint8ClampedArray(data),
+          width,
+          height,
+        );
+        lastPoint.current = null;
+        setSize({ w: width, h: height });
+      },
+    }),
+    [size, background],
+  );
 
   // Redraws the whole stroke, so pixel-perfect can take back a corner it already painted.
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     ctx.putImageData(current.before, 0, 0);
-    ctx.fillStyle = pen.color;
+    ctx.fillStyle = current.erase && fill ? fill : pen.color;
     for (const point of strokePixels(current.points, pen)) {
       const { x, y } = brushOrigin(point, pen.size);
-      if (current.erase) ctx.clearRect(x, y, pen.size, pen.size);
+      // Erasing reveals the background: transparent, or its solid colour.
+      if (current.erase && !fill) ctx.clearRect(x, y, pen.size, pen.size);
       else ctx.fillRect(x, y, pen.size, pen.size);
     }
   };
@@ -87,8 +163,10 @@ export function PixelCanvas({ pen }: { pen: PenSettings }) {
   };
 
   const endStroke = () => {
-    lastPoint.current = stroke.current?.points.at(-1) ?? lastPoint.current;
+    if (!stroke.current) return;
+    lastPoint.current = stroke.current.points.at(-1) ?? lastPoint.current;
     stroke.current = null;
+    onChange?.();
   };
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -110,6 +188,7 @@ export function PixelCanvas({ pen }: { pen: PenSettings }) {
     const ctx = canvasRef.current?.getContext("2d");
     carried.current = ctx?.getImageData(0, 0, size.w, size.h) ?? null;
     setSize(pending);
+    onChange?.();
   };
 
   return (
