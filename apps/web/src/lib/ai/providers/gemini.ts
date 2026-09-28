@@ -74,12 +74,11 @@ export function createGeminiProvider(
       return parts.map((p) => p.text ?? "").join("");
     },
 
-    async generate(prompt) {
+    async generate(prompt, aspectRatio) {
       const parts = await request(
         models.generate,
         [{ role: "user", parts: [{ text: prompt }] }],
-        // Tiles are square, so a square picture fills them without bands.
-        { generationConfig: { imageConfig: { aspectRatio: "1:1" } } },
+        { generationConfig: { imageConfig: { aspectRatio } } },
       );
       const image = parts.find((p) => p.inlineData?.data)?.inlineData;
       if (!image?.data) throw new Error("Gemini returned no image.");

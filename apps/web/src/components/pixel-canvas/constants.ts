@@ -3,9 +3,14 @@ import type { CSSProperties } from "react";
 export type Edge = "e" | "s" | "se";
 export type Size = { w: number; h: number };
 export type ResizeDrag = { edge: Edge; x: number; y: number } & Size;
+/** A rectangle of tile pixels. */
+export type Area = { x: number; y: number } & Size;
 
-/** Screen pixels per tile pixel. */
-export const SCALE = 16;
+/** Screen pixels per tile pixel; the mouse wheel zooms between the bounds. */
+export const DEFAULT_SCALE = 16;
+export const MIN_SCALE = 2;
+export const MAX_SCALE = 48;
+export const ZOOM_FACTOR = 1.15;
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 256;
 export const DEFAULT_SIZE: Size = { w: 32, h: 32 };
@@ -41,11 +46,10 @@ export const CHECKER_STYLE: CSSProperties = {
   backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
 };
 
-/** One grid cell per tile pixel. */
+/** One grid cell per tile pixel; `backgroundSize` is set from the zoom. */
 export const GRID_STYLE: CSSProperties = {
   backgroundImage: [
     "linear-gradient(to right, rgba(127,127,127,0.3) 1px, transparent 1px)",
     "linear-gradient(to bottom, rgba(127,127,127,0.3) 1px, transparent 1px)",
   ].join(", "),
-  backgroundSize: `${SCALE}px ${SCALE}px`,
 };

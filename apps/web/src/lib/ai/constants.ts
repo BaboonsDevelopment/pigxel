@@ -19,7 +19,7 @@ export const ROUTER_PROMPT =
 
 /** Appended to every generation prompt so the model draws a clean sprite. */
 export const IMAGE_STYLE_RULES = [
-  "Pixel art sprite, crisp hard-edged pixels, no anti-aliasing.",
+  "crisp hard-edged pixels, no anti-aliasing.",
   "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
   "The subject is centred, fills the frame, and is complete — nothing cropped.",
   `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
@@ -27,4 +27,18 @@ export const IMAGE_STYLE_RULES = [
   "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
   "no shadow cast behind or beneath it, no vignette.",
   "No text, no watermark, no border, no extra objects.",
+];
+
+/** Frame shapes the image model accepts, as width:height. */
+export const ASPECT_RATIOS = [
+  "1:1",
+  "2:3",
+  "3:2",
+  "3:4",
+  "4:3",
+  "4:5",
+  "5:4",
+  "9:16",
+  "16:9",
+  "21:9",
 ];

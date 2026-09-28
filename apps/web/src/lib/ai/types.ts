@@ -3,6 +3,8 @@ export type ChatMessage = {
   content: string;
   /** Data URL of a generated picture, on assistant messages. */
   image?: string;
+  /** Set when the AI is waiting for the user to pick where to generate. */
+  create?: { subject: string; done?: boolean };
 };
 
 export type Intent = "generate" | "edit";
@@ -18,5 +20,5 @@ export interface AiProvider {
   /** Edit mode: works on the existing tile. Uses the free text model. */
   edit(messages: ChatMessage[]): Promise<string>;
   /** Generate mode: draws a new picture. Uses the paid image model. */
-  generate(prompt: string): Promise<GeneratedImage>;
+  generate(prompt: string, aspectRatio: string): Promise<GeneratedImage>;
 }
