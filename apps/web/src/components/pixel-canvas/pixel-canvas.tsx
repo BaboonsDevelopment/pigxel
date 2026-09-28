@@ -20,7 +20,15 @@ import {
   type ResizeDrag,
   type Size,
 } from "./constants";
-import { areaBetween, pixelAt, resizeTo, sameSize } from "./helpers";
+import {
+  areaBetween,
+  isBlank,
+  largestEmptyArea,
+  pixelAt,
+  resizeTo,
+  sameSize,
+  tileSnapshot,
+} from "./helpers";
 import {
   brushOrigin,
   extendStroke,
@@ -40,8 +48,14 @@ type Stroke = {
 /** Lets the page work with the canvas from outside, e.g. from the AI. */
 export type PixelCanvasHandle = {
   size: Size;
-  /** Replaces the pixels of `area` with `pixels` (`area.w × area.h` RGBA). */
+  /** Paints the opaque pixels of `pixels` (`area.w × area.h` RGBA) into `area`. */
   draw: (pixels: Uint8ClampedArray, area: Area) => void;
+  clear: () => void;
+  isEmpty: () => boolean;
+  /** The biggest empty spot, or null when the tile is too full. */
+  freeArea: () => Area | null;
+  /** The tile as an enlarged PNG data URL, for the AI to look at. */
+  snapshot: () => string;
   /** Lets the user drag out an area; null when they cancel. */
   selectArea: () => Promise<Area | null>;
 };
@@ -49,11 +63,14 @@ export type PixelCanvasHandle = {
 export function PixelCanvas({
   pen,
   scale,
+  highlight,
   ref,
 }: {
   pen: PenSettings;
   /** Screen pixels per tile pixel. */
   scale: number;
+  /** An area to point out, e.g. where a picture would go. */
+  highlight?: Area | null;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const [size, setSize] = useState<Size>(DEFAULT_SIZE);
@@ -79,28 +96,44 @@ export function PixelCanvas({
     setSelecting(false);
   }, []);
 
-  useImperativeHandle(
-    ref,
-    () => ({
+  useImperativeHandle(ref, () => {
+    const context = () => canvasRef.current?.getContext("2d") ?? null;
+    const read = () => context()?.getImageData(0, 0, size.w, size.h) ?? null;
+    return {
       size,
       draw(pixels, area) {
-        const ctx = canvasRef.current?.getContext("2d");
-        ctx?.putImageData(
-          new ImageData(new Uint8ClampedArray(pixels), area.w, area.h),
-          area.x,
-          area.y,
-        );
+        const ctx = context();
+        if (!ctx) return;
+        // Keep what is under the picture's transparent pixels.
+        const target = ctx.getImageData(area.x, area.y, area.w, area.h);
+        for (let i = 0; i < target.data.length; i += 4) {
+          if (pixels[i + 3]) target.data.set(pixels.subarray(i, i + 4), i);
+        }
+        ctx.putImageData(target, area.x, area.y);
+      },
+      clear() {
+        context()?.clearRect(0, 0, size.w, size.h);
+      },
+      isEmpty() {
+        const image = read();
+        return !image || isBlank(image);
+      },
+      freeArea() {
+        const image = read();
+        return image && largestEmptyArea(image);
+      },
+      snapshot() {
+        return canvasRef.current ? tileSnapshot(canvasRef.current) : "";
       },
       selectArea() {
         resolveSelection.current?.(null);
         setSelecting(true);
-        return new Promise((resolve) => {
+        return new Promise<Area | null>((resolve) => {
           resolveSelection.current = resolve;
         });
       },
-    }),
-    [size],
-  );
+    };
+  }, [size]);
 
   useEffect(() => {
     if (!selecting) return;
@@ -263,6 +296,19 @@ export function PixelCanvas({
               {selection.w} × {selection.h}
             </span>
           </div>
+        )}
+
+        {highlight && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute animate-pulse border-2 border-amber-400 bg-amber-400/25"
+            style={{
+              left: highlight.x * scale,
+              top: highlight.y * scale,
+              width: highlight.w * scale,
+              height: highlight.h * scale,
+            }}
+          />
         )}
 
         {!selecting &&

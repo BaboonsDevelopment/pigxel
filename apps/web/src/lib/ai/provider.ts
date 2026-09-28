@@ -1,13 +1,19 @@
 import "server-only";
-import { DEFAULT_EDIT_MODEL, DEFAULT_IMAGE_MODEL } from "./constants";
+import { IMAGE_MODELS, TEXT_MODELS } from "./constants";
 import { createGeminiProvider } from "./providers/gemini";
 import type { AiProvider } from "./types";
+
+/** The model from env first, then the fallbacks, without repeats. */
+const withPreferred = (preferred: string | undefined, fallbacks: string[]) =>
+  [
+    ...new Set([preferred?.trim(), ...fallbacks].filter((m) => !!m)),
+  ] as string[];
 
 export function getAiProvider(): AiProvider {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Add GEMINI_API_KEY to apps/web/.env.local.");
   return createGeminiProvider(apiKey, {
-    edit: process.env.AI_MODEL || DEFAULT_EDIT_MODEL,
-    generate: process.env.AI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL,
+    edit: withPreferred(process.env.AI_MODEL, TEXT_MODELS),
+    generate: withPreferred(process.env.AI_IMAGE_MODEL, IMAGE_MODELS),
   });
 }

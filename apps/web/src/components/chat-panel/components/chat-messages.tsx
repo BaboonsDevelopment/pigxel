@@ -1,14 +1,22 @@
-import type { ChatMessage } from "@/lib/ai/types";
-import { CREATE_TARGETS, type CreateTarget } from "../constants";
+import type { Area } from "@/components/pixel-canvas/constants";
+import type { ChatEntry, Placement } from "../constants";
 
 type Props = {
-  messages: ChatMessage[];
+  messages: ChatEntry[];
   pending: boolean;
   error: string | null;
-  onCreate: (index: number, target: CreateTarget) => void;
+  onChoose: (index: number, placement: Placement) => void;
+  /** Points out on the canvas where a placement would draw. */
+  onHover: (area: Area | null) => void;
 };
 
-export function ChatMessages({ messages, pending, error, onCreate }: Props) {
+export function ChatMessages({
+  messages,
+  pending,
+  error,
+  onChoose,
+  onHover,
+}: Props) {
   return (
     <ol className="flex flex-col gap-3 text-sm leading-relaxed">
       {messages.map((message, i) => (
@@ -21,17 +29,24 @@ export function ChatMessages({ messages, pending, error, onCreate }: Props) {
           }
         >
           {message.content}
-          {message.create && !message.create.done && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {CREATE_TARGETS.map(({ target, label }) => (
+          {message.placements && (
+            <div className="mt-2 flex flex-col gap-1.5">
+              {message.placements.map((placement) => (
                 <button
-                  key={target}
+                  key={placement.kind}
                   type="button"
                   disabled={pending}
-                  onClick={() => onCreate(i, target)}
-                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  onClick={() => onChoose(i, placement)}
+                  onMouseEnter={() => onHover(placement.area)}
+                  onMouseLeave={() => onHover(null)}
+                  onFocus={() => onHover(placement.area)}
+                  onBlur={() => onHover(null)}
+                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-1.5 text-left text-xs font-medium hover:bg-muted disabled:opacity-50"
                 >
-                  {label}
+                  {placement.label}
+                  <span className="text-muted-foreground tabular-nums">
+                    {placement.area.w}×{placement.area.h}
+                  </span>
                 </button>
               ))}
             </div>
