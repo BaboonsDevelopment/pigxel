@@ -2,13 +2,14 @@ import type { PointerEvent } from "react";
 import {
   MAX_SCALE,
   MAX_SIZE,
-  MIN_FREE_SIDE,
+  MIN_PLACEMENT_SIDE,
   MIN_SCALE,
   MIN_SIZE,
   SNAPSHOT_BACKGROUND,
   SNAPSHOT_SIDE,
   ZOOM_FACTOR,
   type Area,
+  type FrameEdges,
   type ResizeDrag,
   type Size,
 } from "./constants";
@@ -77,7 +78,7 @@ export function isBlank(image: ImageData): boolean {
 
 /**
  * The fully transparent rectangle with the biggest square inside it, or null
- * when none is at least `MIN_FREE_SIDE` on both sides.
+ * when none is at least `MIN_PLACEMENT_SIDE` on both sides.
  */
 export function largestEmptyArea(image: ImageData): Area | null {
   const { width: w, height: h, data } = image;
@@ -105,7 +106,7 @@ export function largestEmptyArea(image: ImageData): Area | null {
       stack.push(x);
     }
   }
-  return best && best.w >= MIN_FREE_SIDE && best.h >= MIN_FREE_SIDE
+  return best && best.w >= MIN_PLACEMENT_SIDE && best.h >= MIN_PLACEMENT_SIDE
     ? best
     : null;
 }
@@ -126,4 +127,53 @@ export function tileSnapshot(canvas: HTMLCanvasElement): string {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(canvas, 0, 0, out.width, out.height);
   return out.toDataURL("image/png");
+}
+
+/**
+ * Grows `area` around its centre to at least `MIN_PLACEMENT_SIDE` a side
+ * (or the whole tile, if that is smaller), keeping it inside the tile.
+ */
+export function atLeastPlacementSize(area: Area, tile: Size): Area {
+  const grow = (pos: number, len: number, max: number) => {
+    const next = Math.min(max, Math.max(len, MIN_PLACEMENT_SIDE));
+    const start = Math.round(pos - (next - len) / 2);
+    return [Math.max(0, Math.min(max - next, start)), next] as const;
+  };
+  const [x, w] = grow(area.x, area.w, tile.w);
+  const [y, h] = grow(area.y, area.h, tile.h);
+  return { x, y, w, h };
+}
+
+/**
+ * `start` with the dragged `edges` moved by `dx × dy` tile pixels, kept inside
+ * the tile and no smaller than `MIN_PLACEMENT_SIDE` (or the tile).
+ */
+export function adjustFrame(
+  start: Area,
+  edges: FrameEdges,
+  dx: number,
+  dy: number,
+  tile: Size,
+): Area {
+  const axis = (
+    pos: number,
+    len: number,
+    delta: number,
+    low: boolean,
+    high: boolean,
+    max: number,
+  ) => {
+    const min = Math.min(MIN_PLACEMENT_SIDE, max);
+    if (low && high) {
+      return [Math.max(0, Math.min(max - len, pos + delta)), len] as const;
+    }
+    let from = pos;
+    let to = pos + len;
+    if (low) from = Math.max(0, Math.min(to - min, from + delta));
+    if (high) to = Math.min(max, Math.max(from + min, to + delta));
+    return [from, to - from] as const;
+  };
+  const [x, w] = axis(start.x, start.w, dx, edges.left, edges.right, tile.w);
+  const [y, h] = axis(start.y, start.h, dy, edges.top, edges.bottom, tile.h);
+  return { x, y, w, h };
 }

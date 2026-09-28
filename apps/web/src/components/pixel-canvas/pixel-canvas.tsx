@@ -9,6 +9,7 @@ import {
   useState,
   type Ref,
 } from "react";
+import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
 import {
   CHECKER_STYLE,
@@ -58,6 +59,8 @@ export type PixelCanvasHandle = {
   snapshot: () => string;
   /** Lets the user drag out an area; null when they cancel. */
   selectArea: () => Promise<Area | null>;
+  /** Shows `area` as a frame the user can move and resize; null when they cancel. */
+  adjustArea: (area: Area) => Promise<Area | null>;
 };
 
 export function PixelCanvas({
@@ -87,6 +90,8 @@ export function PixelCanvas({
   const carried = useRef<ImageData | null>(null);
   const selectFrom = useRef<Point>(null);
   const resolveSelection = useRef<(area: Area | null) => void>(null);
+  const [frame, setFrame] = useState<Area | null>(null);
+  const resolveFrame = useRef<(area: Area | null) => void>(null);
 
   const finishSelection = useCallback((area: Area | null) => {
     resolveSelection.current?.(area);
@@ -94,6 +99,12 @@ export function PixelCanvas({
     selectFrom.current = null;
     setSelection(null);
     setSelecting(false);
+  }, []);
+
+  const finishFrame = useCallback((area: Area | null) => {
+    resolveFrame.current?.(area);
+    resolveFrame.current = null;
+    setFrame(null);
   }, []);
 
   useImperativeHandle(ref, () => {
@@ -132,6 +143,13 @@ export function PixelCanvas({
           resolveSelection.current = resolve;
         });
       },
+      adjustArea(area) {
+        resolveFrame.current?.(null);
+        setFrame(area);
+        return new Promise<Area | null>((resolve) => {
+          resolveFrame.current = resolve;
+        });
+      },
     };
   }, [size]);
 
@@ -143,6 +161,16 @@ export function PixelCanvas({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selecting, finishSelection]);
+
+  useEffect(() => {
+    if (!frame) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") finishFrame(null);
+      if (e.key === "Enter") finishFrame(frame);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [frame, finishFrame]);
 
   useLayoutEffect(() => {
     const ctx = canvasRef.current?.getContext("2d");
@@ -162,7 +190,8 @@ export function PixelCanvas({
   };
 
   const startStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (e.button !== 0 && e.button !== 2) return;
+    // While a frame is being placed, clicks on the tile must not paint.
+    if (frame || (e.button !== 0 && e.button !== 2)) return;
     const ctx = e.currentTarget.getContext("2d");
     if (!ctx) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -258,7 +287,7 @@ export function PixelCanvas({
           onContextMenu={(e) => e.preventDefault()}
         />
 
-        {hover && !pending && !selecting && (
+        {hover && !pending && !selecting && !frame && (
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 overflow-hidden"
@@ -311,7 +340,19 @@ export function PixelCanvas({
           />
         )}
 
+        {frame && (
+          <FrameEditor
+            frame={frame}
+            tile={size}
+            scale={scale}
+            onChange={setFrame}
+            onConfirm={() => finishFrame(frame)}
+            onCancel={() => finishFrame(null)}
+          />
+        )}
+
         {!selecting &&
+          !frame &&
           HANDLES.map(({ edge, title, className }) => (
             <div
               key={edge}

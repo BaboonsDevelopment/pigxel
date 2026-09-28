@@ -14,6 +14,8 @@ export type CanvasBridge = {
   freeArea: () => Area | null;
   snapshot: () => string;
   selectArea: () => Promise<Area | null>;
+  /** Lets the user move and resize a proposed area; null when they cancel. */
+  adjustArea: (area: Area) => Promise<Area | null>;
   highlight: (area: Area | null) => void;
   /** Turns a generated picture into pixel art and puts it into `area`. */
   place: (image: string, area: Area, replace: boolean) => Promise<void>;

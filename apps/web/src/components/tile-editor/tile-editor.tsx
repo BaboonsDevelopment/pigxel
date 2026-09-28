@@ -19,7 +19,7 @@ import {
   clampPenSize,
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
-import { CHROMA_KEY } from "@/lib/image/constants";
+import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
 import { imageToPixelArt } from "@/lib/image/helpers";
 import { PenOptions } from "./pen-options";
 import { ToolBar } from "./tool-bar";
@@ -85,15 +85,20 @@ export function TileEditor() {
     freeArea: () => canvas.current?.freeArea() ?? null,
     snapshot: () => canvas.current?.snapshot() ?? "",
     selectArea: async () => (await canvas.current?.selectArea()) ?? null,
+    adjustArea: async (area) =>
+      (await canvas.current?.adjustArea(area)) ?? null,
     highlight: setHighlight,
     // A generated picture is turned into pixel art at the area's size.
     async place(dataUrl, area, replace) {
       const image = await (await fetch(dataUrl)).blob();
-      const { buf } = await imageToPixelArt(image, area.w, area.h, {
-        chromaKey: CHROMA_KEY,
-      });
+      const art = await imageToPixelArt(
+        image,
+        area.w,
+        area.h,
+        GENERATED_PICTURE_STEPS,
+      );
       if (replace) canvas.current?.clear();
-      canvas.current?.draw(buf, area);
+      canvas.current?.draw(art.rgba, area);
     },
   };
 

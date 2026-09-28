@@ -9,7 +9,7 @@ export function buildImagePrompt(
 ): string {
   return [
     subject,
-    `Pixel art sprite on a ${width}x${height} pixel grid,`,
+    `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
     ...IMAGE_STYLE_RULES,
   ].join(" ");
 }

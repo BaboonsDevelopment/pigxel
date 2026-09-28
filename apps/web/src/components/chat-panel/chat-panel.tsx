@@ -7,6 +7,7 @@ import {
   suggestComposition,
 } from "@/app/tiles/new/actions";
 import type { Area } from "@/components/pixel-canvas/constants";
+import { atLeastPlacementSize } from "@/components/pixel-canvas/helpers";
 import { ChatComposer } from "./components/chat-composer";
 import { ChatHeader } from "./components/chat-header";
 import { ChatMessages } from "./components/chat-messages";
@@ -77,7 +78,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
       placements.push({
         kind: "compose",
         label: "Blend into the scene",
-        area: composed.value,
+        area: atLeastPlacementSize(composed.value, tile),
       });
     }
     setPending(false);
@@ -133,13 +134,15 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     const subject = entry?.create?.subject;
     if (!subject || pending) return;
     canvas.highlight(null);
+    const replace = placement.kind === "replace";
+    // Anything but a full replace can be moved and resized on the tile first.
+    const area = replace
+      ? placement.area
+      : await canvas.adjustArea(placement.area);
+    if (!area) return;
     setPlacements(index, undefined);
     setError(null);
-    const drawn = await draw(
-      subject,
-      placement.area,
-      placement.kind === "replace",
-    );
+    const drawn = await draw(subject, area, replace);
     // Bring the choice back so the user can simply try again.
     if (!drawn) setPlacements(index, entry.placements);
   };
