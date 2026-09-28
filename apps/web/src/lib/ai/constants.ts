@@ -42,6 +42,7 @@ export const ROUTER_PROMPT =
 /** Appended to every generation prompt so the model draws a clean sprite. */
 export const IMAGE_STYLE_RULES = [
   "crisp hard-edged pixels, no anti-aliasing.",
+  "Chunky low-detail sprite: big simple shapes and a clear, readable silhouette, no tiny details.",
   "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
   "The subject is centred, fills the frame, and is complete — nothing cropped.",
   `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
