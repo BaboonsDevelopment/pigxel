@@ -25,6 +25,8 @@ site_url = "http://localhost:3000"
 additional_redirect_urls = ["http://localhost:3000/auth/confirm", "http://localhost:3000/auth/callback?next=/auth/update-password"]
 jwt_expiry = 3600
 enable_signup = true
+# Lets people who signed up with email link a Google account for Drive.
+enable_manual_linking = true
 [auth.email]
 enable_signup = true
 enable_confirmations = false
@@ -35,3 +37,9 @@ enabled = false
 [auth.email.template.recovery]
 subject = "Reset your Pigxel password"
 content_path = "./supabase/templates/recovery.html"
+
+# Google sign-in and account linking; also grants Google Drive (drive.file).
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
