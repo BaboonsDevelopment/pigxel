@@ -51,12 +51,16 @@ export type PixelCanvasHandle = {
   size: Size;
   /** Paints the opaque pixels of `pixels` (`area.w × area.h` RGBA) into `area`. */
   draw: (pixels: Uint8ClampedArray, area: Area) => void;
+  /** The RGBA pixels of `area`. */
+  read: (area: Area) => Uint8ClampedArray;
+  /** Replaces every pixel of `area`, transparent ones included. */
+  write: (pixels: Uint8ClampedArray, area: Area) => void;
   clear: () => void;
   isEmpty: () => boolean;
   /** The biggest empty spot, or null when the tile is too full. */
   freeArea: () => Area | null;
-  /** The tile as an enlarged PNG data URL, for the AI to look at. */
-  snapshot: () => string;
+  /** The tile (or `area`) as an enlarged PNG data URL, for the AI to look at. */
+  snapshot: (area?: Area, background?: string) => string;
   /** Lets the user drag out an area; null when they cancel. */
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
@@ -122,6 +126,17 @@ export function PixelCanvas({
         }
         ctx.putImageData(target, area.x, area.y);
       },
+      read(area) {
+        const image = context()?.getImageData(area.x, area.y, area.w, area.h);
+        return image?.data ?? new Uint8ClampedArray(area.w * area.h * 4);
+      },
+      write(pixels, area) {
+        context()?.putImageData(
+          new ImageData(new Uint8ClampedArray(pixels), area.w, area.h),
+          area.x,
+          area.y,
+        );
+      },
       clear() {
         context()?.clearRect(0, 0, size.w, size.h);
       },
@@ -133,8 +148,9 @@ export function PixelCanvas({
         const image = read();
         return image && largestEmptyArea(image);
       },
-      snapshot() {
-        return canvasRef.current ? tileSnapshot(canvasRef.current) : "";
+      snapshot(area, background) {
+        const canvas = canvasRef.current;
+        return canvas ? tileSnapshot(canvas, area, background) : "";
       },
       selectArea() {
         resolveSelection.current?.(null);
