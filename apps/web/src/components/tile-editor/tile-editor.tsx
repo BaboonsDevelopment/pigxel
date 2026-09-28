@@ -10,6 +10,14 @@ import {
   useSyncExternalStore,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { ChatPanel } from "@/components/chat-panel/chat-panel";
+import type { CanvasBridge } from "@/components/chat-panel/constants";
+import {
+  DEFAULT_SCALE,
+  DEFAULT_SIZE,
+  type Area,
+} from "@/components/pixel-canvas/constants";
+import { zoom } from "@/components/pixel-canvas/helpers";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
@@ -20,6 +28,8 @@ import {
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
+import { imageToPixelArt } from "@/lib/image/helpers";
+import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
 import { readDraft, type Draft } from "@/lib/pigxel-file/draft";
 import {
   PIGXEL_EXTENSION,
@@ -54,7 +64,6 @@ function isTyping(target: EventTarget | null) {
   );
 }
 
-/** The tile editor for the draft kept in this browser. It renders in the browser only, where the draft lives. */
 type EditorProps = {
   userId: string;
   drive: DriveStatus;
@@ -62,6 +71,11 @@ type EditorProps = {
   driveError?: boolean;
 };
 
+/**
+ * The tile page for the draft kept in this browser: tools on the left, canvas
+ * in the middle, AI chat on the right. It renders in the browser only, where
+ * the draft lives.
+ */
 export function TileEditor(props: EditorProps) {
   if (!useIsClient()) return <div className="h-dvh bg-muted" />;
   return <DraftLoader {...props} />;
@@ -104,8 +118,11 @@ function Editor({
   const [pickingDriveFile, setPickingDriveFile] = useState(false);
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(draft.pen ?? DEFAULT_PEN);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [highlight, setHighlight] = useState<Area | null>(null);
   const mod = useModifierLabel();
   const canvas = useRef<PixelCanvasHandle>(null);
+  const workspace = useRef<HTMLElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const file = useTileFile({
     canvas,
@@ -150,9 +167,50 @@ function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // The wheel zooms the tile instead of scrolling the page.
+  useEffect(() => {
+    const area = workspace.current;
+    if (!area) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale((s) => zoom(s, e.deltaY));
+    };
+    area.addEventListener("wheel", onWheel, { passive: false });
+    return () => area.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const fullArea = (): Area => ({
+    x: 0,
+    y: 0,
+    ...(canvas.current?.size ?? DEFAULT_SIZE),
+  });
+
+  const bridge: CanvasBridge = {
+    isEmpty: () => canvas.current?.isEmpty() ?? true,
+    fullArea,
+    freeArea: () => canvas.current?.freeArea() ?? null,
+    snapshot: () => canvas.current?.snapshot() ?? "",
+    selectArea: async () => (await canvas.current?.selectArea()) ?? null,
+    adjustArea: async (area) =>
+      (await canvas.current?.adjustArea(area)) ?? null,
+    highlight: setHighlight,
+    // A generated picture is turned into pixel art at the area's size.
+    async place(dataUrl, area, replace) {
+      const image = await (await fetch(dataUrl)).blob();
+      const art = await imageToPixelArt(
+        image,
+        area.w,
+        area.h,
+        GENERATED_PICTURE_STEPS,
+      );
+      if (replace) canvas.current?.clear();
+      canvas.current?.draw(art.rgba, area);
+    },
+  };
+
   return (
-    <div className="grid h-dvh grid-cols-[auto_1fr] grid-rows-[auto_auto_1fr]">
-      <header className="col-span-2 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
+    <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_340px] grid-rows-[auto_auto_minmax(0,1fr)]">
+      <header className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
         <Link
           href="/tiles"
           className="mr-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -262,21 +320,24 @@ function Editor({
           </p>
         )}
       </header>
-      <div className="col-span-2 flex min-h-12 items-center border-b bg-background px-4 py-2">
+      <div className="col-span-3 flex min-h-12 items-center border-b bg-background px-4 py-2">
         {tool === "pen" && <PenOptions pen={pen} onChange={setPen} />}
       </div>
       <ToolBar tool={tool} onSelect={setTool} />
-      <main className="flex overflow-auto bg-muted p-12">
+      <main ref={workspace} className="flex overflow-auto bg-muted p-12">
         <div className="m-auto">
           <PixelCanvas
             ref={canvas}
             pen={pen}
+            scale={scale}
+            highlight={highlight}
             background={file.background}
             initialImage={image}
             onChange={file.markDirty}
           />
         </div>
       </main>
+      <ChatPanel canvas={bridge} />
       {pickingDriveFile && (
         <DriveFilesDialog
           email={drive.email}
