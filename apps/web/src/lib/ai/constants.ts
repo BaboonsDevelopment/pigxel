@@ -8,5 +8,20 @@ export const DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image";
 
 export const ROUTER_PROMPT =
   "Classify the user's message in a pixel art editor. " +
-  "Answer generate if they ask for a new picture to be drawn. " +
-  "Answer edit if they want to change the existing picture, or for anything else.";
+  "Set intent to generate if they ask for a new picture to be drawn, " +
+  "and to edit if they want to change the existing picture, or for anything else. " +
+  "When the intent is generate, set subject to a short plain English description " +
+  "of the subject only — what it is, its pose, its colours, its mood. " +
+  "Do not mention pixel art, resolution, outlines, palettes or the background. " +
+  "Otherwise leave subject empty.";
+
+/** Appended to every generation prompt so the model draws a clean sprite. */
+export const IMAGE_STYLE_RULES = [
+  "Pixel art sprite, crisp hard-edged pixels, no anti-aliasing.",
+  "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
+  "The subject is centred, fills the frame, and is complete — nothing cropped.",
+  "The background is fully transparent — an alpha channel, not a painted colour.",
+  "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
+  "no shadow cast behind or beneath it, no vignette.",
+  "No text, no watermark, no border, no extra objects.",
+];

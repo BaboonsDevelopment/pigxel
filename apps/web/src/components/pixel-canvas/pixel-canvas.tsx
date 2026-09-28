@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import {
   CHECKER_STYLE,
   DEFAULT_SIZE,
@@ -13,10 +19,32 @@ import {
 } from "./constants";
 import { paintAt, resizeTo, sameSize } from "./helpers";
 
-export function PixelCanvas() {
+/** Lets the page put pixels onto the canvas from outside, e.g. from the AI. */
+export type PixelCanvasHandle = {
+  size: Size;
+  draw: (pixels: Uint8ClampedArray) => void;
+};
+
+export function PixelCanvas({ ref }: { ref?: Ref<PixelCanvasHandle> }) {
   const [size, setSize] = useState<Size>(DEFAULT_SIZE);
   const [pending, setPending] = useState<Size | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      size,
+      draw(pixels) {
+        const ctx = canvasRef.current?.getContext("2d");
+        ctx?.putImageData(
+          new ImageData(new Uint8ClampedArray(pixels), size.w, size.h),
+          0,
+          0,
+        );
+      },
+    }),
+    [size],
+  );
   const drawing = useRef(false);
   const drag = useRef<ResizeDrag>(null);
   // Changing a canvas's size wipes it, so the pixels are carried over here.

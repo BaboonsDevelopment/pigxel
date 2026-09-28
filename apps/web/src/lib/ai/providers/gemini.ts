@@ -1,6 +1,6 @@
 import "server-only";
 import { GEMINI_BASE_URL, ROUTER_PROMPT } from "../constants";
-import type { AiProvider } from "../types";
+import type { AiProvider, Route } from "../types";
 
 type GeminiPart = {
   text?: string;
@@ -44,13 +44,23 @@ export function createGeminiProvider(
         {
           systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
           generationConfig: {
-            responseMimeType: "text/x.enum",
-            responseSchema: { type: "STRING", enum: ["generate", "edit"] },
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                intent: { type: "STRING", enum: ["generate", "edit"] },
+                subject: { type: "STRING" },
+              },
+              required: ["intent", "subject"],
+            },
           },
         },
       );
+      const route = parseRoute(parts.map((p) => p.text ?? "").join(""));
       // Anything unexpected falls back to the free edit mode.
-      return parts[0]?.text?.trim() === "generate" ? "generate" : "edit";
+      return route?.intent === "generate"
+        ? { intent: "generate", subject: route.subject || message }
+        : { intent: "edit", subject: "" };
     },
 
     async edit(messages) {
@@ -65,12 +75,23 @@ export function createGeminiProvider(
     },
 
     async generate(prompt) {
-      const parts = await request(models.generate, [
-        { role: "user", parts: [{ text: prompt }] },
-      ]);
+      const parts = await request(
+        models.generate,
+        [{ role: "user", parts: [{ text: prompt }] }],
+        // Tiles are square, so a square picture fills them without bands.
+        { generationConfig: { imageConfig: { aspectRatio: "1:1" } } },
+      );
       const image = parts.find((p) => p.inlineData?.data)?.inlineData;
       if (!image?.data) throw new Error("Gemini returned no image.");
       return { mimeType: image.mimeType ?? "image/png", base64: image.data };
     },
   };
+}
+
+function parseRoute(text: string): Partial<Route> | null {
+  try {
+    return JSON.parse(text) as Partial<Route>;
+  } catch {
+    return null;
+  }
 }
