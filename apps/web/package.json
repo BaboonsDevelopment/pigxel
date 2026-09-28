@@ -1,0 +1,36 @@
+{
+  "name": "@pigxel/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@paddle/paddle-node-sdk": "^3.3.0",
+    "@pigxel/ui": "workspace:*",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.80.0",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@pigxel/eslint-config": "workspace:*",
+    "@pigxel/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "eslint": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "4.1.11"
+  }
+}
