@@ -19,6 +19,14 @@ export function ChatMessages({ messages, pending, error }: Props) {
           }
         >
           {message.content}
+          {message.image && (
+            // eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimize
+            <img
+              src={message.image}
+              alt="Generated picture"
+              className="mt-2 w-full rounded-md [image-rendering:pixelated]"
+            />
+          )}
         </li>
       ))}
       {pending && <li className="text-muted-foreground">Thinking…</li>}

@@ -22,8 +22,11 @@ export function ChatPanel() {
     setError(null);
     setPending(true);
     try {
-      const reply = await sendMessage(conversation);
-      setMessages([...conversation, { role: "assistant", content: reply }]);
+      // Pictures stay on the client; the server only needs the text.
+      const reply = await sendMessage(
+        conversation.map(({ role, content }) => ({ role, content })),
+      );
+      setMessages([...conversation, reply]);
     } catch {
       setError("The assistant could not answer. Try again.");
     } finally {
