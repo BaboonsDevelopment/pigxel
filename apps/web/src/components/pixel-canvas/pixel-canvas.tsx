@@ -11,13 +11,31 @@ import {
   type ResizeDrag,
   type Size,
 } from "./constants";
-import { paintAt, resizeTo, sameSize } from "./helpers";
+import { pixelAt, resizeTo, sameSize } from "./helpers";
+import {
+  brushOrigin,
+  extendStroke,
+  linePoints,
+  strokePixels,
+  type PenSettings,
+  type Point,
+} from "./pen";
 
-export function PixelCanvas() {
+type Stroke = {
+  points: Point[];
+  erase: boolean;
+  /** The canvas before the stroke, so each redraw starts from it. */
+  before: ImageData;
+};
+
+export function PixelCanvas({ pen }: { pen: PenSettings }) {
   const [size, setSize] = useState<Size>(DEFAULT_SIZE);
   const [pending, setPending] = useState<Size | null>(null);
+  const [hover, setHover] = useState<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
+  const stroke = useRef<Stroke>(null);
+  // Where the last stroke ended; Shift+click draws a straight line from here.
+  const lastPoint = useRef<Point>(null);
   const drag = useRef<ResizeDrag>(null);
   // Changing a canvas's size wipes it, so the pixels are carried over here.
   const carried = useRef<ImageData | null>(null);
@@ -27,6 +45,51 @@ export function PixelCanvas() {
     if (ctx && carried.current) ctx.putImageData(carried.current, 0, 0);
     carried.current = null;
   }, [size]);
+
+  // Redraws the whole stroke, so pixel-perfect can take back a corner it already painted.
+  const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
+    ctx.putImageData(current.before, 0, 0);
+    ctx.fillStyle = pen.color;
+    for (const point of strokePixels(current.points, pen)) {
+      const { x, y } = brushOrigin(point, pen.size);
+      if (current.erase) ctx.clearRect(x, y, pen.size, pen.size);
+      else ctx.fillRect(x, y, pen.size, pen.size);
+    }
+  };
+
+  const startStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0 && e.button !== 2) return;
+    const ctx = e.currentTarget.getContext("2d");
+    if (!ctx) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const point = pixelAt(e);
+    stroke.current = {
+      points:
+        e.shiftKey && lastPoint.current
+          ? linePoints(lastPoint.current, point)
+          : [point],
+      erase: e.button === 2,
+      before: ctx.getImageData(0, 0, size.w, size.h),
+    };
+    drawStroke(ctx, stroke.current);
+  };
+
+  const moveStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const point = pixelAt(e);
+    setHover(point);
+    const current = stroke.current;
+    const ctx = e.currentTarget.getContext("2d");
+    if (!current || !ctx) return;
+    const points = extendStroke(current.points, point);
+    if (points === current.points) return;
+    current.points = points;
+    drawStroke(ctx, current);
+  };
+
+  const endStroke = () => {
+    lastPoint.current = stroke.current?.points.at(-1) ?? lastPoint.current;
+    stroke.current = null;
+  };
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -62,20 +125,33 @@ export function PixelCanvas() {
         ref={canvasRef}
         width={size.w}
         height={size.h}
+        aria-label="Tile canvas"
         className="block size-full touch-none cursor-crosshair [image-rendering:pixelated]"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          drawing.current = true;
-          paintAt(e);
-        }}
-        onPointerMove={(e) => {
-          if (drawing.current) paintAt(e);
-        }}
-        onPointerUp={() => {
-          drawing.current = false;
-        }}
+        onPointerDown={startStroke}
+        onPointerMove={moveStroke}
+        onPointerUp={endStroke}
+        onPointerCancel={endStroke}
+        onPointerLeave={() => setHover(null)}
         onContextMenu={(e) => e.preventDefault()}
       />
+
+      {hover && !pending && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div
+            className="absolute opacity-50 outline outline-1 outline-white/80"
+            style={{
+              left: brushOrigin(hover, pen.size).x * SCALE,
+              top: brushOrigin(hover, pen.size).y * SCALE,
+              width: pen.size * SCALE,
+              height: pen.size * SCALE,
+              backgroundColor: pen.color,
+            }}
+          />
+        </div>
+      )}
 
       <div
         aria-hidden="true"
