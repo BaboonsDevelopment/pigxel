@@ -18,7 +18,12 @@ type LocalTile = Draft & { image: PigxelImage };
  * Tiles kept in this browser that aren't in Pigxel cloud: ones stored nowhere
  * else, and Google Drive files opened here. Cloud tiles are listed separately.
  */
-export function LocalTiles(props: { userId: string; hasCloudTiles: boolean }) {
+export function LocalTiles(props: {
+  userId: string;
+  hasCloudTiles: boolean;
+  /** Shows only the most recent tiles, e.g. on Home. */
+  limit?: number;
+}) {
   if (!useIsClient()) return <div className="mt-8 min-h-48" />;
   return <List {...props} />;
 }
@@ -37,11 +42,14 @@ function readTiles(userId: string): LocalTile[] {
 function List({
   userId,
   hasCloudTiles,
+  limit,
 }: {
   userId: string;
   hasCloudTiles: boolean;
+  limit?: number;
 }) {
-  const [tiles, setTiles] = useState(() => readTiles(userId));
+  const [allTiles, setTiles] = useState(() => readTiles(userId));
+  const tiles = limit ? allTiles.slice(0, limit) : allTiles;
 
   const remove = (tile: LocalTile) => {
     const question =

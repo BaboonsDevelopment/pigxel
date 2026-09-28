@@ -123,17 +123,17 @@ describe("connecting Google", () => {
     );
     expect(
       mocks.auth.signInWithOAuth.mock.calls[0]![0].options.redirectTo,
-    ).toContain("next=%2Ftiles");
+    ).toContain("next=%2Fhome");
     expect(safeNext("/tiles/edit")).toBe("/tiles/edit");
     expect(safeNext("/tiles/edit?id=3f2a-b1")).toBe("/tiles/edit?id=3f2a-b1");
     expect(safeNext("/tiles/edit?id=<script>")).toBe("/tiles/edit");
     expect(safeNext("/account?id=x")).toBe("/account");
-    expect(safeNext("https://evil.example/tiles/edit")).toBe("/tiles");
+    expect(safeNext("https://evil.example/tiles/edit")).toBe("/home");
     expect(withParam("/tiles/edit?id=a", "drive", "error")).toBe(
       "/tiles/edit?id=a&drive=error",
     );
-    expect(safeNext("//evil.example")).toBe("/tiles");
-    expect(safeNext(null)).toBe("/tiles");
+    expect(safeNext("//evil.example")).toBe("/home");
+    expect(safeNext(null)).toBe("/home");
   });
   it("hides Google sign-in when it isn't set up", async () => {
     vi.stubEnv("GOOGLE_CLIENT_ID", "");
