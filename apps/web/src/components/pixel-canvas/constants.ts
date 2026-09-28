@@ -11,6 +11,12 @@ export const DEFAULT_SCALE = 16;
 export const MIN_SCALE = 2;
 export const MAX_SCALE = 48;
 export const ZOOM_FACTOR = 1.15;
+/** Smallest free area worth offering for a new picture. */
+export const MIN_FREE_SIDE = 4;
+/** Longest side of the enlarged tile picture sent to the AI. */
+export const SNAPSHOT_SIDE = 512;
+/** Shown in place of transparent pixels in that picture. */
+export const SNAPSHOT_BACKGROUND = "#d4d4d4";
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 256;
 export const DEFAULT_SIZE: Size = { w: 32, h: 32 };

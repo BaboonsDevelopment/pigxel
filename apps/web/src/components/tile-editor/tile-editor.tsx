@@ -3,8 +3,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "@/components/chat-panel/chat-panel";
-import type { CreateTarget } from "@/components/chat-panel/constants";
-import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
+import type { CanvasBridge } from "@/components/chat-panel/constants";
+import {
+  DEFAULT_SCALE,
+  DEFAULT_SIZE,
+  type Area,
+} from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import {
   PixelCanvas,
@@ -35,6 +39,7 @@ export function TileEditor() {
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(DEFAULT_PEN);
   const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
 
@@ -68,19 +73,28 @@ export function TileEditor() {
     return () => area.removeEventListener("wheel", onWheel);
   }, []);
 
-  const pickArea = async (target: CreateTarget): Promise<Area | null> => {
-    if (!canvas.current) return null;
-    if (target === "area") return canvas.current.selectArea();
-    return { x: 0, y: 0, ...canvas.current.size };
-  };
+  const fullArea = (): Area => ({
+    x: 0,
+    y: 0,
+    ...(canvas.current?.size ?? DEFAULT_SIZE),
+  });
 
-  // A generated picture is turned into pixel art at the area's size.
-  const placeImage = async (dataUrl: string, area: Area) => {
-    const image = await (await fetch(dataUrl)).blob();
-    const { buf } = await imageToPixelArt(image, area.w, area.h, {
-      chromaKey: CHROMA_KEY,
-    });
-    canvas.current?.draw(buf, area);
+  const bridge: CanvasBridge = {
+    isEmpty: () => canvas.current?.isEmpty() ?? true,
+    fullArea,
+    freeArea: () => canvas.current?.freeArea() ?? null,
+    snapshot: () => canvas.current?.snapshot() ?? "",
+    selectArea: async () => (await canvas.current?.selectArea()) ?? null,
+    highlight: setHighlight,
+    // A generated picture is turned into pixel art at the area's size.
+    async place(dataUrl, area, replace) {
+      const image = await (await fetch(dataUrl)).blob();
+      const { buf } = await imageToPixelArt(image, area.w, area.h, {
+        chromaKey: CHROMA_KEY,
+      });
+      if (replace) canvas.current?.clear();
+      canvas.current?.draw(buf, area);
+    },
   };
 
   return (
@@ -97,10 +111,15 @@ export function TileEditor() {
       <ToolBar tool={tool} onSelect={setTool} />
       <main ref={workspace} className="flex overflow-auto bg-muted p-12">
         <div className="m-auto">
-          <PixelCanvas ref={canvas} pen={pen} scale={scale} />
+          <PixelCanvas
+            ref={canvas}
+            pen={pen}
+            scale={scale}
+            highlight={highlight}
+          />
         </div>
       </main>
-      <ChatPanel onPickArea={pickArea} onImage={placeImage} />
+      <ChatPanel canvas={bridge} />
     </div>
   );
 }
