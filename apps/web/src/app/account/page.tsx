@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { requireUser } from "@/lib/auth/session";
+import { getDriveStatus } from "@/lib/google-drive/server";
+import { connectDriveUrl } from "@/lib/google-drive/status";
+import { disconnectDrive } from "./actions";
 import { SignOutButton } from "./sign-out-button";
 
 export const metadata: Metadata = { title: "Your account · Pigxel" };
@@ -10,10 +13,11 @@ export const dynamic = "force-dynamic";
 export default async function Account({
   searchParams,
 }: {
-  searchParams: Promise<{ updated?: string }>;
+  searchParams: Promise<{ updated?: string; drive?: string }>;
 }) {
-  const { updated } = await searchParams;
+  const { updated, drive: driveResult } = await searchParams;
   const user = await requireUser();
+  const drive = await getDriveStatus(user.id);
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
       <header className="border-b pb-6">
@@ -49,6 +53,47 @@ export default async function Account({
           </Link>
         </div>
       </section>
+      {drive.available && (
+        <section aria-labelledby="drive-heading" className="border-t py-10">
+          <h2 id="drive-heading" className="font-semibold">
+            Google Drive
+          </h2>
+          {driveResult === "error" && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              Google Drive wasn’t connected. Try again when you’re ready.
+            </p>
+          )}
+          {driveResult === "disconnected" && (
+            <p role="status" className="mt-3 text-sm text-muted-foreground">
+              Google Drive is disconnected. Your files stay in your Drive.
+            </p>
+          )}
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+            {drive.connected
+              ? `Tiles can be saved to and opened from the Google Drive of ${drive.email ?? "your Google account"}. Pigxel only sees files it created.`
+              : "Link your Google account to save tiles in your own Google Drive, with autosave. Pigxel only sees files it creates."}
+          </p>
+          <div className="mt-5">
+            {drive.connected ? (
+              <form action={disconnectDrive}>
+                <button
+                  type="submit"
+                  className="h-10 rounded-lg border px-4 text-sm font-medium hover:bg-muted"
+                >
+                  Disconnect Google Drive
+                </button>
+              </form>
+            ) : (
+              <a
+                href={connectDriveUrl("/account")}
+                className="inline-flex h-10 items-center rounded-lg border px-4 text-sm font-medium hover:bg-muted"
+              >
+                Connect Google Drive
+              </a>
+            )}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

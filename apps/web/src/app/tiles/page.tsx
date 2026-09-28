@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonClassName } from "@pigxel/ui/components/button";
 import { Brand } from "@/components/brand";
+import { DraftCard } from "@/components/tiles/draft-card";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Your tiles · Pigxel" };
@@ -27,12 +28,7 @@ export default async function Tiles() {
             Create tile
           </Link>
         </div>
-        <div className="mt-8 rounded-lg border border-dashed px-6 py-16 text-center">
-          <p className="font-medium">No tiles yet</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Create your first tile to start drawing.
-          </p>
-        </div>
+        <DraftCard userId={user.id} />
       </section>
     </main>
   );

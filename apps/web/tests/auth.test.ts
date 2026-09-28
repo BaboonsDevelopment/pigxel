@@ -318,7 +318,9 @@ describe("email callbacks and route guards", () => {
       Account({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
     await expect(Tiles()).rejects.toThrow("REDIRECT:/login");
-    await expect(NewTile()).rejects.toThrow("REDIRECT:/login");
+    await expect(
+      NewTile({ searchParams: Promise.resolve({}) }),
+    ).rejects.toThrow("REDIRECT:/login");
     await expect(UpdatePassword()).rejects.toThrow(
       "REDIRECT:/login?mode=forgot&error=expired",
     );
