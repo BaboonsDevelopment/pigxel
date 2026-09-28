@@ -6,5 +6,5 @@ import { requireUser } from "@/lib/auth/session";
 
 export async function sendMessage(messages: ChatMessage[]): Promise<string> {
   await requireUser();
-  return getAiProvider().reply(messages);
+  return getAiProvider().edit(messages);
 }
