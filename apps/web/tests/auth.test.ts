@@ -19,7 +19,15 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: mocks.auth }),
+  createClient: async () => ({
+    auth: mocks.auth,
+    // The tiles page lists Pigxel cloud tiles; none in these tests.
+    from: () => ({
+      select: () => ({
+        order: () => ({ limit: async () => ({ data: [], error: null }) }),
+      }),
+    }),
+  }),
 }));
 vi.mock("@/lib/supabase/config", () => ({
   isSupabaseConfigured: mocks.configured,
@@ -33,6 +41,7 @@ vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`REDIRECT:${path}`);
   },
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
 
 import { authenticate, signOut } from "@/app/login/actions";

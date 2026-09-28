@@ -62,9 +62,13 @@ Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/do
 
 ## .pigxel files and Google Drive
 
-`/tiles/new` sets up a tile: name, size (up to 256×256), background (transparent, white or black) and where to keep it: **Google Drive**, which creates the file in Drive and autosaves every change, or **Don’t store it**, which keeps it in the browser until it is downloaded or saved to Drive. The editor at `/tiles/edit` works on that tile and keeps it as a per-user draft in `localStorage`, so it survives navigation and reloads. On a white or black tile the eraser paints the background.
+`/tiles/new` sets up a tile: name, size (up to 256×256), background (transparent, white or black) and where to keep it: **Google Drive**, which creates the file in Drive and autosaves every change, or **Don’t store it**, which keeps it in the browser until it is downloaded or saved to Drive. The editor at `/tiles/edit?id=…` works on one tile at a time. Every tile you create or open gets its own draft in `localStorage` (per user), so it survives navigation and reloads and never replaces another tile; **Your tiles** lists them under “In this browser” next to the Pigxel cloud tiles. On a white or black tile the eraser paints the background.
 
 The editor opens and saves `.pigxel` files: versioned JSON with the tile size and base64 RGBA pixels (see `apps/web/src/lib/pigxel-file/format.ts`). **Open** reads a file from the computer or Google Drive; **Save** downloads it or saves it to Google Drive. `Ctrl/⌘+S` saves back to where the tile came from, and `Ctrl/⌘+O` opens a file from the computer.
+
+### Pigxel cloud
+
+Tiles kept in **Pigxel cloud** (the default on `/tiles/new`) are stored in Supabase: the `.pigxel` file goes to the private `tiles` Storage bucket at `<user id>/<tile id>.pigxel`, and the `tiles` table holds the name, size, background and a small thumbnail for **Your tiles**. Row-level security on both limits each person to their own tiles, so the browser uses its normal session and no secret key is involved. Cloud tiles autosave like Drive ones; the editor can also move a tile between Pigxel cloud and Google Drive (**Save → Move to …**). Apply `supabase/migrations/20260928180000_tiles.sql` (SQL editor, or `supabase db push`) to create the table, bucket and policies.
 
 ### Google sign-in and Google Drive
 
