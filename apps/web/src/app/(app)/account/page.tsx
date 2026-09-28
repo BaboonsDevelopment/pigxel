@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Brand } from "@/components/brand";
 import { requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
 import { connectDriveUrl } from "@/lib/google-drive/status";
@@ -19,11 +18,8 @@ export default async function Account({
   const user = await requireUser();
   const drive = await getDriveStatus(user.id);
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
-      <header className="border-b pb-6">
-        <Brand />
-      </header>
-      <section className="py-16">
+    <main className="mx-auto max-w-2xl px-6 py-10 md:px-10">
+      <section className="pb-12">
         {updated === "password" && (
           <p
             role="status"
@@ -43,7 +39,7 @@ export default async function Account({
         <div className="flex flex-wrap items-center gap-5">
           <SignOutButton />
           <Link href="/tiles" className="text-sm underline underline-offset-4">
-            Your tiles
+            My projects
           </Link>
           <Link
             href="/auth/update-password"

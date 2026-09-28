@@ -131,7 +131,7 @@ function MissingTile() {
         href="/tiles"
         className="text-sm font-medium underline underline-offset-4"
       >
-        Go to your tiles
+        Go to My projects
       </Link>
     </main>
   );
@@ -252,7 +252,7 @@ function Editor({
           href="/tiles"
           className="mr-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
-          ← Your tiles
+          ← My projects
         </Link>
         <label className="flex items-center rounded-md border bg-background pr-2 focus-within:ring-2 focus-within:ring-ring">
           <span className="sr-only">File name</span>
