@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChatPanel } from "@/components/chat-panel/chat-panel";
+import type { CreateTarget } from "@/components/chat-panel/constants";
+import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
+import { zoom } from "@/components/pixel-canvas/helpers";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
@@ -31,7 +34,9 @@ function isTyping(target: EventTarget | null) {
 export function TileEditor() {
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(DEFAULT_PEN);
+  const [scale, setScale] = useState(DEFAULT_SCALE);
   const canvas = useRef<PixelCanvasHandle>(null);
+  const workspace = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -51,15 +56,31 @@ export function TileEditor() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // A generated picture is turned into pixel art at the tile's size.
-  const placeImage = async (dataUrl: string) => {
-    if (!canvas.current) return;
-    const { w, h } = canvas.current.size;
+  // The wheel zooms the tile instead of scrolling the page.
+  useEffect(() => {
+    const area = workspace.current;
+    if (!area) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale((s) => zoom(s, e.deltaY));
+    };
+    area.addEventListener("wheel", onWheel, { passive: false });
+    return () => area.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const pickArea = async (target: CreateTarget): Promise<Area | null> => {
+    if (!canvas.current) return null;
+    if (target === "area") return canvas.current.selectArea();
+    return { x: 0, y: 0, ...canvas.current.size };
+  };
+
+  // A generated picture is turned into pixel art at the area's size.
+  const placeImage = async (dataUrl: string, area: Area) => {
     const image = await (await fetch(dataUrl)).blob();
-    const { buf } = await imageToPixelArt(image, w, h, {
+    const { buf } = await imageToPixelArt(image, area.w, area.h, {
       chromaKey: CHROMA_KEY,
     });
-    canvas.current.draw(buf);
+    canvas.current?.draw(buf, area);
   };
 
   return (
@@ -74,12 +95,12 @@ export function TileEditor() {
         {tool === "pen" && <PenOptions pen={pen} onChange={setPen} />}
       </header>
       <ToolBar tool={tool} onSelect={setTool} />
-      <main className="flex overflow-auto bg-muted p-12">
+      <main ref={workspace} className="flex overflow-auto bg-muted p-12">
         <div className="m-auto">
-          <PixelCanvas ref={canvas} pen={pen} />
+          <PixelCanvas ref={canvas} pen={pen} scale={scale} />
         </div>
       </main>
-      <ChatPanel onImage={placeImage} />
+      <ChatPanel onPickArea={pickArea} onImage={placeImage} />
     </div>
   );
 }

@@ -1,11 +1,16 @@
 "use server";
 
-import { buildImagePrompt } from "@/lib/ai/helpers";
+import { buildImagePrompt, closestAspectRatio } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/lib/ai/types";
 import { requireUser } from "@/lib/auth/session";
 
-/** Routes the latest message to generation or editing and returns the reply. */
+const MAX_GRID = 256;
+
+/**
+ * Routes the latest message: edits are answered right away, while a request
+ * to create asks the user where to draw before anything is generated.
+ */
 export async function sendMessage(
   messages: ChatMessage[],
 ): Promise<ChatMessage> {
@@ -15,14 +20,30 @@ export async function sendMessage(
 
   const route = await ai.route(last);
   if (route.intent === "generate") {
-    const { mimeType, base64 } = await ai.generate(
-      buildImagePrompt(route.subject),
-    );
     return {
       role: "assistant",
-      content: "Here is your picture.",
-      image: `data:${mimeType};base64,${base64}`,
+      content: "Where should I draw it?",
+      create: { subject: route.subject },
     };
   }
   return { role: "assistant", content: await ai.edit(messages) };
+}
+
+/** Draws `subject` as pixel art for a `width × height` grid; returns a data URL. */
+export async function generateImage(
+  subject: string,
+  width: number,
+  height: number,
+): Promise<string> {
+  await requireUser();
+  const valid = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
+  if (!subject.trim() || !valid(width) || !valid(height)) {
+    throw new Error("Invalid generation request.");
+  }
+
+  const { mimeType, base64 } = await getAiProvider().generate(
+    buildImagePrompt(subject, width, height),
+    closestAspectRatio(width, height),
+  );
+  return `data:${mimeType};base64,${base64}`;
 }

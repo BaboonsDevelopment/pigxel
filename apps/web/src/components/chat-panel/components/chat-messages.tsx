@@ -1,12 +1,14 @@
 import type { ChatMessage } from "@/lib/ai/types";
+import { CREATE_TARGETS, type CreateTarget } from "../constants";
 
 type Props = {
   messages: ChatMessage[];
   pending: boolean;
   error: string | null;
+  onCreate: (index: number, target: CreateTarget) => void;
 };
 
-export function ChatMessages({ messages, pending, error }: Props) {
+export function ChatMessages({ messages, pending, error, onCreate }: Props) {
   return (
     <ol className="flex flex-col gap-3 text-sm leading-relaxed">
       {messages.map((message, i) => (
@@ -19,6 +21,21 @@ export function ChatMessages({ messages, pending, error }: Props) {
           }
         >
           {message.content}
+          {message.create && !message.create.done && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {CREATE_TARGETS.map(({ target, label }) => (
+                <button
+                  key={target}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onCreate(i, target)}
+                  className="rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {message.image && (
             // eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimize
             <img
