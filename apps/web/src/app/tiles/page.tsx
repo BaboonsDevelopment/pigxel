@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonClassName } from "@pigxel/ui/components/button";
 import { Brand } from "@/components/brand";
-import { DraftCard } from "@/components/tiles/draft-card";
+import { CloudTiles } from "@/components/tiles/cloud-tiles";
+import { LocalTiles } from "@/components/tiles/local-tiles";
+import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Your tiles · Pigxel" };
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Tiles() {
   const user = await requireUser();
+  const cloudTiles = await listCloudTilesOnServer();
   return (
     <main className="mx-auto max-w-5xl px-6">
       <header className="flex h-24 items-center justify-between border-b">
@@ -28,7 +31,8 @@ export default async function Tiles() {
             Create tile
           </Link>
         </div>
-        <DraftCard userId={user.id} />
+        <LocalTiles userId={user.id} hasCloudTiles={cloudTiles.length > 0} />
+        <CloudTiles userId={user.id} tiles={cloudTiles} />
       </section>
     </main>
   );

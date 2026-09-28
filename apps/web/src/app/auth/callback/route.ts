@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { authUrl } from "@/lib/auth/config";
-import { safeNext } from "@/lib/auth/routes";
+import { safeNext, withParam } from "@/lib/auth/routes";
 import {
   isDriveAvailable,
   saveDriveConnection,
@@ -33,7 +33,9 @@ export async function GET(request: NextRequest) {
                 (google?.identity_data?.email as string | undefined) ?? null,
             });
           } catch {
-            return NextResponse.redirect(authUrl(`${next}?drive=error`));
+            return NextResponse.redirect(
+              authUrl(withParam(next, "drive", "error")),
+            );
           }
         }
         return NextResponse.redirect(authUrl(next), {
@@ -51,7 +53,8 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     const next = safeNext(request.nextUrl.searchParams.get("next"));
-    if (user) return NextResponse.redirect(authUrl(`${next}?drive=error`));
+    if (user)
+      return NextResponse.redirect(authUrl(withParam(next, "drive", "error")));
     if (!code) return NextResponse.redirect(authUrl("/login?error=google"));
   }
   return NextResponse.redirect(authUrl("/login?error=confirmation"));

@@ -75,6 +75,15 @@ export type PixelCanvasHandle = {
   adjustArea: (area: Area) => Promise<Area | null>;
 };
 
+/**
+ * The tile's 2D context. Strokes, autosave and the AI read pixels back all the
+ * time, so the canvas is kept in memory for fast reads. Every call asks the
+ * same way, since the first one decides.
+ */
+function tileContext(canvas: HTMLCanvasElement | null) {
+  return canvas?.getContext("2d", { willReadFrequently: true }) ?? null;
+}
+
 /** The RGB of a solid background, used to treat it as empty space. */
 const BACKGROUND_RGB: Record<Background, [number, number, number] | null> = {
   transparent: null,
@@ -148,7 +157,7 @@ export function PixelCanvas({
   }, []);
 
   useImperativeHandle(ref, () => {
-    const context = () => canvasRef.current?.getContext("2d") ?? null;
+    const context = () => tileContext(canvasRef.current) ?? null;
     const read = () => context()?.getImageData(0, 0, size.w, size.h) ?? null;
     // Pixels of a solid background count as empty space for the AI.
     const content = () => {
@@ -239,7 +248,7 @@ export function PixelCanvas({
   }, [frame, finishFrame]);
 
   useLayoutEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
+    const ctx = tileContext(canvasRef.current);
     if (ctx && carried.current) {
       if (fill) {
         ctx.fillStyle = fill;
@@ -265,7 +274,7 @@ export function PixelCanvas({
   const startStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
     // While a frame is being placed, clicks on the tile must not paint.
     if (frame || (e.button !== 0 && e.button !== 2)) return;
-    const ctx = e.currentTarget.getContext("2d");
+    const ctx = tileContext(e.currentTarget);
     if (!ctx) return;
     e.currentTarget.setPointerCapture(e.pointerId);
     const point = pixelAt(e);
@@ -284,7 +293,7 @@ export function PixelCanvas({
     const point = pixelAt(e);
     setHover(point);
     const current = stroke.current;
-    const ctx = e.currentTarget.getContext("2d");
+    const ctx = tileContext(e.currentTarget);
     if (!current || !ctx) return;
     const points = extendStroke(current.points, point);
     if (points === current.points) return;
@@ -331,7 +340,7 @@ export function PixelCanvas({
     drag.current = null;
     setPending(null);
     if (!pending || sameSize(pending, size)) return;
-    const ctx = canvasRef.current?.getContext("2d");
+    const ctx = tileContext(canvasRef.current);
     carried.current = ctx?.getImageData(0, 0, size.w, size.h) ?? null;
     setSize(pending);
     onChange?.();

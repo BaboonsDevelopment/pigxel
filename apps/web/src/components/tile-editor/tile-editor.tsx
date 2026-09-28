@@ -22,22 +22,27 @@ import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
-import {
-  DEFAULT_PEN,
-  clampPenSize,
-  type PenSettings,
-} from "@/components/pixel-canvas/pen";
+import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
 import { imageToPixelArt } from "@/lib/image/helpers";
 import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
-import { readDraft, type Draft } from "@/lib/pigxel-file/draft";
+import {
+  listDrafts,
+  readDraft,
+  readPen,
+  writePen,
+  type Draft,
+} from "@/lib/pigxel-file/draft";
+import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
   type PigxelImage,
 } from "@/lib/pigxel-file/format";
 import { useIsClient } from "@/lib/use-is-client";
-import { DriveFilesDialog } from "./drive-files-dialog";
+import { listCloudTiles } from "@/lib/pigxel-file/cloud";
+import { DriveError, listDriveFiles } from "@/lib/pigxel-file/google-drive";
+import { FilesDialog } from "./files-dialog";
 import { Menu } from "./menu";
 import { PenOptions } from "./pen-options";
 import { ToolBar } from "./tool-bar";
@@ -66,45 +71,70 @@ function isTyping(target: EventTarget | null) {
 
 type EditorProps = {
   userId: string;
+  /** The draft to edit, from the URL; the most recent one when missing. */
+  tileId?: string;
   drive: DriveStatus;
   /** Connecting Google Drive was cancelled or failed on the way back. */
   driveError?: boolean;
 };
 
 /**
- * The tile page for the draft kept in this browser: tools on the left, canvas
- * in the middle, AI chat on the right. It renders in the browser only, where
- * the draft lives.
+ * The tile page for one of the drafts kept in this browser: tools on the
+ * left, canvas in the middle, AI chat on the right. It renders in the browser
+ * only, where the drafts live.
  */
 export function TileEditor(props: EditorProps) {
   if (!useIsClient()) return <div className="h-dvh bg-muted" />;
-  return <DraftLoader {...props} />;
+  // A new tile id means a different tile: start its editor from scratch.
+  return <DraftLoader key={props.tileId ?? ""} {...props} />;
 }
 
 function DraftLoader(props: EditorProps) {
-  const { userId } = props;
+  const { userId, tileId } = props;
   const [restored] = useState(() => {
-    const draft = readDraft(userId);
+    if (!tileId) return { redirect: listDrafts(userId)[0]?.id ?? null };
+    const draft = readDraft(userId, tileId);
     try {
-      return draft ? { draft, image: parsePigxel(draft.file) } : null;
+      return draft
+        ? { draft, image: parsePigxel(draft.file) }
+        : { missing: true as const };
     } catch {
-      return null;
+      return { missing: true as const };
     }
   });
-  if (!restored) return <StartNewTile />;
+  if ("redirect" in restored)
+    return (
+      <Redirect
+        to={restored.redirect ? editorUrl(restored.redirect) : "/tiles/new"}
+      />
+    );
+  if ("missing" in restored) return <MissingTile />;
   return <Editor {...props} draft={restored.draft} image={restored.image} />;
 }
 
-/** With no tile to continue, the editor sends people to create one. */
-function StartNewTile() {
+function Redirect({ to }: { to: string }) {
   const router = useRouter();
-  useEffect(() => router.replace("/tiles/new"), [router]);
+  useEffect(() => router.replace(to), [router, to]);
   return <div className="h-dvh bg-muted" />;
 }
 
-/** Goes to Google to link the account, then back to the editor with the draft intact. */
-function connectDrive() {
-  window.location.assign(connectDriveUrl("/tiles/edit"));
+/** A link to a tile that isn't in this browser, e.g. opened on another device. */
+function MissingTile() {
+  return (
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-muted p-6 text-center">
+      <h1 className="text-xl font-semibold">This tile isn’t in this browser</h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Tiles you haven’t saved to Pigxel cloud or Google Drive stay in the
+        browser they were made in.
+      </p>
+      <Link
+        href="/tiles"
+        className="text-sm font-medium underline underline-offset-4"
+      >
+        Go to your tiles
+      </Link>
+    </main>
+  );
 }
 
 function Editor({
@@ -115,9 +145,9 @@ function Editor({
   image,
 }: EditorProps & { draft: Draft; image: PigxelImage }) {
   const router = useRouter();
-  const [pickingDriveFile, setPickingDriveFile] = useState(false);
+  const [picking, setPicking] = useState<"cloud" | "drive" | null>(null);
   const [tool, setTool] = useState<ToolId>("pen");
-  const [pen, setPen] = useState<PenSettings>(draft.pen ?? DEFAULT_PEN);
+  const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [scale, setScale] = useState(DEFAULT_SCALE);
   const [highlight, setHighlight] = useState<Area | null>(null);
   const mod = useModifierLabel();
@@ -130,8 +160,8 @@ function Editor({
     userId,
     initial: draft,
     initialBackground: image.background ?? "transparent",
-    pen,
     drive,
+    onOpen: (id) => router.push(editorUrl(id)),
     notice: driveError
       ? {
           tone: "error",
@@ -139,6 +169,13 @@ function Editor({
         }
       : undefined,
   });
+
+  // Pen colour and size carry over to every tile.
+  useEffect(() => writePen(userId, pen), [userId, pen]);
+
+  /** Goes to Google to link the account, then back to this tile with its draft intact. */
+  const connectDrive = () =>
+    window.location.assign(connectDriveUrl(editorUrl(draft.id)));
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
@@ -248,12 +285,18 @@ function Editor({
               onSelect: file.openFromComputer,
             },
             {
+              label: "From Pigxel cloud…",
+              onSelect: () => {
+                setPicking("cloud");
+              },
+            },
+            {
               label: drive.connected
                 ? "From Google Drive…"
                 : "Connect Google Drive…",
               onSelect: () => {
                 if (!drive.connected) connectDrive();
-                else if (file.confirmDiscard()) setPickingDriveFile(true);
+                else setPicking("drive");
               },
               hidden: !drive.available,
             },
@@ -264,19 +307,27 @@ function Editor({
           disabled={file.busy}
           items={[
             {
-              label: "Download .pigxel",
-              shortcut: file.driveFile ? undefined : `${mod}S`,
-              onSelect: file.download,
+              label:
+                file.location && file.location.kind !== "cloud"
+                  ? "Move to Pigxel cloud"
+                  : "Save to Pigxel cloud",
+              shortcut: file.location?.kind === "cloud" ? `${mod}S` : undefined,
+              onSelect: file.saveToCloud,
             },
             {
               label: !drive.connected
                 ? "Connect Google Drive…"
-                : file.driveFile
-                  ? "Save to Google Drive"
-                  : "Save to Google Drive…",
-              shortcut: file.driveFile ? `${mod}S` : undefined,
+                : file.location && file.location.kind !== "drive"
+                  ? "Move to Google Drive"
+                  : "Save to Google Drive",
+              shortcut: file.location?.kind === "drive" ? `${mod}S` : undefined,
               onSelect: drive.connected ? file.saveToDrive : connectDrive,
               hidden: !drive.available,
+            },
+            {
+              label: "Download .pigxel",
+              shortcut: file.location ? undefined : `${mod}S`,
+              onSelect: file.download,
             },
           ]}
         />
@@ -305,7 +356,7 @@ function Editor({
         {!file.busy && file.status?.retry && (
           <button
             type="button"
-            onClick={file.status.connect ? connectDrive : file.saveToDrive}
+            onClick={file.status.connect ? connectDrive : file.save}
             className="h-8 rounded-md border px-3 text-sm font-medium hover:bg-muted"
           >
             {file.status.retry}
@@ -338,11 +389,48 @@ function Editor({
         </div>
       </main>
       <ChatPanel canvas={bridge} />
-      {pickingDriveFile && (
-        <DriveFilesDialog
-          email={drive.email}
-          onPick={file.openDriveFile}
-          onClose={() => setPickingDriveFile(false)}
+      {picking === "cloud" && (
+        <FilesDialog
+          title="Open from Pigxel cloud"
+          empty="No tiles in Pigxel cloud yet. Tiles you save there appear here."
+          load={async () =>
+            (await listCloudTiles()).map((tile) => ({
+              id: tile.id,
+              name: tile.name,
+              modified: tile.updatedAt,
+              thumbnail: tile.thumbnail,
+            }))
+          }
+          onPick={(item) =>
+            file.openCloudTile({ id: item.id, name: item.name })
+          }
+          onClose={() => setPicking(null)}
+        />
+      )}
+      {picking === "drive" && (
+        <FilesDialog
+          title="Open from Google Drive"
+          subtitle={drive.email}
+          empty="No Pigxel files in your Google Drive yet. Tiles you save there appear here. To open a file uploaded to Drive yourself, download it and open it from your computer."
+          load={async () =>
+            (await listDriveFiles()).map((f) => ({
+              id: f.id,
+              name: f.name,
+              modified: f.modifiedTime,
+            }))
+          }
+          errorAction={(error) =>
+            error instanceof DriveError && error.needsConnect
+              ? {
+                  label: "Connect Google Drive",
+                  href: connectDriveUrl(editorUrl(draft.id)),
+                }
+              : null
+          }
+          onPick={(item) =>
+            file.openDriveFile({ id: item.id, name: item.name })
+          }
+          onClose={() => setPicking(null)}
         />
       )}
     </div>

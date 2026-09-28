@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
-import { DEFAULT_PEN } from "@/components/pixel-canvas/pen";
-import { readDraft, writeDraft } from "@/lib/pigxel-file/draft";
+import { createDraft } from "@/lib/pigxel-file/draft";
+import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   MAX_PIGXEL_SIZE,
   PIGXEL_EXTENSION,
@@ -15,14 +15,13 @@ import {
   type Background,
 } from "@/lib/pigxel-file/format";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
-import {
-  DriveError,
-  saveDriveFile,
-  type DriveFile,
-} from "@/lib/pigxel-file/google-drive";
+import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
+import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
+import type { TileLocation } from "@/lib/pigxel-file/location";
+import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { useIsClient } from "@/lib/use-is-client";
 
-type Storage = "drive" | "none";
+type Storage = "cloud" | "drive" | "none";
 
 const PRESETS = [16, 32, 64, 128];
 const BACKGROUND_OPTIONS: {
@@ -58,14 +57,11 @@ export function NewTileForm(props: FormProps) {
 
 function Form({ userId, drive, driveError }: FormProps) {
   const router = useRouter();
-  const [current] = useState(() => readDraft(userId));
   const [name, setName] = useState("Untitled");
   const [width, setWidth] = useState("32");
   const [height, setHeight] = useState("32");
   const [background, setBackground] = useState<Background>("transparent");
-  const [storage, setStorage] = useState<Storage>(
-    drive.connected ? "drive" : "none",
-  );
+  const [storage, setStorage] = useState<Storage>("cloud");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
     driveError
@@ -79,36 +75,53 @@ function Form({ userId, drive, driveError }: FormProps) {
   };
 
   const create = async (w: number, h: number) => {
-    const file = serializePigxel(blankImage(w, h, background));
-    let driveFile: DriveFile | null = null;
+    const image = blankImage(w, h, background);
+    const file = serializePigxel(image);
+    let location: TileLocation | null = null;
     setBusy(true);
     setError(null);
     try {
-      if (storage === "drive") driveFile = await saveDriveFile({ name }, file);
+      if (storage === "cloud")
+        location = {
+          kind: "cloud",
+          tile: await saveCloudTile(
+            { name },
+            file,
+            image,
+            thumbnailDataUrl(image),
+          ),
+        };
+      if (storage === "drive")
+        location = {
+          kind: "drive",
+          file: await saveDriveFile({ name }, file),
+        };
     } catch (e) {
       setError(
-        e instanceof DriveError
+        e instanceof DriveError || e instanceof CloudError
           ? e.message
-          : "Couldn’t create the file in Google Drive. Try again.",
+          : "Couldn’t create the tile. Try again.",
       );
       setBusy(false);
       return;
     }
-    const kept = writeDraft(userId, {
+    // Every new tile gets its own draft; other tiles are left as they are.
+    const draft = createDraft(userId, {
       name,
       file,
-      driveFile,
+      location,
       dirty: false,
-      pen: current?.pen ?? DEFAULT_PEN,
     });
-    if (!kept) {
+    if (!draft) {
       setError(
-        "This browser blocks site storage, which the editor needs. Allow site data for Pigxel and try again.",
+        location
+          ? "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from Your tiles."
+          : "This browser won’t keep the tile. Allow site data for Pigxel, or remove some tiles from this browser.",
       );
       setBusy(false);
       return;
     }
-    router.push("/tiles/edit");
+    router.push(editorUrl(draft.id));
   };
 
   return (
@@ -122,13 +135,6 @@ function Form({ userId, drive, driveError }: FormProps) {
           setError(`Use a size from 1 to ${MAX_PIGXEL_SIZE} pixels.`);
           return;
         }
-        if (
-          current?.dirty &&
-          !window.confirm(
-            `“${current.name}” has unsaved changes. Replace it with a new tile?`,
-          )
-        )
-          return;
         void create(w, h);
       }}
     >
@@ -217,7 +223,24 @@ function Form({ userId, drive, driveError }: FormProps) {
 
       <fieldset>
         <legend className="mb-3 text-sm font-medium">Where to keep it</legend>
-        <div className="grid max-w-2xl gap-3 sm:grid-cols-2">
+        <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
+          <label className={optionCard}>
+            <input
+              type="radio"
+              name="storage"
+              value="cloud"
+              checked={storage === "cloud"}
+              onChange={() => setStorage("cloud")}
+              className="mt-0.5 size-4 accent-primary"
+            />
+            <span>
+              <span className="block text-sm font-medium">Pigxel cloud</span>
+              <span className="mt-1 block text-sm text-muted-foreground">
+                Saved to your Pigxel account and autosaved as you draw. Open it
+                from any device.
+              </span>
+            </span>
+          </label>
           <label className={optionCard}>
             <input
               type="radio"
@@ -265,20 +288,15 @@ function Form({ userId, drive, driveError }: FormProps) {
             <span>
               <span className="block text-sm font-medium">Don’t store it</span>
               <span className="mt-1 block text-sm text-muted-foreground">
-                Kept in this browser while you work. Download it
-                {drive.available ? " or save it to Google Drive" : ""} any time.
+                Kept in this browser while you work. Download it or save it to
+                Pigxel cloud{drive.available ? " or Google Drive" : ""} any
+                time.
               </span>
             </span>
           </label>
         </div>
       </fieldset>
 
-      {current && (
-        <p className="max-w-2xl rounded-lg border bg-muted p-3 text-sm">
-          This replaces the tile you’re working on, “{current.name}”
-          {current.dirty ? ", which has unsaved changes." : "."}
-        </p>
-      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -288,15 +306,14 @@ function Form({ userId, drive, driveError }: FormProps) {
       <div className="flex items-center gap-5">
         <Button disabled={busy}>
           {busy
-            ? storage === "drive"
-              ? "Creating in Google Drive…"
-              : "Creating…"
+            ? storage === "cloud"
+              ? "Creating in Pigxel cloud…"
+              : storage === "drive"
+                ? "Creating in Google Drive…"
+                : "Creating…"
             : "Create tile"}
         </Button>
-        <Link
-          href={current ? "/tiles/edit" : "/tiles"}
-          className="text-sm underline underline-offset-4"
-        >
+        <Link href="/tiles" className="text-sm underline underline-offset-4">
           Cancel
         </Link>
       </div>
