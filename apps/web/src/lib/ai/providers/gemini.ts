@@ -1,5 +1,5 @@
 import "server-only";
-import { GEMINI_BASE_URL } from "../constants";
+import { GEMINI_BASE_URL, ROUTER_PROMPT } from "../constants";
 import type { AiProvider } from "../types";
 
 type GeminiPart = {
@@ -13,7 +13,11 @@ export function createGeminiProvider(
   apiKey: string,
   models: { edit: string; generate: string },
 ): AiProvider {
-  const request = async (model: string, contents: GeminiContent[]) => {
+  const request = async (
+    model: string,
+    contents: GeminiContent[],
+    options: object = {},
+  ) => {
     const res = await fetch(
       `${GEMINI_BASE_URL}/models/${model}:generateContent`,
       {
@@ -22,7 +26,7 @@ export function createGeminiProvider(
           "content-type": "application/json",
           "x-goog-api-key": apiKey,
         },
-        body: JSON.stringify({ contents }),
+        body: JSON.stringify({ contents, ...options }),
       },
     );
     if (!res.ok) {
@@ -33,6 +37,22 @@ export function createGeminiProvider(
   };
 
   return {
+    async route(message) {
+      const parts = await request(
+        models.edit,
+        [{ role: "user", parts: [{ text: message }] }],
+        {
+          systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
+          generationConfig: {
+            responseMimeType: "text/x.enum",
+            responseSchema: { type: "STRING", enum: ["generate", "edit"] },
+          },
+        },
+      );
+      // Anything unexpected falls back to the free edit mode.
+      return parts[0]?.text?.trim() === "generate" ? "generate" : "edit";
+    },
+
     async edit(messages) {
       const parts = await request(
         models.edit,
