@@ -1,7 +1,7 @@
 export type RGB = { r: number; g: number; b: number };
 
-/** Upper bound on palette size — a small palette keeps the result pixel-art-like. */
-const MAX_COLORS = 16;
+/** Upper bound on palette size. */
+const MAX_COLORS = 62;
 
 export type QuantizeOpts = {
   bgTolerance?: number;
@@ -126,6 +126,19 @@ function keyOut(
     stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
   }
   return removed;
+}
+
+/** Makes every pixel close to `key` transparent, wherever it is in the picture. */
+export function removeChromaKey(
+  buf: Uint8ClampedArray,
+  key: RGB,
+  tolerance: number,
+) {
+  const tol2 = tolerance * tolerance;
+  for (let i = 0; i < buf.length; i += 4) {
+    const c = { r: px(buf, i), g: px(buf, i + 1), b: px(buf, i + 2) };
+    if (dist2(c, key) <= tol2) buf.fill(0, i, i + 4);
+  }
 }
 
 export function removeBackground(

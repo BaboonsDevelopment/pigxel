@@ -6,6 +6,7 @@ import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
+import { CHROMA_KEY } from "@/lib/image/constants";
 import { imageToPixelArt } from "@/lib/image/helpers";
 
 /** The tile page: canvas on the left, AI chat on the right. */
@@ -17,7 +18,9 @@ export function TileEditor() {
     if (!canvas.current) return;
     const { w, h } = canvas.current.size;
     const image = await (await fetch(dataUrl)).blob();
-    const { buf } = await imageToPixelArt(image, w, h);
+    const { buf } = await imageToPixelArt(image, w, h, {
+      chromaKey: CHROMA_KEY,
+    });
     canvas.current.draw(buf);
   };
 
