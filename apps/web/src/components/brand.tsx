@@ -8,12 +8,15 @@ export function Brand() {
     >
       <svg
         aria-hidden="true"
-        viewBox="0 0 16 16"
-        className="size-7"
-        fill="currentColor"
+        viewBox="0 0 24 24"
+        className="size-8"
         shapeRendering="crispEdges"
       >
-        <path d="M2 2h10v2h2v6h-2v2H6v4H2V2Zm4 4v2h4V6H6Z" />
+        <path fill="#d64a62" d="M3 3h6v3h6V3h6v15h-3v3H6v-3H3Z" />
+        <path fill="#ffa4b2" d="M5 5h3v4h8V5h3v12h-3v2H8v-2H5Z" />
+        <path fill="#542a35" d="M7 10h2v3H7zm8 0h2v3h-2Z" />
+        <path fill="#ef748d" d="M8 14h8v4H8Z" />
+        <path fill="#9e384e" d="M10 15h1v2h-1zm3 0h1v2h-1Z" />
       </svg>
       Pigxel
     </Link>
