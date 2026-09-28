@@ -4,6 +4,8 @@ export type RGB = { r: number; g: number; b: number };
 const MAX_COLORS = 62;
 
 export type QuantizeOpts = {
+  /** Palette size; capped at MAX_COLORS. */
+  colors?: number;
   bgTolerance?: number;
   bgRounds?: number;
   keepBackground?: boolean;
@@ -126,19 +128,6 @@ function keyOut(
     stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
   }
   return removed;
-}
-
-/** Makes every pixel close to `key` transparent, wherever it is in the picture. */
-export function removeChromaKey(
-  buf: Uint8ClampedArray,
-  key: RGB,
-  tolerance: number,
-) {
-  const tol2 = tolerance * tolerance;
-  for (let i = 0; i < buf.length; i += 4) {
-    const c = { r: px(buf, i), g: px(buf, i + 1), b: px(buf, i + 2) };
-    if (dist2(c, key) <= tol2) buf.fill(0, i, i + 4);
-  }
 }
 
 export function removeBackground(
@@ -368,7 +357,10 @@ export function imageToSprite(
   };
 
   const bins = histogram(source, sw, sh);
-  const palette = buildPalette(bins, MAX_COLORS);
+  const palette = buildPalette(
+    bins,
+    Math.max(2, Math.min(opts.colors ?? MAX_COLORS, MAX_COLORS)),
+  );
   if (palette.length === 0) {
     return { buf: new Uint8ClampedArray(dw * dh * 4), palette: [], removed };
   }

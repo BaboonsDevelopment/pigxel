@@ -1,27 +1,17 @@
-import { CHROMA_KEY_TOLERANCE } from "./constants";
+import type { Bitmap } from "./bitmap";
 import { decodeImage } from "./decode";
-import {
-  imageToSprite,
-  removeChromaKey,
-  type QuantizeOpts,
-  type Quantized,
-  type RGB,
-} from "./quantize";
+import { runSteps, type Step } from "./pipeline";
 
 /**
- * Turns a picture into pixel art of the given size.
- * Pass `chromaKey` to cut out a flat background of that colour first.
- * Browser-only: decoding needs `createImageBitmap` and a canvas.
+ * Turns a picture into `width × height` pixel art by running it through
+ * `steps` (see pipeline.ts). Browser-only: decoding needs a canvas.
  */
 export async function imageToPixelArt(
   source: Blob,
   width: number,
   height: number,
-  opts?: QuantizeOpts & { chromaKey?: RGB },
-): Promise<Quantized> {
+  steps: Step[],
+): Promise<Bitmap> {
   const { rgba, w, h } = await decodeImage(source, Math.max(width, height));
-  if (opts?.chromaKey) {
-    removeChromaKey(rgba, opts.chromaKey, CHROMA_KEY_TOLERANCE);
-  }
-  return imageToSprite(rgba, w, h, width, height, opts);
+  return runSteps({ rgba, w, h }, { w: width, h: height }, steps);
 }
