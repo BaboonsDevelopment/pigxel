@@ -1,0 +1,28 @@
+import type { ChatMessage } from "@/lib/ai/types";
+
+type Props = {
+  messages: ChatMessage[];
+  pending: boolean;
+  error: string | null;
+};
+
+export function ChatMessages({ messages, pending, error }: Props) {
+  return (
+    <ol className="flex flex-col gap-3 text-sm leading-relaxed">
+      {messages.map((message, i) => (
+        <li
+          key={i}
+          className={
+            message.role === "user"
+              ? "max-w-[85%] self-end rounded-lg bg-primary px-3 py-2 whitespace-pre-wrap text-primary-foreground"
+              : "max-w-[85%] self-start rounded-lg border bg-muted px-3 py-2 whitespace-pre-wrap"
+          }
+        >
+          {message.content}
+        </li>
+      ))}
+      {pending && <li className="text-muted-foreground">Thinking…</li>}
+      {error && <li className="text-destructive">{error}</li>}
+    </ol>
+  );
+}
