@@ -43,7 +43,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { GET as google } from "@/app/auth/google/route";
 import { GET as callback } from "@/app/auth/callback/route";
 import { POST as token } from "@/app/api/google-drive/token/route";
-import { safeNext } from "@/lib/auth/routes";
+import { safeNext, withParam } from "@/lib/auth/routes";
 import { DRIVE_SCOPE } from "@/lib/google-drive/server";
 
 const emailUser = {
@@ -125,6 +125,13 @@ describe("connecting Google", () => {
       mocks.auth.signInWithOAuth.mock.calls[0]![0].options.redirectTo,
     ).toContain("next=%2Ftiles");
     expect(safeNext("/tiles/edit")).toBe("/tiles/edit");
+    expect(safeNext("/tiles/edit?id=3f2a-b1")).toBe("/tiles/edit?id=3f2a-b1");
+    expect(safeNext("/tiles/edit?id=<script>")).toBe("/tiles/edit");
+    expect(safeNext("/account?id=x")).toBe("/account");
+    expect(safeNext("https://evil.example/tiles/edit")).toBe("/tiles");
+    expect(withParam("/tiles/edit?id=a", "drive", "error")).toBe(
+      "/tiles/edit?id=a&drive=error",
+    );
     expect(safeNext("//evil.example")).toBe("/tiles");
     expect(safeNext(null)).toBe("/tiles");
   });
