@@ -1,6 +1,12 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import {
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import {
   CHECKER_STYLE,
   DEFAULT_SIZE,
@@ -28,11 +34,39 @@ type Stroke = {
   before: ImageData;
 };
 
-export function PixelCanvas({ pen }: { pen: PenSettings }) {
+/** Lets the page put pixels onto the canvas from outside, e.g. from the AI. */
+export type PixelCanvasHandle = {
+  size: Size;
+  draw: (pixels: Uint8ClampedArray) => void;
+};
+
+export function PixelCanvas({
+  pen,
+  ref,
+}: {
+  pen: PenSettings;
+  ref?: Ref<PixelCanvasHandle>;
+}) {
   const [size, setSize] = useState<Size>(DEFAULT_SIZE);
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      size,
+      draw(pixels) {
+        const ctx = canvasRef.current?.getContext("2d");
+        ctx?.putImageData(
+          new ImageData(new Uint8ClampedArray(pixels), size.w, size.h),
+          0,
+          0,
+        );
+      },
+    }),
+    [size],
+  );
   const stroke = useRef<Stroke>(null);
   // Where the last stroke ended; Shift+click draws a straight line from here.
   const lastPoint = useRef<Point>(null);
