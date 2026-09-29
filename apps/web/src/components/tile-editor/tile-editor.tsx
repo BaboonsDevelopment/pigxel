@@ -62,8 +62,8 @@ import { listCloudTiles } from "@/lib/pigxel-file/cloud";
 import { DriveError, listDriveFiles } from "@/lib/pigxel-file/google-drive";
 import { FilesDialog } from "./files-dialog";
 import { Menu } from "./menu";
-import { PenOptions } from "./pen-options";
 import { ToolBar } from "./tool-bar";
+import { ToolOptions, sizeKey } from "./tool-options";
 import { TOOLS, type ToolId } from "./tools";
 import { useTileFile } from "./use-tile-file";
 
@@ -188,7 +188,7 @@ function Editor({
       : undefined,
   });
 
-  // Pen colour and size carry over to every tile.
+  // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
 
   /** Goes to Google to link the account, then back to this tile with its draft intact. */
@@ -208,11 +208,11 @@ function Editor({
     const shortcut = TOOLS.find(
       (t) => t.shortcut.toLowerCase() === e.key.toLowerCase(),
     );
+    const key = sizeKey(tool);
+    const step = e.key === "[" ? -1 : e.key === "]" ? 1 : 0;
     if (shortcut) setTool(shortcut.id);
-    else if (e.key === "[")
-      setPen((p) => ({ ...p, size: clampPenSize(p.size - 1) }));
-    else if (e.key === "]")
-      setPen((p) => ({ ...p, size: clampPenSize(p.size + 1) }));
+    else if (step && key)
+      setPen((p) => ({ ...p, [key]: clampPenSize(p[key] + step) }));
     else return;
     e.preventDefault();
   });
@@ -465,19 +465,21 @@ function Editor({
         )}
       </header>
       <div className="col-span-3 flex min-h-12 items-center border-b bg-background px-4 py-2">
-        {tool === "pen" && <PenOptions pen={pen} onChange={setPen} />}
+        <ToolOptions tool={tool} pen={pen} onChange={setPen} />
       </div>
       <ToolBar tool={tool} onSelect={setTool} />
       <main ref={workspace} className="flex overflow-auto bg-muted p-12">
         <div className="m-auto">
           <PixelCanvas
             ref={canvas}
+            tool={tool}
             pen={pen}
             scale={scale}
             highlight={highlight}
             background={file.background}
             initialImage={image}
             onChange={file.markDirty}
+            onPickColor={(color) => setPen((p) => ({ ...p, color }))}
           />
         </div>
       </main>

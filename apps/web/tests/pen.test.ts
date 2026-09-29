@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   brushOrigin,
+  brushTip,
   clampPenSize,
   extendStroke,
+  fillPoints,
   linePoints,
+  pixelColor,
   pixelPerfect,
+  snapLine,
   strokePixels,
   DEFAULT_PEN,
   type Point,
@@ -97,5 +101,64 @@ describe("brush", () => {
     expect(
       strokePixels(stroke, { ...DEFAULT_PEN, pixelPerfect: false }),
     ).toHaveLength(3);
+  });
+});
+
+/** An image drawn from rows of letters: r(ed), b(lue) or "." for transparent. */
+function image(rows: string[]): ImageData {
+  const colors: Record<string, number[]> = {
+    ".": [0, 0, 0, 0],
+    r: [255, 0, 0, 255],
+    b: [0, 0, 255, 255],
+  };
+  const data = new Uint8ClampedArray(
+    rows.flatMap((row) => [...row].flatMap((c) => colors[c]!)),
+  );
+  return { width: rows[0]!.length, height: rows.length, data } as ImageData;
+}
+
+describe("brushTip", () => {
+  const covered = (size: number) =>
+    brushTip(size, true).reduce((sum, r) => sum + r.w * r.h, 0);
+  it("is one square for a square tip", () => {
+    expect(brushTip(4, false)).toEqual([{ dx: 0, dy: 0, w: 4, h: 4 }]);
+  });
+  it("rounds off the corners of a round tip", () => {
+    expect(covered(1)).toBe(1);
+    expect(covered(2)).toBe(4);
+    expect(covered(3)).toBe(5);
+    expect(covered(4)).toBe(12);
+    expect(brushTip(5, true).map((r) => r.w)).toEqual([3, 5, 5, 5, 3]);
+  });
+});
+
+describe("snapLine", () => {
+  it("snaps to horizontal, vertical and diagonal lines", () => {
+    expect(snapLine(p(0, 0), p(10, 2))).toEqual(p(10, 0));
+    expect(snapLine(p(0, 0), p(-2, 10))).toEqual(p(0, 10));
+    expect(snapLine(p(0, 0), p(-9, 7))).toEqual(p(-9, 9));
+  });
+});
+
+describe("fillPoints", () => {
+  const img = image(["rr.", "b.r", "rrr"]);
+  it("fills the connected same-coloured area", () => {
+    expect(fillPoints(img, p(0, 0), true).sort()).toEqual([0, 1]);
+    expect(fillPoints(img, p(2, 0), true).sort()).toEqual([2]);
+  });
+  it("fills every pixel of that colour when not contiguous", () => {
+    expect(fillPoints(img, p(0, 0), false)).toEqual([0, 1, 5, 6, 7, 8]);
+  });
+  it("does not wrap around the image edges", () => {
+    expect(fillPoints(image(["r.", ".r"]), p(1, 1), true)).toEqual([3]);
+  });
+});
+
+describe("pixelColor", () => {
+  it("reads a pixel's colour, or null when transparent", () => {
+    const img = image(["rb."]);
+    expect(pixelColor(img, p(0, 0))).toBe("#ff0000");
+    expect(pixelColor(img, p(1, 0))).toBe("#0000ff");
+    expect(pixelColor(img, p(2, 0))).toBeNull();
   });
 });
