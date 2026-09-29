@@ -11,6 +11,7 @@ import {
   suggestComposition,
 } from "@/lib/ai/actions";
 import type { Area } from "@/components/pixel-canvas/constants";
+import { ResizeHandle } from "@/components/resize-handle";
 import {
   atLeastPlacementSize,
   sameArea,
@@ -21,10 +22,12 @@ import { ChatComposer } from "./components/chat-composer";
 import { ChatHeader } from "./components/chat-header";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
+import { ICONS } from "./icons";
 import {
   ASK_FRAME,
   ASK_SELECT,
   NO_LAYER,
+  PANEL_WIDTH,
   UNREACHABLE,
   type CanvasBridge,
   type ChatEntry,
@@ -37,6 +40,8 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [selectArea, setSelectArea] = useState(false);
+  const [width, setWidth] = useState(PANEL_WIDTH.initial);
+  const [collapsed, setCollapsed] = useState(false);
 
   const append = (entry: ChatEntry) => setMessages((all) => [...all, entry]);
   const say = (content: string) => append({ role: "assistant", content });
@@ -313,9 +318,35 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     if (!drawn) setPlacements(index, entry.placements);
   };
 
+  // Folded into a small tab at the top right, over the workspace.
+  if (collapsed)
+    return (
+      <aside className="relative w-0">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          title="Show the assistant"
+          className="absolute top-0 right-0 z-10 flex items-center gap-2 rounded-bl-md border-b border-l bg-background px-3 py-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase shadow-sm hover:text-foreground"
+        >
+          {ICONS.expand}
+          Assistant
+        </button>
+      </aside>
+    );
+
   return (
-    <aside className="flex min-h-0 flex-col border-l bg-background">
-      <ChatHeader />
+    <aside
+      style={{ width }}
+      className="relative flex min-h-0 flex-col border-l bg-background"
+    >
+      <ResizeHandle
+        edge="left"
+        size={width}
+        min={PANEL_WIDTH.min}
+        max={PANEL_WIDTH.max}
+        onResize={setWidth}
+      />
+      <ChatHeader onCollapse={() => setCollapsed(true)} />
       <div className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <ChatWelcome />
