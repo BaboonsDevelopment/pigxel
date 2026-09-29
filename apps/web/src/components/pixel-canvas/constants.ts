@@ -119,3 +119,6 @@ export const GRID_STYLE: CSSProperties = {
     "linear-gradient(to bottom, rgba(127,127,127,0.3) 1px, transparent 1px)",
   ].join(", "),
 };
+
+/** How many finished changes Ctrl+Z can step back through. */
+export const MAX_UNDO = 100;

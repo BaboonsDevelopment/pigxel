@@ -1,5 +1,6 @@
 import { cn } from "@pigxel/ui/lib/utils";
-import { TOOLS, type ToolId } from "./tools";
+import type { ToolId } from "../constants";
+import { TOOLS } from "../tools";
 
 export function ToolBar({
   tool,

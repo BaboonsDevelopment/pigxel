@@ -7,16 +7,8 @@ import {
   clampPenSize,
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
-import type { ToolId } from "./tools";
-
-/** The setting `[` and `]` change for a tool, if it has a size. */
-export function sizeKey(
-  tool: ToolId,
-): "size" | "brushSize" | "eraserSize" | null {
-  if (tool === "brush") return "brushSize";
-  if (tool === "eraser") return "eraserSize";
-  return tool === "pen" || tool === "line" ? "size" : null;
-}
+import type { ToolId } from "../constants";
+import { sizeKey } from "../helpers";
 
 /** The settings of the selected tool, shown above the canvas. */
 export function ToolOptions({

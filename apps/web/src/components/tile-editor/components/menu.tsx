@@ -2,13 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { buttonVariants } from "@pigxel/ui/components/button";
-
-export type MenuItem = {
-  label: string;
-  shortcut?: string;
-  onSelect: () => void;
-  hidden?: boolean;
-};
+import type { MenuItem } from "../constants";
 
 /** A small dropdown built on <details>, closed on selection or an outside click. */
 export function Menu({
