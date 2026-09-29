@@ -1,12 +1,13 @@
 "use server";
 
-import { MAX_HISTORY } from "@/lib/ai/constants";
+import { MAX_HISTORY, PLACEMENT_HISTORY } from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
   buildComposePrompt,
   buildEditSystemPrompt,
   buildEditUserMessage,
   buildImagePrompt,
+  buildPlacementPrompt,
   buildPlanPrompt,
   buildRedrawPrompt,
   clampRect,
@@ -18,6 +19,7 @@ import type {
   ChatMessage,
   EditPlan,
   EditReply,
+  PlacementPlan,
   Rect,
 } from "@/lib/ai/types";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
@@ -60,7 +62,12 @@ export async function sendMessage(
     return {
       role: "assistant",
       content: `${route.intent}: ${route.subject}`,
-      action: { kind: route.intent, request: route.subject },
+      action: {
+        kind: route.intent,
+        request: route.subject,
+        where: route.where,
+        count: route.count,
+      },
     };
   });
 }
@@ -225,4 +232,66 @@ function unionOf(rects: (Rect | undefined)[]): Rect | null {
   const right = Math.max(...found.map((r) => r.x + r.w));
   const bottom = Math.max(...found.map((r) => r.y + r.h));
   return { x, y, w: right - x, h: bottom - y };
+}
+
+/**
+ * Decides where new pictures go on a tile that has drawings: free spots that
+ * follow `where`, or copies of an existing object when the user asked for
+ * more of it. `ask` comes back when there is no room without covering art.
+ */
+export async function planPlacement(args: {
+  subject: string;
+  where: string;
+  count: number;
+  tile: string;
+  width: number;
+  height: number;
+  objects: Rect[];
+  recent: ChatMessage[];
+}): Promise<AiResult<PlacementPlan>> {
+  await requireUser();
+  const { width, height } = args;
+  const png = PNG_DATA_URL.exec(args.tile)?.[1];
+  const valid =
+    args.subject.trim() &&
+    png &&
+    validSize(width) &&
+    validSize(height) &&
+    Number.isInteger(args.count) &&
+    args.count >= 1 &&
+    args.objects.length <= MAX_OBJECTS &&
+    args.objects.every((r) => [r.x, r.y, r.w, r.h].every(Number.isInteger));
+  if (!valid) return { ok: false, error: "The tile could not be analysed." };
+
+  return attempt("planPlacement", async () => {
+    const reply = await getAiProvider().place(
+      buildPlacementPrompt({
+        ...args,
+        where: args.where.trim(),
+        recent: args.recent
+          .slice(-PLACEMENT_HISTORY)
+          .map(({ role, content }) => ({
+            role,
+            content: content.slice(0, 500),
+          })),
+      }),
+      { mimeType: "image/png", base64: png! },
+    );
+    const copyOf = args.objects[reply.copyOf] ?? null;
+    const areas = reply.areas
+      .slice(0, args.count)
+      .map((r) => clampRect(r, width, height))
+      // A copy keeps the size of the original.
+      .map((r) =>
+        copyOf
+          ? clampRect({ ...r, w: copyOf.w, h: copyOf.h }, width, height)
+          : r,
+      );
+    return {
+      copyOf,
+      areas,
+      ask: reply.ask || !areas.length,
+      question: reply.question,
+    };
+  });
 }

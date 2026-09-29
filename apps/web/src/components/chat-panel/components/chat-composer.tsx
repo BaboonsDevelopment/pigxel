@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@pigxel/ui/components/button";
+import { Checkbox } from "@pigxel/ui/components/choice";
+import { Textarea } from "@pigxel/ui/components/input";
+
 type Props = {
   draft: string;
   onDraft: (text: string) => void;
@@ -35,16 +39,14 @@ export function ChatComposer({
       }}
     >
       <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none hover:text-foreground">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selectArea}
           onChange={(e) => onSelectArea(e.target.checked)}
-          className="accent-primary"
         />
         Select area
       </label>
       <div className="flex items-end gap-2">
-        <textarea
+        <Textarea
           rows={2}
           aria-label="Message"
           placeholder="Ask for a change…"
@@ -56,15 +58,11 @@ export function ChatComposer({
               submit();
             }
           }}
-          className="min-h-11 flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-11 flex-1"
         />
-        <button
-          type="submit"
-          disabled={!canSend}
-          className="h-11 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button size="lg" disabled={!canSend}>
           Send
-        </button>
+        </Button>
       </div>
     </form>
   );

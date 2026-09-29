@@ -23,6 +23,8 @@ export const requireUser = cache(async () => {
 export type Profile = {
   name: string;
   email: string | null;
+  /** Their @username; null before their profile exists. */
+  username: string | null;
   /** A profile picture, e.g. from Google; null shows the initial instead. */
   avatarUrl: string | null;
 };
@@ -40,6 +42,7 @@ export function profileOf(user: User): Profile {
       user.email?.split("@")[0] ??
       "Pigxel artist",
     email: user.email ?? null,
+    username: null,
     avatarUrl: avatar?.startsWith("https://") ? avatar : null,
   };
 }

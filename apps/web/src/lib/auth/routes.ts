@@ -1,7 +1,14 @@
 /** Where signed-in people land after logging in or returning to the site. */
 export const HOME_PATH = "/home";
 
-const protectedPaths = ["/home", "/tiles", "/account", "/auth/update-password"];
+const protectedPaths = [
+  "/home",
+  "/tiles",
+  "/settings",
+  "/profile",
+  "/u",
+  "/auth/update-password",
+];
 
 export function isProtectedPath(pathname: string) {
   return protectedPaths.some(
@@ -14,7 +21,8 @@ const returnPaths = [
   "/tiles",
   "/tiles/new",
   "/tiles/edit",
-  "/account",
+  "/settings/account",
+  "/settings/profile",
   "/auth/update-password",
 ];
 

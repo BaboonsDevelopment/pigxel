@@ -76,7 +76,7 @@ function gridFit(runs: Map<number, number>, cell: number) {
  * stretches fit, then the most precise size just below it, as the slack also
  * lets slightly-too-large sizes pass.
  */
-export function estimateCellSize(image: Bitmap): number | null {
+function estimateCellSize(image: Bitmap): number | null {
   const runs = runLengths(image);
   let largest = 0;
   for (let cell = MAX_GRID_CELL; cell >= MIN_GRID_CELL; cell -= GRID_STEP) {

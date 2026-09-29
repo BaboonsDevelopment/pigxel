@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { FormMessage } from "@pigxel/ui/components/field";
+import { SectionTitle } from "@pigxel/ui/components/typography";
 import {
   CloudError,
   deleteCloudTile,
@@ -23,10 +25,13 @@ export function CloudTiles({
   /** Shows only the most recent tiles, e.g. on Home. */
   limit?: number;
 }) {
-  const tiles = limit ? allTiles.slice(0, limit) : allTiles;
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Deleted tiles disappear at once; one comes back if deleting it fails.
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
+  const visible = allTiles.filter((tile) => !removed.has(tile.id));
+  const tiles = limit ? visible.slice(0, limit) : visible;
 
   const open = async (tile: CloudTileSummary) => {
     setBusy(tile.id);
@@ -50,8 +55,8 @@ export function CloudTiles({
 
   const remove = async (tile: CloudTileSummary) => {
     if (!window.confirm(`Delete “${tile.name}” from Pigxel cloud?`)) return;
-    setBusy(tile.id);
     setError(null);
+    setRemoved((ids) => new Set(ids).add(tile.id));
     try {
       await deleteCloudTile(tile.id);
       // A copy open in this browser stays, as a tile kept only here.
@@ -69,24 +74,27 @@ export function CloudTiles({
         });
       router.refresh();
     } catch (e) {
+      setRemoved((ids) => {
+        const next = new Set(ids);
+        next.delete(tile.id);
+        return next;
+      });
       setError(
         e instanceof CloudError ? e.message : "Couldn’t delete the tile.",
       );
-    } finally {
-      setBusy(null);
     }
   };
 
   if (tiles.length === 0) return null;
   return (
     <section aria-labelledby="cloud-tiles-heading" className="mt-12">
-      <h2 id="cloud-tiles-heading" className="mb-4 font-semibold">
+      <SectionTitle id="cloud-tiles-heading" className="mb-4">
         In Pigxel cloud
-      </h2>
+      </SectionTitle>
       {error && (
-        <p role="alert" className="mb-4 text-sm text-destructive">
+        <FormMessage tone="error" className="mb-4">
           {error}
-        </p>
+        </FormMessage>
       )}
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
         {tiles.map((tile) => (
@@ -100,12 +108,14 @@ export function CloudTiles({
               onClick={() => void open(tile)}
               className="block w-full text-left disabled:opacity-60"
             >
-              <span className="flex aspect-square items-center justify-center bg-[repeating-conic-gradient(#e5e5e5_0_25%,#fff_0_50%)] bg-[length:12px_12px] p-4">
+              <span className="flex aspect-square items-center justify-center bg-checker p-4">
                 {tile.thumbnail && (
                   // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
                   <img
                     src={tile.thumbnail}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="size-full object-contain [image-rendering:pixelated]"
                   />
                 )}

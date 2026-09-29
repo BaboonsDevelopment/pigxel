@@ -9,6 +9,7 @@ import {
   type Size,
 } from "../constants";
 import { adjustFrame } from "../helpers";
+import { Button } from "@pigxel/ui/components/button";
 
 type Props = {
   frame: Area;
@@ -88,20 +89,18 @@ export function FrameEditor({
         className="absolute top-full left-0 mt-2 flex items-center gap-2 whitespace-nowrap"
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground shadow hover:bg-primary/90"
-        >
+        <Button type="button" size="sm" onClick={onConfirm}>
           Generate here
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
+          className="shadow"
           onClick={onCancel}
-          className="rounded-md border bg-background px-3 py-1 text-xs shadow hover:bg-muted"
         >
           Cancel
-        </button>
+        </Button>
         <span className="rounded bg-amber-400 px-2 py-0.5 text-xs text-black tabular-nums">
           {frame.w} × {frame.h}
         </span>

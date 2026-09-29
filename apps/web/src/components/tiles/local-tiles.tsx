@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { EmptyState } from "@pigxel/ui/components/empty-state";
+import { SectionTitle } from "@pigxel/ui/components/typography";
 import { listDrafts, removeDraft, type Draft } from "@/lib/pigxel-file/draft";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
-  type PigxelImage,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useIsClient } from "@/lib/use-is-client";
 import { TileThumbnail } from "./tile-thumbnail";
 
-type LocalTile = Draft & { image: PigxelImage };
+type LocalTile = Draft & { image: PigxelDocument };
 
 /**
  * Tiles kept in this browser that aren't in Pigxel cloud: ones stored nowhere
@@ -63,19 +65,18 @@ function List({
 
   if (tiles.length === 0)
     return hasCloudTiles ? null : (
-      <div className="mt-8 rounded-lg border border-dashed px-6 py-16 text-center">
-        <p className="font-medium">No tiles yet</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Create your first tile to start drawing.
-        </p>
-      </div>
+      <EmptyState
+        className="mt-8"
+        title="No tiles yet"
+        description="Create your first tile to start drawing."
+      />
     );
 
   return (
     <section aria-labelledby="local-tiles-heading" className="mt-10">
-      <h2 id="local-tiles-heading" className="mb-4 font-semibold">
+      <SectionTitle id="local-tiles-heading" className="mb-4">
         In this browser
-      </h2>
+      </SectionTitle>
       <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
         {tiles.map((tile) => (
           <li
@@ -83,7 +84,7 @@ function List({
             className="group relative overflow-hidden rounded-lg border"
           >
             <Link href={editorUrl(tile.id)} className="block">
-              <span className="flex aspect-square items-center justify-center bg-[repeating-conic-gradient(#e5e5e5_0_25%,#fff_0_50%)] bg-[length:12px_12px] p-4">
+              <span className="flex aspect-square items-center justify-center bg-checker p-4">
                 <TileThumbnail image={tile.image} />
               </span>
               <span className="block border-t px-3 py-2">

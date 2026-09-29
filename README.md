@@ -17,10 +17,14 @@ Open http://localhost:3000. The landing page works without credentials. Connect 
 
 ```text
 apps/web/                    Next.js App Router + TypeScript
-  src/app/                   Landing, login/signup, account, auth callbacks
+  src/app/                   Landing, login, tiles, editor, profiles, settings, auth callbacks
+  src/components/            Editor canvas and tools, AI chat, app shell, profile UI
+  src/lib/edit/, lib/image/  Pixel editing operations and picture-to-pixel-art pipeline
+  src/lib/ai/                AI helper (Gemini)
+  src/lib/profile/           Artist profiles: validation and queries
   src/lib/supabase/          Browser/server clients and configuration
-  src/lib/paddle/            Server-only Paddle client
-  src/proxy.ts              Supabase session refresh when configured
+  src/lib/paddle/            Server-only Paddle client (billing comes next)
+  src/proxy.ts               Supabase session refresh when configured
 packages/ui/                 Tailwind theme, shadcn configuration, cn utility
 packages/typescript-config/  Shared TypeScript settings
 packages/eslint-config/      Shared ESLint settings
@@ -44,19 +48,25 @@ Shared components go into `packages/ui` through the configured aliases.
 
 Copy `apps/web/.env.example` to `apps/web/.env.local` when connecting services.
 
-- **Supabase:** set the public URL and publishable key. Local development requires Docker: `pnpm db:start` starts Supabase, and `pnpm db:stop` stops it. Email/password login, signup (no email confirmation), password recovery, session refresh, and sign-out are implemented. `/account` verifies the user on the server.
+- **Supabase:** set the public URL and publishable key. Local development requires Docker: `pnpm db:start` starts Supabase, and `pnpm db:stop` stops it. Apply the migrations in `supabase/migrations` (`pnpm exec supabase db push` for a linked project).
+- **Gemini:** set `GEMINI_API_KEY` for the AI helper in the editor.
 - **Paddle:** set the server API key and environment (defaults to `sandbox`). The server client is ready; add checkout, webhook verification, and subscription storage when implementing billing.
-
-There are no application database tables, payment endpoints, editor code, or AI provider integrations yet. No remote services are provisioned.
 
 ## Supabase Auth setup
 
 1. In `apps/web/.env.local`, set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `APP_URL` (locally `http://localhost:3000`). Restart the dev server after changing these values.
 2. In Supabase Auth, enable the Email provider and turn **Confirm email** off (Authentication → Sign In / Providers → Email). Signup then signs the user in immediately. Set Site URL to your app origin and allow `${APP_URL}/auth/callback?next=/auth/update-password` and `${APP_URL}/auth/confirm` as redirect URLs (replace `${APP_URL}` with the actual origin).
 3. For password reset links that work across browsers, replace the **Reset password** email template with the contents of `supabase/templates/recovery.html`. Local Supabase already uses it.
-4. Create an account at `/login?mode=signup`; you land on `/tiles` right away. Local reset emails are available at http://localhost:54324. Use a configured SMTP provider for production emails.
+4. Create an account at `/login?mode=signup`; you land on `/home` right away. Local reset emails are available at http://localhost:54324. Use a configured SMTP provider for production emails.
+5. For email changes from Settings → Account, also allow `${APP_URL}/auth/callback?next=/settings/account`.
 
-Successful authentication opens `/tiles`, which has the **Create tile** button; `/account` shows the signed-in email and a sign-out button. The session is kept in cookies and refreshed by `src/proxy.ts` on every page, so returning visitors of `/` or `/login` go straight to `/tiles`. The proxy redirects signed-out visitors of `/tiles`, `/account`, and `/auth/update-password` to `/login` (the list lives in `src/lib/auth/routes.ts`), and each protected page verifies the user again on the server. No service-role key or custom database migration is required for authentication. Signup does not send a confirmation email. Password reset links that return to the landing page with a code are forwarded to the callback; open default reset links in the same browser that requested them. The forgot-password link is on `/login`. Recovery links open `/auth/update-password`; it verifies the user before changing their password and returning to `/account`. OAuth is not enabled.
+The session is kept in cookies and refreshed by `src/proxy.ts` on every page, so returning visitors of `/` or `/login` go straight to `/home`. The proxy redirects signed-out visitors of the signed-in pages to `/login` (the list lives in `src/lib/auth/routes.ts`), and each protected page verifies the user again on the server. Signup does not send a confirmation email. Password reset links that return to the landing page with a code are forwarded to the callback; open default reset links in the same browser that requested them. The forgot-password link is on `/login`. Recovery links open `/auth/update-password`; it verifies the user before changing their password and returning to Settings → Account.
+
+## Profiles and settings
+
+Every account gets a profile (`supabase/migrations/20260929120000_profiles.sql`) with a username, display name, description (up to 200 characters), up to three links, an avatar and a public/private setting. `/u/<username>` shows the profile, its art count, pinned arts (up to six) and published arts; `/profile` goes to your own. Tiles in Pigxel cloud stay private until published from the profile. `/settings` has Profile, Account (email, password, connected Google/Apple sign-in, Google Drive, sign-out), Subscription and Privacy tabs.
+
+Apple sign-in is optional: it needs an Apple Developer account, the Apple provider enabled in Supabase, and `APPLE_CLIENT_ID` in `apps/web/.env.local`. Without it, the Apple buttons stay hidden.
 
 Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs).
 
@@ -72,9 +82,9 @@ Tiles kept in **Pigxel cloud** (the default on `/tiles/new`) are stored in Supab
 
 ### Google sign-in and Google Drive
 
-People connect **their own** Google Drive through Supabase Auth: **Continue with Google** on the login page signs in and connects Drive at once, and people who signed up with email use **Connect Google Drive** (on the account page, the new-tile form or the editor) to link a Google account. Pigxel asks only for `drive.file`, so it can reach just the files it creates, and Google doesn’t require a security review.
+People connect **their own** Google Drive through Supabase Auth: **Continue with Google** on the login page signs in and connects Drive at once, and people who signed up with email use **Connect Google Drive** (in Settings → Account, the new-tile form or the editor) to link a Google account (also possible under Settings → Account). Pigxel asks only for `drive.file`, so it can reach just the files it creates, and Google doesn’t require a security review.
 
-Supabase hands over Google’s access token only once and doesn’t renew it, so `/auth/callback` stores the Google refresh token in `google_drive_connections` (RLS on, no policies: only the server’s secret key can read it). The browser asks `POST /api/google-drive/token` for a short-lived access token and talks to Drive directly, so autosave keeps working across reloads. **Disconnect Google Drive** on the account page deletes the token and revokes Pigxel’s access at Google.
+Supabase hands over Google’s access token only once and doesn’t renew it, so `/auth/callback` stores the Google refresh token in `google_drive_connections` (RLS on, no policies: only the server’s secret key can read it). The browser asks `POST /api/google-drive/token` for a short-lived access token and talks to Drive directly, so autosave keeps working across reloads. **Disconnect Google Drive** in Settings → Account deletes the token and revokes Pigxel’s access at Google.
 
 One-time setup:
 
