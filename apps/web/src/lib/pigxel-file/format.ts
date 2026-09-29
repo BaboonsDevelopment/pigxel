@@ -1,3 +1,4 @@
+import { deflateSync, inflateSync } from "fflate";
 import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
@@ -7,11 +8,11 @@ import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
 
 /**
- * The .pigxel file format: UTF-8 JSON with the pixels as base64 RGBA.
+ * The .pigxel file format: UTF-8 JSON with the pixels as compressed base64.
  *
  * {
  *   "format": "pigxel",
- *   "version": 3,
+ *   "version": 4,
  *   "width": 32,
  *   "height": 32,
  *   "background": "white",
@@ -23,27 +24,29 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *       "locked": false, "opacity": 255, "blend": "normal", "collapsed": false,
  *       "children": [ …layers… ] }
  *   ],
- *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64>" }, …]
+ *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …]
  * }
  *
  * `frames` are the animation in playing order, each shown for `duration`
  * milliseconds; a still tile has one. `layers` is listed bottom to top; a
  * group lists its own layers the same way. A cel is one layer's pixels in one
  * frame: width × height × 4 bytes (red, green, blue, alpha), row by row from
- * the top-left. A layer with no cel in a frame is empty there. `opacity`
+ * the top-left, compressed with DEFLATE (raw, RFC 1951) and base64-encoded;
+ * pixel art shrinks many times over. A layer with no cel in a frame is empty
+ * there. `opacity`
  * runs 0–255 and `blend` is one of the blend modes in lib/layers.
  * `background` (default "transparent") is what the eraser paints on the
  * Background layer.
  *
- * Version 2 had no frames: every layer but a group carried its `pixels`.
+ * Version 3 was the same with uncompressed cels. Version 2 had no frames: every layer but a group carried its `pixels`.
  * Version 1 had only a flat list of `{ name, visible, opacity (0–1), pixels }`
- * layers. Both are still read, as one frame. Bump `version` whenever the
+ * layers; those two are read as one frame. All are still read. Bump `version` whenever the
  * shape changes, and keep reading older versions.
  */
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 3;
+export const PIGXEL_VERSION = 4;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -155,7 +158,7 @@ export function serializePigxel(doc: PigxelDocument): string {
       .map(([layer, pixels]) => ({
         frame: frame.id,
         layer,
-        pixels: toBase64(pixels),
+        pixels: encodeCel(pixels),
       })),
   );
   return JSON.stringify({
@@ -192,11 +195,16 @@ export function parsePigxel(text: string): PigxelDocument {
     );
   const background =
     BACKGROUNDS.find((b) => b === file.background) ?? "transparent";
+  // Cels are compressed from version 4 on.
+  const compressed = file.version >= 4;
   const readPixels = (value: unknown) => {
     if (typeof value !== "string") throw DAMAGED();
     let data: Uint8ClampedArray;
     try {
-      data = fromBase64(value);
+      const bytes = fromBase64(value);
+      data = compressed
+        ? new Uint8ClampedArray(inflateSync(new Uint8Array(bytes.buffer)))
+        : bytes;
     } catch {
       throw DAMAGED();
     }
@@ -372,7 +380,24 @@ function isValidSize(value: unknown): value is number {
   );
 }
 
-function toBase64(bytes: Uint8ClampedArray) {
+// Saving happens on every change (the draft), while most cels stay the same:
+// each cel's encoding is kept for as long as its pixels are.
+const encoded = new WeakMap<Uint8ClampedArray, string>();
+
+function encodeCel(pixels: Uint8ClampedArray) {
+  let text = encoded.get(pixels);
+  if (text === undefined) {
+    text = toBase64(
+      deflateSync(
+        new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength),
+      ),
+    );
+    encoded.set(pixels, text);
+  }
+  return text;
+}
+
+function toBase64(bytes: Uint8Array) {
   let binary = "";
   // Chunked so large tiles don't overflow the argument limit.
   for (let i = 0; i < bytes.length; i += 0x8000)

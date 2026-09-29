@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  MAX_FRAME_DURATION,
-  MIN_FRAME_DURATION,
-} from "@/lib/sprite/constants";
+import { MAX_FRAME_DURATION, MIN_FRAME_DURATION } from "@/lib/sprite/constants";
 
 /**
  * How long the active frame shows, in milliseconds. The change is kept on

@@ -145,7 +145,10 @@ export function PixelCanvas({
         0,
       );
   });
-  useLayoutEffect(() => paintScreen(), [sprite.version, sprite.tree, sprite.frameId, size]);
+  useLayoutEffect(
+    () => paintScreen(),
+    [sprite.version, sprite.tree, sprite.frameId, size],
+  );
 
   const finishSelection = useCallback((area: Area | null) => {
     resolveSelection.current?.(area);

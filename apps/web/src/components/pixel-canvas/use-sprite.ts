@@ -4,10 +4,7 @@ import { useRef, useState } from "react";
 import { flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
-import {
-  backgroundColor,
-  type PigxelDocument,
-} from "@/lib/pigxel-file/format";
+import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import * as frameList from "@/lib/sprite/frames";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
@@ -72,11 +69,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     isBackground(id) ? backgroundColor(background) : null;
 
   /** Adds a cel: a copy of `pixels`, or empty (the Background filled). */
-  const addCel = (
-    frame: string,
-    layer: string,
-    pixels?: Uint8ClampedArray,
-  ) => {
+  const addCel = (frame: string, layer: string, pixels?: Uint8ClampedArray) => {
     const canvas = cels.set(frame, layer, size, pixels);
     const fill = !pixels && fillOf(layer);
     const ctx = contextOf(canvas);
@@ -101,12 +94,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
 
   /** A frame's layers combined (the active frame by default), without the kinds in `skip`. */
   const composite = (skip: LayerKind[] = [], frame = frameId) =>
-    flatten(
-      tree,
-      (id) => cels.pixels(frame, id),
-      size.w * size.h * 4,
-      skip,
-    );
+    flatten(tree, (id) => cels.pixels(frame, id), size.w * size.h * 4, skip);
 
   /** Marks the active cel as drawn on; the screen repaints. */
   const touched = () => {
@@ -138,7 +126,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     for (const cel of cels.list()) {
       const frameCels = snapshot.cels.get(cel.frameId);
       const drawn = changed.current.has(cel.canvas);
-      const kept = !drawn && frameList.celOf(present.cels, cel.frameId, cel.layerId);
+      const kept =
+        !drawn && frameList.celOf(present.cels, cel.frameId, cel.layerId);
       const pixels = kept || cels.pixels(cel.frameId, cel.layerId)!;
       const erased =
         drawn &&
@@ -223,11 +212,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     if (pixels) for (const frame of frames) addCel(frame.id, layer.id, pixels);
     setLayerId(layer.id);
     changeTree(
-      layerTree.insertLayer(
-        tree,
-        layer,
-        layerTree.placeAbove(tree, layerId),
-      ),
+      layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId)),
     );
   };
 
@@ -249,9 +234,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       if (!kept.has(gone)) cels.deleteLayer(gone);
     if (!layerTree.findLayer(next, layerId))
       setLayerId(
-        neighbour?.id ??
-          found?.parent?.id ??
-          layerTree.pixelLayerIds(next)[0]!,
+        neighbour?.id ?? found?.parent?.id ?? layerTree.pixelLayerIds(next)[0]!,
       );
     changeTree(next);
   };
@@ -339,7 +322,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
           duration: frameList.clampDuration(ms),
         }),
       ),
-    /** The tile as a document, for saving. */
+    /** The tile as a document, for saving. Its pixels are shared: never modify them. */
     document: (): PigxelDocument => ({
       width: size.w,
       height: size.h,
@@ -350,12 +333,10 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
         frames.map((frame) => [
           frame.id,
           new Map(
-            layerTree
-              .pixelLayerIds(tree)
-              .flatMap((id) => {
-                const pixels = cels.pixels(frame.id, id);
-                return pixels ? [[id, pixels.slice()] as const] : [];
-              }),
+            layerTree.pixelLayerIds(tree).flatMap((id) => {
+              const pixels = cels.pixels(frame.id, id);
+              return pixels ? [[id, pixels] as const] : [];
+            }),
           ),
         ]),
       ),

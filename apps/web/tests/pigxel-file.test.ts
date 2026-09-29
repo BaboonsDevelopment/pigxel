@@ -55,7 +55,7 @@ describe(".pigxel format", () => {
   it("writes a versioned document with frames, layer settings and cels", () => {
     expect(valid).toMatchObject({
       format: "pigxel",
-      version: 3,
+      version: 4,
       width: 2,
       height: 2,
       frames: [{ duration: 100 }],
@@ -111,6 +111,14 @@ describe(".pigxel format", () => {
     expect(parsed.layers).toEqual(layers);
     expect(parsed.cels).toEqual(original.cels);
   });
+  it("compresses cels: an empty 256×256 layer takes a few hundred bytes", () => {
+    const doc = document(256, 256);
+    const id = doc.layers[0]!.id;
+    doc.cels
+      .get(doc.frames[0]!.id)!
+      .set(id, new Uint8ClampedArray(256 * 256 * 4));
+    expect(serializePigxel(doc).length).toBeLessThan(1000);
+  });
   it("round-trips frames in order, with durations and empty cels", () => {
     const doc = document(1, 1);
     const layer = doc.layers[0]!.id;
@@ -130,7 +138,7 @@ describe(".pigxel format", () => {
     }
   });
   it("rejects files from a newer version", () => {
-    expect(() => parsePigxel(file({ ...valid, version: 4 }))).toThrow(
+    expect(() => parsePigxel(file({ ...valid, version: 5 }))).toThrow(
       "newer version",
     );
   });
@@ -177,6 +185,17 @@ describe(".pigxel format", () => {
 });
 
 describe("older files", () => {
+  it("reads a version 3 file, whose cels aren't compressed", () => {
+    const v3 = file({
+      ...valid,
+      version: 3,
+      cels: [{ ...valid.cels[0], pixels: btoa("ÿ".repeat(4)) }],
+    });
+    expect([...firstCel(parsePigxel(v3))!]).toEqual(
+      Array(4).fill([1, 2, 3, 255]).flat(),
+    );
+  });
+
   it("reads a version 2 file as one frame", () => {
     const v2 = file({
       format: "pigxel",

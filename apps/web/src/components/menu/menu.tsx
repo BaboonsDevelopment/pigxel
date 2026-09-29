@@ -4,14 +4,17 @@ import { useEffect, useRef } from "react";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import type { MenuItem } from "../constants";
 
-/** A small dropdown built on <details>, closed on selection or an outside click. */
+/**
+ * A small dropdown built on <details>, closed on selection or an outside
+ * click. Its items come in groups, divided by a line.
+ */
 export function Menu({
   label,
-  items,
+  sections,
   disabled,
 }: {
   label: string;
-  items: MenuItem[];
+  sections: MenuItem[][];
   disabled?: boolean;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
@@ -54,11 +57,19 @@ export function Menu({
         role="menu"
         className="absolute left-0 z-20 mt-1 min-w-60 rounded-lg border bg-background p-1 shadow-lg"
       >
-        {items
-          .filter((item) => !item.hidden)
-          .map((item) => (
-            <MenuButton key={item.label} item={item} onDone={close} />
-          ))}
+        {sections.map((items, index) => (
+          <div
+            key={index}
+            role="group"
+            className="border-t py-1 first:border-t-0 first:pt-0 last:pb-0"
+          >
+            {items
+              .filter((item) => !item.hidden)
+              .map((item) => (
+                <MenuButton key={item.label} item={item} onDone={close} />
+              ))}
+          </div>
+        ))}
       </div>
     </details>
   );

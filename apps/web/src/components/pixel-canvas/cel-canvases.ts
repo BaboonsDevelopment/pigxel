@@ -35,9 +35,12 @@ export class CelCanvases {
     frameId: string,
     layerId: string,
     size: Size,
-    pixels = new Uint8ClampedArray(size.w * size.h * 4),
+    pixels?: Uint8ClampedArray,
   ) {
-    const canvas = canvasOf(pixels, size);
+    const canvas = canvasOf(
+      pixels ?? new Uint8ClampedArray(size.w * size.h * 4),
+      size,
+    );
     let frame = this.frames.get(frameId);
     if (!frame) this.frames.set(frameId, (frame = new Map()));
     frame.set(layerId, canvas);
