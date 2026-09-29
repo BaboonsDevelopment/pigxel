@@ -5,7 +5,7 @@ import {
   generateImage,
   sendMessage,
   suggestComposition,
-} from "@/app/tiles/new/actions";
+} from "@/lib/ai/actions";
 import type { Area } from "@/components/pixel-canvas/constants";
 import { atLeastPlacementSize } from "@/components/pixel-canvas/helpers";
 import { ChatComposer } from "./components/chat-composer";

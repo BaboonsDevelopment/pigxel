@@ -10,7 +10,7 @@ export function editorUrl(draftId: string) {
 }
 
 const FULL = new PigxelFileError(
-  "This browser can’t keep more tiles. Remove some from Your tiles, or save them to Pigxel cloud.",
+  "This browser can’t keep more tiles. Remove some from My projects, or save them to Pigxel cloud.",
 );
 
 /** Starts a draft for file contents; checks they are a valid .pigxel file first. */

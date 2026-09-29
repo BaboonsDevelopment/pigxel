@@ -15,11 +15,15 @@ import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 /** The person's Pigxel cloud tiles; each opens in its own editor draft. */
 export function CloudTiles({
   userId,
-  tiles,
+  tiles: allTiles,
+  limit,
 }: {
   userId: string;
   tiles: CloudTileSummary[];
+  /** Shows only the most recent tiles, e.g. on Home. */
+  limit?: number;
 }) {
+  const tiles = limit ? allTiles.slice(0, limit) : allTiles;
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
