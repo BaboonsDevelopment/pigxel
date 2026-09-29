@@ -23,7 +23,7 @@ export const MAX_POINTS_PER_OP = 4096;
 export const OPS = [
   {
     syntax: "pal <char> <#rrggbb>",
-    doc: "bind a NEW colour to a character before using it",
+    doc: "new char: add a colour; existing char: recolour all its pixels",
   },
   { syntax: "px <char> <x,y> <x,y> ...", doc: "set individual pixels" },
   {

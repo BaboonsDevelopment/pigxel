@@ -52,7 +52,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
       await canvas.place(result.value, area, replace);
       append({
         role: "assistant",
-        content: "Here is your picture.",
+        content: `Here is your picture: ${subject}.`,
         image: result.value,
       });
     } else {
@@ -112,7 +112,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
   };
 
   /** Exact pixel operations inside `area` (free); null when it failed. */
-  const editPixels = async (instruction: string, area: Area) => {
+  const editPixels = async (instruction: string, area: Area, keep: Area[]) => {
     const tile = canvas.encode(area);
     const result = await editTile(instruction, tile.text).catch(
       () => UNREACHABLE,
@@ -121,11 +121,16 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
       setError(result.error);
       return null;
     }
-    return canvas.applyEdit(result.value.ops, tile.palette, area) > 0;
+    return canvas.applyEdit(result.value.ops, tile.palette, area, keep) > 0;
   };
 
   /** The image model redraws `source` into `target` (paid); null when it failed. */
-  const redraw = async (instruction: string, source: Area, target: Area) => {
+  const redraw = async (
+    instruction: string,
+    source: Area,
+    target: Area,
+    keep: Area[],
+  ) => {
     const picture = canvas.snapshot(source, CHROMA_KEY_HEX);
     const result = await redrawArea(
       instruction,
@@ -138,7 +143,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
       return null;
     }
     if (sameArea(source, target)) {
-      await canvas.applyRedraw(result.value, target);
+      await canvas.applyRedraw(result.value, target, keep);
     } else {
       await canvas.replaceObject(result.value, source, target);
     }
@@ -169,7 +174,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     setPending(false);
     if (!plan.ok) return setError(plan.error);
 
-    const { mode, source, instruction, summary } = plan.value;
+    const { mode, source, keep, instruction, summary } = plan.value;
     let target = plan.value.target;
     if (!sameArea(source, target)) {
       const adjusted = await canvas.adjustArea(target);
@@ -179,11 +184,14 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
 
     setPending(true);
     if (mode === "ops") {
-      const changed = await editPixels(instruction, source);
+      const changed = await editPixels(instruction, source, keep);
       if (changed) say(summary || "Done.");
       else if (changed === false) say("Nothing on the tile changed.");
+    } else if (mode === "move") {
+      canvas.moveObject(source, target);
+      say(summary || "Done.");
     } else {
-      const image = await redraw(instruction, source, target);
+      const image = await redraw(instruction, source, target, keep);
       if (image)
         append({ role: "assistant", content: summary || "Done.", image });
     }

@@ -141,12 +141,30 @@ export function applyOps(
   };
   const rgbaAt = (p: Point) =>
     pixels.slice((p.y * width + p.x) * 4, (p.y * width + p.x) * 4 + 4);
+  /** Every pixel of the area that has exactly the colour `c`. */
+  const pixelsOf = (c: RGBA) => {
+    const match: Point[] = [];
+    for (let y = area.y; y < area.y + area.h; y++) {
+      for (let x = area.x; x < area.x + area.w; x++) {
+        const [r, g, b, a] = rgbaAt({ x, y });
+        const same =
+          c.a === 0 ? a === 0 : a !== 0 && r === c.r && g === c.g && b === c.b;
+        if (same) match.push({ x, y });
+      }
+    }
+    return match;
+  };
 
   ops.forEach((op, i) => {
     switch (op.t) {
-      case "pal":
+      case "pal": {
+        // Rebinding a colour already in the grid recolours its pixels: that
+        // is what the model means when it answers "pal 3 #aa2211".
+        const before = op.c in palette ? color(op.c) : null;
         colors[op.c] = op.hex;
+        if (before) draw(i, pixelsOf(before), op.c);
         return;
+      }
       case "px":
         return void draw(i, op.pts, op.c);
       case "blit": {
@@ -182,18 +200,7 @@ export function applyOps(
         const from = color(op.from);
         if (!from)
           return void errors.push(`op ${i}: unknown colour "${op.from}"`);
-        const match: Point[] = [];
-        for (let y = area.y; y < area.y + area.h; y++) {
-          for (let x = area.x; x < area.x + area.w; x++) {
-            const [r, g, b, a] = rgbaAt({ x, y });
-            const same =
-              from.a === 0
-                ? a === 0
-                : a !== 0 && r === from.r && g === from.g && b === from.b;
-            if (same) match.push({ x, y });
-          }
-        }
-        return void draw(i, match, op.to);
+        return void draw(i, pixelsOf(from), op.to);
       }
       case "mirror": {
         const half =

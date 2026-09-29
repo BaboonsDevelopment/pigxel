@@ -25,14 +25,21 @@ export type CanvasBridge = {
   paintedArea: (area: Area) => Area;
   /** `area` as the text grid a precise edit is made on. */
   encode: (area: Area) => EncodedTile;
-  /** Runs a precise edit's operations inside `area`; returns how many worked. */
+  /**
+   * Runs a precise edit's operations inside `area`; returns how many worked.
+   * The objects boxed in `keep` are left exactly as they are.
+   */
   applyEdit: (
     ops: string[],
     palette: Record<string, string>,
     area: Area,
+    keep: Area[],
   ) => number;
-  /** Puts a redrawn picture of `area` back, changing only what differs. */
-  applyRedraw: (image: string, area: Area) => Promise<void>;
+  /**
+   * Puts a redrawn picture of `area` back, changing only what differs and
+   * leaving the objects boxed in `keep` exactly as they are.
+   */
+  applyRedraw: (image: string, area: Area, keep: Area[]) => Promise<void>;
   /** Boxes of the separate drawn things on the tile, biggest first. */
   objects: () => Area[];
   /**
@@ -40,6 +47,8 @@ export type CanvasBridge = {
    * edits that move or resize it; other drawings are left alone.
    */
   replaceObject: (image: string, source: Area, target: Area) => Promise<void>;
+  /** Moves the drawn things inside `source` to `target`, pixel for pixel. */
+  moveObject: (source: Area, target: Area) => void;
 };
 
 /** A way to add a new picture to a tile that already has something on it. */

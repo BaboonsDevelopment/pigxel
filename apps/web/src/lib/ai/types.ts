@@ -30,23 +30,26 @@ export type EditReply = { summary: string; ops: string[] };
 /**
  * How an edit is carried out. `source` is what gets changed, `target` where
  * the result goes: the same box for an in-place change, another box to move
- * or resize. "ops" edits pixels precisely (free); "redraw" has the image
- * model paint the result (paid).
+ * or resize. "ops" edits pixels precisely and "move" copies them exactly
+ * (both free); "redraw" has the image model paint the result (paid).
  */
 export type EditPlan = {
-  mode: "ops" | "redraw";
+  mode: "ops" | "move" | "redraw";
   source: Rect;
   target: Rect;
+  /** Objects inside `source` that must stay exactly as they are. */
+  keep: Rect[];
   /** A clear English instruction for the model that does the edit. */
   instruction: string;
   /** One short sentence for the user, in their language. */
   summary: string;
 };
 
-/** The planner's raw answer; `object` indexes the objects it was shown. */
+/** The planner's raw answer; `objects` index the objects it was shown. */
 export type PlanReply = {
   mode: EditPlan["mode"];
-  object: number;
+  objects: number[];
+  keep: number[];
   target: Rect;
   instruction: string;
   summary: string;
@@ -54,7 +57,7 @@ export type PlanReply = {
 
 export interface AiProvider {
   /** Decides what the user wants. Free text model. */
-  route(message: string): Promise<Route>;
+  route(messages: ChatMessage[]): Promise<Route>;
   /** Plain conversation. Free text model. */
   chat(messages: ChatMessage[]): Promise<string>;
   /** Precise edit: reads the tile grid, answers with operations. Free text model. */
