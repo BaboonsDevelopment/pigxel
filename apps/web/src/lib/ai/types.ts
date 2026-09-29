@@ -3,6 +3,10 @@ export type TileAction = {
   kind: "generate" | "edit";
   /** For generate: a clean subject description; otherwise the user's words. */
   request: string;
+  /** For generate: where the user wants it, in their words; "" when unsaid. */
+  where?: string;
+  /** For generate: how many to add. */
+  count?: number;
 };
 
 export type ChatMessage = {
@@ -17,7 +21,16 @@ export type AiResult<T> = { ok: true; value: T } | { ok: false; error: string };
 type Intent = TileAction["kind"] | "chat";
 
 /** `subject` is a clean description of what to draw, set when generating. */
-export type Route = { intent: Intent; subject: string };
+/**
+ * `subject` is what to draw (generate) or the full request (edit); `where`
+ * and `count` say where and how many, for generate.
+ */
+export type Route = {
+  intent: Intent;
+  subject: string;
+  where: string;
+  count: number;
+};
 
 export type GeneratedImage = { mimeType: string; base64: string };
 
@@ -43,6 +56,8 @@ export type EditPlan = {
   instruction: string;
   /** One short sentence for the user, in their language. */
   summary: string;
+  /** Asks the user, in their language, to check the frame of a move or resize. */
+  question: string;
 };
 
 /** The planner's raw answer; `objects` index the objects it was shown. */
@@ -53,6 +68,27 @@ export type PlanReply = {
   target: Rect;
   instruction: string;
   summary: string;
+  question: string;
+};
+
+/**
+ * Where new pictures go on a tile that already has drawings. `copyOf`, when
+ * set, is an object to duplicate instead of generating; `ask` means no spot
+ * works without covering something, so the user should choose.
+ */
+export type PlacementPlan = {
+  copyOf: Rect | null;
+  areas: Rect[];
+  ask: boolean;
+  question: string;
+};
+
+/** The placement planner's raw answer; `copyOf` indexes the objects shown. */
+export type PlacementReply = {
+  copyOf: number;
+  areas: Rect[];
+  ask: boolean;
+  question: string;
 };
 
 export interface AiProvider {
@@ -72,6 +108,8 @@ export interface AiProvider {
   ): Promise<GeneratedImage>;
   /** Looks at the tile and picks where a new subject fits the scene. Free model. */
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;
+  /** Looks at the tile and decides where new pictures go. Free model. */
+  place(prompt: string, tile: GeneratedImage): Promise<PlacementReply>;
   /** Looks at the tile and decides how to carry out an edit. Free model. */
   plan(prompt: string, tile: GeneratedImage): Promise<PlanReply>;
 }

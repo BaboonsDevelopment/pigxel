@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -19,7 +20,7 @@ import {
 } from "@pigxel/ui/components/input";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
-import { ChatHeader } from "@/components/chat-panel/components/chat-header";
+import { PANEL_WIDTH } from "@/components/chat-panel/constants";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import {
@@ -27,6 +28,11 @@ import {
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
+import {
+  useLayers,
+  type LayersApi,
+} from "@/components/pixel-canvas/use-layers";
+import { LayersPanel } from "@/components/layers-panel/layers-panel";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
 import {
   listDrafts,
@@ -39,7 +45,7 @@ import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
-  type PigxelImage,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { useIsClient } from "@/lib/use-is-client";
 import { listCloudTiles } from "@/lib/pigxel-file/cloud";
@@ -64,8 +70,15 @@ const FilesDialog = dynamic(
 /** The chat's frame while its code loads. */
 function ChatPlaceholder() {
   return (
-    <aside className="flex min-h-0 flex-col border-l bg-background">
-      <ChatHeader />
+    <aside
+      style={{ width: PANEL_WIDTH.initial }}
+      className="flex min-h-0 flex-col border-l bg-background"
+    >
+      <header className="flex h-14 shrink-0 items-center border-b px-4">
+        <h2 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+          Assistant
+        </h2>
+      </header>
       <div className="space-y-3 p-4" aria-hidden="true">
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
@@ -168,7 +181,7 @@ function Editor({
   driveError,
   draft,
   image,
-}: EditorProps & { draft: Draft; image: PigxelImage }) {
+}: EditorProps & { draft: Draft; image: PigxelDocument }) {
   const router = useRouter();
   const [picking, setPicking] = useState<"cloud" | "drive" | null>(null);
   const [tool, setTool] = useState<ToolId>("pen");
@@ -179,12 +192,12 @@ function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const tile = useRef<LayersApi>(null);
   const file = useTileFile({
-    canvas,
+    tile,
     fileInput,
     userId,
     initial: draft,
-    initialBackground: image.background ?? "transparent",
     drive,
     onOpen: (id) => router.push(editorUrl(id)),
     notice: driveError
@@ -193,6 +206,12 @@ function Editor({
           text: "Google Drive wasn’t connected. Try again when you’re ready.",
         }
       : undefined,
+  });
+
+  // Every finished change to the layers marks the tile for saving.
+  const layers = useLayers(image, file.markDirty);
+  useLayoutEffect(() => {
+    tile.current = layers;
   });
 
   // Tool colour and sizes carry over to every tile.
@@ -242,7 +261,7 @@ function Editor({
   }, []);
 
   return (
-    <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_340px] grid-rows-[auto_auto_minmax(0,1fr)]">
+    <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]">
       <header className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
         <Link
           href="/tiles"
@@ -376,22 +395,26 @@ function Editor({
         <ToolOptions tool={tool} pen={pen} onChange={setPen} />
       </div>
       <ToolBar tool={tool} onSelect={setTool} />
-      <main ref={workspace} className="flex overflow-auto bg-muted p-12">
-        <div className="m-auto">
-          <PixelCanvas
-            ref={canvas}
-            tool={tool}
-            pen={pen}
-            scale={scale}
-            highlight={highlight}
-            background={file.background}
-            initialImage={image}
-            onChange={file.markDirty}
-            onPickColor={(color) => setPen((p) => ({ ...p, color }))}
-          />
-        </div>
-      </main>
-      <EditorChat canvas={canvas} onHighlight={setHighlight} />
+      <div className="flex min-h-0 flex-col">
+        <main
+          ref={workspace}
+          className="flex min-h-0 flex-1 overflow-auto bg-muted p-12"
+        >
+          <div className="m-auto">
+            <PixelCanvas
+              ref={canvas}
+              tool={tool}
+              pen={pen}
+              scale={scale}
+              layers={layers}
+              highlight={highlight}
+              onPickColor={(color) => setPen((p) => ({ ...p, color }))}
+            />
+          </div>
+        </main>
+        <LayersPanel layers={layers} />
+      </div>
+      <EditorChat canvas={canvas} layers={layers} onHighlight={setHighlight} />
       {picking === "cloud" && (
         <FilesDialog
           title="Open from Pigxel cloud"

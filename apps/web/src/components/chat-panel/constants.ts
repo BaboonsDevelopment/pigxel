@@ -13,8 +13,12 @@ export type CanvasBridge = {
   isEmpty: () => boolean;
   fullArea: () => Area;
   freeArea: () => Area | null;
-  /** The tile (or `area`) as an enlarged PNG data URL. */
+  /** Whether the selected layer can be drawn on (shown, unlocked, not a group). */
+  canPaint: () => boolean;
+  /** The tile (or `area`) as an enlarged PNG data URL, every layer combined. */
   snapshot: (area?: Area, background?: string) => string;
+  /** `area` of the selected layer alone, as an enlarged PNG data URL. */
+  snapshotLayer: (area: Area, background: string) => string;
   selectArea: () => Promise<Area | null>;
   /** Lets the user move and resize a proposed area; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
@@ -49,6 +53,12 @@ export type CanvasBridge = {
   replaceObject: (image: string, source: Area, target: Area) => Promise<void>;
   /** Moves the drawn things inside `source` to `target`, pixel for pixel. */
   moveObject: (source: Area, target: Area) => void;
+  /** True when noticeably much of `area` is already drawn on. */
+  overlapsDrawing: (area: Area) => boolean;
+  /** Copies the drawn things inside `source` into each of `targets`. */
+  copyObject: (source: Area, targets: Area[]) => void;
+  /** Puts one generated picture into each area, only on empty pixels. */
+  placeMany: (image: string, areas: Area[]) => Promise<void>;
 };
 
 /** A way to add a new picture to a tile that already has something on it. */
@@ -68,3 +78,14 @@ export const UNREACHABLE = {
   ok: false,
   error: "Could not reach the server.",
 } as const;
+
+/** Said in the chat when the next step happens on the tile. */
+export const ASK_SELECT =
+  "Select the area on the tile you want to work on (Esc to cancel).";
+export const ASK_FRAME =
+  'Move or resize the highlighted frame on the tile if needed, then press "Generate here".';
+export const NO_LAYER =
+  "The selected layer can’t be drawn on. Pick a visible, unlocked layer (not a group or reference) in the Layers panel.";
+
+/** The panel's width in pixels, changed by dragging its left edge. */
+export const PANEL_WIDTH = { initial: 340, min: 260, max: 640 };

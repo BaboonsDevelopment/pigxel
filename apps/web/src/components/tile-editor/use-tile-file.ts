@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import type { PixelCanvasHandle } from "@/components/pixel-canvas/pixel-canvas";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
 import {
@@ -13,7 +12,7 @@ import {
   PigxelFileError,
   pigxelFileName,
   serializePigxel,
-  type Background,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import {
   DriveError,
@@ -60,21 +59,20 @@ const isKnownError = (error: unknown): error is Error =>
  * `onOpen` shows.
  */
 export function useTileFile({
-  canvas,
+  tile,
   fileInput,
   userId,
   initial,
-  initialBackground,
   drive,
   notice,
   onOpen,
 }: {
-  canvas: RefObject<PixelCanvasHandle | null>;
+  /** The tile being edited, read for the draft and for saving. */
+  tile: RefObject<{ document: () => PigxelDocument } | null>;
   fileInput: RefObject<HTMLInputElement | null>;
   userId: string;
   /** The draft restored when the editor opened. */
   initial: Draft;
-  initialBackground: Background;
   drive: DriveStatus;
   /** A message to show when the editor opens. */
   notice?: FileStatus;
@@ -82,7 +80,6 @@ export function useTileFile({
   onOpen: (draftId: string) => void;
 }) {
   const [name, setName] = useState(initial.name);
-  const background = initialBackground;
   const [location, setLocation] = useState<TileLocation | null>(
     initial.location,
   );
@@ -106,16 +103,16 @@ export function useTileFile({
 
   useEffect(() => {
     latestRevision.current = revision;
-    const image = canvas.current?.getImage();
-    if (!image) return;
-    const file = serializePigxel(image);
+    const doc = tile.current?.document();
+    if (!doc) return;
+    const file = serializePigxel(doc);
     writeDraft(userId, { id: initial.id, name, file, location, dirty });
-  }, [canvas, userId, initial.id, name, location, dirty, revision]);
+  }, [tile, userId, initial.id, name, location, dirty, revision]);
 
   const currentImage = () => {
-    const image = canvas.current?.getImage();
-    if (!image) throw new PigxelFileError("The tile isn’t ready yet.");
-    return image;
+    const doc = tile.current?.document();
+    if (!doc) throw new PigxelFileError("The tile isn’t ready yet.");
+    return doc;
   };
 
   /** Saves the tile to `target` (the same place, or a new one) and returns where it now lives. */
@@ -259,7 +256,6 @@ export function useTileFile({
       setName(next);
       changed();
     },
-    background,
     location,
     dirty,
     markDirty: changed,

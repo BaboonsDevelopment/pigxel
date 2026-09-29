@@ -8,13 +8,13 @@ import { listDrafts, removeDraft, type Draft } from "@/lib/pigxel-file/draft";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
-  type PigxelImage,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useIsClient } from "@/lib/use-is-client";
 import { TileThumbnail } from "./tile-thumbnail";
 
-type LocalTile = Draft & { image: PigxelImage };
+type LocalTile = Draft & { image: PigxelDocument };
 
 /**
  * Tiles kept in this browser that aren't in Pigxel cloud: ones stored nowhere

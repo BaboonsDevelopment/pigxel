@@ -3,8 +3,9 @@
 import type { RefObject } from "react";
 import { ChatPanel } from "@/components/chat-panel/chat-panel";
 import type { CanvasBridge } from "@/components/chat-panel/constants";
-import { DEFAULT_SIZE, type Area } from "@/components/pixel-canvas/constants";
+import type { Area } from "@/components/pixel-canvas/constants";
 import type { PixelCanvasHandle } from "@/components/pixel-canvas/pixel-canvas";
+import type { LayersApi } from "@/components/pixel-canvas/use-layers";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import {
@@ -21,6 +22,9 @@ import { mergeRedraw } from "@/lib/edit/redraw";
 import { imageToPixelArt } from "@/lib/image/helpers";
 import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
 
+/** Share of an area that may already be drawn on before a new picture there counts as covering art. */
+const MAX_OVERLAP = 0.03;
+
 /**
  * The AI chat, wired to the canvas. It pulls in the AI, editing and
  * picture-to-pixel-art code, so the editor loads it separately (see
@@ -28,16 +32,14 @@ import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
  */
 export default function EditorChat({
   canvas,
+  layers,
   onHighlight,
 }: {
   canvas: RefObject<PixelCanvasHandle | null>;
+  layers: LayersApi;
   onHighlight: (area: Area | null) => void;
 }) {
-  const fullArea = (): Area => ({
-    x: 0,
-    y: 0,
-    ...(canvas.current?.size ?? DEFAULT_SIZE),
-  });
+  const fullArea = (): Area => ({ x: 0, y: 0, ...layers.size });
 
   // A picture from the AI, turned into pixel art at the area's size.
   const toArt = async (dataUrl: string, area: Area) => {
@@ -58,8 +60,11 @@ export default function EditorChat({
     isEmpty: () => canvas.current?.isEmpty() ?? true,
     fullArea,
     freeArea: () => canvas.current?.freeArea() ?? null,
+    canPaint: () => layers.canPaint,
     snapshot: (area, background) =>
       canvas.current?.snapshot(area, background) ?? "",
+    snapshotLayer: (area, background) =>
+      canvas.current?.snapshotLayer(area, background) ?? "",
     selectArea: async () => (await canvas.current?.selectArea()) ?? null,
     adjustArea: async (area) =>
       (await canvas.current?.adjustArea(area)) ?? null,
@@ -134,6 +139,39 @@ export default function EditorChat({
       );
       const placed = { ...target, w: source.w, h: source.h };
       canvas.current.write(drawOnEmpty(rest, tile.w, lifted, placed), tile);
+    },
+    overlapsDrawing(area) {
+      // Art on any layer counts, not only the one being drawn on.
+      const pixels = canvas.current?.readTile(area) ?? new Uint8ClampedArray();
+      let drawn = 0;
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) drawn++;
+      return drawn > area.w * area.h * MAX_OVERLAP;
+    },
+    copyObject(source, targets) {
+      if (!canvas.current) return;
+      const tile = fullArea();
+      const before = canvas.current.read(tile);
+      const { lifted } = liftObjectsInside(before, tile.w, tile.h, source);
+      const after = targets.reduce(
+        (pixels, t) =>
+          drawOnEmpty(pixels, tile.w, lifted, {
+            ...t,
+            w: source.w,
+            h: source.h,
+          }),
+        before,
+      );
+      canvas.current.write(after, tile);
+    },
+    async placeMany(dataUrl, areas) {
+      const arts = await Promise.all(areas.map((a) => toArt(dataUrl, a)));
+      if (!canvas.current) return;
+      const tile = fullArea();
+      const after = arts.reduce(
+        (pixels, art, i) => drawOnEmpty(pixels, tile.w, art.rgba, areas[i]!),
+        canvas.current.read(tile),
+      );
+      canvas.current.write(after, tile);
     },
   };
 

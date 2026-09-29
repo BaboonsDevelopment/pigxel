@@ -1,10 +1,10 @@
-import type { PigxelImage } from "./format";
+import { flattenDocument, type PigxelDocument } from "./format";
 
 /** Longest side of a tile-list thumbnail, in pixels. */
 const THUMBNAIL_SIDE = 64;
 
 /** A small PNG data URL of the tile for lists; browser only. */
-export function thumbnailDataUrl(image: PigxelImage): string {
+export function thumbnailDataUrl(image: PigxelDocument): string {
   const source = document.createElement("canvas");
   source.width = image.width;
   source.height = image.height;
@@ -12,7 +12,7 @@ export function thumbnailDataUrl(image: PigxelImage): string {
     .getContext("2d")
     ?.putImageData(
       new ImageData(
-        new Uint8ClampedArray(image.data),
+        flattenDocument(image) as Uint8ClampedArray<ArrayBuffer>,
         image.width,
         image.height,
       ),
