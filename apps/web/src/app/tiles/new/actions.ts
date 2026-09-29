@@ -1,5 +1,6 @@
 "use server";
 
+import { MAX_HISTORY } from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
   buildComposePrompt,
@@ -49,16 +50,17 @@ export async function sendMessage(
   await requireUser();
   return attempt("sendMessage", async () => {
     const ai = getAiProvider();
-    const last = messages.at(-1)?.content ?? "";
-    const route = await ai.route(last);
+    // Recent turns give follow-ups like "make it bigger" their meaning.
+    const recent = messages.slice(-MAX_HISTORY);
+    const route = await ai.route(recent);
     if (route.intent === "chat") {
-      return { role: "assistant", content: await ai.chat(messages) };
+      return { role: "assistant", content: await ai.chat(recent) };
     }
-    const request = route.intent === "generate" ? route.subject : last;
+    // The router spells out what the latest message refers to.
     return {
       role: "assistant",
-      content: `${route.intent}: ${request}`,
-      action: { kind: route.intent, request },
+      content: `${route.intent}: ${route.subject}`,
+      action: { kind: route.intent, request: route.subject },
     };
   });
 }
@@ -189,13 +191,38 @@ export async function planEdit(args: {
       { mimeType: "image/png", base64: png! },
     );
     const source = clampRect(
-      args.selection ?? args.objects[reply.object] ?? args.drawn,
+      args.selection ??
+        unionOf(
+          [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
+        ) ??
+        args.drawn,
       width,
       height,
     );
-    // Exact operations work in place; only a redraw can resize or move.
+    // Exact operations work in place; a move keeps the size; only a
+    // redraw can resize.
+    const placed = clampRect(reply.target, width, height);
     const target =
-      reply.mode === "ops" ? source : clampRect(reply.target, width, height);
-    return { ...reply, source, target };
+      reply.mode === "ops"
+        ? source
+        : reply.mode === "move"
+          ? clampRect({ ...placed, w: source.w, h: source.h }, width, height)
+          : placed;
+    const keep = reply.keep
+      .map((i) => args.objects[i])
+      .filter((r): r is Rect => !!r);
+    // Kept objects stay where they are, so the edit happens in place.
+    return { ...reply, source, target: keep.length ? source : target, keep };
   });
+}
+
+/** The box around all given rectangles; null when there are none. */
+function unionOf(rects: (Rect | undefined)[]): Rect | null {
+  const found = rects.filter((r): r is Rect => !!r);
+  if (!found.length) return null;
+  const x = Math.min(...found.map((r) => r.x));
+  const y = Math.min(...found.map((r) => r.y));
+  const right = Math.max(...found.map((r) => r.x + r.w));
+  const bottom = Math.max(...found.map((r) => r.y + r.h));
+  return { x, y, w: right - x, h: bottom - y };
 }

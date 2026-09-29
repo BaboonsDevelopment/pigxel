@@ -11,6 +11,7 @@ import {
 import { AiError, errorForStatus } from "../errors";
 import type {
   AiProvider,
+  ChatMessage,
   EditReply,
   GeneratedImage,
   PlanReply,
@@ -88,41 +89,33 @@ export function createGeminiProvider(
   };
 
   return {
-    async route(message) {
-      const parts = await request(
-        models.edit,
-        [{ role: "user", parts: [{ text: message }] }],
-        {
-          systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                intent: { type: "STRING", enum: [...INTENTS] },
-                subject: { type: "STRING" },
-              },
-              required: ["intent", "subject"],
+    async route(messages) {
+      const parts = await request(models.edit, toContents(messages), {
+        systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              intent: { type: "STRING", enum: [...INTENTS] },
+              subject: { type: "STRING" },
             },
+            required: ["intent", "subject"],
           },
         },
-      );
+      });
       const route = parseJson<Route>(textOf(parts));
       const intent = INTENTS.find((i) => i === route?.intent);
       // Anything unexpected becomes plain chat: free, and changes nothing.
       if (!intent) return { intent: "chat", subject: "" };
-      return { intent, subject: route?.subject || message };
+      const latest = messages.at(-1)?.content ?? "";
+      return { intent, subject: route?.subject || latest };
     },
 
     async chat(messages) {
-      const parts = await request(
-        models.edit,
-        messages.map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        })),
-        { systemInstruction: { parts: [{ text: CHAT_PROMPT }] } },
-      );
+      const parts = await request(models.edit, toContents(messages), {
+        systemInstruction: { parts: [{ text: CHAT_PROMPT }] },
+      });
       return textOf(parts);
     },
 
@@ -252,13 +245,21 @@ export function createGeminiProvider(
             responseSchema: {
               type: "OBJECT",
               properties: {
-                mode: { type: "STRING", enum: ["ops", "redraw"] },
-                object: { type: "INTEGER" },
+                mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
+                objects: { type: "ARRAY", items: { type: "INTEGER" } },
+                keep: { type: "ARRAY", items: { type: "INTEGER" } },
                 target: rect,
                 instruction: { type: "STRING" },
                 summary: { type: "STRING" },
               },
-              required: ["mode", "object", "target", "instruction", "summary"],
+              required: [
+                "mode",
+                "objects",
+                "keep",
+                "target",
+                "instruction",
+                "summary",
+              ],
             },
           },
         },
@@ -268,8 +269,10 @@ export function createGeminiProvider(
         throw new AiError("failed", "Gemini sent no usable plan.");
       }
       return {
-        mode: reply.mode === "ops" ? "ops" : "redraw",
-        object: Number.isInteger(reply.object) ? reply.object! : -1,
+        mode:
+          reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
+        objects: (reply.objects ?? []).filter(Number.isInteger),
+        keep: (reply.keep ?? []).filter(Number.isInteger),
         target: reply.target,
         instruction: reply.instruction,
         summary: reply.summary ?? "",
@@ -306,3 +309,10 @@ function firstImage(parts: GeminiPart[]): GeneratedImage {
   if (!image?.data) throw new AiError("failed", "Gemini returned no image.");
   return { mimeType: image.mimeType ?? "image/png", base64: image.data };
 }
+
+/** A conversation in Gemini's shape: the model's turns are called "model". */
+const toContents = (messages: ChatMessage[]): GeminiContent[] =>
+  messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
