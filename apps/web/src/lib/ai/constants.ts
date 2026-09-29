@@ -32,6 +32,8 @@ export const IMAGE_MODELS = [
 
 /** How many recent messages the AI sees, so it follows the conversation. */
 export const MAX_HISTORY = 12;
+/** How many of them the placement planner sees, to know what was drawn. */
+export const PLACEMENT_HISTORY = 6;
 
 export const ROUTER_PROMPT = `You follow a conversation in a pixel art editor. Classify the user's LATEST
 message; earlier messages are context, so short follow-ups like "and a dog too",
@@ -43,13 +45,19 @@ message; earlier messages are context, so short follow-ups like "and a dog too",
   clothes or style.
 - chat: a question, a greeting or anything else.
 Set subject so it can be understood without the conversation:
-- generate: a short plain English description of the new subject only — what
+- generate: a short plain English description of ONE new thing only — what
   it is, its pose, its colours, its mood. Never include what is already drawn
-  (for "and a dog too" it is just the dog). Do not mention pixel art,
-  resolution, outlines, palettes or the background.
+  or where it goes (for "a big carrot above the beaver" it is just "a big
+  carrot"). Do not mention pixel art, resolution, outlines, palettes or the
+  background.
 - edit: the full request in plain English, naming the thing to change instead
   of "it", "him" or "that".
-- chat: leave it empty.`;
+- chat: leave it empty.
+For generate also set:
+- where: where the user wants it, in plain English ("above the beaver",
+  "at the bottom", "next to the apple"); empty when they did not say.
+- count: how many to add (1 unless they asked for more, e.g. "5 more apples" is 5).
+Otherwise leave where empty and count 1.`;
 
 /** For plain conversation, so the model answers in words, not fake tool calls. */
 export const CHAT_PROMPT =
@@ -136,4 +144,34 @@ target: where the result goes, in tile pixels (x, y of the top-left, w, h).
 instruction: a clear English instruction for the model that makes the change,
 naming exactly what changes and saying that everything else stays the same.
 
-summary: one short sentence for the user, in the language of the request.`;
+summary: one short sentence for the user, in the language of the request,
+saying what was done.
+
+question: one or two short sentences for the user, in the language of the
+request, used when the target differs from the object: say what you are
+about to do (e.g. shrink the beaver to about half) and ask them to move or
+resize the highlighted frame on the tile if needed, then press "Generate here".`;
+
+// ── Placing new pictures on a tile that has drawings ───────────────────────
+
+export const PLACEMENT_RULES = `Decide where the new picture(s) go on the tile.
+
+copyOf: when the user asks for more of something already drawn ("5 more
+apples", "another one like it", "the same again"), the number of that object
+from OBJECTS; it is copied as is instead of drawn anew. Otherwise -1.
+
+areas: one box per new picture, in tile pixels (x, y of the top-left, w, h):
+- In empty space (light grey), never covering existing drawings.
+- Follow WHERE when given ("above the beaver" goes right above it, "at the
+  bottom" goes near the bottom edge).
+- Copies sit near the original, spread out, each the same size as it.
+- New things get a size that suits the scene: similar in scale to what is
+  drawn, bigger or smaller when the request says so, at least 16 pixels a
+  side when there is room.
+
+ask: true only when the new picture cannot fit without covering existing
+drawings, or the user asked to replace or overlap what is drawn. Then the
+user chooses; otherwise false.
+
+question: when ask is true, one short sentence in the language of the request
+asking how to add it; otherwise empty.`;
