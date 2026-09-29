@@ -3,12 +3,21 @@ import {
   GEMINI_BASE_URL,
   IMAGE_ATTEMPT_TIMEOUT_MS,
   IMAGE_RETRY_DELAYS_MS,
+  CHAT_PROMPT,
   ROUTER_PROMPT,
   TEXT_ATTEMPT_TIMEOUT_MS,
   TEXT_RETRY_DELAYS_MS,
 } from "../constants";
 import { AiError, errorForStatus } from "../errors";
-import type { AiProvider, Rect, Route } from "../types";
+import type {
+  AiProvider,
+  ChatMessage,
+  EditReply,
+  GeneratedImage,
+  PlanReply,
+  Rect,
+  Route,
+} from "../types";
 
 type GeminiPart = {
   text?: string;
@@ -80,41 +89,63 @@ export function createGeminiProvider(
   };
 
   return {
-    async route(message) {
+    async route(messages) {
+      const parts = await request(models.edit, toContents(messages), {
+        systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              intent: { type: "STRING", enum: [...INTENTS] },
+              subject: { type: "STRING" },
+            },
+            required: ["intent", "subject"],
+          },
+        },
+      });
+      const route = parseJson<Route>(textOf(parts));
+      const intent = INTENTS.find((i) => i === route?.intent);
+      // Anything unexpected becomes plain chat: free, and changes nothing.
+      if (!intent) return { intent: "chat", subject: "" };
+      const latest = messages.at(-1)?.content ?? "";
+      return { intent, subject: route?.subject || latest };
+    },
+
+    async chat(messages) {
+      const parts = await request(models.edit, toContents(messages), {
+        systemInstruction: { parts: [{ text: CHAT_PROMPT }] },
+      });
+      return textOf(parts);
+    },
+
+    async edit(system, user) {
       const parts = await request(
         models.edit,
-        [{ role: "user", parts: [{ text: message }] }],
+        [{ role: "user", parts: [{ text: user }] }],
         {
-          systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
+          systemInstruction: { parts: [{ text: system }] },
           generationConfig: {
             responseMimeType: "application/json",
             responseSchema: {
               type: "OBJECT",
               properties: {
-                intent: { type: "STRING", enum: ["generate", "edit"] },
-                subject: { type: "STRING" },
+                summary: { type: "STRING" },
+                ops: { type: "ARRAY", items: { type: "STRING" } },
               },
-              required: ["intent", "subject"],
+              required: ["summary", "ops"],
             },
           },
         },
       );
-      const route = parseJson<Route>(parts.map((p) => p.text ?? "").join(""));
-      // Anything unexpected falls back to the free edit mode.
-      return route?.intent === "generate"
-        ? { intent: "generate", subject: route.subject || message }
-        : { intent: "edit", subject: "" };
-    },
-
-    async edit(messages) {
-      const parts = await request(
-        models.edit,
-        messages.map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.content }],
-        })),
-      );
-      return parts.map((p) => p.text ?? "").join("");
+      const reply = parseJson<EditReply>(textOf(parts));
+      if (!Array.isArray(reply?.ops)) {
+        throw new AiError("failed", "Gemini sent no usable edit.");
+      }
+      return {
+        summary: reply.summary ?? "",
+        ops: reply.ops.filter((o) => typeof o === "string"),
+      };
     },
 
     async generate(prompt, aspectRatio) {
@@ -124,10 +155,30 @@ export function createGeminiProvider(
         { generationConfig: { imageConfig: { aspectRatio } } },
         { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
       );
-      const image = parts.find((p) => p.inlineData?.data)?.inlineData;
-      if (!image?.data)
-        throw new AiError("failed", "Gemini returned no image.");
-      return { mimeType: image.mimeType ?? "image/png", base64: image.data };
+      return firstImage(parts);
+    },
+
+    async redraw(prompt, picture, aspectRatio) {
+      const parts = await request(
+        models.generate,
+        [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: picture.mimeType,
+                  data: picture.base64,
+                },
+              },
+            ],
+          },
+        ],
+        { generationConfig: { imageConfig: { aspectRatio } } },
+        { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
+      );
+      return firstImage(parts);
     },
 
     async compose(prompt, tile) {
@@ -158,12 +209,74 @@ export function createGeminiProvider(
           },
         },
       );
-      const rect = parseJson<Rect>(parts.map((p) => p.text ?? "").join(""));
+      const rect = parseJson<Rect>(textOf(parts));
       const { x, y, w, h } = rect ?? {};
       if (x === undefined || y === undefined || !w || !h) {
         throw new AiError("failed", "Gemini sent no usable area.");
       }
       return { x, y, w, h };
+    },
+
+    async plan(prompt, tile) {
+      const rect = {
+        type: "OBJECT",
+        properties: {
+          x: { type: "INTEGER" },
+          y: { type: "INTEGER" },
+          w: { type: "INTEGER" },
+          h: { type: "INTEGER" },
+        },
+        required: ["x", "y", "w", "h"],
+      };
+      const parts = await request(
+        models.edit,
+        [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType: tile.mimeType, data: tile.base64 } },
+            ],
+          },
+        ],
+        {
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
+                objects: { type: "ARRAY", items: { type: "INTEGER" } },
+                keep: { type: "ARRAY", items: { type: "INTEGER" } },
+                target: rect,
+                instruction: { type: "STRING" },
+                summary: { type: "STRING" },
+              },
+              required: [
+                "mode",
+                "objects",
+                "keep",
+                "target",
+                "instruction",
+                "summary",
+              ],
+            },
+          },
+        },
+      );
+      const reply = parseJson<PlanReply>(textOf(parts));
+      if (!reply?.instruction || !reply.target) {
+        throw new AiError("failed", "Gemini sent no usable plan.");
+      }
+      return {
+        mode:
+          reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
+        objects: (reply.objects ?? []).filter(Number.isInteger),
+        keep: (reply.keep ?? []).filter(Number.isInteger),
+        target: reply.target,
+        instruction: reply.instruction,
+        summary: reply.summary ?? "",
+      };
     },
   };
 }
@@ -186,3 +299,20 @@ function parseJson<T>(text: string): Partial<T> | null {
     return null;
   }
 }
+
+const INTENTS = ["generate", "edit", "chat"] as const;
+
+const textOf = (parts: GeminiPart[]) => parts.map((p) => p.text ?? "").join("");
+
+function firstImage(parts: GeminiPart[]): GeneratedImage {
+  const image = parts.find((p) => p.inlineData?.data)?.inlineData;
+  if (!image?.data) throw new AiError("failed", "Gemini returned no image.");
+  return { mimeType: image.mimeType ?? "image/png", base64: image.data };
+}
+
+/** A conversation in Gemini's shape: the model's turns are called "model". */
+const toContents = (messages: ChatMessage[]): GeminiContent[] =>
+  messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
