@@ -82,7 +82,8 @@ const wdist2 = (a: RGB, b: RGB) =>
 
 const luma = (c: RGB) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 
-function nearestIndex(c: RGB, palette: RGB[]): number {
+/** The palette entry closest to `c`, weighted the way the eye sees colour. */
+export function nearestIndex(c: RGB, palette: RGB[]): number {
   let best = 0;
   let bestD = Infinity;
   for (let i = 0; i < palette.length; i++) {
@@ -157,9 +158,11 @@ function removeBackground(
   return removed;
 }
 
-type Bucket = { r: number; g: number; b: number; n: number };
+/** A colour and how many pixels have it. */
+export type Bucket = { r: number; g: number; b: number; n: number };
 
-function medianCut(buckets: Bucket[], max: number): RGB[] {
+/** At most `max` colours that stand for all of `buckets`, split where they differ most. */
+export function medianCut(buckets: Bucket[], max: number): RGB[] {
   if (buckets.length === 0) return [];
   let boxes: Bucket[][] = [buckets];
 

@@ -32,6 +32,7 @@ export function EditorHeader({
   playback,
   onOpenFrom,
   onConnectDrive,
+  onExport,
 }: {
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
@@ -40,6 +41,7 @@ export function EditorHeader({
   playback: Playback;
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
+  onExport: () => void;
 }) {
   const router = useRouter();
   const mod = useModifierLabel();
@@ -106,6 +108,13 @@ export function EditorHeader({
               label: "Download .pigxel",
               shortcut: file.location ? undefined : `${mod}S`,
               onSelect: file.download,
+            },
+          ],
+          [
+            {
+              label: "Export…",
+              shortcut: `${mod}E`,
+              onSelect: onExport,
             },
           ],
         ]}

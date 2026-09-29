@@ -25,6 +25,7 @@ export type Tool = {
 export type Command =
   | "save"
   | "open"
+  | "export"
   | "undo"
   | "redo"
   | "zoomIn"

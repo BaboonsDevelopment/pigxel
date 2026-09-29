@@ -348,13 +348,18 @@ function uniqueId(value: unknown, ids: Set<string>, fresh: string) {
   return id;
 }
 
-/** A safe file name ending in .pigxel. */
-export function pigxelFileName(name: string) {
-  const base =
+/** The tile's name without .pigxel or characters file systems refuse. */
+export function safeFileBase(name: string) {
+  return (
     stripPigxelExtension(name)
       .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "")
-      .trim() || "Untitled";
-  return base + PIGXEL_EXTENSION;
+      .trim() || "Untitled"
+  );
+}
+
+/** A safe file name ending in .pigxel. */
+export function pigxelFileName(name: string) {
+  return safeFileBase(name) + PIGXEL_EXTENSION;
 }
 
 export function stripPigxelExtension(name: string) {
