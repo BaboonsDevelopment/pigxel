@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Page } from "@pigxel/ui/components/page";
+import { PageTitle } from "@pigxel/ui/components/typography";
 import { NewTileForm } from "@/components/tiles/new-tile-form";
 import { requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
@@ -17,15 +19,13 @@ export default async function NewTile({
     getDriveStatus(user.id),
   ]);
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10 md:px-10">
-      <section>
-        <h1 className="mb-8 text-3xl font-semibold tracking-tight">New tile</h1>
-        <NewTileForm
-          userId={user.id}
-          drive={drive}
-          driveError={params.drive === "error"}
-        />
-      </section>
-    </main>
+    <Page>
+      <PageTitle className="mb-8">New tile</PageTitle>
+      <NewTileForm
+        userId={user.id}
+        drive={drive}
+        driveError={params.drive === "error"}
+      />
+    </Page>
   );
 }

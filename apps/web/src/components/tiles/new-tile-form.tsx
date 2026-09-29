@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
-import { Button } from "@pigxel/ui/components/button";
+import { useState } from "react";
+import { Button, buttonVariants } from "@pigxel/ui/components/button";
+import { ChoiceCard, ChoiceText, Radio } from "@pigxel/ui/components/choice";
+import { Field, FormMessage } from "@pigxel/ui/components/field";
+import {
+  Input,
+  InputGroup,
+  InputGroupInput,
+  InputGroupText,
+} from "@pigxel/ui/components/input";
+import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { createDraft } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
@@ -32,15 +41,11 @@ const BACKGROUND_OPTIONS: {
   {
     value: "transparent",
     label: "Transparent",
-    swatch:
-      "bg-[repeating-conic-gradient(#d4d4d4_0_25%,#fff_0_50%)] bg-[length:10px_10px]",
+    swatch: "bg-checker",
   },
   { value: "white", label: "White", swatch: "bg-white" },
   { value: "black", label: "Black", swatch: "bg-black" },
 ];
-
-const optionCard =
-  "flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/60 has-checked:border-primary has-checked:ring-1 has-checked:ring-primary has-disabled:cursor-not-allowed has-disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-ring";
 
 type FormProps = {
   userId: string;
@@ -139,39 +144,37 @@ function Form({ userId, drive, driveError }: FormProps) {
       }}
     >
       <Field label="Name" htmlFor="tile-name">
-        <div className="flex max-w-sm items-center rounded-md border bg-background pr-3 focus-within:ring-2 focus-within:ring-ring">
-          <input
+        <InputGroup className="max-w-sm">
+          <InputGroupInput
             id="tile-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={100}
             required
-            className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
           />
-          <span className="text-sm text-muted-foreground">
-            {PIGXEL_EXTENSION}
-          </span>
-        </div>
+          <InputGroupText>{PIGXEL_EXTENSION}</InputGroupText>
+        </InputGroup>
       </Field>
 
       <Field label="Size" hint={`In pixels, up to ${MAX_PIGXEL_SIZE}.`}>
         <div className="flex flex-wrap items-center gap-2">
           {PRESETS.map((n) => (
-            <button
+            <Button
               key={n}
               type="button"
+              variant="secondary"
               aria-pressed={width === String(n) && height === String(n)}
               onClick={() => {
                 setWidth(String(n));
                 setHeight(String(n));
               }}
-              className="h-9 rounded-md border px-3 text-sm tabular-nums hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground"
+              className="tabular-nums"
             >
               {n}×{n}
-            </button>
+            </Button>
           ))}
           <span className="mx-2 h-6 w-px bg-border" aria-hidden="true" />
-          <input
+          <Input
             aria-label="Width"
             type="number"
             min={1}
@@ -179,10 +182,10 @@ function Form({ userId, drive, driveError }: FormProps) {
             required
             value={width}
             onChange={(e) => setWidth(e.target.value)}
-            className="h-9 w-16 rounded-md border bg-background text-center text-sm tabular-nums"
+            className="h-9 w-16 px-1 text-center tabular-nums"
           />
           <span className="text-muted-foreground">×</span>
-          <input
+          <Input
             aria-label="Height"
             type="number"
             min={1}
@@ -190,7 +193,7 @@ function Form({ userId, drive, driveError }: FormProps) {
             required
             value={height}
             onChange={(e) => setHeight(e.target.value)}
-            className="h-9 w-16 rounded-md border bg-background text-center text-sm tabular-nums"
+            className="h-9 w-16 px-1 text-center tabular-nums"
           />
         </div>
       </Field>
@@ -199,12 +202,8 @@ function Form({ userId, drive, driveError }: FormProps) {
         <legend className="mb-3 text-sm font-medium">Background</legend>
         <div className="grid max-w-lg grid-cols-3 gap-3">
           {BACKGROUND_OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              className={cn(optionCard, "items-center")}
-            >
-              <input
-                type="radio"
+            <ChoiceCard key={option.value} className="items-center">
+              <Radio
                 name="background"
                 value={option.value}
                 checked={background === option.value}
@@ -216,7 +215,7 @@ function Form({ userId, drive, driveError }: FormProps) {
                 className={cn("size-6 shrink-0 rounded border", option.swatch)}
               />
               <span className="text-sm">{option.label}</span>
-            </label>
+            </ChoiceCard>
           ))}
         </div>
       </fieldset>
@@ -224,87 +223,66 @@ function Form({ userId, drive, driveError }: FormProps) {
       <fieldset>
         <legend className="mb-3 text-sm font-medium">Where to keep it</legend>
         <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
-          <label className={optionCard}>
-            <input
-              type="radio"
+          <ChoiceCard>
+            <Radio
               name="storage"
               value="cloud"
               checked={storage === "cloud"}
               onChange={() => setStorage("cloud")}
-              className="mt-0.5 size-4 accent-primary"
             />
-            <span>
-              <span className="block text-sm font-medium">Pigxel cloud</span>
-              <span className="mt-1 block text-sm text-muted-foreground">
-                Saved to your Pigxel account and autosaved as you draw. Open it
-                from any device.
-              </span>
-            </span>
-          </label>
-          <label className={optionCard}>
-            <input
-              type="radio"
+            <ChoiceText title="Pigxel cloud">
+              Saved to your Pigxel account and autosaved as you draw. Open it
+              from any device.
+            </ChoiceText>
+          </ChoiceCard>
+          <ChoiceCard>
+            <Radio
               name="storage"
               value="drive"
               checked={storage === "drive"}
               disabled={!drive.connected}
               onChange={() => setStorage("drive")}
-              className="mt-0.5 size-4 accent-primary"
             />
-            <span>
-              <span className="block text-sm font-medium">Google Drive</span>
-              <span className="mt-1 block text-sm text-muted-foreground">
-                {!drive.available ? (
-                  "Google Drive isn’t set up for Pigxel yet."
-                ) : drive.connected ? (
-                  <>
-                    Created in the Drive of{" "}
-                    {drive.email ?? "your Google account"} and saved
-                    automatically as you draw.
-                  </>
-                ) : (
-                  <>
-                    Link your Google account to keep tiles in your Drive.{" "}
-                    <a
-                      href={connectDriveUrl("/tiles/new")}
-                      className="font-medium text-foreground underline underline-offset-4"
-                    >
-                      Connect Google Drive
-                    </a>
-                  </>
-                )}
-              </span>
-            </span>
-          </label>
-          <label className={optionCard}>
-            <input
-              type="radio"
+            <ChoiceText title="Google Drive">
+              {!drive.available ? (
+                "Google Drive isn’t set up for Pigxel yet."
+              ) : drive.connected ? (
+                <>
+                  Created in the Drive of {drive.email ?? "your Google account"}{" "}
+                  and saved automatically as you draw.
+                </>
+              ) : (
+                <>
+                  Link your Google account to keep tiles in your Drive.{" "}
+                  <a
+                    href={connectDriveUrl("/tiles/new")}
+                    className={textLinkClassName}
+                  >
+                    Connect Google Drive
+                  </a>
+                </>
+              )}
+            </ChoiceText>
+          </ChoiceCard>
+          <ChoiceCard>
+            <Radio
               name="storage"
               value="none"
               checked={storage === "none"}
               onChange={() => setStorage("none")}
-              className="mt-0.5 size-4 accent-primary"
             />
-            <span>
-              <span className="block text-sm font-medium">Don’t store it</span>
-              <span className="mt-1 block text-sm text-muted-foreground">
-                Kept in this browser while you work. Download it or save it to
-                Pigxel cloud{drive.available ? " or Google Drive" : ""} any
-                time.
-              </span>
-            </span>
-          </label>
+            <ChoiceText title="Don’t store it">
+              Kept in this browser while you work. Download it or save it to
+              Pigxel cloud{drive.available ? " or Google Drive" : ""} any time.
+            </ChoiceText>
+          </ChoiceCard>
         </div>
       </fieldset>
 
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      {error && <FormMessage tone="error">{error}</FormMessage>}
 
-      <div className="flex items-center gap-5">
-        <Button disabled={busy}>
+      <div className="flex items-center gap-3">
+        <Button size="lg" disabled={busy}>
           {busy
             ? storage === "cloud"
               ? "Creating in Pigxel cloud…"
@@ -313,32 +291,13 @@ function Form({ userId, drive, driveError }: FormProps) {
                 : "Creating…"
             : "Create tile"}
         </Button>
-        <Link href="/tiles" className="text-sm underline underline-offset-4">
+        <Link
+          href="/tiles"
+          className={buttonVariants({ variant: "ghost", size: "lg" })}
+        >
           Cancel
         </Link>
       </div>
     </form>
-  );
-}
-
-function Field({
-  label,
-  htmlFor,
-  hint,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label htmlFor={htmlFor} className="mb-2 block text-sm font-medium">
-        {label}
-      </label>
-      {children}
-      {hint && <p className="mt-2 text-xs text-muted-foreground">{hint}</p>}
-    </div>
   );
 }

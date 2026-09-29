@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,25 +11,28 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { Button, buttonVariants } from "@pigxel/ui/components/button";
+import { EmptyState } from "@pigxel/ui/components/empty-state";
+import {
+  InputGroup,
+  InputGroupInput,
+  InputGroupText,
+} from "@pigxel/ui/components/input";
+import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
-import { ChatPanel } from "@/components/chat-panel/chat-panel";
-import type { CanvasBridge } from "@/components/chat-panel/constants";
+import { PANEL_WIDTH } from "@/components/chat-panel/constants";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
+import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
 import {
   useLayers,
   type LayersApi,
 } from "@/components/pixel-canvas/use-layers";
 import { LayersPanel } from "@/components/layers-panel/layers-panel";
-import {
-  DEFAULT_PEN,
-  clampPenSize,
-  type PenSettings,
-} from "@/components/pixel-canvas/pen";
 import { encodeTile } from "@/lib/edit/codec";
 import { panelRows } from "@/lib/layers/tree";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
@@ -45,8 +49,6 @@ import { applyOps, parseOps } from "@/lib/edit/ops";
 import { mergeRedraw } from "@/lib/edit/redraw";
 import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
-
-import { imageToPixelArt } from "@/lib/image/helpers";
 import {
   listDrafts,
   readDraft,
@@ -63,14 +65,45 @@ import {
 import { useIsClient } from "@/lib/use-is-client";
 import { listCloudTiles } from "@/lib/pigxel-file/cloud";
 import { DriveError, listDriveFiles } from "@/lib/pigxel-file/google-drive";
-import { FilesDialog } from "./files-dialog";
-import { isTyping } from "./helpers";
+
 import { Menu } from "./menu";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions, sizeKey } from "./tool-options";
 import { TOOLS, type ToolId } from "./tools";
 import { usePan } from "./use-pan";
 import { useTileFile } from "./use-tile-file";
+
+// Loaded on their own so the canvas is ready first: the chat brings the AI,
+// editing and picture-to-pixel-art code; the file picker opens on demand.
+const EditorChat = dynamic(() => import("./editor-chat"), {
+  ssr: false,
+  loading: ChatPlaceholder,
+});
+const FilesDialog = dynamic(
+  () => import("./files-dialog").then((m) => m.FilesDialog),
+  { ssr: false },
+);
+
+/** The chat's frame while its code loads. */
+function ChatPlaceholder() {
+  return (
+    <aside
+      style={{ width: PANEL_WIDTH.initial }}
+      className="flex min-h-0 flex-col border-l bg-background"
+    >
+      <header className="flex h-14 shrink-0 items-center border-b px-4">
+        <h2 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+          Assistant
+        </h2>
+      </header>
+      <div className="space-y-3 p-4" aria-hidden="true">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-16 w-full" />
+      </div>
+    </aside>
+  );
+}
 
 const noSubscribe = () => () => {};
 
@@ -85,6 +118,15 @@ function useModifierLabel() {
 
 /** Share of an area that may already be drawn on before a new picture there counts as covering art. */
 const MAX_OVERLAP = 0.03;
+
+/** Typing in a field must not trigger editor shortcuts. */
+function isTyping(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+  );
+}
 
 type EditorProps = {
   userId: string;
@@ -138,18 +180,17 @@ function Redirect({ to }: { to: string }) {
 /** A link to a tile that isn't in this browser, e.g. opened on another device. */
 function MissingTile() {
   return (
-    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-muted p-6 text-center">
-      <h1 className="text-xl font-semibold">This tile isn’t in this browser</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        Tiles you haven’t saved to Pigxel cloud or Google Drive stay in the
-        browser they were made in.
-      </p>
-      <Link
-        href="/tiles"
-        className="text-sm font-medium underline underline-offset-4"
-      >
-        Go to My projects
-      </Link>
+    <main className="flex h-dvh items-center justify-center bg-canvas p-6">
+      <EmptyState
+        className="max-w-md bg-background"
+        title="This tile isn’t in this browser"
+        description="Tiles you haven’t saved to Pigxel cloud or Google Drive stay in the browser they were made in."
+        action={
+          <Link href="/tiles" className={buttonVariants({ size: "lg" })}>
+            Go to My projects
+          </Link>
+        }
+      />
     </main>
   );
 }
@@ -279,168 +320,36 @@ function Editor({
     return () => area.removeEventListener("wheel", onWheel);
   }, []);
 
-  const fullArea = (): Area => ({ x: 0, y: 0, ...layers.size });
-
-  // A picture from the AI, turned into pixel art at the area's size.
-  const toArt = async (dataUrl: string, area: Area) => {
-    const image = await (await fetch(dataUrl)).blob();
-    return imageToPixelArt(image, area.w, area.h, GENERATED_PICTURE_STEPS);
-  };
-
-  // Pixels an edit of `area` may not change: neighbours reaching into it and
-  // the objects the plan said to keep.
-  const protectedMask = (tile: Uint8ClampedArray, area: Area, keep: Area[]) => {
-    const { w, h } = fullArea();
-    const mask = neighbourMask(tile, w, h, area);
-    objectMask(tile, w, h, keep).forEach((k, i) => k && (mask[i] = 1));
-    return mask;
-  };
-
-  const bridge: CanvasBridge = {
-    isEmpty: () => canvas.current?.isEmpty() ?? true,
-    fullArea,
-    freeArea: () => canvas.current?.freeArea() ?? null,
-    canPaint: () => layers.canPaint,
-    snapshot: (area, background) =>
-      canvas.current?.snapshot(area, background) ?? "",
-    snapshotLayer: (area, background) =>
-      canvas.current?.snapshotLayer(area, background) ?? "",
-    selectArea: async () => (await canvas.current?.selectArea()) ?? null,
-    adjustArea: async (area) =>
-      (await canvas.current?.adjustArea(area)) ?? null,
-    highlight: setHighlight,
-    async place(dataUrl, area, replace) {
-      const art = await toArt(dataUrl, area);
-      if (replace) canvas.current?.clear();
-      canvas.current?.draw(art.rgba, area);
-    },
-    paintedArea(area) {
-      const tile = fullArea();
-      const pixels = canvas.current?.read(tile) ?? new Uint8ClampedArray();
-      return paintedBounds(pixels, tile.w, area, EDIT_MARGIN);
-    },
-    encode(area) {
-      const tile = fullArea();
-      const pixels = canvas.current?.read(tile) ?? new Uint8ClampedArray();
-      return encodeTile(pixels, tile.w, tile.h, area);
-    },
-    // Edits change what lies fully inside their area; drawings that only
-    // reach into it (a neighbour's edge) are always put back untouched.
-    applyEdit(lines, palette, area, keep) {
-      if (!canvas.current) return 0;
-      const tile = fullArea();
-      const before = canvas.current.read(tile);
-      const { ops } = parseOps(lines);
-      const result = applyOps(before, tile.w, ops, palette, area);
-      const mask = protectedMask(before, area, keep);
-      canvas.current.write(keepMasked(before, result.pixels, mask), tile);
-      return result.applied;
-    },
-    async applyRedraw(dataUrl, area, keep) {
-      const art = await toArt(dataUrl, area);
-      if (!canvas.current) return;
-      const tile = fullArea();
-      const before = canvas.current.read(tile);
-      const after = new Uint8ClampedArray(before);
-      const merged = mergeRedraw(canvas.current.read(area), art.rgba);
-      for (let y = 0; y < area.h; y++) {
-        const row = merged.subarray(y * area.w * 4, (y + 1) * area.w * 4);
-        after.set(row, ((area.y + y) * tile.w + area.x) * 4);
-      }
-      const mask = protectedMask(before, area, keep);
-      canvas.current.write(keepMasked(before, after, mask), tile);
-    },
-    objects() {
-      const tile = fullArea();
-      const pixels = canvas.current?.read(tile) ?? new Uint8ClampedArray();
-      return findObjects(pixels, tile.w, tile.h);
-    },
-    async replaceObject(dataUrl, source, target) {
-      const art = await toArt(dataUrl, target);
-      if (!canvas.current) return;
-      const tile = fullArea();
-      const { rest } = liftObjectsInside(
-        canvas.current.read(tile),
-        tile.w,
-        tile.h,
-        source,
-      );
-      // The moved or resized object never covers other drawings.
-      canvas.current.write(drawOnEmpty(rest, tile.w, art.rgba, target), tile);
-    },
-    moveObject(source, target) {
-      if (!canvas.current) return;
-      const tile = fullArea();
-      const { rest, lifted } = liftObjectsInside(
-        canvas.current.read(tile),
-        tile.w,
-        tile.h,
-        source,
-      );
-      const placed = { ...target, w: source.w, h: source.h };
-      canvas.current.write(drawOnEmpty(rest, tile.w, lifted, placed), tile);
-    },
-    overlapsDrawing(area) {
-      // Art on any layer counts, not only the one being drawn on.
-      const pixels = canvas.current?.readTile(area) ?? new Uint8ClampedArray();
-      let drawn = 0;
-      for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) drawn++;
-      return drawn > area.w * area.h * MAX_OVERLAP;
-    },
-    copyObject(source, targets) {
-      if (!canvas.current) return;
-      const tile = fullArea();
-      const before = canvas.current.read(tile);
-      const { lifted } = liftObjectsInside(before, tile.w, tile.h, source);
-      const after = targets.reduce(
-        (pixels, t) =>
-          drawOnEmpty(pixels, tile.w, lifted, {
-            ...t,
-            w: source.w,
-            h: source.h,
-          }),
-        before,
-      );
-      canvas.current.write(after, tile);
-    },
-    async placeMany(dataUrl, areas) {
-      const arts = await Promise.all(areas.map((a) => toArt(dataUrl, a)));
-      if (!canvas.current) return;
-      const tile = fullArea();
-      const after = arts.reduce(
-        (pixels, art, i) => drawOnEmpty(pixels, tile.w, art.rgba, areas[i]!),
-        canvas.current.read(tile),
-      );
-      canvas.current.write(after, tile);
-    },
-  };
-
   return (
     <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]">
       <header className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
         <Link
           href="/tiles"
-          className="mr-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className={buttonVariants({
+            variant: "ghost",
+            size: "sm",
+            className: "mr-2 text-sm",
+          })}
         >
           ← My projects
         </Link>
-        <label className="flex items-center rounded-md border bg-background pr-2 focus-within:ring-2 focus-within:ring-ring">
-          <span className="sr-only">File name</span>
-          <input
+        <InputGroup className="h-8 w-auto">
+          <InputGroupInput
+            aria-label="File name"
             value={file.name}
             onChange={(e) => file.rename(e.target.value)}
             maxLength={100}
-            className="h-8 w-40 bg-transparent px-2 text-sm outline-none"
+            className="w-40 px-2"
           />
-          <span className="text-xs text-muted-foreground">
+          <InputGroupText className="pr-2 pl-0 text-xs">
             {PIGXEL_EXTENSION}
             {file.dirty && (
               <span title="Unsaved changes" className="ml-1">
                 •
               </span>
             )}
-          </span>
-        </label>
+          </InputGroupText>
+        </InputGroup>
         <Menu
           label="Open"
           disabled={file.busy}
@@ -524,13 +433,14 @@ function Editor({
           {file.busy ? "Working…" : file.status?.text}
         </p>
         {!file.busy && file.status?.retry && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={file.status.connect ? connectDrive : file.save}
-            className="h-8 rounded-md border px-3 text-sm font-medium hover:bg-muted"
           >
             {file.status.retry}
-          </button>
+          </Button>
         )}
         {drive.connected && (
           <p
@@ -568,7 +478,7 @@ function Editor({
         </main>
         <LayersPanel layers={layers} />
       </div>
-      <ChatPanel canvas={bridge} />
+      <EditorChat canvas={canvas} layers={layers} onHighlight={setHighlight} />
       {picking === "cloud" && (
         <FilesDialog
           title="Open from Pigxel cloud"

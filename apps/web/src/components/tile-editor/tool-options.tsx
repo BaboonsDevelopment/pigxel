@@ -1,3 +1,6 @@
+import { Button } from "@pigxel/ui/components/button";
+import { Checkbox } from "@pigxel/ui/components/choice";
+import { Input } from "@pigxel/ui/components/input";
 import {
   MAX_PEN_SIZE,
   MIN_PEN_SIZE,
@@ -5,9 +8,6 @@ import {
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
 import type { ToolId } from "./tools";
-
-const stepButton =
-  "flex size-8 items-center justify-center rounded-md border text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
 
 /** The setting `[` and `]` change for a tool, if it has a size. */
 export function sizeKey(
@@ -61,14 +61,12 @@ export function ToolOptions({
               : "Removes the extra corner pixels from freehand lines"
           }
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={pen.pixelPerfect}
             disabled={pen.size > 1}
             onChange={(e) =>
               onChange({ ...pen, pixelPerfect: e.target.checked })
             }
-            className="size-4 accent-primary"
           />
           Pixel-perfect
         </label>
@@ -79,11 +77,9 @@ export function ToolOptions({
           className="flex items-center gap-2"
           title="Off: fills every pixel of the clicked colour, connected or not"
         >
-          <input
-            type="checkbox"
+          <Checkbox
             checked={pen.contiguous}
             onChange={(e) => onChange({ ...pen, contiguous: e.target.checked })}
-            className="size-4 accent-primary"
           />
           Contiguous
         </label>
@@ -119,35 +115,38 @@ function SizeField({
       <span id="tool-size-label" className="text-muted-foreground">
         {label}
       </span>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="icon"
         aria-label="Smaller"
         title="Smaller ([)"
-        className={stepButton}
         disabled={value <= MIN_PEN_SIZE}
         onClick={() => onChange(value - 1)}
       >
         −
-      </button>
-      <input
+      </Button>
+      <Input
         type="number"
+        inputSize="sm"
         aria-labelledby="tool-size-label"
         min={MIN_PEN_SIZE}
         max={MAX_PEN_SIZE}
         value={value}
         onChange={(e) => onChange(Number(e.target.value) || MIN_PEN_SIZE)}
-        className="h-8 w-12 rounded-md border bg-background text-center tabular-nums"
+        className="w-12 px-1 text-center tabular-nums"
       />
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="icon"
         aria-label="Bigger"
         title="Bigger (])"
-        className={stepButton}
         disabled={value >= MAX_PEN_SIZE}
         onClick={() => onChange(value + 1)}
       >
         +
-      </button>
+      </Button>
     </div>
   );
 }

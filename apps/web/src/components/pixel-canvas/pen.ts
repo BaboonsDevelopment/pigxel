@@ -1,4 +1,7 @@
-export type Point = { x: number; y: number };
+import { linePoints, type Point } from "@/lib/edit/raster";
+
+// The tools draw with the same pixel lines as AI edits.
+export { linePoints, type Point };
 
 /** What a click on the tile does. */
 export type PaintTool =
@@ -33,30 +36,6 @@ export const DEFAULT_PEN: PenSettings = {
 
 export function clampPenSize(size: number) {
   return Math.max(MIN_PEN_SIZE, Math.min(MAX_PEN_SIZE, Math.round(size)));
-}
-
-/** Every pixel on the straight line from `a` to `b`, both ends included (Bresenham). */
-export function linePoints(a: Point, b: Point): Point[] {
-  const points: Point[] = [];
-  const dx = Math.abs(b.x - a.x);
-  const dy = -Math.abs(b.y - a.y);
-  const sx = a.x < b.x ? 1 : -1;
-  const sy = a.y < b.y ? 1 : -1;
-  let { x, y } = a;
-  let error = dx + dy;
-  for (;;) {
-    points.push({ x, y });
-    if (x === b.x && y === b.y) return points;
-    const doubled = 2 * error;
-    if (doubled >= dy) {
-      error += dy;
-      x += sx;
-    }
-    if (doubled <= dx) {
-      error += dx;
-      y += sy;
-    }
-  }
 }
 
 /** Adds the pixels leading to `to` onto a stroke, skipping the repeated start pixel. */

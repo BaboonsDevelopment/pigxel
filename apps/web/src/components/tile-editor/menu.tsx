@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { buttonVariants } from "@pigxel/ui/components/button";
 
 export type MenuItem = {
   label: string;
@@ -43,7 +44,12 @@ export function Menu({
     >
       <summary
         aria-disabled={disabled}
-        className="flex h-8 cursor-pointer list-none items-center gap-1 rounded-md px-3 text-sm font-medium hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50 [&::-webkit-details-marker]:hidden"
+        className={buttonVariants({
+          variant: "ghost",
+          size: "sm",
+          className:
+            "cursor-pointer list-none gap-1 px-3 text-sm text-foreground [&::-webkit-details-marker]:hidden",
+        })}
       >
         {label}
         <span aria-hidden="true" className="text-xs text-muted-foreground">

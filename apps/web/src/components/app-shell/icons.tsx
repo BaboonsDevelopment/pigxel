@@ -61,12 +61,6 @@ export const SettingsIcon = () => (
   </Icon>
 );
 
-export const PlusIcon = () => (
-  <Icon strokeWidth={2}>
-    <path d="M12 5v14M5 12h14" />
-  </Icon>
-);
-
 export const ChevronRightIcon = () => (
   <Icon className="size-4 shrink-0">
     <path d="m9 6 6 6-6 6" />

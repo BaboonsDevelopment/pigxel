@@ -18,7 +18,7 @@ export type ChatMessage = {
 /** What a server action returns; errors are already readable for the user. */
 export type AiResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-export type Intent = TileAction["kind"] | "chat";
+type Intent = TileAction["kind"] | "chat";
 
 /** `subject` is a clean description of what to draw, set when generating. */
 /**

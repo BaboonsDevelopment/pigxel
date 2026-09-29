@@ -25,7 +25,7 @@ const px = (buf: Uint8ClampedArray, i: number) => buf[i] ?? 0;
 const hex = (c: RGB) =>
   `#${[c.r, c.g, c.b].map((n) => Math.round(n).toString(16).padStart(2, "0")).join("")}`;
 
-export function downscale(
+function downscale(
   src: Uint8ClampedArray,
   sw: number,
   sh: number,
@@ -130,7 +130,7 @@ function keyOut(
   return removed;
 }
 
-export function removeBackground(
+function removeBackground(
   buf: Uint8ClampedArray,
   w: number,
   h: number,

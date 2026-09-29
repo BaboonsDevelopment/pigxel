@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "@pigxel/ui/components/button";
+import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
+import { Notice } from "@pigxel/ui/components/notice";
+import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { authenticate } from "./actions";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
 
@@ -12,7 +15,6 @@ const labels: Record<AuthMode, string> = {
   signup: "Create account",
   forgot: "Send reset link",
 };
-const linkStyle = "font-medium text-foreground underline underline-offset-4";
 
 export function AuthForm({
   mode,
@@ -28,14 +30,12 @@ export function AuthForm({
   const signup = mode === "signup";
   return (
     <form action={action} className="space-y-5">
-      <div className="space-y-2">
-        <label htmlFor="email" className="text-sm font-medium">
-          Email
-        </label>
+      <Field label="Email" htmlFor="email">
         <Input
           id="email"
           name="email"
           type="email"
+          inputSize="lg"
           defaultValue={state.email}
           placeholder="you@example.com"
           autoComplete="email"
@@ -43,75 +43,59 @@ export function AuthForm({
           required
           disabled={pending || !configured}
         />
-      </div>
+      </Field>
       {(mode === "login" || signup) && (
-        <div className="space-y-2">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-          </label>
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint={signup ? "At least 8 characters." : undefined}
+        >
           <Input
             id="password"
             name="password"
             type="password"
+            inputSize="lg"
             autoComplete={signup ? "new-password" : "current-password"}
+            aria-describedby={signup ? "password-hint" : undefined}
             minLength={signup ? 8 : 1}
             maxLength={128}
             required
             disabled={pending || !configured}
-            aria-describedby={signup ? "password-hint" : undefined}
           />
-          {signup && (
-            <p id="password-hint" className="text-xs text-muted-foreground">
-              At least 8 characters.
-            </p>
-          )}
           {mode === "login" && (
             <Link
-              className="inline-block text-xs text-muted-foreground underline underline-offset-4"
+              className="inline-block text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
               href="/login?mode=forgot"
             >
               Forgot password?
             </Link>
           )}
-        </div>
+        </Field>
       )}
-      {state.error && (
-        <p role="alert" className="text-sm text-destructive">
-          {state.error}
-        </p>
-      )}
-      {state.message && (
-        <p
-          role="status"
-          className="rounded-lg border bg-muted p-3 text-sm leading-relaxed"
-        >
-          {state.message}
-        </p>
-      )}
+      {state.error && <FormMessage tone="error">{state.error}</FormMessage>}
+      {state.message && <Notice>{state.message}</Notice>}
       {!configured && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <FormMessage role="status">
           Sign-in is not available yet. Please try again later.
-        </p>
+        </FormMessage>
       )}
-      <Button className="w-full" disabled={pending || !configured}>
+      <Button size="lg" className="w-full" disabled={pending || !configured}>
         {pending ? "Please wait…" : labels[mode]}
       </Button>
-      <div className="text-center text-sm text-muted-foreground">
-        <p>
-          {mode === "login" ? (
-            <>
-              New to Pigxel?{" "}
-              <Link className={linkStyle} href="/login?mode=signup">
-                Create an account
-              </Link>
-            </>
-          ) : (
-            <Link className={linkStyle} href="/login">
-              Back to log in
+      <p className="text-center text-sm text-muted-foreground">
+        {mode === "login" ? (
+          <>
+            New to Pigxel?{" "}
+            <Link className={textLinkClassName} href="/login?mode=signup">
+              Create an account
             </Link>
-          )}
-        </p>
-      </div>
+          </>
+        ) : (
+          <Link className={textLinkClassName} href="/login">
+            Back to log in
+          </Link>
+        )}
+      </p>
     </form>
   );
 }

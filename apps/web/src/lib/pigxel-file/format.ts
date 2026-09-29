@@ -37,7 +37,7 @@ export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
 export const PIGXEL_VERSION = 2;
 export const MAX_PIGXEL_SIZE = 256;
 
-export const BACKGROUNDS = ["transparent", "white", "black"] as const;
+const BACKGROUNDS = ["transparent", "white", "black"] as const;
 export type Background = (typeof BACKGROUNDS)[number];
 
 /** The colour a background paints, or null for transparent. */
