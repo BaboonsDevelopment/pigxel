@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { PaintTool } from "@/components/pixel-canvas/pen";
+import { pixelIcon } from "@/components/pixel-icon";
 
 export type ToolId = PaintTool;
 
@@ -10,28 +11,6 @@ export type Tool = {
   shortcut: string;
   icon: ReactNode;
 };
-
-/** A 16×16 icon drawn from rows of text, one "#" per filled pixel. */
-function pixelIcon(rows: string[]) {
-  const d = rows
-    .flatMap((row, y) =>
-      [...row.matchAll(/#+/g)].map(
-        (run) => `M${run.index} ${y}h${run[0].length}v1H${run.index}Z`,
-      ),
-    )
-    .join("");
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 16 16"
-      className="size-5"
-      fill="currentColor"
-      shapeRendering="crispEdges"
-    >
-      <path d={d} />
-    </svg>
-  );
-}
 
 export const TOOLS: Tool[] = [
   {

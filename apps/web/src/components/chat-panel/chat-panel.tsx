@@ -24,6 +24,7 @@ import { ChatWelcome } from "./components/chat-welcome";
 import {
   ASK_FRAME,
   ASK_SELECT,
+  NO_LAYER,
   UNREACHABLE,
   type CanvasBridge,
   type ChatEntry,
@@ -195,7 +196,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     target: Area,
     keep: Area[],
   ) => {
-    const picture = canvas.snapshot(source, CHROMA_KEY_HEX);
+    const picture = canvas.snapshotLayer(source, CHROMA_KEY_HEX);
     const result = await redrawArea(
       instruction,
       picture,
@@ -287,6 +288,8 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     }
     const { action } = result.value;
     if (!action) append(result.value);
+    // The AI draws on the selected layer, so it must be one that can be drawn on.
+    else if (!canvas.canPaint()) say(NO_LAYER);
     else if (action.kind === "generate") await create(action);
     else await changeTile(action);
   };

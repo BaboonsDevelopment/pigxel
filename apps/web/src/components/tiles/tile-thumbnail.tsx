@@ -1,7 +1,7 @@
-import type { PigxelImage } from "@/lib/pigxel-file/format";
+import { flattenDocument, type PigxelDocument } from "@/lib/pigxel-file/format";
 
 /** The tile drawn at its own size and scaled up crisply, on a checkerboard. */
-export function TileThumbnail({ image }: { image: PigxelImage }) {
+export function TileThumbnail({ image }: { image: PigxelDocument }) {
   return (
     <canvas
       aria-hidden="true"
@@ -13,7 +13,7 @@ export function TileThumbnail({ image }: { image: PigxelImage }) {
           ?.getContext("2d")
           ?.putImageData(
             new ImageData(
-              new Uint8ClampedArray(image.data),
+              flattenDocument(image) as Uint8ClampedArray<ArrayBuffer>,
               image.width,
               image.height,
             ),

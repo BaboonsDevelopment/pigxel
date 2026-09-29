@@ -10,7 +10,7 @@ import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   MAX_PIGXEL_SIZE,
   PIGXEL_EXTENSION,
-  blankImage,
+  blankDocument,
   serializePigxel,
   type Background,
 } from "@/lib/pigxel-file/format";
@@ -75,7 +75,7 @@ function Form({ userId, drive, driveError }: FormProps) {
   };
 
   const create = async (w: number, h: number) => {
-    const image = blankImage(w, h, background);
+    const image = blankDocument(w, h, background);
     const file = serializePigxel(image);
     let location: TileLocation | null = null;
     setBusy(true);

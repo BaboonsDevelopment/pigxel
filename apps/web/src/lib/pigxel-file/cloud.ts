@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   PIGXEL_MIME_TYPE,
   stripPigxelExtension,
-  type PigxelImage,
+  type PigxelDocument,
 } from "./format";
 import type { CloudTile } from "./location";
 
@@ -77,7 +77,7 @@ export async function readCloudTile(id: string): Promise<string> {
 export async function saveCloudTile(
   tile: { id?: string; name: string },
   contents: string,
-  image: PigxelImage,
+  image: PigxelDocument,
   thumbnail: string,
 ): Promise<CloudTile> {
   const supabase = createClient();
@@ -85,7 +85,7 @@ export async function saveCloudTile(
     name: stripPigxelExtension(tile.name).trim().slice(0, 100) || "Untitled",
     width: image.width,
     height: image.height,
-    background: image.background ?? "transparent",
+    background: image.background,
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { blankImage } from "@/lib/pigxel-file/format";
+import { blankDocument } from "@/lib/pigxel-file/format";
 
 /** A tiny stand-in for the Supabase browser client: a tiles table and a bucket. */
 const fake = vi.hoisted(() => {
@@ -83,7 +83,7 @@ import {
   saveCloudTile,
 } from "@/lib/pigxel-file/cloud";
 
-const image = blankImage(16, 8, "white");
+const image = blankDocument(16, 8, "white");
 
 beforeEach(() => {
   fake.state.rows.clear();

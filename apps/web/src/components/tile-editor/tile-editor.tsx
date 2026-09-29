@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   useEffect,
   useEffectEvent,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -12,16 +13,17 @@ import {
 import { cn } from "@pigxel/ui/lib/utils";
 import { ChatPanel } from "@/components/chat-panel/chat-panel";
 import type { CanvasBridge } from "@/components/chat-panel/constants";
-import {
-  DEFAULT_SCALE,
-  DEFAULT_SIZE,
-  type Area,
-} from "@/components/pixel-canvas/constants";
+import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
+import {
+  useLayers,
+  type LayersApi,
+} from "@/components/pixel-canvas/use-layers";
+import { LayersPanel } from "@/components/layers-panel/layers-panel";
 import {
   DEFAULT_PEN,
   clampPenSize,
@@ -55,7 +57,7 @@ import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
-  type PigxelImage,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { useIsClient } from "@/lib/use-is-client";
 import { listCloudTiles } from "@/lib/pigxel-file/cloud";
@@ -164,7 +166,7 @@ function Editor({
   driveError,
   draft,
   image,
-}: EditorProps & { draft: Draft; image: PigxelImage }) {
+}: EditorProps & { draft: Draft; image: PigxelDocument }) {
   const router = useRouter();
   const [picking, setPicking] = useState<"cloud" | "drive" | null>(null);
   const [tool, setTool] = useState<ToolId>("pen");
@@ -175,12 +177,12 @@ function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const tile = useRef<LayersApi>(null);
   const file = useTileFile({
-    canvas,
+    tile,
     fileInput,
     userId,
     initial: draft,
-    initialBackground: image.background ?? "transparent",
     drive,
     onOpen: (id) => router.push(editorUrl(id)),
     notice: driveError
@@ -189,6 +191,12 @@ function Editor({
           text: "Google Drive wasn’t connected. Try again when you’re ready.",
         }
       : undefined,
+  });
+
+  // Every finished change to the layers marks the tile for saving.
+  const layers = useLayers(image, file.markDirty);
+  useLayoutEffect(() => {
+    tile.current = layers;
   });
 
   // Tool colour and sizes carry over to every tile.
@@ -237,11 +245,7 @@ function Editor({
     return () => area.removeEventListener("wheel", onWheel);
   }, []);
 
-  const fullArea = (): Area => ({
-    x: 0,
-    y: 0,
-    ...(canvas.current?.size ?? DEFAULT_SIZE),
-  });
+  const fullArea = (): Area => ({ x: 0, y: 0, ...layers.size });
 
   // A picture from the AI, turned into pixel art at the area's size.
   const toArt = async (dataUrl: string, area: Area) => {
@@ -262,8 +266,11 @@ function Editor({
     isEmpty: () => canvas.current?.isEmpty() ?? true,
     fullArea,
     freeArea: () => canvas.current?.freeArea() ?? null,
+    canPaint: () => layers.canPaint,
     snapshot: (area, background) =>
       canvas.current?.snapshot(area, background) ?? "",
+    snapshotLayer: (area, background) =>
+      canvas.current?.snapshotLayer(area, background) ?? "",
     selectArea: async () => (await canvas.current?.selectArea()) ?? null,
     adjustArea: async (area) =>
       (await canvas.current?.adjustArea(area)) ?? null,
@@ -340,7 +347,8 @@ function Editor({
       canvas.current.write(drawOnEmpty(rest, tile.w, lifted, placed), tile);
     },
     overlapsDrawing(area) {
-      const pixels = canvas.current?.read(area) ?? new Uint8ClampedArray();
+      // Art on any layer counts, not only the one being drawn on.
+      const pixels = canvas.current?.readTile(area) ?? new Uint8ClampedArray();
       let drawn = 0;
       for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) drawn++;
       return drawn > area.w * area.h * MAX_OVERLAP;
@@ -503,21 +511,25 @@ function Editor({
         <ToolOptions tool={tool} pen={pen} onChange={setPen} />
       </div>
       <ToolBar tool={tool} onSelect={setTool} />
-      <main ref={workspace} className="flex overflow-auto bg-muted p-12">
-        <div className="m-auto">
-          <PixelCanvas
-            ref={canvas}
-            tool={tool}
-            pen={pen}
-            scale={scale}
-            highlight={highlight}
-            background={file.background}
-            initialImage={image}
-            onChange={file.markDirty}
-            onPickColor={(color) => setPen((p) => ({ ...p, color }))}
-          />
-        </div>
-      </main>
+      <div className="flex min-h-0 flex-col">
+        <main
+          ref={workspace}
+          className="flex min-h-0 flex-1 overflow-auto bg-muted p-12"
+        >
+          <div className="m-auto">
+            <PixelCanvas
+              ref={canvas}
+              tool={tool}
+              pen={pen}
+              scale={scale}
+              layers={layers}
+              highlight={highlight}
+              onPickColor={(color) => setPen((p) => ({ ...p, color }))}
+            />
+          </div>
+        </main>
+        <LayersPanel layers={layers} />
+      </div>
       <ChatPanel canvas={bridge} />
       {picking === "cloud" && (
         <FilesDialog
