@@ -11,6 +11,7 @@ import {
   nextName,
   panelRows,
   placeAbove,
+  placeOutside,
   removeLayer,
   updateLayer,
 } from "@/lib/layers/tree";
@@ -79,6 +80,19 @@ describe("layer tree", () => {
       "C",
       "BG",
     ]);
+  });
+  it("takes a layer out of its group, right above the group", () => {
+    const tree = sample();
+    const place = placeOutside(tree, "B")!;
+    expect(names(moveLayer(tree, "B", place))).toEqual([
+      "D",
+      "B",
+      "G",
+      "C",
+      "A",
+      "BG",
+    ]);
+    expect(placeOutside(tree, "A")).toBeNull();
   });
   it("keeps the Background at the bottom and groups out of themselves", () => {
     const tree = sample();

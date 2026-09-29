@@ -1,0 +1,492 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { flatten } from "@/lib/layers/composite";
+import * as layerTree from "@/lib/layers/tree";
+import type { Layer, LayerKind, Place } from "@/lib/layers/types";
+import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import * as frameList from "@/lib/sprite/frames";
+import * as history from "@/lib/sprite/history";
+import type { Cels, Frame, History } from "@/lib/sprite/types";
+import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
+import { MAX_UNDO, type Size } from "./constants";
+
+/** Layer settings the panel can change. */
+export type LayerPatch = Partial<
+  Pick<Layer, "name" | "visible" | "locked" | "opacity" | "blend">
+> & { collapsed?: boolean };
+
+export type SpriteApi = ReturnType<typeof useSprite>;
+
+/** A layer to add, with its name and its pixels by frame id. */
+export type NewLayer = {
+  name?: string;
+  cels?: Map<string, Uint8ClampedArray>;
+  /**
+   * Puts the pixels on the active layer instead when it is an untouched
+   * drawing layer (a new tile's "Layer 1"), so empty layers don't pile up.
+   */
+  reuseEmpty?: boolean;
+  /** Hides the other drawing layers, so the new one takes the tile's place. */
+  hideOthers?: boolean;
+};
+
+/**
+ * An animation to add: it runs from the first frame for `frameCount` frames,
+ * with one layer per entry of `layers` (bottom to top), whose `cels` are its
+ * full-tile pixels per frame (null where it is not seen). New layers go in a
+ * group called `name`; an entry that `replaces` an existing layer gives that
+ * layer these cels instead.
+ */
+export type AnimationSpec = {
+  name: string;
+  frameCount: number;
+  duration: number;
+  layers: {
+    name: string;
+    cels: (Uint8ClampedArray | null)[];
+    replaces?: string;
+  }[];
+};
+
+/** The tile at one point of its history. Unchanged cels share their pixels. */
+type Snapshot = { tree: Layer[]; frames: Frame[]; size: Size; cels: Cels };
+
+/**
+ * The tile being edited, as Aseprite calls it a sprite: a layer tree, a list
+ * of frames, and a cel (one layer's pixels in one frame) wherever something
+ * is drawn. The tree and the frames are React state; the cels live in
+ * canvases (see CelCanvases), so the tools draw on the active cel (the
+ * active layer in the active frame) and the screen shows the active frame
+ * with every layer combined.
+ *
+ * Every finished change is a step Ctrl+Z can undo, and fires `onChange`, for
+ * saving.
+ */
+export function useSprite(initial: PigxelDocument, onChange: () => void) {
+  const { background } = initial;
+  const [size, setSize] = useState<Size>({
+    w: initial.width,
+    h: initial.height,
+  });
+  const [tree, setTree] = useState(initial.layers);
+  const [frames, setFrames] = useState(initial.frames);
+  const [layerId, setLayerId] = useState(
+    () =>
+      layerTree.pixelLayerIds(initial.layers).at(-1) ?? initial.layers[0]!.id,
+  );
+  const [frameId, setFrameId] = useState(initial.frames[0]!.id);
+  // Bumped when what the screen shows changes, so the canvas repaints.
+  const [version, setVersion] = useState(0);
+  const [cels] = useState(() => new CelCanvases(initial.cels, size));
+  // Cels drawn on since the last finished change.
+  const changed = useRef(new Set<HTMLCanvasElement>());
+  const past = useRef<History<Snapshot>>(
+    history.startHistory({
+      tree: initial.layers,
+      frames: initial.frames,
+      size,
+      cels: initial.cels,
+    }),
+  );
+
+  const repaint = () => setVersion((v) => v + 1);
+
+  const isBackground = (id: string, inTree = tree) =>
+    layerTree.findLayer(inTree, id)?.layer.kind === "background";
+
+  /** What fills a cel of `id` where nothing is drawn: the Background's colour. */
+  const fillOf = (id: string) =>
+    isBackground(id) ? backgroundColor(background) : null;
+
+  /** Adds a cel: a copy of `pixels`, or empty (the Background filled). */
+  const addCel = (frame: string, layer: string, pixels?: Uint8ClampedArray) => {
+    const canvas = cels.set(frame, layer, size, pixels);
+    const fill = !pixels && fillOf(layer);
+    const ctx = contextOf(canvas);
+    if (fill && ctx) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, size.w, size.h);
+    }
+    return canvas;
+  };
+
+  /**
+   * The drawing context of the active cel. With `create`, an empty cel is
+   * made first where the active layer has none in this frame yet.
+   */
+  const context = (create = false) => {
+    let canvas = cels.get(frameId, layerId);
+    const active = layerTree.findLayer(tree, layerId)?.layer;
+    if (!canvas && create && active && active.kind !== "group")
+      canvas = addCel(frameId, layerId);
+    return contextOf(canvas);
+  };
+
+  /** A frame's layers combined (the active frame by default), without the kinds in `skip`. */
+  const composite = (skip: LayerKind[] = [], frame = frameId) =>
+    flatten(tree, (id) => cels.pixels(frame, id), size.w * size.h * 4, skip);
+
+  /** Marks the active cel as drawn on; the screen repaints. */
+  const touched = () => {
+    const canvas = cels.get(frameId, layerId);
+    if (canvas) {
+      cels.invalidate(canvas);
+      changed.current.add(canvas);
+    }
+    repaint();
+  };
+
+  /**
+   * Ends a change: it becomes a step to undo, the screen repaints and the
+   * tile is saved. Only cels drawn on are read back from their canvases, and
+   * those erased to nothing are removed.
+   */
+  const finish = (
+    next: { tree?: Layer[]; frames?: Frame[]; size?: Size } = {},
+  ) => {
+    const snapshot: Snapshot = {
+      tree: next.tree ?? tree,
+      frames: next.frames ?? frames,
+      size: next.size ?? size,
+      cels: new Map(),
+    };
+    const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
+    for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
+    const { present } = past.current;
+    for (const cel of cels.list()) {
+      const frameCels = snapshot.cels.get(cel.frameId);
+      const drawn = changed.current.has(cel.canvas);
+      const kept =
+        !drawn && frameList.celOf(present.cels, cel.frameId, cel.layerId);
+      const pixels = kept || cels.pixels(cel.frameId, cel.layerId)!;
+      const erased =
+        drawn &&
+        !isBackground(cel.layerId, snapshot.tree) &&
+        isTransparent(pixels);
+      if (!frameCels || !layerIds.has(cel.layerId) || erased)
+        cels.delete(cel.frameId, cel.layerId);
+      else frameCels.set(cel.layerId, pixels);
+    }
+    changed.current.clear();
+    past.current = history.record(past.current, snapshot, MAX_UNDO);
+    repaint();
+    onChange();
+  };
+
+  /** Records a finished drawing on the active cel. */
+  const commit = () => {
+    touched();
+    finish();
+  };
+
+  /** Empties the active cel; on the Background it goes back to the colour. */
+  const clearCel = () => {
+    const canvas = cels.get(frameId, layerId);
+    if (!canvas || !layerTree.canPaint(tree, layerId)) return;
+    const fill = fillOf(layerId);
+    const ctx = contextOf(canvas);
+    if (fill && ctx) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, size.w, size.h);
+      commit();
+    } else {
+      cels.delete(frameId, layerId);
+      finish();
+    }
+  };
+
+  const changeTree = (next: Layer[]) => {
+    setTree(next);
+    finish({ tree: next });
+  };
+
+  const changeFrames = (next: Frame[]) => {
+    setFrames(next);
+    finish({ frames: next });
+  };
+
+  /** Puts the tile back as it was at `snapshot`, redrawing only cels that differ. */
+  const restore = (snapshot: Snapshot) => {
+    const { present } = past.current;
+    const sameSize =
+      snapshot.size.w === present.size.w && snapshot.size.h === present.size.h;
+    for (const cel of cels.list())
+      if (!frameList.celOf(snapshot.cels, cel.frameId, cel.layerId))
+        cels.delete(cel.frameId, cel.layerId);
+    for (const [frame, frameCels] of snapshot.cels)
+      for (const [layer, pixels] of frameCels) {
+        const same =
+          sameSize &&
+          cels.get(frame, layer) &&
+          frameList.celOf(present.cels, frame, layer) === pixels;
+        if (!same) cels.set(frame, layer, snapshot.size, pixels);
+      }
+    changed.current.clear();
+    setTree(snapshot.tree);
+    setFrames(snapshot.frames);
+    setSize(snapshot.size);
+    if (!layerTree.findLayer(snapshot.tree, layerId))
+      setLayerId(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
+    if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
+      const at = frameList.frameIndex(frames, frameId);
+      setFrameId(snapshot.frames[Math.min(at, snapshot.frames.length - 1)]!.id);
+    }
+    repaint();
+    onChange();
+  };
+
+  const undo = () => {
+    const back = history.undo(past.current);
+    if (!back) return;
+    restore(back.present);
+    past.current = back;
+  };
+
+  const redo = () => {
+    const forward = history.redo(past.current);
+    if (!forward) return;
+    restore(forward.present);
+    past.current = forward;
+  };
+
+  /** Whether a layer has nothing drawn in any frame. */
+  const isEmptyLayer = (id: string) => frames.every((f) => !cels.get(f.id, id));
+
+  /** Makes the cels of a layer these pixels (null empties the cel). */
+  const putCels = (
+    id: string,
+    next: Iterable<[string, Uint8ClampedArray | null]>,
+  ) => {
+    for (const [frame, pixels] of next) {
+      if (pixels) changed.current.add(addCel(frame, id, pixels));
+      else cels.delete(frame, id);
+    }
+  };
+
+  /** Adds a layer above the active one, in one undo step; returns its id. */
+  const addLayer = (
+    kind: Exclude<LayerKind, "background">,
+    {
+      name,
+      cels: pixels = new Map(),
+      reuseEmpty = false,
+      hideOthers = false,
+    }: NewLayer = {},
+  ) => {
+    const active = layerTree.findLayer(tree, layerId)?.layer;
+    const empty =
+      reuseEmpty && active?.kind === "normal" && isEmptyLayer(active.id)
+        ? active
+        : null;
+    const layer =
+      empty ??
+      layerTree.createLayer(kind, name ?? layerTree.nextName(tree, kind));
+    let next = empty
+      ? name
+        ? layerTree.updateLayer(tree, empty.id, { name })
+        : tree
+      : layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId));
+    if (hideOthers)
+      for (const other of layerTree.allLayers(next))
+        if (other.kind === "normal" && other.id !== layer.id && other.visible)
+          next = layerTree.updateLayer(next, other.id, { visible: false });
+    putCels(layer.id, pixels);
+    setLayerId(layer.id);
+    changeTree(next);
+    return layer.id;
+  };
+
+  /** Replaces cels of a layer by frame id, in one undo step. */
+  const writeCels = (
+    id: string,
+    next: Map<string, Uint8ClampedArray | null>,
+  ) => {
+    putCels(id, next);
+    finish();
+  };
+
+  /** Adds an animation (see AnimationSpec) in one undo step. */
+  const addAnimation = (spec: AnimationSpec) => {
+    // The animation runs from the first frame. Missing frames are added,
+    // showing what the last frame shows, so the still scene stays.
+    const last = frames.at(-1)!;
+    const nextFrames = frames.map((frame, i) =>
+      i < spec.frameCount ? { ...frame, duration: spec.duration } : frame,
+    );
+    for (let i = frames.length; i < spec.frameCount; i++) {
+      const frame = frameList.createFrame(spec.duration);
+      for (const id of layerTree.pixelLayerIds(tree)) {
+        const pixels = cels.pixels(last.id, id);
+        if (pixels) addCel(frame.id, id, pixels);
+      }
+      nextFrames.push(frame);
+    }
+    const frameIds = nextFrames.slice(0, spec.frameCount).map((f) => f.id);
+    const byFrame = (list: (Uint8ClampedArray | null)[]) =>
+      frameIds.map(
+        (id, i) => [id, list[i] ?? null] as [string, Uint8ClampedArray | null],
+      );
+
+    const added: Layer[] = [];
+    let selected = layerId;
+    for (const entry of spec.layers) {
+      if (entry.replaces && layerTree.findLayer(tree, entry.replaces)) {
+        putCels(entry.replaces, byFrame(entry.cels));
+        selected = entry.replaces;
+        continue;
+      }
+      const layer = layerTree.createLayer("normal", entry.name);
+      putCels(layer.id, byFrame(entry.cels));
+      added.push(layer);
+      selected = layer.id;
+    }
+    const group = layerTree.createLayer("group", spec.name);
+    const nextTree =
+      added.length && group.kind === "group"
+        ? layerTree.insertLayer(
+            tree,
+            { ...group, children: added },
+            layerTree.placeAbove(tree, layerId),
+          )
+        : tree;
+    setTree(nextTree);
+    setFrames(nextFrames);
+    setLayerId(selected);
+    setFrameId(frameIds[0]!);
+    finish({ tree: nextTree, frames: nextFrames });
+  };
+
+  /** A tile keeps at least one layer to draw on, so that one can't be removed. */
+  const canRemoveLayer = (id: string) =>
+    layerTree
+      .allLayers(layerTree.removeLayer(tree, id))
+      .some((layer) => layer.kind === "normal" || layer.kind === "background");
+
+  const removeLayer = (id: string) => {
+    if (!canRemoveLayer(id)) return;
+    const next = layerTree.removeLayer(tree, id);
+    const found = layerTree.findLayer(tree, id);
+    const siblings = found?.parent?.children ?? tree;
+    const neighbour =
+      siblings[(found?.index ?? 0) - 1] ?? siblings[(found?.index ?? 0) + 1];
+    const kept = new Set(layerTree.pixelLayerIds(next));
+    for (const gone of layerTree.pixelLayerIds(tree))
+      if (!kept.has(gone)) cels.deleteLayer(gone);
+    if (!layerTree.findLayer(next, layerId))
+      setLayerId(
+        neighbour?.id ?? found?.parent?.id ?? layerTree.pixelLayerIds(next)[0]!,
+      );
+    changeTree(next);
+  };
+
+  /**
+   * Adds a frame after the active one and moves to it. A copy repeats every
+   * cel of the active frame; an empty one keeps only the Background and the
+   * references, which belong to every frame.
+   */
+  const addFrame = (copy: boolean) => {
+    const current = frames.find((f) => f.id === frameId)!;
+    const frame = frameList.createFrame(current.duration);
+    for (const layer of layerTree.allLayers(tree)) {
+      if (layer.kind === "group") continue;
+      const pixels = cels.pixels(frameId, layer.id);
+      if (copy || layer.kind === "reference") {
+        if (pixels) addCel(frame.id, layer.id, pixels);
+      } else if (layer.kind === "background") addCel(frame.id, layer.id);
+    }
+    const at = frameList.frameIndex(frames, frameId) + 1;
+    setFrameId(frame.id);
+    changeFrames(frameList.insertFrame(frames, frame, at));
+  };
+
+  const removeFrame = (id: string) => {
+    if (frames.length < 2) return;
+    const next = frameList.removeFrame(frames, id);
+    cels.deleteFrame(id);
+    if (id === frameId) {
+      const at = frameList.frameIndex(frames, id);
+      setFrameId(next[Math.min(at, next.length - 1)]!.id);
+    }
+    changeFrames(next);
+  };
+
+  /** Grows or shrinks every cel, keeping the top-left; a Background fills new space. */
+  const resize = (next: Size) => {
+    cels.resize(next, fillOf);
+    for (const cel of cels.list()) changed.current.add(cel.canvas);
+    setSize(next);
+    finish({ size: next });
+  };
+
+  const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
+
+  return {
+    size,
+    tree,
+    frames,
+    background,
+    layerId,
+    activeLayer,
+    frameId,
+    /** Whether the tools may draw on the active layer. */
+    canPaint: layerTree.canPaint(tree, layerId),
+    version,
+    context,
+    composite,
+    touched,
+    commit,
+    clearCel,
+    resize,
+    undo,
+    redo,
+    /** Whether a layer has anything drawn in a frame. */
+    hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
+    /** A layer's full-tile pixels in a frame; transparent where it has no cel. */
+    readCel: (layer: string, frame: string) =>
+      cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
+    writeCels,
+    addAnimation,
+    selectLayer: setLayerId,
+    addLayer,
+    canRemoveLayer,
+    removeLayer,
+    updateLayer: (id: string, patch: LayerPatch) =>
+      changeTree(layerTree.updateLayer(tree, id, patch)),
+    moveLayer: (id: string, place: Place) =>
+      changeTree(layerTree.moveLayer(tree, id, place)),
+    selectFrame: setFrameId,
+    /** Moves to the frame `step` places away, wrapping around. */
+    stepFrame: (step: number) =>
+      setFrameId(frameList.stepFrame(frames, frameId, step).id),
+    addFrame,
+    removeFrame,
+    moveFrame: (id: string, index: number) =>
+      changeFrames(frameList.moveFrame(frames, id, index)),
+    setFrameDuration: (id: string, ms: number) =>
+      changeFrames(
+        frameList.updateFrame(frames, id, {
+          duration: frameList.clampDuration(ms),
+        }),
+      ),
+    /** The tile as a document, for saving. Its pixels are shared: never modify them. */
+    document: (): PigxelDocument => ({
+      width: size.w,
+      height: size.h,
+      background,
+      layers: tree,
+      frames,
+      cels: new Map(
+        frames.map((frame) => [
+          frame.id,
+          new Map(
+            layerTree.pixelLayerIds(tree).flatMap((id) => {
+              const pixels = cels.pixels(frame.id, id);
+              return pixels ? [[id, pixels] as const] : [];
+            }),
+          ),
+        ]),
+      ),
+    }),
+  };
+}

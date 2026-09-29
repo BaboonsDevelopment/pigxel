@@ -1,8 +1,6 @@
 import type { PanelRow } from "@/lib/layers/tree";
 import type { Place } from "@/lib/layers/types";
-
-/** Where a dragged layer lands relative to the row under the pointer. */
-export type DropZone = "above" | "below" | "into";
+import type { DropZone, FrameSide } from "./constants";
 
 /**
  * The zone of a row the pointer is over: its top or bottom half, or for a
@@ -30,4 +28,31 @@ export function dropPlace(row: PanelRow, zone: DropZone): Place {
     parentId: row.parentId,
     index: zone === "above" ? row.index + 1 : row.index,
   };
+}
+
+/** Lets the person pick a picture; null if they cancel. */
+export function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
+/** The half of a frame's column the pointer is over. */
+export function sideAt(e: React.DragEvent<HTMLElement>): FrameSide {
+  const box = e.currentTarget.getBoundingClientRect();
+  return e.clientX - box.left < box.width / 2 ? "before" : "after";
+}
+
+/**
+ * Where a frame dragged from index `from` goes when dropped on `side` of the
+ * frame at index `to`, counted in the list without the dragged frame.
+ */
+export function frameDropIndex(from: number, to: number, side: FrameSide) {
+  const at = side === "before" ? to : to + 1;
+  return from < at ? at - 1 : at;
 }

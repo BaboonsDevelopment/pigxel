@@ -45,6 +45,7 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
   }
   if (isTyping(e.target)) return null;
   if (e.altKey) {
+    if (code === "KeyN") return command("newFrame");
     if (code === "ArrowUp") return command("layerAbove");
     if (code === "ArrowDown") return command("layerBelow");
     return null;
@@ -52,6 +53,8 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
   if (shift) return code === "KeyN" ? command("newLayer") : null;
   if (zoomIn) return command("zoomIn");
   if (zoomOut) return command("zoomOut");
+  if (code === "Comma") return command("previousFrame");
+  if (code === "Period") return command("nextFrame");
   if (code === "BracketLeft") return command("penSmaller");
   if (code === "BracketRight") return command("penBigger");
   if (code === "Delete" || code === "Backspace") return command("clearLayer");

@@ -34,6 +34,9 @@ export type Command =
   | "layerBelow"
   | "newLayer"
   | "clearLayer"
+  | "newFrame"
+  | "previousFrame"
+  | "nextFrame"
   | "penSmaller"
   | "penBigger";
 
@@ -41,13 +44,6 @@ export type Shortcut = { command: Command } | { tool: ToolId };
 
 /** The places a tile can be opened from in a dialog. */
 export type OpenSource = "cloud" | "drive";
-
-export type MenuItem = {
-  label: string;
-  shortcut?: string;
-  onSelect: () => void;
-  hidden?: boolean;
-};
 
 export type FileItem = {
   id: string;
@@ -61,6 +57,3 @@ export type Listing =
   | { state: "loading" }
   | { state: "ready"; items: FileItem[] }
   | { state: "error"; message: string };
-
-/** Share of an area that may already be drawn on before a new picture there counts as covering art. */
-export const MAX_OVERLAP = 0.03;

@@ -1,8 +1,9 @@
 "use server";
 
-import { MAX_HISTORY, PLACEMENT_HISTORY } from "@/lib/ai/constants";
+import { MAX_FRAMES, MAX_HISTORY, PLACEMENT_HISTORY } from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
+  buildAnimationPrompt,
   buildComposePrompt,
   buildEditSystemPrompt,
   buildEditUserMessage,
@@ -10,12 +11,17 @@ import {
   buildPlacementPrompt,
   buildPlanPrompt,
   buildRedrawPrompt,
+  buildSheetPrompt,
+  clampAnimationPlan,
   clampRect,
   closestAspectRatio,
+  sheetLayout,
+  type SheetLayout,
 } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
+  AnimationPlan,
   ChatMessage,
   EditPlan,
   EditReply,
@@ -67,6 +73,8 @@ export async function sendMessage(
         request: route.subject,
         where: route.where,
         count: route.count,
+        name: route.name,
+        frames: route.frames,
       },
     };
   });
@@ -83,9 +91,10 @@ export async function generateImage(
     return { ok: false, error: "That area cannot be used for a picture." };
   }
   return attempt("generateImage", async () => {
-    const { mimeType, base64 } = await getAiProvider().generate(
+    const ai = getAiProvider();
+    const { mimeType, base64 } = await ai.generate(
       buildImagePrompt(subject, width, height),
-      closestAspectRatio(width, height),
+      closestAspectRatio(width, height, ai.aspectRatios),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -121,10 +130,11 @@ export async function redrawArea(
     return { ok: false, error: "That area cannot be redrawn." };
   }
   return attempt("redrawArea", async () => {
-    const { mimeType, base64 } = await getAiProvider().redraw(
+    const ai = getAiProvider();
+    const { mimeType, base64 } = await ai.redraw(
       buildRedrawPrompt(request, width, height),
       { mimeType: "image/png", base64: png },
-      closestAspectRatio(width, height),
+      closestAspectRatio(width, height, ai.aspectRatios),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -166,6 +176,8 @@ export async function planEdit(args: {
   width: number;
   height: number;
   objects: Rect[];
+  /** The name of the layer each object is on. */
+  layers: string[];
   drawn: Rect;
   selection: Rect | null;
 }): Promise<AiResult<EditPlan>> {
@@ -193,6 +205,7 @@ export async function planEdit(args: {
         width,
         height,
         objects: args.objects,
+        layers: args.layers,
         selection: args.selection,
       }),
       { mimeType: "image/png", base64: png! },
@@ -218,8 +231,15 @@ export async function planEdit(args: {
     const keep = reply.keep
       .map((i) => args.objects[i])
       .filter((r): r is Rect => !!r);
+    const objects = reply.objects.filter((i) => !!args.objects[i]);
     // Kept objects stay where they are, so the edit happens in place.
-    return { ...reply, source, target: keep.length ? source : target, keep };
+    return {
+      ...reply,
+      objects,
+      source,
+      target: keep.length ? source : target,
+      keep,
+    };
   });
 }
 
@@ -247,6 +267,8 @@ export async function planPlacement(args: {
   width: number;
   height: number;
   objects: Rect[];
+  /** The name of the layer each object is on. */
+  layers: string[];
   recent: ChatMessage[];
 }): Promise<AiResult<PlacementPlan>> {
   await requireUser();
@@ -277,14 +299,15 @@ export async function planPlacement(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
-    const copyOf = args.objects[reply.copyOf] ?? null;
+    const copied = args.objects[reply.copyOf];
+    const copyOf = copied ? reply.copyOf : null;
     const areas = reply.areas
       .slice(0, args.count)
       .map((r) => clampRect(r, width, height))
       // A copy keeps the size of the original.
       .map((r) =>
-        copyOf
-          ? clampRect({ ...r, w: copyOf.w, h: copyOf.h }, width, height)
+        copied
+          ? clampRect({ ...r, w: copied.w, h: copied.h }, width, height)
           : r,
       );
     return {
@@ -293,5 +316,100 @@ export async function planPlacement(args: {
       ask: reply.ask || !areas.length,
       question: reply.question,
     };
+  });
+}
+
+/**
+ * Plans an animation of `request` on the tile (a PNG data URL): its frames
+ * and one track per thing that moves. `layers` are the drawn layers, which
+ * the plan may reuse by index; `frames` is the count asked for, or 0.
+ */
+export async function planAnimation(args: {
+  request: string;
+  tile: string;
+  width: number;
+  height: number;
+  layers: { name: string; box: Rect | null }[];
+  frames: number;
+}): Promise<AiResult<AnimationPlan>> {
+  await requireUser();
+  const { request, width, height } = args;
+  const png = PNG_DATA_URL.exec(args.tile)?.[1];
+  const valid =
+    request.trim() &&
+    png &&
+    validSize(width) &&
+    validSize(height) &&
+    Number.isInteger(args.frames) &&
+    args.frames >= 0 &&
+    args.frames <= MAX_FRAMES &&
+    args.layers.length <= MAX_OBJECTS;
+  if (!valid) return { ok: false, error: "The tile could not be analysed." };
+
+  return attempt("planAnimation", async () => {
+    const reply = await getAiProvider().animate(
+      buildAnimationPrompt({
+        ...args,
+        layers: args.layers.map((l) => ({ ...l, name: l.name.slice(0, 40) })),
+      }),
+      { mimeType: "image/png", base64: png! },
+    );
+    return clampAnimationPlan(
+      reply,
+      width,
+      height,
+      args.layers.length,
+      args.frames,
+    );
+  });
+}
+
+/**
+ * Draws `subject` in every pose as one sprite sheet (paid), each cell sized
+ * for `cellW × cellH` tile pixels. With `reference` (a PNG data URL of what
+ * is already drawn), its look is kept. Returns the picture and its grid.
+ */
+export async function generateSheet(args: {
+  subject: string;
+  poses: string[];
+  cellW: number;
+  cellH: number;
+  reference: string | null;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
+  await requireUser();
+  const reference = args.reference
+    ? PNG_DATA_URL.exec(args.reference)?.[1]
+    : null;
+  const valid =
+    args.subject.trim() &&
+    args.poses.length >= 1 &&
+    args.poses.length <= MAX_FRAMES &&
+    args.poses.every((p) => typeof p === "string" && p.trim()) &&
+    validSize(args.cellW) &&
+    validSize(args.cellH) &&
+    reference !== undefined;
+  if (!valid) return { ok: false, error: "That animation cannot be drawn." };
+
+  return attempt("generateSheet", async () => {
+    const ai = getAiProvider();
+    const layout = sheetLayout(
+      args.poses.length,
+      args.cellW,
+      args.cellH,
+      ai.aspectRatios,
+    );
+    const prompt = buildSheetPrompt({
+      ...args,
+      layout,
+      fromReference: !!reference,
+    });
+    const { mimeType, base64 } = reference
+      ? await ai.redraw(
+          prompt,
+          { mimeType: "image/png", base64: reference },
+          layout.aspectRatio,
+        )
+      : await ai.generate(prompt, layout.aspectRatio);
+    return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }
