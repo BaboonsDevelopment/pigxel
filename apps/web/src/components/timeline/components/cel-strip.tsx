@@ -37,6 +37,8 @@ export function CelStrip({
           e.stopPropagation();
           onSelect(frame.id);
         }}
+        // The row opens the layer's menu for the cel's frame.
+        onContextMenu={() => onSelect(frame.id)}
         className={cn(
           "flex shrink-0 items-center justify-center border-r",
           FRAME_COLUMN,

@@ -22,6 +22,7 @@ import {
   type SpriteApi,
 } from "@/components/pixel-canvas/use-sprite";
 import { Timeline } from "@/components/timeline/timeline";
+import { usePlayback } from "@/components/timeline/use-playback";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
@@ -88,6 +89,7 @@ export function Editor({
   useLayoutEffect(() => {
     tile.current = sprite;
   });
+  const playback = usePlayback(sprite);
 
   // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
@@ -120,9 +122,7 @@ export function Editor({
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
-    clearLayer: () => {
-      if (sprite.canPaint) canvas.current?.clear();
-    },
+    clearLayer: sprite.clearCel,
     newFrame: () => sprite.addFrame(true),
     previousFrame: () => sprite.stepFrame(-1),
     nextFrame: () => sprite.stepFrame(1),
@@ -161,6 +161,8 @@ export function Editor({
         file={file}
         fileInput={fileInput}
         drive={drive}
+        sprite={sprite}
+        playback={playback}
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
       />
@@ -189,7 +191,7 @@ export function Editor({
             />
           </div>
         </main>
-        <Timeline sprite={sprite} />
+        <Timeline sprite={sprite} playback={playback} />
       </div>
       <EditorChat canvas={canvas} sprite={sprite} onHighlight={setHighlight} />
       {opening && (

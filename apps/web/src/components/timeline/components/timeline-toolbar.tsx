@@ -1,18 +1,17 @@
 "use client";
 
-import { useRef } from "react";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
-import { fitImageToTile } from "@/lib/image/helpers";
 import { ACTION } from "../constants";
 import { ICONS } from "../icons";
 import type { Playback } from "../use-playback";
+import { ControlGroup } from "./control-group";
 import { FrameDuration } from "./frame-duration";
 import { LayerOptions } from "./layer-options";
 
 /**
- * The timeline's buttons: layers (add, group, reference, remove), frames
- * (play, step, add, duplicate, remove, duration) and the active layer's
- * opacity and blend mode.
+ * The timeline's main controls, one group for the active layer and one for
+ * the active frame. The rest is in the Layer and Frame menus at the top and
+ * on right-click.
  */
 export function TimelineToolbar({
   sprite,
@@ -23,62 +22,45 @@ export function TimelineToolbar({
   playback: Playback;
   onCollapse: () => void;
 }) {
-  const pictureInput = useRef<HTMLInputElement>(null);
   const { activeLayer, layerId, frames, frameId } = sprite;
   const frame = frames.find((f) => f.id === frameId)!;
-
-  const addReference = async (file: File | undefined) => {
-    if (!file) return;
-    const { w, h } = sprite.size;
-    sprite.addLayer("reference", await fitImageToTile(file, w, h));
-  };
+  const single = frames.length < 2;
 
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-2 py-1">
-      <h2 className="px-1 text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-        Timeline
-      </h2>
-      <div className="flex items-center">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1">
+      <ControlGroup label="Layer">
         <button
           type="button"
           className={ACTION}
           title="New layer (Shift+N)"
           onClick={() => sprite.addLayer("normal")}
         >
-          {ICONS.add} Layer
+          {ICONS.add}
         </button>
         <button
           type="button"
           className={ACTION}
-          onClick={() => sprite.addLayer("group")}
-        >
-          {ICONS.group} Group
-        </button>
-        <button
-          type="button"
-          className={ACTION}
-          title="A picture to trace over, in every frame; it isn’t drawn on or exported"
-          onClick={() => pictureInput.current?.click()}
-        >
-          {ICONS.reference} Reference…
-        </button>
-        <button
-          type="button"
-          className={ACTION}
-          title="Remove layer"
+          title="Delete layer"
           disabled={!sprite.canRemoveLayer(layerId)}
           onClick={() => sprite.removeLayer(layerId)}
         >
           {ICONS.remove}
         </button>
-      </div>
+        {activeLayer && (
+          <LayerOptions
+            key={activeLayer.id}
+            layer={activeLayer}
+            onChange={(patch) => sprite.updateLayer(activeLayer.id, patch)}
+          />
+        )}
+      </ControlGroup>
 
-      <div className="flex items-center">
+      <ControlGroup label="Frame">
         <button
           type="button"
           className={ACTION}
           title="Previous frame (,)"
-          disabled={frames.length < 2}
+          disabled={single}
           onClick={() => sprite.stepFrame(-1)}
         >
           {ICONS.previous}
@@ -97,7 +79,7 @@ export function TimelineToolbar({
           type="button"
           className={ACTION}
           title="Next frame (.)"
-          disabled={frames.length < 2}
+          disabled={single}
           onClick={() => sprite.stepFrame(1)}
         >
           {ICONS.next}
@@ -105,42 +87,35 @@ export function TimelineToolbar({
         <button
           type="button"
           className={ACTION}
-          title="New empty frame after this one"
+          title="New empty frame"
           onClick={() => sprite.addFrame(false)}
         >
-          {ICONS.add} Frame
+          {ICONS.add}
         </button>
         <button
           type="button"
           className={ACTION}
-          title="Copy of this frame after it (Alt+N)"
+          title="Duplicate frame (Alt+N)"
           onClick={() => sprite.addFrame(true)}
         >
-          {ICONS.duplicate} Duplicate
+          {ICONS.duplicate}
         </button>
         <button
           type="button"
           className={ACTION}
-          title="Remove frame"
-          disabled={frames.length < 2}
+          title="Delete frame"
+          disabled={single}
           onClick={() => sprite.removeFrame(frameId)}
         >
           {ICONS.remove}
         </button>
-      </div>
-      <FrameDuration
-        key={`${frame.id}:${frame.duration}`}
-        duration={frame.duration}
-        onChange={(ms) => sprite.setFrameDuration(frame.id, ms)}
-      />
-
-      {activeLayer && (
-        <LayerOptions
-          key={activeLayer.id}
-          layer={activeLayer}
-          onChange={(patch) => sprite.updateLayer(activeLayer.id, patch)}
+        <FrameDuration
+          key={`${frame.id}:${frame.duration}`}
+          duration={frame.duration}
+          onChange={(ms) => sprite.setFrameDuration(frame.id, ms)}
         />
-      )}
+      </ControlGroup>
+
       <button
         type="button"
         className={`${ACTION} ml-auto text-muted-foreground`}
@@ -149,16 +124,6 @@ export function TimelineToolbar({
       >
         {ICONS.collapse}
       </button>
-      <input
-        ref={pictureInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          void addReference(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
     </header>
   );
 }

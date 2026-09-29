@@ -15,19 +15,29 @@ import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import type { OpenSource } from "../constants";
 import { useModifierLabel } from "../use-modifier-label";
 import type { TileFile } from "../use-tile-file";
-import { Menu } from "./menu";
+import { Menu } from "@/components/menu/menu";
+import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import { frameActions, layerActions } from "@/components/timeline/actions";
+import type { Playback } from "@/components/timeline/use-playback";
 
-/** The file bar: the tile's name, Open and Save menus, and where it is saved. */
+/**
+ * The bar on top: back to the projects, the File, Layer and Frame menus, the
+ * tile's name and where it is saved.
+ */
 export function EditorHeader({
   file,
   fileInput,
   drive,
+  sprite,
+  playback,
   onOpenFrom,
   onConnectDrive,
 }: {
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
   drive: DriveStatus;
+  sprite: SpriteApi;
+  playback: Playback;
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
 }) {
@@ -100,7 +110,9 @@ export function EditorHeader({
           ],
         ]}
       />
-      <InputGroup className="h-8 w-auto">
+      <Menu label="Layer" sections={layerActions(sprite)} />
+      <Menu label="Frame" sections={frameActions(sprite, playback)} />
+      <InputGroup className="ml-2 h-8 w-auto">
         <InputGroupInput
           aria-label="File name"
           value={file.name}

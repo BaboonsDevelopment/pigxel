@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { ContextMenu } from "@/components/menu/context-menu";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import { ResizeHandle } from "@/components/resize-handle";
 import { panelRows } from "@/lib/layers/tree";
+import { frameActions, layerActions } from "./actions";
 import { CelStrip } from "./components/cel-strip";
 import { FrameHeader } from "./components/frame-header";
 import { LayerRow } from "./components/layer-row";
@@ -11,22 +13,39 @@ import { TimelineToolbar } from "./components/timeline-toolbar";
 import { PANEL_HEIGHT, type DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
 import { ICONS } from "./icons";
-import { usePlayback } from "./use-playback";
+import type { Playback } from "./use-playback";
+
+/** An open right-click menu: whose actions, and where. */
+type OpenMenu = { of: "layer" | "frame"; x: number; y: number };
 
 /**
  * The timeline under the canvas, as in Aseprite: a row per layer (top layer
  * first) and a column per frame, each cell being that layer's cel in that
- * frame. Layers are added, shown, locked, renamed and dragged into order or
- * into groups; frames are added, played, timed and dragged into order.
+ * frame. Layers are shown, locked, renamed and dragged into order or into
+ * groups; frames are played, timed and dragged into order. A right-click on
+ * a layer or a frame picks it and opens its menu.
  */
-export function Timeline({ sprite }: { sprite: SpriteApi }) {
+export function Timeline({
+  sprite,
+  playback,
+}: {
+  sprite: SpriteApi;
+  playback: Playback;
+}) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [height, setHeight] = useState(PANEL_HEIGHT.initial);
   const [collapsed, setCollapsed] = useState(false);
-  const playback = usePlayback(sprite);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const rows = panelRows(sprite.tree);
   const { layerId, frameId, frames } = sprite;
+
+  const openMenu = (of: OpenMenu["of"], e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenu({ of, x: e.clientX, y: e.clientY });
+  };
 
   const endDrag = () => {
     setDragging(null);
@@ -75,6 +94,10 @@ export function Timeline({ sprite }: { sprite: SpriteApi }) {
             frameId={frameId}
             onSelect={sprite.selectFrame}
             onMove={sprite.moveFrame}
+            onContextMenu={(id, e) => {
+              sprite.selectFrame(id);
+              openMenu("frame", e);
+            }}
           />
           <ol onDragLeave={() => setOver(null)}>
             {rows.map((row) => (
@@ -83,8 +106,14 @@ export function Timeline({ sprite }: { sprite: SpriteApi }) {
                 row={row}
                 active={row.layer.id === layerId}
                 drop={over?.id === row.layer.id ? over.zone : null}
+                renaming={renaming === row.layer.id}
+                onRenamingChange={(on) => setRenaming(on ? row.layer.id : null)}
                 onSelect={() => sprite.selectLayer(row.layer.id)}
                 onChange={(patch) => sprite.updateLayer(row.layer.id, patch)}
+                onContextMenu={(e) => {
+                  sprite.selectLayer(row.layer.id);
+                  openMenu("layer", e);
+                }}
                 onDragStart={() => setDragging(row.layer.id)}
                 onDragOver={(e) => {
                   if (!dragging || dragging === row.layer.id) return;
@@ -115,6 +144,19 @@ export function Timeline({ sprite }: { sprite: SpriteApi }) {
           </ol>
         </div>
       </div>
+
+      {menu && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          sections={
+            menu.of === "layer"
+              ? layerActions(sprite, () => setRenaming(layerId))
+              : frameActions(sprite, playback)
+          }
+          onClose={closeMenu}
+        />
+      )}
     </section>
   );
 }

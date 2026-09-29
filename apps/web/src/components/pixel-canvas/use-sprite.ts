@@ -149,6 +149,22 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     finish();
   };
 
+  /** Empties the active cel; on the Background it goes back to the colour. */
+  const clearCel = () => {
+    const canvas = cels.get(frameId, layerId);
+    if (!canvas || !layerTree.canPaint(tree, layerId)) return;
+    const fill = fillOf(layerId);
+    const ctx = contextOf(canvas);
+    if (fill && ctx) {
+      ctx.fillStyle = fill;
+      ctx.fillRect(0, 0, size.w, size.h);
+      commit();
+    } else {
+      cels.delete(frameId, layerId);
+      finish();
+    }
+  };
+
   const changeTree = (next: Layer[]) => {
     setTree(next);
     finish({ tree: next });
@@ -295,6 +311,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     composite,
     touched,
     commit,
+    clearCel,
     resize,
     undo,
     redo,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { LayerPatch } from "@/components/pixel-canvas/use-sprite";
 import type { PanelRow } from "@/lib/layers/tree";
@@ -12,8 +12,13 @@ type Props = {
   active: boolean;
   /** The drop zone shown while a layer is dragged over this row. */
   drop: DropZone | null;
+  /** Whether the name is being edited in place. */
+  renaming: boolean;
+  onRenamingChange: (renaming: boolean) => void;
   onSelect: () => void;
   onChange: (patch: LayerPatch) => void;
+  /** Right-click: the layer's menu. */
+  onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent<HTMLLIElement>) => void;
   onDragLeave: () => void;
@@ -35,17 +40,19 @@ export function LayerRow({
   row,
   active,
   drop,
+  renaming,
+  onRenamingChange,
   onSelect,
   onChange,
+  onContextMenu,
   children,
   ...drag
 }: Props) {
   const { layer, depth } = row;
-  const [renaming, setRenaming] = useState(false);
   const movable = layer.kind !== "background";
 
   const rename = (name: string) => {
-    setRenaming(false);
+    onRenamingChange(false);
     if (name.trim() && name !== layer.name) onChange({ name: name.trim() });
   };
 
@@ -58,6 +65,7 @@ export function LayerRow({
         drag.onDrop();
       }}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       className={cn(
         "group/row relative flex h-8 cursor-default border-b text-sm select-none",
         // Opaque, so frames scrolling under the name column stay hidden.
@@ -139,14 +147,14 @@ export function LayerRow({
             onBlur={(e) => rename(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") rename(e.currentTarget.value);
-              if (e.key === "Escape") setRenaming(false);
+              if (e.key === "Escape") onRenamingChange(false);
             }}
             className="h-6 min-w-0 flex-1 rounded border bg-background px-1 outline-none focus:ring-2 focus:ring-ring"
           />
         ) : (
           <span
             title="Double-click to rename"
-            onDoubleClick={() => setRenaming(true)}
+            onDoubleClick={() => onRenamingChange(true)}
             className={cn(
               "min-w-0 flex-1 truncate px-1",
               layer.kind === "background" && "italic",

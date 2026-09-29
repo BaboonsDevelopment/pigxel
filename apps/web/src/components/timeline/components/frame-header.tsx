@@ -15,12 +15,15 @@ export function FrameHeader({
   frameId,
   onSelect,
   onMove,
+  onContextMenu,
 }: {
   frames: Frame[];
   frameId: string;
   onSelect: (id: string) => void;
   /** Moves a frame to `index` of the list without it. */
   onMove: (id: string, index: number) => void;
+  /** Right-click on a frame: its menu. */
+  onContextMenu: (id: string, e: React.MouseEvent) => void;
 }) {
   const [dragging, setDragging] = useState<number | null>(null);
   const [over, setOver] = useState<{ index: number; side: FrameSide } | null>(
@@ -49,6 +52,7 @@ export function FrameHeader({
           draggable
           title={`Frame ${index + 1} · ${frame.duration} ms`}
           onClick={() => onSelect(frame.id)}
+          onContextMenu={(e) => onContextMenu(frame.id, e)}
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
             setDragging(index);

@@ -30,6 +30,18 @@ export function dropPlace(row: PanelRow, zone: DropZone): Place {
   };
 }
 
+/** Lets the person pick a picture; null if they cancel. */
+export function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = () => resolve(input.files?.[0] ?? null);
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 /** The half of a frame's column the pointer is over. */
 export function sideAt(e: React.DragEvent<HTMLElement>): FrameSide {
   const box = e.currentTarget.getBoundingClientRect();

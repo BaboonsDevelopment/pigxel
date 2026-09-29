@@ -45,13 +45,6 @@ export type Shortcut = { command: Command } | { tool: ToolId };
 /** The places a tile can be opened from in a dialog. */
 export type OpenSource = "cloud" | "drive";
 
-export type MenuItem = {
-  label: string;
-  shortcut?: string;
-  onSelect: () => void;
-  hidden?: boolean;
-};
-
 export type FileItem = {
   id: string;
   name: string;

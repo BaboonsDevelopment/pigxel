@@ -203,15 +203,7 @@ export function PixelCanvas({
         );
         sprite.commit();
       },
-      clear() {
-        const c = ctx(true);
-        if (!c) return;
-        if (eraseFill) {
-          c.fillStyle = eraseFill;
-          c.fillRect(0, 0, size.w, size.h);
-        } else c.clearRect(0, 0, size.w, size.h);
-        sprite.commit();
-      },
+      clear: sprite.clearCel,
       readTile(area) {
         const image = tile()
           .getContext("2d", { willReadFrequently: true })
@@ -242,7 +234,7 @@ export function PixelCanvas({
         });
       },
     };
-  }, [sprite, size, eraseFill]);
+  }, [sprite, size]);
 
   useEffect(() => {
     if (!selecting) return;
