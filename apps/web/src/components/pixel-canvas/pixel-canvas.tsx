@@ -9,6 +9,7 @@ import {
   useState,
   type Ref,
 } from "react";
+import { hexToRgba } from "@/lib/edit/raster";
 import {
   backgroundColor,
   type Background,
@@ -38,14 +39,22 @@ import {
 } from "./helpers";
 import {
   brushOrigin,
+  brushTip,
   extendStroke,
+  fillPoints,
   linePoints,
+  pixelColor,
+  snapLine,
   strokePixels,
+  type PaintTool,
   type PenSettings,
   type Point,
 } from "./pen";
 
 type Stroke = {
+  /** The tool that started the stroke: pen, brush, eraser or line. */
+  tool: PaintTool;
+  /** Pixels the tip passes through; a line keeps its start as the first one. */
   points: Point[];
   erase: boolean;
   /** The canvas before the stroke, so each redraw starts from it. */
@@ -96,14 +105,17 @@ const BACKGROUND_RGB: Record<Background, [number, number, number] | null> = {
 };
 
 export function PixelCanvas({
+  tool,
   pen,
   scale,
   highlight,
   background = "transparent",
   initialImage,
   onChange,
+  onPickColor,
   ref,
 }: {
+  tool: PaintTool;
   pen: PenSettings;
   /** Screen pixels per tile pixel. */
   scale: number;
@@ -115,6 +127,8 @@ export function PixelCanvas({
   initialImage?: PigxelImage | null;
   /** Called after the drawing or the tile size changes. */
   onChange?: () => void;
+  /** Called with the colour the pipette (or Alt+click) picked up. */
+  onPickColor?: (color: string) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const [initial] = useState(() =>
@@ -275,16 +289,61 @@ export function PixelCanvas({
     carried.current = null;
   }, [size, fill]);
 
+  // The brush is round; the pen, eraser and line have a square tip.
+  const tipSize = (t: PaintTool) =>
+    t === "brush" ? pen.brushSize : t === "eraser" ? pen.eraserSize : pen.size;
+  const hoverSize = tool === "bucket" || tool === "pipette" ? 1 : tipSize(tool);
+  const hoverTip = brushTip(hoverSize, tool === "brush");
+  // Tools that don't lay down the pen colour show only the outline of their tip.
+  const hoverOutline = tool === "pipette" || tool === "eraser";
+
   // Redraws the whole stroke, so pixel-perfect can take back a corner it already painted.
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     ctx.putImageData(current.before, 0, 0);
     ctx.fillStyle = current.erase && fill ? fill : pen.color;
-    for (const point of strokePixels(current.points, pen)) {
-      const { x, y } = brushOrigin(point, pen.size);
-      // Erasing reveals the background: transparent, or its solid colour.
-      if (current.erase && !fill) ctx.clearRect(x, y, pen.size, pen.size);
-      else ctx.fillRect(x, y, pen.size, pen.size);
+    const size = tipSize(current.tool);
+    const tip = brushTip(size, current.tool === "brush");
+    const points =
+      current.tool === "pen"
+        ? strokePixels(current.points, pen)
+        : current.points;
+    for (const point of points) {
+      const { x, y } = brushOrigin(point, size);
+      for (const r of tip) {
+        // Erasing reveals the background: transparent, or its solid colour.
+        if (current.erase && !fill) ctx.clearRect(x + r.dx, y + r.dy, r.w, r.h);
+        else ctx.fillRect(x + r.dx, y + r.dy, r.w, r.h);
+      }
     }
+  };
+
+  const pickColor = (ctx: CanvasRenderingContext2D, point: Point) => {
+    const pixel = ctx.getImageData(point.x, point.y, 1, 1);
+    const color = pixelColor(pixel, { x: 0, y: 0 });
+    if (color) onPickColor?.(color);
+  };
+
+  // Repaints the area under `point` with the pen colour, or the background when erasing.
+  const fillAt = (
+    ctx: CanvasRenderingContext2D,
+    point: Point,
+    erase: boolean,
+  ) => {
+    const ink = hexToRgba(pen.color);
+    const solid = BACKGROUND_RGB[background];
+    const rgba = !erase
+      ? [ink.r, ink.g, ink.b, 255]
+      : solid
+        ? [...solid, 255]
+        : [0, 0, 0, 0];
+    const image = ctx.getImageData(0, 0, size.w, size.h);
+    const start = (point.y * size.w + point.x) * 4;
+    if (rgba.every((v, c) => image.data[start + c] === v)) return;
+    for (const i of fillPoints(image, point, pen.contiguous)) {
+      image.data.set(rgba, i * 4);
+    }
+    ctx.putImageData(image, 0, 0);
+    onChange?.();
   };
 
   const startStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -292,14 +351,20 @@ export function PixelCanvas({
     if (frame || (e.button !== 0 && e.button !== 2)) return;
     const ctx = tileContext(e.currentTarget);
     if (!ctx) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
     const point = pixelAt(e);
+    const erase = e.button === 2 || tool === "eraser";
+    // Alt+click picks a colour whatever the tool, as in Aseprite.
+    if (tool === "pipette" || (e.altKey && e.button === 0))
+      return pickColor(ctx, point);
+    if (tool === "bucket") return fillAt(ctx, point, erase);
+    e.currentTarget.setPointerCapture(e.pointerId);
     stroke.current = {
+      tool,
       points:
-        e.shiftKey && lastPoint.current
+        tool !== "line" && e.shiftKey && lastPoint.current
           ? linePoints(lastPoint.current, point)
           : [point],
-      erase: e.button === 2,
+      erase,
       before: ctx.getImageData(0, 0, size.w, size.h),
     };
     drawStroke(ctx, stroke.current);
@@ -311,8 +376,18 @@ export function PixelCanvas({
     const current = stroke.current;
     const ctx = tileContext(e.currentTarget);
     if (!current || !ctx) return;
-    const points = extendStroke(current.points, point);
-    if (points === current.points) return;
+    let points: Point[];
+    if (current.tool === "line") {
+      // A line is redrawn from its start; Shift keeps it to 45° steps.
+      const from = current.points[0]!;
+      const to = e.shiftKey ? snapLine(from, point) : point;
+      const end = current.points.at(-1)!;
+      if (end.x === to.x && end.y === to.y) return;
+      points = linePoints(from, to);
+    } else {
+      points = extendStroke(current.points, point);
+      if (points === current.points) return;
+    }
     current.points = points;
     drawStroke(ctx, current);
   };
@@ -393,16 +468,23 @@ export function PixelCanvas({
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 overflow-hidden"
           >
-            <div
-              className="absolute opacity-50 outline outline-1 outline-white/80"
-              style={{
-                left: brushOrigin(hover, pen.size).x * scale,
-                top: brushOrigin(hover, pen.size).y * scale,
-                width: pen.size * scale,
-                height: pen.size * scale,
-                backgroundColor: pen.color,
-              }}
-            />
+            {hoverTip.map((r) => (
+              <div
+                key={r.dy}
+                className={
+                  hoverOutline
+                    ? "absolute outline outline-1 outline-white/80"
+                    : "absolute opacity-50"
+                }
+                style={{
+                  left: (brushOrigin(hover, hoverSize).x + r.dx) * scale,
+                  top: (brushOrigin(hover, hoverSize).y + r.dy) * scale,
+                  width: r.w * scale,
+                  height: r.h * scale,
+                  backgroundColor: hoverOutline ? undefined : pen.color,
+                }}
+              />
+            ))}
           </div>
         )}
 
