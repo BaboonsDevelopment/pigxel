@@ -5,9 +5,10 @@ import {
   EDIT_CRAFT_RULES,
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
+  PLACEMENT_RULES,
   PLAN_RULES,
 } from "./constants";
-import type { Rect } from "./types";
+import type { ChatMessage, Rect } from "./types";
 
 /** Wraps a subject description in the pixel-art style rules for a grid size. */
 export function buildImagePrompt(
@@ -135,5 +136,31 @@ export function buildPlanPrompt(args: {
     `OBJECTS (separate drawn things, in tile pixels):\n${objects}${selection}`,
     `REQUEST: ${args.request}`,
     PLAN_RULES,
+  ].join("\n\n");
+}
+
+/** Asks the placement planner where new pictures go on the tile shown. */
+export function buildPlacementPrompt(args: {
+  subject: string;
+  where: string;
+  count: number;
+  width: number;
+  height: number;
+  objects: Rect[];
+  /** Recent turns, so "5 more apples" is tied to the apple drawn before. */
+  recent: ChatMessage[];
+}): string {
+  const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
+  const objects = args.objects.length
+    ? args.objects.map((r, i) => `${i}: ${box(r)}`).join("\n")
+    : "(nothing drawn)";
+  const recent = args.recent.map((m) => `${m.role}: ${m.content}`).join("\n");
+  return [
+    `The picture is a ${args.width}x${args.height} pixel art tile, shown enlarged; light grey means empty.`,
+    `OBJECTS (separate drawn things, in tile pixels):\n${objects}`,
+    `CONVERSATION (latest last):\n${recent || "(none)"}`,
+    `NEW: ${args.count} × ${args.subject}`,
+    `WHERE: ${args.where || "(not said)"}`,
+    PLACEMENT_RULES,
   ].join("\n\n");
 }

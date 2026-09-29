@@ -49,6 +49,12 @@ export type CanvasBridge = {
   replaceObject: (image: string, source: Area, target: Area) => Promise<void>;
   /** Moves the drawn things inside `source` to `target`, pixel for pixel. */
   moveObject: (source: Area, target: Area) => void;
+  /** True when noticeably much of `area` is already drawn on. */
+  overlapsDrawing: (area: Area) => boolean;
+  /** Copies the drawn things inside `source` into each of `targets`. */
+  copyObject: (source: Area, targets: Area[]) => void;
+  /** Puts one generated picture into each area, only on empty pixels. */
+  placeMany: (image: string, areas: Area[]) => Promise<void>;
 };
 
 /** A way to add a new picture to a tile that already has something on it. */
@@ -68,3 +74,9 @@ export const UNREACHABLE = {
   ok: false,
   error: "Could not reach the server.",
 } as const;
+
+/** Said in the chat when the next step happens on the tile. */
+export const ASK_SELECT =
+  "Select the area on the tile you want to work on (Esc to cancel).";
+export const ASK_FRAME =
+  'Move or resize the highlighted frame on the tile if needed, then press "Generate here".';

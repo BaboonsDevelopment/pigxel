@@ -78,6 +78,9 @@ function useModifierLabel() {
   );
 }
 
+/** Share of an area that may already be drawn on before a new picture there counts as covering art. */
+const MAX_OVERLAP = 0.03;
+
 /** Typing in a field must not trigger editor shortcuts. */
 function isTyping(target: EventTarget | null) {
   return (
@@ -335,6 +338,38 @@ function Editor({
       );
       const placed = { ...target, w: source.w, h: source.h };
       canvas.current.write(drawOnEmpty(rest, tile.w, lifted, placed), tile);
+    },
+    overlapsDrawing(area) {
+      const pixels = canvas.current?.read(area) ?? new Uint8ClampedArray();
+      let drawn = 0;
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) drawn++;
+      return drawn > area.w * area.h * MAX_OVERLAP;
+    },
+    copyObject(source, targets) {
+      if (!canvas.current) return;
+      const tile = fullArea();
+      const before = canvas.current.read(tile);
+      const { lifted } = liftObjectsInside(before, tile.w, tile.h, source);
+      const after = targets.reduce(
+        (pixels, t) =>
+          drawOnEmpty(pixels, tile.w, lifted, {
+            ...t,
+            w: source.w,
+            h: source.h,
+          }),
+        before,
+      );
+      canvas.current.write(after, tile);
+    },
+    async placeMany(dataUrl, areas) {
+      const arts = await Promise.all(areas.map((a) => toArt(dataUrl, a)));
+      if (!canvas.current) return;
+      const tile = fullArea();
+      const after = arts.reduce(
+        (pixels, art, i) => drawOnEmpty(pixels, tile.w, art.rgba, areas[i]!),
+        canvas.current.read(tile),
+      );
+      canvas.current.write(after, tile);
     },
   };
 

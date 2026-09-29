@@ -14,6 +14,7 @@ import type {
   ChatMessage,
   EditReply,
   GeneratedImage,
+  PlacementReply,
   PlanReply,
   Rect,
   Route,
@@ -99,17 +100,65 @@ export function createGeminiProvider(
             properties: {
               intent: { type: "STRING", enum: [...INTENTS] },
               subject: { type: "STRING" },
+              where: { type: "STRING" },
+              count: { type: "INTEGER" },
             },
-            required: ["intent", "subject"],
+            required: ["intent", "subject", "where", "count"],
           },
         },
       });
       const route = parseJson<Route>(textOf(parts));
       const intent = INTENTS.find((i) => i === route?.intent);
       // Anything unexpected becomes plain chat: free, and changes nothing.
-      if (!intent) return { intent: "chat", subject: "" };
+      if (!intent) return { intent: "chat", subject: "", where: "", count: 1 };
       const latest = messages.at(-1)?.content ?? "";
-      return { intent, subject: route?.subject || latest };
+      const count = Math.round(Number(route?.count));
+      return {
+        intent,
+        subject: route?.subject || latest,
+        where: route?.where ?? "",
+        count: count >= 1 ? Math.min(count, MAX_COUNT) : 1,
+      };
+    },
+
+    async place(prompt, tile) {
+      const parts = await request(
+        models.edit,
+        [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType: tile.mimeType, data: tile.base64 } },
+            ],
+          },
+        ],
+        {
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                copyOf: { type: "INTEGER" },
+                areas: { type: "ARRAY", items: RECT_SCHEMA },
+                ask: { type: "BOOLEAN" },
+                question: { type: "STRING" },
+              },
+              required: ["copyOf", "areas", "ask", "question"],
+            },
+          },
+        },
+      );
+      const reply = parseJson<PlacementReply>(textOf(parts));
+      if (!reply || !Array.isArray(reply.areas)) {
+        throw new AiError("failed", "Gemini sent no usable placement.");
+      }
+      return {
+        copyOf: Number.isInteger(reply.copyOf) ? reply.copyOf! : -1,
+        areas: reply.areas,
+        ask: reply.ask === true,
+        question: reply.question ?? "",
+      };
     },
 
     async chat(messages) {
@@ -251,6 +300,7 @@ export function createGeminiProvider(
                 target: rect,
                 instruction: { type: "STRING" },
                 summary: { type: "STRING" },
+                question: { type: "STRING" },
               },
               required: [
                 "mode",
@@ -259,6 +309,7 @@ export function createGeminiProvider(
                 "target",
                 "instruction",
                 "summary",
+                "question",
               ],
             },
           },
@@ -276,6 +327,7 @@ export function createGeminiProvider(
         target: reply.target,
         instruction: reply.instruction,
         summary: reply.summary ?? "",
+        question: reply.question ?? "",
       };
     },
   };
@@ -316,3 +368,17 @@ const toContents = (messages: ChatMessage[]): GeminiContent[] =>
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
+
+/** Most pictures one request may add at once. */
+const MAX_COUNT = 12;
+
+const RECT_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    x: { type: "INTEGER" },
+    y: { type: "INTEGER" },
+    w: { type: "INTEGER" },
+    h: { type: "INTEGER" },
+  },
+  required: ["x", "y", "w", "h"],
+};

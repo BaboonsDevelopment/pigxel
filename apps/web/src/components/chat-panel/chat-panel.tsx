@@ -5,6 +5,7 @@ import {
   editTile,
   generateImage,
   planEdit,
+  planPlacement,
   redrawArea,
   sendMessage,
   suggestComposition,
@@ -21,6 +22,8 @@ import { ChatHeader } from "./components/chat-header";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
 import {
+  ASK_FRAME,
+  ASK_SELECT,
   UNREACHABLE,
   type CanvasBridge,
   type ChatEntry,
@@ -99,15 +102,76 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     });
   };
 
-  const create = async (subject: string) => {
+  /** One generated picture, put into every area (only on empty pixels). */
+  const drawMany = async (subject: string, areas: Area[]) => {
+    const largest = areas.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
+    setPending(true);
+    const result = await generateImage(subject, largest.w, largest.h).catch(
+      () => UNREACHABLE,
+    );
+    if (result.ok) {
+      await canvas.placeMany(result.value, areas);
+      const many = areas.length > 1 ? ` ×${areas.length}` : "";
+      append({
+        role: "assistant",
+        content: `Here is your picture: ${subject}${many}.`,
+        image: result.value,
+      });
+    } else {
+      setError(result.error);
+    }
+    setPending(false);
+  };
+
+  /**
+   * New pictures. On a tile with drawings the placement planner finds free
+   * spots that follow what the user said (or copies an existing object when
+   * they asked for more of it); the user is asked to choose only when there
+   * is no room without covering what is drawn.
+   */
+  const create = async ({
+    request: subject,
+    where = "",
+    count = 1,
+  }: TileAction) => {
     if (selectArea) {
+      say(ASK_SELECT);
       const area = await canvas.selectArea();
       if (area) await draw(subject, area, false);
       else say("No area selected, so nothing was drawn.");
-    } else if (canvas.isEmpty()) {
+      return;
+    }
+    if (canvas.isEmpty() && count === 1 && !where) {
       await draw(subject, canvas.fullArea(), true);
-    } else {
+      return;
+    }
+
+    setPending(true);
+    const tile = canvas.fullArea();
+    const plan = await planPlacement({
+      subject,
+      where,
+      count,
+      tile: canvas.snapshot(),
+      width: tile.w,
+      height: tile.h,
+      objects: canvas.objects(),
+      recent: messages.map(({ role, content }) => ({ role, content })),
+    }).catch(() => UNREACHABLE);
+    setPending(false);
+
+    const blocked =
+      !plan.ok ||
+      plan.value.ask ||
+      plan.value.areas.some((a) => canvas.overlapsDrawing(a));
+    if (blocked) {
+      if (plan.ok && plan.value.question) say(plan.value.question);
       await offerPlacements(subject);
+    } else if (plan.value.copyOf) {
+      canvas.copyObject(plan.value.copyOf, plan.value.areas);
+      say(`Added ${plan.value.areas.length} more like it.`);
+    } else {
+      await drawMany(subject, plan.value.areas);
     }
   };
 
@@ -156,6 +220,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
    * as a frame first, so the user confirms it before anything is touched.
    */
   const changeTile = async (action: TileAction) => {
+    if (selectArea) say(ASK_SELECT);
     const selection = selectArea ? await canvas.selectArea() : null;
     if (selectArea && !selection) {
       return say("No area selected, so nothing changed.");
@@ -174,9 +239,10 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     setPending(false);
     if (!plan.ok) return setError(plan.error);
 
-    const { mode, source, keep, instruction, summary } = plan.value;
+    const { mode, source, keep, instruction, summary, question } = plan.value;
     let target = plan.value.target;
     if (!sameArea(source, target)) {
+      say(question || ASK_FRAME);
       const adjusted = await canvas.adjustArea(target);
       if (!adjusted) return say("Cancelled, nothing changed.");
       target = adjusted;
@@ -221,7 +287,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     }
     const { action } = result.value;
     if (!action) append(result.value);
-    else if (action.kind === "generate") await create(action.request);
+    else if (action.kind === "generate") await create(action);
     else await changeTile(action);
   };
 
@@ -232,6 +298,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     canvas.highlight(null);
     const replace = placement.kind === "replace";
     // Anything but a full replace can be moved and resized on the tile first.
+    if (!replace) say(ASK_FRAME);
     const area = replace
       ? placement.area
       : await canvas.adjustArea(placement.area);
