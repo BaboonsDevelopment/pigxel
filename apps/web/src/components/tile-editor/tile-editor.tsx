@@ -30,6 +30,7 @@ import {
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
 import { encodeTile } from "@/lib/edit/codec";
+import { panelRows } from "@/lib/layers/tree";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import {
   drawOnEmpty,
@@ -63,10 +64,12 @@ import { useIsClient } from "@/lib/use-is-client";
 import { listCloudTiles } from "@/lib/pigxel-file/cloud";
 import { DriveError, listDriveFiles } from "@/lib/pigxel-file/google-drive";
 import { FilesDialog } from "./files-dialog";
+import { isTyping } from "./helpers";
 import { Menu } from "./menu";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions, sizeKey } from "./tool-options";
 import { TOOLS, type ToolId } from "./tools";
+import { usePan } from "./use-pan";
 import { useTileFile } from "./use-tile-file";
 
 const noSubscribe = () => () => {};
@@ -82,15 +85,6 @@ function useModifierLabel() {
 
 /** Share of an area that may already be drawn on before a new picture there counts as covering art. */
 const MAX_OVERLAP = 0.03;
-
-/** Typing in a field must not trigger editor shortcuts. */
-function isTyping(target: EventTarget | null) {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
-  );
-}
 
 type EditorProps = {
   userId: string;
@@ -176,6 +170,7 @@ function Editor({
   const mod = useModifierLabel();
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
+  const pan = usePan();
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<LayersApi>(null);
   const file = useTileFile({
@@ -206,26 +201,65 @@ function Editor({
   const connectDrive = () =>
     window.location.assign(connectDriveUrl(editorUrl(draft.id)));
 
-  const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
-      const key = e.key.toLowerCase();
-      if (key === "s") file.save();
-      else if (key === "o") file.openFromComputer();
-      else return;
-      e.preventDefault();
-      return;
-    }
-    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
-    const shortcut = TOOLS.find(
-      (t) => t.shortcut.toLowerCase() === e.key.toLowerCase(),
-    );
+  const zoomBy = (direction: 1 | -1) => setScale((s) => zoom(s, -direction));
+
+  const resizePen = (step: 1 | -1) => {
     const key = sizeKey(tool);
-    const step = e.key === "[" ? -1 : e.key === "]" ? 1 : 0;
-    if (shortcut) setTool(shortcut.id);
-    else if (step && key)
-      setPen((p) => ({ ...p, [key]: clampPenSize(p[key] + step) }));
-    else return;
+    if (key) setPen((p) => ({ ...p, [key]: clampPenSize(p[key] + step) }));
+  };
+
+  /** Selects the layer `step` rows down the Layers panel (up when negative). */
+  const selectLayer = (step: 1 | -1) => {
+    const rows = panelRows(layers.tree);
+    const at = rows.findIndex((row) => row.layer.id === layers.activeId);
+    const row = rows[at + step];
+    if (row) layers.select(row.layer.id);
+  };
+
+  const clearLayer = () => {
+    if (layers.canPaint) canvas.current?.clear();
+  };
+
+  // What a key press does. Keys are matched by position (`e.code`), so
+  // shortcuts work in any keyboard layout, e.g. Ukrainian.
+  const shortcutFor = (e: KeyboardEvent): (() => void) | null => {
+    const { code, shiftKey: shift } = e;
+    if (e.ctrlKey || e.metaKey) {
+      if (e.altKey) return null;
+      if (code === "KeyS" && !shift) return file.save;
+      if (code === "KeyO" && !shift) return file.openFromComputer;
+      // Text fields keep their own undo.
+      if (isTyping(e.target)) return null;
+      if (code === "KeyZ") return shift ? layers.redo : layers.undo;
+      if (code === "KeyY") return layers.redo;
+      if (code === "Equal" || code === "NumpadAdd") return () => zoomBy(1);
+      if (code === "Minus" || code === "NumpadSubtract")
+        return () => zoomBy(-1);
+      if (code === "Digit0" || code === "Numpad0")
+        return () => setScale(DEFAULT_SCALE);
+      return null;
+    }
+    if (isTyping(e.target)) return null;
+    if (e.altKey) {
+      if (code === "ArrowUp") return () => selectLayer(-1);
+      if (code === "ArrowDown") return () => selectLayer(1);
+      return null;
+    }
+    if (shift) return code === "KeyN" ? () => layers.add("normal") : null;
+    if (code === "Equal" || code === "NumpadAdd") return () => zoomBy(1);
+    if (code === "Minus" || code === "NumpadSubtract") return () => zoomBy(-1);
+    if (code === "BracketLeft") return () => resizePen(-1);
+    if (code === "BracketRight") return () => resizePen(1);
+    if (code === "Delete" || code === "Backspace") return clearLayer;
+    const picked = TOOLS.find((t) => code === `Key${t.shortcut}`);
+    return picked ? () => setTool(picked.id) : null;
+  };
+
+  const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    const run = shortcutFor(e);
+    if (!run) return;
     e.preventDefault();
+    run();
   });
 
   useEffect(() => {
@@ -514,7 +548,11 @@ function Editor({
       <div className="flex min-h-0 flex-col">
         <main
           ref={workspace}
-          className="flex min-h-0 flex-1 overflow-auto bg-muted p-12"
+          {...pan.handlers}
+          className={cn(
+            "flex min-h-0 flex-1 overflow-auto bg-muted p-12",
+            pan.panning && "cursor-grab [&_*]:cursor-grab!",
+          )}
         >
           <div className="m-auto">
             <PixelCanvas
