@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authUrl } from "@/lib/auth/config";
-import { safeNext } from "@/lib/auth/routes";
+import { safeNext, withParam } from "@/lib/auth/routes";
 import {
   DRIVE_SCOPE,
   isDriveAvailable,
@@ -60,7 +60,8 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.redirect(
-    url ?? authUrl(user ? `${next}?drive=error` : "/login?error=google"),
+    url ??
+      authUrl(user ? withParam(next, "drive", "error") : "/login?error=google"),
     { headers: { "Cache-Control": "private, no-store" } },
   );
 }

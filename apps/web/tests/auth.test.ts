@@ -19,7 +19,15 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: mocks.auth }),
+  createClient: async () => ({
+    auth: mocks.auth,
+    // The tiles page lists Pigxel cloud tiles; none in these tests.
+    from: () => ({
+      select: () => ({
+        order: () => ({ limit: async () => ({ data: [], error: null }) }),
+      }),
+    }),
+  }),
 }));
 vi.mock("@/lib/supabase/config", () => ({
   isSupabaseConfigured: mocks.configured,
@@ -33,18 +41,19 @@ vi.mock("next/navigation", () => ({
   redirect: (path: string) => {
     throw new Error(`REDIRECT:${path}`);
   },
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
 
 import { authenticate, signOut } from "@/app/login/actions";
 import { updatePassword } from "@/app/auth/update-password/actions";
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as confirm } from "@/app/auth/confirm/route";
-import Account from "@/app/account/page";
+import Account from "@/app/(app)/account/page";
 import Login from "@/app/login/page";
 import UpdatePassword from "@/app/auth/update-password/page";
 import Home from "@/app/page";
-import Tiles from "@/app/tiles/page";
-import NewTile from "@/app/tiles/new/page";
+import Tiles from "@/app/(app)/tiles/page";
+import NewTile from "@/app/(app)/tiles/new/page";
 import { proxy } from "@/proxy";
 
 function form(
@@ -86,14 +95,14 @@ beforeEach(() => {
 });
 
 describe("email/password authentication", () => {
-  it("redirects a successful login to the tiles page and refreshes cached UI", async () => {
+  it("redirects a successful login to Home and refreshes cached UI", async () => {
     await expect(
       authenticate(
         "login",
         {},
         form({ email: " person@example.com ", password: "test-password" }),
       ),
-    ).rejects.toThrow("REDIRECT:/tiles");
+    ).rejects.toThrow("REDIRECT:/home");
     expect(mocks.auth.signInWithPassword).toHaveBeenCalledWith({
       email: "person@example.com",
       password: "test-password",
@@ -120,7 +129,7 @@ describe("email/password authentication", () => {
   });
   it("signs a new account in directly without email confirmation", async () => {
     await expect(authenticate("signup", {}, form())).rejects.toThrow(
-      "REDIRECT:/tiles",
+      "REDIRECT:/home",
     );
     expect(mocks.auth.signUp).toHaveBeenCalledWith({
       email: "person@example.com",
@@ -256,9 +265,7 @@ describe("email callbacks and route guards", () => {
         "http://localhost:3000/auth/callback?code=test&next=https://untrusted.example",
       ),
     );
-    expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/tiles",
-    );
+    expect(response.headers.get("location")).toBe("http://localhost:3000/home");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(mocks.auth.exchangeCodeForSession).toHaveBeenCalledWith(
       "test",
@@ -327,7 +334,7 @@ describe("email callbacks and route guards", () => {
   });
   it("redirects signed-in users away from login", async () => {
     await expect(Login({ searchParams: Promise.resolve({}) })).rejects.toThrow(
-      "REDIRECT:/tiles",
+      "REDIRECT:/home",
     );
   });
   it("renders the account after Supabase verifies the user", async () => {
@@ -354,7 +361,7 @@ describe("proxy", () => {
 
   it("sends signed-out visitors of protected pages to login", async () => {
     signedOut();
-    for (const path of ["/tiles", "/tiles/new", "/account"]) {
+    for (const path of ["/home", "/tiles", "/tiles/new", "/account"]) {
       expect((await visit(path)).headers.get("location")).toBe(
         "http://localhost:3000/login",
       );
@@ -369,10 +376,10 @@ describe("proxy", () => {
       expect((await visit(path)).headers.get("location")).toBeNull();
     }
   });
-  it("sends returning signed-in visitors to their tiles", async () => {
+  it("sends returning signed-in visitors to Home", async () => {
     for (const path of ["/", "/login"]) {
       expect((await visit(path)).headers.get("location")).toBe(
-        "http://localhost:3000/tiles",
+        "http://localhost:3000/home",
       );
     }
     expect((await visit("/tiles")).headers.get("location")).toBeNull();

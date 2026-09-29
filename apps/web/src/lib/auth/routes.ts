@@ -1,7 +1,7 @@
 /** Where signed-in people land after logging in or returning to the site. */
-export const HOME_PATH = "/tiles";
+export const HOME_PATH = "/home";
 
-const protectedPaths = ["/tiles", "/account", "/auth/update-password"];
+const protectedPaths = ["/home", "/tiles", "/account", "/auth/update-password"];
 
 export function isProtectedPath(pathname: string) {
   return protectedPaths.some(
@@ -10,6 +10,7 @@ export function isProtectedPath(pathname: string) {
 }
 
 const returnPaths = [
+  "/home",
   "/tiles",
   "/tiles/new",
   "/tiles/edit",
@@ -17,7 +18,31 @@ const returnPaths = [
   "/auth/update-password",
 ];
 
-/** Where to go after sign-in or linking; unknown targets fall back to HOME_PATH. */
+const BASE = "http://pigxel.invalid";
+
+/**
+ * Where to go after sign-in or linking; unknown targets fall back to
+ * HOME_PATH. Only the editor keeps a query: the id of the tile being edited.
+ */
 export function safeNext(next: string | null | undefined) {
-  return next && returnPaths.includes(next) ? next : HOME_PATH;
+  if (!next) return HOME_PATH;
+  let url: URL;
+  try {
+    url = new URL(next, BASE);
+  } catch {
+    return HOME_PATH;
+  }
+  if (url.origin !== BASE || !returnPaths.includes(url.pathname))
+    return HOME_PATH;
+  const id = url.searchParams.get("id");
+  return url.pathname === "/tiles/edit" && id && /^[\w-]{1,64}$/.test(id)
+    ? `/tiles/edit?id=${id}`
+    : url.pathname;
+}
+
+/** `path` with one more query parameter. */
+export function withParam(path: string, key: string, value: string) {
+  const url = new URL(path, BASE);
+  url.searchParams.set(key, value);
+  return url.pathname + url.search;
 }

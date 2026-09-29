@@ -9,16 +9,17 @@ export const dynamic = "force-dynamic";
 export default async function EditTile({
   searchParams,
 }: {
-  searchParams: Promise<{ drive?: string }>;
+  searchParams: Promise<{ id?: string; drive?: string }>;
 }) {
   const user = await requireUser();
-  const [{ drive: driveResult }, drive] = await Promise.all([
+  const [{ id, drive: driveResult }, drive] = await Promise.all([
     searchParams,
     getDriveStatus(user.id),
   ]);
   return (
     <TileEditor
       userId={user.id}
+      tileId={id}
       drive={drive}
       driveError={driveResult === "error"}
     />
