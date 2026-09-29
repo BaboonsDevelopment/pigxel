@@ -1,10 +1,11 @@
 import { MAX_OBJECTS, MIN_OBJECT_PIXELS } from "./constants";
 import type { Rect } from "./raster";
 
-type Component = { box: Rect; members: number[] };
+/** A separate drawn thing: its box and the numbers of its pixels. */
+export type Component = { box: Rect; members: number[] };
 
 /** Groups touching opaque pixels (diagonals too) into separate drawn things. */
-function components(
+export function components(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,

@@ -25,5 +25,6 @@ export function usePlayback(sprite: SpriteApi) {
     playing: playing && canPlay,
     canPlay,
     toggle: () => setPlaying((p) => !p),
+    play: () => setPlaying(true),
   };
 }

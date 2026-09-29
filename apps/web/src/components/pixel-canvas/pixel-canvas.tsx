@@ -59,20 +59,11 @@ type Stroke = {
 };
 
 /**
- * Lets the page work with the canvas from outside, e.g. the AI. Pixel reads
- * and writes go to the active cel (the active layer in the active frame); the
- * checks for empty space and the snapshots look at the whole frame.
+ * Lets the page work with the canvas from outside, e.g. the AI: what the
+ * frame on screen shows, and choosing areas on it. Cels are changed through
+ * the sprite instead.
  */
 export type PixelCanvasHandle = {
-  size: Size;
-  /** Paints the opaque pixels of `pixels` (`area.w × area.h` RGBA) into `area`. */
-  draw: (pixels: Uint8ClampedArray, area: Area) => void;
-  /** The RGBA pixels of `area`. */
-  read: (area: Area) => Uint8ClampedArray;
-  /** Replaces every pixel of `area`, transparent ones included. */
-  write: (pixels: Uint8ClampedArray, area: Area) => void;
-  /** Empties the active layer (a Background goes back to its colour). */
-  clear: () => void;
   /** The RGBA of `area` on the whole tile, every layer combined. */
   readTile: (area: Area) => Uint8ClampedArray;
   /** True when nothing is drawn on any layer but the Background. */
@@ -81,8 +72,6 @@ export type PixelCanvasHandle = {
   freeArea: () => Area | null;
   /** The tile (or `area` of it) as an enlarged PNG data URL, for the AI. */
   snapshot: (area?: Area, background?: string) => string;
-  /** The same for the active layer alone, e.g. for a redraw of it. */
-  snapshotLayer: (area: Area, background: string) => string;
   /** Lets the user drag out an area; null when they cancel. */
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
@@ -165,8 +154,6 @@ export function PixelCanvas({
   }, []);
 
   useImperativeHandle(ref, () => {
-    // Reads leave an empty cel alone; writes make it first.
-    const ctx = (create = false) => sprite.context(create);
     // The tile as the AI sees it: no references, no Background.
     const content = () =>
       new ImageData(
@@ -179,31 +166,6 @@ export function PixelCanvas({
       );
     const tile = () => canvasOf(sprite.composite(["reference"]), size);
     return {
-      size,
-      draw(pixels, area) {
-        const c = ctx(true);
-        if (!c) return;
-        // Keep what is under the picture's transparent pixels.
-        const target = c.getImageData(area.x, area.y, area.w, area.h);
-        for (let i = 0; i < target.data.length; i += 4) {
-          if (pixels[i + 3]) target.data.set(pixels.subarray(i, i + 4), i);
-        }
-        c.putImageData(target, area.x, area.y);
-        sprite.commit();
-      },
-      read(area) {
-        const image = ctx()?.getImageData(area.x, area.y, area.w, area.h);
-        return image?.data ?? new Uint8ClampedArray(area.w * area.h * 4);
-      },
-      write(pixels, area) {
-        ctx(true)?.putImageData(
-          new ImageData(new Uint8ClampedArray(pixels), area.w, area.h),
-          area.x,
-          area.y,
-        );
-        sprite.commit();
-      },
-      clear: sprite.clearCel,
       readTile(area) {
         const image = tile()
           .getContext("2d", { willReadFrequently: true })
@@ -213,12 +175,6 @@ export function PixelCanvas({
       isEmpty: () => isBlank(content()),
       freeArea: () => largestEmptyArea(content()),
       snapshot: (area, background) => tileSnapshot(tile(), area, background),
-      snapshotLayer(area, background) {
-        const pixels =
-          ctx()?.getImageData(0, 0, size.w, size.h).data ??
-          new Uint8ClampedArray(size.w * size.h * 4);
-        return tileSnapshot(canvasOf(pixels, size), area, background);
-      },
       selectArea() {
         resolveSelection.current?.(null);
         setSelecting(true);

@@ -38,3 +38,18 @@ export const copyBitmap = (image: Bitmap): Bitmap => ({
   ...image,
   rgba: new Uint8ClampedArray(image.rgba),
 });
+
+/** `image` at `w × h`, nearest neighbour, so pixel art stays crisp. */
+export function resizeNearest(image: Bitmap, w: number, h: number): Bitmap {
+  if (image.w === w && image.h === h) return image;
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(image.h - 1, Math.floor((y * image.h) / h));
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(image.w - 1, Math.floor((x * image.w) / w));
+      const from = (sy * image.w + sx) * 4;
+      rgba.set(image.rgba.subarray(from, from + 4), (y * w + x) * 4);
+    }
+  }
+  return { rgba, w, h };
+}

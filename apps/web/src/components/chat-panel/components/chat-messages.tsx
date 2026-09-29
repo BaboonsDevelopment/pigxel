@@ -7,6 +7,8 @@ type Props = {
   pending: boolean;
   error: string | null;
   onChoose: (index: number, placement: Placement) => void;
+  /** Runs the step message `index` waits for (its button). */
+  onPress: (index: number) => void;
   /** Points out on the canvas where a placement would draw. */
   onHover: (area: Area | null) => void;
 };
@@ -16,6 +18,7 @@ export function ChatMessages({
   pending,
   error,
   onChoose,
+  onPress,
   onHover,
 }: Props) {
   return (
@@ -55,6 +58,19 @@ export function ChatMessages({
                 </button>
               ))}
             </div>
+          )}
+          {message.button && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => onPress(i)}
+              className={buttonVariants({
+                size: "sm",
+                className: "mt-2 w-full",
+              })}
+            >
+              {message.button.label}
+            </button>
           )}
           {message.image && (
             // eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimize

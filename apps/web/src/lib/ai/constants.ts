@@ -1,8 +1,5 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 
-export const GEMINI_BASE_URL =
-  "https://generativelanguage.googleapis.com/v1beta";
-
 /**
  * Waits between rounds: each round tries every model once, so a busy model is
  * skipped right away and the pause only comes when all of them are busy.
@@ -14,17 +11,42 @@ export const IMAGE_RETRY_DELAYS_MS = [2_000];
 export const TEXT_ATTEMPT_TIMEOUT_MS = 20_000;
 export const IMAGE_ATTEMPT_TIMEOUT_MS = 40_000;
 
+// ── OpenAI (the provider in use) ───────────────────────────────────────────
+
+export const OPENAI_BASE_URL = "https://api.openai.com/v1";
+/**
+ * Cheap text models that read pictures and answer in strict JSON, tried in
+ * order after `AI_MODEL`.
+ */
+export const OPENAI_TEXT_MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
+/** Image models, tried in order after `AI_IMAGE_MODEL`; the mini one costs less. */
+export const OPENAI_IMAGE_MODELS = ["gpt-image-1-mini", "gpt-image-1"];
+/** The picture sizes gpt-image draws, by frame shape (width:height). */
+export const OPENAI_IMAGE_SIZES: Record<string, string> = {
+  "1:1": "1024x1024",
+  "3:2": "1536x1024",
+  "2:3": "1024x1536",
+};
+/** Picture quality when `AI_IMAGE_QUALITY` isn't set: low, medium or high. */
+export const OPENAI_IMAGE_QUALITY = "medium";
+/** gpt-image can take a minute or more for one picture. */
+export const OPENAI_IMAGE_TIMEOUT_MS = 150_000;
+
+// ── Google Gemini (kept as an alternative, AI_PROVIDER=gemini) ─────────────
+
+export const GEMINI_BASE_URL =
+  "https://generativelanguage.googleapis.com/v1beta";
 /**
  * Free text models, tried in order after `AI_MODEL`. Google often answers 503
  * for one model while another is fine, so there are several.
  */
-export const TEXT_MODELS = [
+export const GEMINI_TEXT_MODELS = [
   "gemini-3.6-flash",
   "gemini-3.7-flash",
   "gemini-3.1-flash-lite",
 ];
 /** Paid image models, tried in order after `AI_IMAGE_MODEL` (≈$0.03–0.05 each). */
-export const IMAGE_MODELS = [
+export const GEMINI_IMAGE_MODELS = [
   "gemini-3.1-flash-image",
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
@@ -43,6 +65,9 @@ message; earlier messages are context, so short follow-ups like "and a dog too",
 - edit: any change to what is already drawn — recolour, outline, erase, move,
   resize, add a detail to it (a hat, a sword), change a pose, expression,
   clothes or style.
+- animate: they want movement over several frames — an animation, a loop, a
+  character doing an action ("a monkey that throws a grenade", "make the cat
+  walk", "animate the flag waving"), new or already drawn.
 - chat: a question, a greeting or anything else.
 Set subject so it can be understood without the conversation:
 - generate: a short plain English description of ONE new thing only — what
@@ -52,12 +77,18 @@ Set subject so it can be understood without the conversation:
   background.
 - edit: the full request in plain English, naming the thing to change instead
   of "it", "him" or "that".
+- animate: the full request in plain English: what moves and what happens,
+  naming already drawn things instead of "it".
 - chat: leave it empty.
 For generate also set:
 - where: where the user wants it, in plain English ("above the beaver",
   "at the bottom", "next to the apple"); empty when they did not say.
 - count: how many to add (1 unless they asked for more, e.g. "5 more apples" is 5).
-Otherwise leave where empty and count 1.`;
+- name: a short Title Case name for its layer, one or two English words
+  ("Monkey", "Red Apple").
+For animate also set frames: the number of frames they asked for, 0 when
+they did not say.
+Otherwise leave where and name empty, count 1 and frames 0.`;
 
 /** For plain conversation, so the model answers in words, not fake tool calls. */
 export const CHAT_PROMPT =
@@ -75,15 +106,16 @@ export const IMAGE_BACKGROUND_RULES = [
 ];
 
 export const IMAGE_STYLE_RULES = [
-  "crisp hard-edged pixels, no anti-aliasing.",
-  "Chunky low-detail sprite: big simple shapes and a clear, readable silhouette, no tiny details.",
-  "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
+  "crisp hard-edged pixels, no anti-aliasing, no blur.",
+  "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
+  "Rich hand-placed shading with hue-shifted shadows and highlights, texture on materials (cloth, metal, fur, stone), one clear light source from the top left.",
+  "Muted, atmospheric palette with a few strong accent colours, dark outline.",
   "The subject is centred, fills the frame, and is complete — nothing cropped.",
   ...IMAGE_BACKGROUND_RULES,
 ];
 
-/** Frame shapes the image model accepts, as width:height. */
-export const ASPECT_RATIOS = [
+/** Frame shapes Gemini's image models accept, as width:height. */
+export const GEMINI_ASPECT_RATIOS = [
   "1:1",
   "2:3",
   "3:2",
@@ -175,3 +207,53 @@ user chooses; otherwise false.
 
 question: when ask is true, one short sentence in the language of the request
 asking how to add it; otherwise empty.`;
+
+// ── Animations ──────────────────────────────────────────────────────────────
+
+/** Most frames an animation may have. */
+export const MAX_FRAMES = 12;
+/** Most pictures (paid) one animation may need: one per track. */
+export const MAX_TRACKS = 3;
+
+export const ANIMATION_RULES = `Plan a short pixel art animation for the request.
+
+frameCount: how many frames, 4 to 8 for most actions (more for a long or slow
+one), at most ${MAX_FRAMES}; use FRAMES when given.
+duration: how long each frame shows, in milliseconds: about 100 for most
+actions, 60-80 for fast ones, 150-250 for slow ones.
+name: a short Title Case name for the animation ("Monkey Throws Grenade").
+
+tracks: one per thing that moves, bottom to top in drawing order, at most
+${MAX_TRACKS} (each costs one picture). Things that do not move are not tracks.
+- kind "sheet": something whose shape changes between frames — a character's
+  pose, a flag, fire, an explosion. An image model draws all its poses at
+  once as a sprite sheet.
+  subject: a full visual description of it that is the same in every frame
+  (what it is, colours, clothes, what it holds at the start). Do not describe
+  the motion here.
+  poses: exactly frameCount short descriptions, one per frame, of its pose
+  in that frame, forming smooth motion; "" for frames where it is not seen
+  (an explosion before it happens).
+  box: one rectangle in tile pixels where it is drawn in every frame, large
+  enough for all its poses (arms raised, legs apart), inside the tile.
+  path: empty.
+- kind "prop": something that keeps its shape and only moves — a thrown ball
+  or grenade, a flying arrow, a falling leaf. It is drawn once and placed.
+  subject: what it looks like.
+  path: exactly frameCount boxes in tile pixels, one per frame, where it is
+  in that frame; visible false where it is not seen (still held in a hand,
+  already exploded). Follow a believable path (a throw is an arc) with even
+  spacing, and keep its size unless it comes closer or goes away.
+  box: its size in the first frame it is seen; poses: empty.
+When a character holds something that later flies off, the character's
+poses show it in the hand until it is thrown, and a prop shows it from the
+frame it leaves the hand.
+reuse: when the request animates something already drawn (from LAYERS), that
+layer's number, so its look is kept; otherwise -1. Only a sheet can reuse.
+
+Keep everything inside the tile, where it fits the scene. Motion is smooth:
+neighbouring frames differ a little. A looping action (walk, idle, waving)
+ends where it can start again.
+
+summary: one or two short sentences for the user, in the language of the
+request, saying what the animation will show.`;

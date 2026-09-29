@@ -193,7 +193,12 @@ export function Editor({
         </main>
         <Timeline sprite={sprite} playback={playback} />
       </div>
-      <EditorChat canvas={canvas} sprite={sprite} onHighlight={setHighlight} />
+      <EditorChat
+        canvas={canvas}
+        sprite={sprite}
+        playback={playback}
+        onHighlight={setHighlight}
+      />
       {opening && (
         <OpenTileDialog
           source={opening}

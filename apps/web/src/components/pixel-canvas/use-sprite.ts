@@ -18,6 +18,37 @@ export type LayerPatch = Partial<
 
 export type SpriteApi = ReturnType<typeof useSprite>;
 
+/** A layer to add, with its name and its pixels by frame id. */
+export type NewLayer = {
+  name?: string;
+  cels?: Map<string, Uint8ClampedArray>;
+  /**
+   * Puts the pixels on the active layer instead when it is an untouched
+   * drawing layer (a new tile's "Layer 1"), so empty layers don't pile up.
+   */
+  reuseEmpty?: boolean;
+  /** Hides the other drawing layers, so the new one takes the tile's place. */
+  hideOthers?: boolean;
+};
+
+/**
+ * An animation to add: it runs from the first frame for `frameCount` frames,
+ * with one layer per entry of `layers` (bottom to top), whose `cels` are its
+ * full-tile pixels per frame (null where it is not seen). New layers go in a
+ * group called `name`; an entry that `replaces` an existing layer gives that
+ * layer these cels instead.
+ */
+export type AnimationSpec = {
+  name: string;
+  frameCount: number;
+  duration: number;
+  layers: {
+    name: string;
+    cels: (Uint8ClampedArray | null)[];
+    replaces?: string;
+  }[];
+};
+
 /** The tile at one point of its history. Unchanged cels share their pixels. */
 type Snapshot = { tree: Layer[]; frames: Frame[]; size: Size; cels: Cels };
 
@@ -219,17 +250,111 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     past.current = forward;
   };
 
-  /** Adds a layer above the active one; a reference gets `pixels` in every frame. */
+  /** Whether a layer has nothing drawn in any frame. */
+  const isEmptyLayer = (id: string) => frames.every((f) => !cels.get(f.id, id));
+
+  /** Makes the cels of a layer these pixels (null empties the cel). */
+  const putCels = (
+    id: string,
+    next: Iterable<[string, Uint8ClampedArray | null]>,
+  ) => {
+    for (const [frame, pixels] of next) {
+      if (pixels) changed.current.add(addCel(frame, id, pixels));
+      else cels.delete(frame, id);
+    }
+  };
+
+  /** Adds a layer above the active one, in one undo step; returns its id. */
   const addLayer = (
     kind: Exclude<LayerKind, "background">,
-    pixels?: Uint8ClampedArray,
+    {
+      name,
+      cels: pixels = new Map(),
+      reuseEmpty = false,
+      hideOthers = false,
+    }: NewLayer = {},
   ) => {
-    const layer = layerTree.createLayer(kind, layerTree.nextName(tree, kind));
-    if (pixels) for (const frame of frames) addCel(frame.id, layer.id, pixels);
+    const active = layerTree.findLayer(tree, layerId)?.layer;
+    const empty =
+      reuseEmpty && active?.kind === "normal" && isEmptyLayer(active.id)
+        ? active
+        : null;
+    const layer =
+      empty ??
+      layerTree.createLayer(kind, name ?? layerTree.nextName(tree, kind));
+    let next = empty
+      ? name
+        ? layerTree.updateLayer(tree, empty.id, { name })
+        : tree
+      : layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId));
+    if (hideOthers)
+      for (const other of layerTree.allLayers(next))
+        if (other.kind === "normal" && other.id !== layer.id && other.visible)
+          next = layerTree.updateLayer(next, other.id, { visible: false });
+    putCels(layer.id, pixels);
     setLayerId(layer.id);
-    changeTree(
-      layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId)),
+    changeTree(next);
+    return layer.id;
+  };
+
+  /** Replaces cels of a layer by frame id, in one undo step. */
+  const writeCels = (
+    id: string,
+    next: Map<string, Uint8ClampedArray | null>,
+  ) => {
+    putCels(id, next);
+    finish();
+  };
+
+  /** Adds an animation (see AnimationSpec) in one undo step. */
+  const addAnimation = (spec: AnimationSpec) => {
+    // The animation runs from the first frame. Missing frames are added,
+    // showing what the last frame shows, so the still scene stays.
+    const last = frames.at(-1)!;
+    const nextFrames = frames.map((frame, i) =>
+      i < spec.frameCount ? { ...frame, duration: spec.duration } : frame,
     );
+    for (let i = frames.length; i < spec.frameCount; i++) {
+      const frame = frameList.createFrame(spec.duration);
+      for (const id of layerTree.pixelLayerIds(tree)) {
+        const pixels = cels.pixels(last.id, id);
+        if (pixels) addCel(frame.id, id, pixels);
+      }
+      nextFrames.push(frame);
+    }
+    const frameIds = nextFrames.slice(0, spec.frameCount).map((f) => f.id);
+    const byFrame = (list: (Uint8ClampedArray | null)[]) =>
+      frameIds.map(
+        (id, i) => [id, list[i] ?? null] as [string, Uint8ClampedArray | null],
+      );
+
+    const added: Layer[] = [];
+    let selected = layerId;
+    for (const entry of spec.layers) {
+      if (entry.replaces && layerTree.findLayer(tree, entry.replaces)) {
+        putCels(entry.replaces, byFrame(entry.cels));
+        selected = entry.replaces;
+        continue;
+      }
+      const layer = layerTree.createLayer("normal", entry.name);
+      putCels(layer.id, byFrame(entry.cels));
+      added.push(layer);
+      selected = layer.id;
+    }
+    const group = layerTree.createLayer("group", spec.name);
+    const nextTree =
+      added.length && group.kind === "group"
+        ? layerTree.insertLayer(
+            tree,
+            { ...group, children: added },
+            layerTree.placeAbove(tree, layerId),
+          )
+        : tree;
+    setTree(nextTree);
+    setFrames(nextFrames);
+    setLayerId(selected);
+    setFrameId(frameIds[0]!);
+    finish({ tree: nextTree, frames: nextFrames });
   };
 
   /** A tile keeps at least one layer to draw on, so that one can't be removed. */
@@ -317,6 +442,11 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     redo,
     /** Whether a layer has anything drawn in a frame. */
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
+    /** A layer's full-tile pixels in a frame; transparent where it has no cel. */
+    readCel: (layer: string, frame: string) =>
+      cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
+    writeCels,
+    addAnimation,
     selectLayer: setLayerId,
     addLayer,
     canRemoveLayer,

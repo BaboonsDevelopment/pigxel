@@ -57,6 +57,3 @@ export type Listing =
   | { state: "loading" }
   | { state: "ready"; items: FileItem[] }
   | { state: "error"; message: string };
-
-/** Share of an area that may already be drawn on before a new picture there counts as covering art. */
-export const MAX_OVERLAP = 0.03;

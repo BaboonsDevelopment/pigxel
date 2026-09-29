@@ -1,6 +1,7 @@
 import type { MenuSections } from "@/components/menu/constants";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import { fitImageToTile } from "@/lib/image/helpers";
+import { placeOutside } from "@/lib/layers/tree";
 import { frameIndex } from "@/lib/sprite/frames";
 import { pickImageFile } from "./helpers";
 import type { Playback } from "./use-playback";
@@ -10,7 +11,11 @@ export async function addReference(sprite: SpriteApi) {
   const file = await pickImageFile();
   if (!file) return;
   const { w, h } = sprite.size;
-  sprite.addLayer("reference", await fitImageToTile(file, w, h));
+  const pixels = await fitImageToTile(file, w, h);
+  // A picture to trace belongs to every frame.
+  sprite.addLayer("reference", {
+    cels: new Map(sprite.frames.map((frame) => [frame.id, pixels])),
+  });
 }
 
 /**
@@ -23,6 +28,8 @@ export function layerActions(
   rename?: () => void,
 ): MenuSections {
   const { activeLayer: layer, layerId } = sprite;
+  // Where the layer goes when taken out of its group: right above the group.
+  const outside = placeOutside(sprite.tree, layerId);
   return [
     [
       {
@@ -53,6 +60,13 @@ export function layerActions(
         shortcut: "Delete",
         onSelect: sprite.clearCel,
         disabled: !sprite.canPaint || !sprite.hasCel(sprite.frameId, layerId),
+      },
+    ],
+    [
+      {
+        label: "Move out of group",
+        onSelect: () => outside && sprite.moveLayer(layerId, outside),
+        hidden: !outside,
       },
     ],
     [
