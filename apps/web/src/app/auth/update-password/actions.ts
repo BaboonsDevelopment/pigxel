@@ -41,5 +41,5 @@ export async function updatePassword(
     return { error: "We couldn’t connect. Please try again." };
   }
   revalidatePath("/", "layout");
-  redirect("/account?updated=password");
+  redirect("/settings/account?updated=password");
 }

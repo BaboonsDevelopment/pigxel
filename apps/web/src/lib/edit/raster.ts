@@ -15,7 +15,7 @@ export function hexToRgba(hex: string): RGBA {
   };
 }
 
-/** Every pixel on the straight line from `a` to `b` (Bresenham). */
+/** Every pixel on the straight line from `a` to `b`, both ends included (Bresenham). */
 export function linePoints(a: Point, b: Point): Point[] {
   const points: Point[] = [];
   const dx = Math.abs(b.x - a.x);

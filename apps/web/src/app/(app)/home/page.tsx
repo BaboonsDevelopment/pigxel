@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createButtonClass } from "@/components/app-shell/styles";
+import { buttonVariants } from "@pigxel/ui/components/button";
+import { Page } from "@pigxel/ui/components/page";
+import { Lead, PageTitle } from "@pigxel/ui/components/typography";
 import { CloudTiles } from "@/components/tiles/cloud-tiles";
 import { LocalTiles } from "@/components/tiles/local-tiles";
-import { profileOf, requireUser } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
+import { sidebarProfile } from "@/lib/profile/server";
 import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 
 export const metadata: Metadata = { title: "Home · Pigxel" };
@@ -14,29 +17,30 @@ const RECENT = 4;
 
 export default async function Home() {
   const user = await requireUser();
-  const cloudTiles = await listCloudTilesOnServer();
-  const firstName = profileOf(user).name.split(" ")[0];
+  const [cloudTiles, profile] = await Promise.all([
+    listCloudTilesOnServer(RECENT),
+    sidebarProfile(user),
+  ]);
+  const firstName = profile.name.split(" ")[0];
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10 md:px-10">
-      <section className="flex flex-wrap items-end justify-between gap-6 rounded-2xl bg-[linear-gradient(120deg,#f8e3ec,#f3e6f6)] p-8">
+    <Page>
+      <section className="flex flex-wrap items-end justify-between gap-6 rounded-2xl bg-linear-120 from-[#f8e3ec] to-[#f3e6f6] p-8">
         <div>
-          <p className="text-sm text-[#8b7a84]">Welcome back,</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-[#3b2a33]">
-            {firstName}
-          </h1>
-          <p className="mt-3 max-w-md text-sm leading-relaxed text-[#6d5f67]">
+          <p className="text-sm text-muted-foreground">Welcome back,</p>
+          <PageTitle className="mt-1">{firstName}</PageTitle>
+          <Lead className="mt-3 max-w-md">
             Pick up a tile where you left off, or start something new.
-          </p>
+          </Lead>
         </div>
-        <Link href="/tiles/new" className={createButtonClass}>
+        <Link href="/tiles/new" className={buttonVariants({ size: "lg" })}>
           Create tile
         </Link>
       </section>
 
-      <div className="mt-2 flex items-center justify-end">
+      <div className="mt-6 flex items-center justify-end">
         <Link
           href="/tiles"
-          className="mt-6 text-sm font-medium underline-offset-4 hover:underline"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
           See all projects →
         </Link>
@@ -47,6 +51,6 @@ export default async function Home() {
         limit={RECENT}
       />
       <CloudTiles userId={user.id} tiles={cloudTiles} limit={RECENT} />
-    </main>
+    </Page>
   );
 }

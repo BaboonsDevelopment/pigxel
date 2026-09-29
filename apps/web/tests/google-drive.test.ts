@@ -127,7 +127,8 @@ describe("connecting Google", () => {
     expect(safeNext("/tiles/edit")).toBe("/tiles/edit");
     expect(safeNext("/tiles/edit?id=3f2a-b1")).toBe("/tiles/edit?id=3f2a-b1");
     expect(safeNext("/tiles/edit?id=<script>")).toBe("/tiles/edit");
-    expect(safeNext("/account?id=x")).toBe("/account");
+    expect(safeNext("/settings/account?id=x")).toBe("/settings/account");
+    expect(safeNext("/account")).toBe("/home");
     expect(safeNext("https://evil.example/tiles/edit")).toBe("/home");
     expect(withParam("/tiles/edit?id=a", "drive", "error")).toBe(
       "/tiles/edit?id=a&drive=error",

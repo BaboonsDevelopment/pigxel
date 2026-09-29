@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * Sends the person to Google, then back to `next` through /auth/callback:
  * - signed out: "Sign in with Google", which also connects Drive;
- * - signed in with email: links a Google account to connect Drive;
+ * - signed in with email: links a Google account (and connects Drive, when available);
  * - signed in with Google: asks again for Drive access (e.g. after disconnecting).
  */
 export async function GET(request: NextRequest) {
@@ -39,7 +39,14 @@ export async function GET(request: NextRequest) {
     });
     url = data.url ?? undefined;
   } else if (!isDriveAvailable()) {
-    return NextResponse.redirect(authUrl(next));
+    // Without Drive, linking only adds Google as a way to sign in.
+    if (user.identities?.some((i) => i.provider === "google"))
+      return NextResponse.redirect(authUrl(next));
+    const { data } = await supabase.auth.linkIdentity({
+      provider: "google",
+      options: { redirectTo },
+    });
+    url = data?.url ?? undefined;
   } else {
     // "consent" makes Google send a new refresh token even if access was granted before.
     const connect = {

@@ -31,8 +31,8 @@ export function AppShell({
   }, [menuOpen]);
 
   return (
-    <div className="flex h-dvh bg-[#fcf6f9] font-[family-name:var(--font-ui)]">
-      <div className="hidden shrink-0 border-r border-[#efdfe7] md:block">
+    <div className="flex h-dvh bg-canvas">
+      <div className="hidden shrink-0 border-r border-border md:block">
         <Sidebar profile={profile} />
       </div>
 
@@ -42,7 +42,7 @@ export function AppShell({
             type="button"
             aria-label="Close menu"
             onClick={() => setMenuOpen(false)}
-            className="absolute inset-0 bg-[#3b2a33]/30"
+            className="absolute inset-0 bg-foreground/30"
           />
           <div className="absolute inset-y-0 left-0 shadow-xl">
             <Sidebar profile={profile} onNavigate={() => setMenuOpen(false)} />
@@ -50,7 +50,7 @@ export function AppShell({
               type="button"
               aria-label="Close menu"
               onClick={() => setMenuOpen(false)}
-              className="absolute top-5 -right-12 flex size-10 items-center justify-center rounded-full bg-white text-[#3b2a33] shadow"
+              className="absolute top-5 -right-12 flex size-10 items-center justify-center rounded-full bg-white text-foreground shadow"
             >
               <CloseIcon />
             </button>
@@ -59,19 +59,19 @@ export function AppShell({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[#efdfe7] bg-[#f8eef3] px-4 md:hidden">
+        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:hidden">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
-            className="flex size-10 items-center justify-center rounded-lg text-[#3b2a33] hover:bg-white/60"
+            className="flex size-10 items-center justify-center rounded-lg text-foreground hover:bg-white/60"
           >
             <MenuIcon />
           </button>
           <Link href="/home" className="flex items-center gap-2">
             <Image src={pig} alt="" width={30} className="h-auto" />
-            <span className="font-[family-name:var(--font-display)] text-xl font-semibold text-[#3b2a33]">
+            <span className="font-display text-xl font-semibold text-foreground">
               Pigxel
             </span>
           </Link>

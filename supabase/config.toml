@@ -16,13 +16,13 @@ enabled = false
 [studio]
 enabled = true
 port = 54323
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/confirm", "http://localhost:3000/auth/callback?next=/auth/update-password"]
+additional_redirect_urls = ["http://localhost:3000/auth/confirm", "http://localhost:3000/auth/callback?next=/auth/update-password", "http://localhost:3000/auth/callback?next=/settings/account", "http://localhost:3000/auth/callback?next=/settings/account&provider=apple"]
 jwt_expiry = 3600
 enable_signup = true
 # Lets people who signed up with email link a Google account for Drive.
@@ -43,3 +43,11 @@ content_path = "./supabase/templates/recovery.html"
 enabled = true
 client_id = "env(GOOGLE_CLIENT_ID)"
 secret = "env(GOOGLE_CLIENT_SECRET)"
+
+# Apple sign-in and account linking. Needs an Apple Developer account: set the
+# Services ID as APPLE_CLIENT_ID and the generated client secret (a JWT signed
+# with your key) as APPLE_SECRET, then set enabled = true.
+[auth.external.apple]
+enabled = false
+client_id = "env(APPLE_CLIENT_ID)"
+secret = "env(APPLE_SECRET)"

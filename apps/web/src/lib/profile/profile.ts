@@ -1,0 +1,86 @@
+import { readLinks, type ProfileLink } from "./validation";
+
+export type Visibility = "public" | "private";
+export type AvatarKind = "none" | "provider" | "upload";
+
+/** A row of the `profiles` table. */
+export type ProfileRow = {
+  id: string;
+  username: string;
+  display_name: string;
+  bio: string;
+  links: unknown;
+  avatar_kind: AvatarKind;
+  provider_avatar_url: string | null;
+  avatar_path: string | null;
+  visibility: Visibility;
+  created_at: string;
+};
+
+export const PROFILE_COLUMNS =
+  "id, username, display_name, bio, links, avatar_kind, provider_avatar_url, avatar_path, visibility, created_at";
+
+/** An artist's profile as the pages show it. */
+export type ArtistProfile = {
+  id: string;
+  username: string;
+  name: string;
+  bio: string;
+  links: ProfileLink[];
+  avatarKind: AvatarKind;
+  /** The picture to show; null shows the initial instead. */
+  avatarUrl: string | null;
+  /** The sign-in provider's picture, offered as an avatar choice. */
+  providerAvatarUrl: string | null;
+  visibility: Visibility;
+  joinedAt: string;
+};
+
+/** A cloud tile as a profile shows it. */
+export type ProfileTile = {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  thumbnail: string | null;
+  visibility: Visibility;
+  /** 1–6 when pinned to the top of the profile. */
+  pinOrder: number | null;
+  updatedAt: string;
+};
+
+export const AVATAR_BUCKET = "avatars";
+
+/** The public address of an uploaded avatar. */
+function uploadedAvatarUrl(path: string) {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  return `${base}/storage/v1/object/public/${AVATAR_BUCKET}/${path}`;
+}
+
+export function toArtistProfile(row: ProfileRow): ArtistProfile {
+  const avatarUrl =
+    row.avatar_kind === "upload" && row.avatar_path
+      ? uploadedAvatarUrl(row.avatar_path)
+      : row.avatar_kind === "provider"
+        ? row.provider_avatar_url
+        : null;
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.display_name,
+    bio: row.bio,
+    links: readLinks(row.links),
+    avatarKind: row.avatar_kind,
+    avatarUrl,
+    providerAvatarUrl: row.provider_avatar_url,
+    visibility: row.visibility,
+    joinedAt: row.created_at,
+  };
+}
+
+/** "Joined September 2026". */
+export function joinedLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Joined ${date.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}`;
+}

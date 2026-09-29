@@ -48,7 +48,7 @@ import { authenticate, signOut } from "@/app/login/actions";
 import { updatePassword } from "@/app/auth/update-password/actions";
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as confirm } from "@/app/auth/confirm/route";
-import Account from "@/app/(app)/account/page";
+import AccountSettings from "@/app/(app)/settings/account/page";
 import Login from "@/app/login/page";
 import UpdatePassword from "@/app/auth/update-password/page";
 import Home from "@/app/page";
@@ -251,7 +251,7 @@ describe("email recovery", () => {
         {},
         form({ password: "test-password", confirmPassword: "test-password" }),
       ),
-    ).rejects.toThrow("REDIRECT:/account?updated=password");
+    ).rejects.toThrow("REDIRECT:/settings/account?updated=password");
     expect(mocks.auth.updateUser).toHaveBeenCalledWith({
       password: "test-password",
     });
@@ -280,6 +280,37 @@ describe("email callbacks and route guards", () => {
     );
     expect(response.headers.get("location")).toBe(
       "http://localhost:3000/auth/update-password",
+    );
+  });
+  it("returns email-change links to account settings", async () => {
+    const response = await callback(
+      new NextRequest(
+        "http://localhost:3000/auth/callback?code=test&next=/settings/account",
+      ),
+    );
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/settings/account",
+    );
+  });
+  it("reports a cancelled Apple link as a linking error, not a Drive one", async () => {
+    const response = await callback(
+      new NextRequest(
+        "http://localhost:3000/auth/callback?error=access_denied&next=/settings/account&provider=apple",
+      ),
+    );
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/settings/account?link=error",
+    );
+  });
+  it("sends a cancelled Apple sign-in back to login", async () => {
+    mocks.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    const response = await callback(
+      new NextRequest(
+        "http://localhost:3000/auth/callback?error=access_denied&provider=apple",
+      ),
+    );
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?error=apple",
     );
   });
   it("rejects a failed code exchange", async () => {
@@ -322,7 +353,7 @@ describe("email callbacks and route guards", () => {
   it("protects account, tiles, and password pages from signed-out users", async () => {
     mocks.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
     await expect(
-      Account({ searchParams: Promise.resolve({}) }),
+      AccountSettings({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
     await expect(Tiles()).rejects.toThrow("REDIRECT:/login");
     await expect(
@@ -337,11 +368,17 @@ describe("email callbacks and route guards", () => {
       "REDIRECT:/home",
     );
   });
-  it("renders the account after Supabase verifies the user", async () => {
-    await expect(
-      Account({ searchParams: Promise.resolve({}) }),
-    ).resolves.toBeTruthy();
+  it("renders account settings after Supabase verifies the user", async () => {
+    const html = renderToStaticMarkup(
+      await AccountSettings({
+        searchParams: Promise.resolve({ updated: "password" }),
+      }),
+    );
     expect(mocks.auth.getUser).toHaveBeenCalledOnce();
+    expect(html).toContain("person@example.com");
+    expect(html).toContain("Your password has been updated.");
+    // Signed up with email: no password identity yet in this mock user.
+    expect(html).toContain("Set a password");
   });
   it("forwards auth codes that arrive at the default Site URL", async () => {
     await expect(
@@ -361,7 +398,15 @@ describe("proxy", () => {
 
   it("sends signed-out visitors of protected pages to login", async () => {
     signedOut();
-    for (const path of ["/home", "/tiles", "/tiles/new", "/account"]) {
+    for (const path of [
+      "/home",
+      "/tiles",
+      "/tiles/new",
+      "/settings/account",
+      "/settings/profile",
+      "/profile",
+      "/u/someone",
+    ]) {
       expect((await visit(path)).headers.get("location")).toBe(
         "http://localhost:3000/login",
       );
