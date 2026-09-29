@@ -12,13 +12,12 @@ import {
   ChevronRightIcon,
   FolderIcon,
   HomeIcon,
-  PlusIcon,
   SettingsIcon,
   SparklesIcon,
   TelescopeIcon,
 } from "./icons";
+import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { SidebarScene } from "./sidebar-scene";
-import { createButtonClass } from "./styles";
 
 type NavItem = {
   label: string;
@@ -50,12 +49,12 @@ const FOOTER: NavItem[] = [
   {
     label: "Settings",
     icon: <SettingsIcon />,
-    href: "/account",
-    match: (p) => p === "/account",
+    href: "/settings",
+    match: (p) => p === "/settings" || p.startsWith("/settings/"),
   },
 ];
 
-/** The app's navigation: logo, Create, pages, a pixel landscape and the account. */
+/** The app’s navigation: logo, pages, a pixel landscape and the account. */
 export function Sidebar({
   profile,
   onNavigate,
@@ -77,45 +76,36 @@ export function Sidebar({
   return (
     <nav
       aria-label="Main"
-      className="flex h-full w-60 flex-col bg-[linear-gradient(180deg,#f8eef3_0%,#f4e6ed_100%)] font-[family-name:var(--font-ui)] text-[#3b2c35]"
+      className="flex h-full w-60 flex-col bg-linear-to-b from-sidebar to-sidebar-end text-foreground"
     >
       <Link
         href="/home"
         onClick={onNavigate}
-        className="mx-5 mt-6 flex items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#c65a7e]"
+        className="mx-5 mt-6 flex items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
       >
         <Image src={pig} alt="" width={56} priority className="h-auto" />
-        <span className="font-[family-name:var(--font-display)] text-[32px] leading-none font-semibold tracking-tight text-[#3b2a33]">
+        <span className="font-display text-[32px] leading-none font-semibold tracking-tight text-foreground">
           Pigxel
         </span>
       </Link>
 
-      <Link
-        href="/tiles/new"
-        onClick={onNavigate}
-        className={cn(createButtonClass, "mx-5 mt-7 flex")}
-      >
-        <PlusIcon />
-        Create
-      </Link>
-
-      <ul className="mt-6 space-y-1 px-3">{MAIN.map(item)}</ul>
+      <ul className="mt-7 space-y-1 px-3">{MAIN.map(item)}</ul>
 
       <SidebarScene />
 
       <ul className="space-y-1 px-3 pt-2 pb-3">{FOOTER.map(item)}</ul>
 
       <Link
-        href="/account"
+        href={profile.username ? `/u/${profile.username}` : "/settings/profile"}
         onClick={onNavigate}
-        className="mx-3 mb-4 flex items-center gap-3 rounded-xl border-t border-[#ead6df] px-2 pt-3 pb-1 transition-colors hover:bg-white/50"
+        className="mx-3 mb-4 flex items-center gap-3 rounded-xl border-t border-border px-2 pt-3 pb-1 transition-colors hover:bg-white/50"
       >
-        <Avatar profile={profile} />
+        <ProfileAvatar name={profile.name} url={profile.avatarUrl} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">
             {profile.name}
           </span>
-          <span className="block text-xs text-[#8b7a84]">Free plan</span>
+          <span className="block text-xs text-muted-foreground">Free plan</span>
         </span>
         <ChevronRightIcon />
       </Link>
@@ -139,11 +129,11 @@ function NavLink({
       <li>
         <span
           aria-disabled="true"
-          className={cn(base, "cursor-default text-[#3b2c35]/45")}
+          className={cn(base, "cursor-default text-foreground/45")}
         >
           {item.icon}
           <span className="flex-1">{item.label}</span>
-          <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#b0869a] uppercase">
+          <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             Soon
           </span>
         </span>
@@ -158,33 +148,15 @@ function NavLink({
         aria-current={active ? "page" : undefined}
         className={cn(
           base,
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c65a7e]",
+          "focus-visible:outline-2 focus-visible:outline-offset-2",
           active
-            ? "bg-[#f6dbe5] font-medium text-[#3b2a33]"
-            : "text-[#4a3d45] hover:bg-white/60",
+            ? "bg-sidebar-accent font-medium text-foreground"
+            : "text-foreground/85 hover:bg-white/60",
         )}
       >
         {item.icon}
         {item.label}
       </Link>
     </li>
-  );
-}
-
-function Avatar({ profile }: { profile: Profile }) {
-  if (profile.avatarUrl)
-    return (
-      // eslint-disable-next-line @next/next/no-img-element -- avatars come from the sign-in provider
-      <img
-        src={profile.avatarUrl}
-        alt=""
-        referrerPolicy="no-referrer"
-        className="size-9 shrink-0 rounded-full object-cover"
-      />
-    );
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#e9c2d2] text-sm font-semibold text-[#8a3d5c]">
-      {profile.name.charAt(0).toUpperCase()}
-    </span>
   );
 }

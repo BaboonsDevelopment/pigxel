@@ -5,6 +5,13 @@ import {
   PIGXEL_EXTENSION,
   stripPigxelExtension,
 } from "@/lib/pigxel-file/format";
+import { Button } from "@pigxel/ui/components/button";
+import { FormMessage } from "@pigxel/ui/components/field";
+import {
+  Lead,
+  SectionTitle,
+  textLinkClassName,
+} from "@pigxel/ui/components/typography";
 
 export type FileItem = {
   id: string;
@@ -78,21 +85,19 @@ export function FilesDialog({
     >
       <div className="flex items-start justify-between gap-4 border-b p-5">
         <div>
-          <h2 id="files-dialog-title" className="font-semibold">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
-          )}
+          <SectionTitle id="files-dialog-title">{title}</SectionTitle>
+          {subtitle && <Lead className="mt-1">{subtitle}</Lead>}
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon"
           aria-label="Close"
           onClick={() => dialog.current?.close()}
-          className="rounded-md px-2 text-lg leading-none text-muted-foreground hover:bg-muted"
+          className="text-lg leading-none"
         >
           ×
-        </button>
+        </Button>
       </div>
 
       <div className="max-h-96 overflow-y-auto p-2">
@@ -101,13 +106,11 @@ export function FilesDialog({
         )}
         {listing.state === "error" && (
           <div className="p-4 text-sm">
-            <p role="alert" className="text-destructive">
-              {listing.message}
-            </p>
+            <FormMessage tone="error">{listing.message}</FormMessage>
             {fix && (
               <a
                 href={fix.href}
-                className="mt-3 inline-block font-medium underline underline-offset-4"
+                className={`mt-3 inline-block ${textLinkClassName}`}
               >
                 {fix.label}
               </a>
@@ -129,7 +132,7 @@ export function FilesDialog({
               className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-muted"
             >
               {item.thumbnail !== undefined && (
-                <span className="flex size-10 shrink-0 items-center justify-center rounded border bg-[repeating-conic-gradient(#e5e5e5_0_25%,#fff_0_50%)] bg-[length:8px_8px]">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded border bg-checker">
                   {item.thumbnail && (
                     // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
                     <img

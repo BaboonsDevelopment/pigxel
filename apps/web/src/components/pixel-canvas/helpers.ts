@@ -15,7 +15,7 @@ import {
 } from "./constants";
 import type { Point } from "./pen";
 
-export function clampSize(value: number) {
+function clampSize(value: number) {
   return Math.max(MIN_SIZE, Math.min(MAX_SIZE, value));
 }
 

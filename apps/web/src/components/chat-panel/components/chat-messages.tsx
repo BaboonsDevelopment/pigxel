@@ -1,5 +1,6 @@
 import type { Area } from "@/components/pixel-canvas/constants";
 import type { ChatEntry, Placement } from "../constants";
+import { buttonVariants } from "@pigxel/ui/components/button";
 
 type Props = {
   messages: ChatEntry[];
@@ -41,7 +42,11 @@ export function ChatMessages({
                   onMouseLeave={() => onHover(null)}
                   onFocus={() => onHover(placement.area)}
                   onBlur={() => onHover(null)}
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-1.5 text-left text-xs font-medium hover:bg-muted disabled:opacity-50"
+                  className={buttonVariants({
+                    variant: "secondary",
+                    size: "sm",
+                    className: "justify-between gap-3 text-left",
+                  })}
                 >
                   {placement.label}
                   <span className="text-muted-foreground tabular-nums">

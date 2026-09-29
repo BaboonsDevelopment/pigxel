@@ -3,7 +3,7 @@ import { MIN_PALETTE, PALETTE_PER_SIDE } from "../constants";
 import { imageToSprite } from "../quantize";
 
 /** Small tiles read best with few colours; bigger ones can hold more shading. */
-export const paletteSize = ({ w, h }: Size) =>
+const paletteSize = ({ w, h }: Size) =>
   Math.max(MIN_PALETTE, Math.round(Math.sqrt(w * h) * PALETTE_PER_SIDE));
 
 /**
