@@ -85,7 +85,7 @@ export const ASK_SELECT =
 export const ASK_FRAME =
   'Move or resize the highlighted frame on the tile if needed, then press "Generate here".';
 export const NO_LAYER =
-  "The selected layer can’t be drawn on. Pick a visible, unlocked layer (not a group or reference) in the Layers panel.";
+  "The selected layer can’t be drawn on. Pick a visible, unlocked layer (not a group or reference) in the timeline.";
 
 /** The panel's width in pixels, changed by dragging its left edge. */
 export const PANEL_WIDTH = { initial: 340, min: 260, max: 640 };

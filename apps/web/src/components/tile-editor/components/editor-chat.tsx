@@ -5,7 +5,7 @@ import { ChatPanel } from "@/components/chat-panel/chat-panel";
 import type { CanvasBridge } from "@/components/chat-panel/constants";
 import type { Area } from "@/components/pixel-canvas/constants";
 import type { PixelCanvasHandle } from "@/components/pixel-canvas/pixel-canvas";
-import type { LayersApi } from "@/components/pixel-canvas/use-layers";
+import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import {
@@ -30,14 +30,14 @@ import { MAX_OVERLAP } from "../constants";
  */
 export default function EditorChat({
   canvas,
-  layers,
+  sprite,
   onHighlight,
 }: {
   canvas: RefObject<PixelCanvasHandle | null>;
-  layers: LayersApi;
+  sprite: SpriteApi;
   onHighlight: (area: Area | null) => void;
 }) {
-  const fullArea = (): Area => ({ x: 0, y: 0, ...layers.size });
+  const fullArea = (): Area => ({ x: 0, y: 0, ...sprite.size });
 
   // A picture from the AI, turned into pixel art at the area's size.
   const toArt = async (dataUrl: string, area: Area) => {
@@ -58,7 +58,7 @@ export default function EditorChat({
     isEmpty: () => canvas.current?.isEmpty() ?? true,
     fullArea,
     freeArea: () => canvas.current?.freeArea() ?? null,
-    canPaint: () => layers.canPaint,
+    canPaint: () => sprite.canPaint,
     snapshot: (area, background) =>
       canvas.current?.snapshot(area, background) ?? "",
     snapshotLayer: (area, background) =>

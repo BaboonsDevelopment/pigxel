@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { LayersPanel } from "@/components/layers-panel/layers-panel";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
@@ -19,9 +18,10 @@ import {
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
 import {
-  useLayers,
-  type LayersApi,
-} from "@/components/pixel-canvas/use-layers";
+  useSprite,
+  type SpriteApi,
+} from "@/components/pixel-canvas/use-sprite";
+import { Timeline } from "@/components/timeline/timeline";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
@@ -48,7 +48,7 @@ const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
- * left, canvas and layers in the middle, AI chat on the right.
+ * left, canvas and timeline in the middle, AI chat on the right.
  */
 export function Editor({
   userId,
@@ -67,7 +67,7 @@ export function Editor({
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
   const fileInput = useRef<HTMLInputElement>(null);
-  const tile = useRef<LayersApi>(null);
+  const tile = useRef<SpriteApi>(null);
   const file = useTileFile({
     tile,
     fileInput,
@@ -83,10 +83,10 @@ export function Editor({
       : undefined,
   });
 
-  // Every finished change to the layers marks the tile for saving.
-  const layers = useLayers(image, file.markDirty);
+  // Every finished change to the sprite marks the tile for saving.
+  const sprite = useSprite(image, file.markDirty);
   useLayoutEffect(() => {
-    tile.current = layers;
+    tile.current = sprite;
   });
 
   // Tool colour and sizes carry over to every tile.
@@ -101,28 +101,31 @@ export function Editor({
     if (key) setPen((p) => ({ ...p, [key]: clampPenSize(p[key] + step) }));
   };
 
-  /** Selects the layer `step` rows down the Layers panel (up when negative). */
+  /** Selects the layer `step` rows down the timeline (up when negative). */
   const selectLayer = (step: 1 | -1) => {
-    const rows = panelRows(layers.tree);
-    const at = rows.findIndex((row) => row.layer.id === layers.activeId);
+    const rows = panelRows(sprite.tree);
+    const at = rows.findIndex((row) => row.layer.id === sprite.layerId);
     const row = rows[at + step];
-    if (row) layers.select(row.layer.id);
+    if (row) sprite.selectLayer(row.layer.id);
   };
 
   const commands: Record<Command, () => void> = {
     save: file.save,
     open: file.openFromComputer,
-    undo: layers.undo,
-    redo: layers.redo,
+    undo: sprite.undo,
+    redo: sprite.redo,
     zoomIn: () => setScale((s) => zoom(s, -1)),
     zoomOut: () => setScale((s) => zoom(s, 1)),
     zoomReset: () => setScale(DEFAULT_SCALE),
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
-    newLayer: () => layers.add("normal"),
+    newLayer: () => sprite.addLayer("normal"),
     clearLayer: () => {
-      if (layers.canPaint) canvas.current?.clear();
+      if (sprite.canPaint) canvas.current?.clear();
     },
+    newFrame: () => sprite.addFrame(true),
+    previousFrame: () => sprite.stepFrame(-1),
+    nextFrame: () => sprite.stepFrame(1),
     penSmaller: () => resizePen(-1),
     penBigger: () => resizePen(1),
   };
@@ -180,15 +183,15 @@ export function Editor({
               tool={tool}
               pen={pen}
               scale={scale}
-              layers={layers}
+              sprite={sprite}
               highlight={highlight}
               onPickColor={(color) => setPen((p) => ({ ...p, color }))}
             />
           </div>
         </main>
-        <LayersPanel layers={layers} />
+        <Timeline sprite={sprite} />
       </div>
-      <EditorChat canvas={canvas} layers={layers} onHighlight={setHighlight} />
+      <EditorChat canvas={canvas} sprite={sprite} onHighlight={setHighlight} />
       {opening && (
         <OpenTileDialog
           source={opening}

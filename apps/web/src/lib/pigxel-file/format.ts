@@ -2,39 +2,48 @@ import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
+import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
+import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
+import type { Cels, Frame } from "@/lib/sprite/types";
 
 /**
  * The .pigxel file format: UTF-8 JSON with the pixels as base64 RGBA.
  *
  * {
  *   "format": "pigxel",
- *   "version": 2,
+ *   "version": 3,
  *   "width": 32,
  *   "height": 32,
  *   "background": "white",
+ *   "frames": [{ "id": "…", "duration": 100 }, …],
  *   "layers": [
  *     { "id": "…", "name": "Background", "kind": "background", "visible": true,
- *       "locked": false, "opacity": 255, "blend": "normal", "pixels": "<base64>" },
+ *       "locked": false, "opacity": 255, "blend": "normal" },
  *     { "id": "…", "name": "Group 1", "kind": "group", "visible": true,
  *       "locked": false, "opacity": 255, "blend": "normal", "collapsed": false,
  *       "children": [ …layers… ] }
- *   ]
+ *   ],
+ *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64>" }, …]
  * }
  *
- * `layers` is listed bottom to top; a group lists its own layers the same
- * way. Every layer but a group has `pixels`: width × height × 4 bytes (red,
- * green, blue, alpha), row by row from the top-left. `opacity` runs 0–255 and
- * `blend` is one of the blend modes in lib/layers. `background` (default
- * "transparent") is what the eraser paints on the Background layer.
+ * `frames` are the animation in playing order, each shown for `duration`
+ * milliseconds; a still tile has one. `layers` is listed bottom to top; a
+ * group lists its own layers the same way. A cel is one layer's pixels in one
+ * frame: width × height × 4 bytes (red, green, blue, alpha), row by row from
+ * the top-left. A layer with no cel in a frame is empty there. `opacity`
+ * runs 0–255 and `blend` is one of the blend modes in lib/layers.
+ * `background` (default "transparent") is what the eraser paints on the
+ * Background layer.
  *
+ * Version 2 had no frames: every layer but a group carried its `pixels`.
  * Version 1 had only a flat list of `{ name, visible, opacity (0–1), pixels }`
- * layers; it is still read. Bump `version` whenever the shape changes, and
- * keep reading older versions.
+ * layers. Both are still read, as one frame. Bump `version` whenever the
+ * shape changes, and keep reading older versions.
  */
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 2;
+export const PIGXEL_VERSION = 3;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -49,20 +58,21 @@ export function backgroundColor(background: Background) {
       : null;
 }
 
-/** A tile: its size, its layer tree and every layer's pixels. */
+/** A tile: its size, layer tree, frames and the pixels of every cel. */
 export type PigxelDocument = {
   width: number;
   height: number;
   background: Background;
   /** Bottom to top. */
   layers: Layer[];
-  /** RGBA (width × height × 4) of every layer that isn't a group, by layer id. */
-  pixels: Map<string, Uint8ClampedArray>;
+  /** In playing order; at least one. */
+  frames: Frame[];
+  cels: Cels;
 };
 
 /**
- * A new tile: a Background layer of the chosen colour (none for a transparent
- * tile) and an empty layer above it to draw on.
+ * A new tile: one frame with a Background layer of the chosen colour (none
+ * for a transparent tile) and an empty layer above it to draw on.
  */
 export function blankDocument(
   width: number,
@@ -70,7 +80,8 @@ export function blankDocument(
   background: Background,
 ): PigxelDocument {
   const layers: Layer[] = [];
-  const pixels = new Map<string, Uint8ClampedArray>();
+  const frame = createFrame();
+  const frameCels = new Map<string, Uint8ClampedArray>();
   const color = backgroundColor(background);
   if (color) {
     const layer = createLayer("background", "Background");
@@ -79,22 +90,31 @@ export function blankDocument(
     for (let i = 0; i < data.length; i += 4)
       data.set([value, value, value, 255], i);
     layers.push(layer);
-    pixels.set(layer.id, data);
+    frameCels.set(layer.id, data);
   }
-  const layer = createLayer("normal", "Layer 1");
-  layers.push(layer);
-  pixels.set(layer.id, new Uint8ClampedArray(width * height * 4));
-  return { width, height, background, layers, pixels };
+  layers.push(createLayer("normal", "Layer 1"));
+  return {
+    width,
+    height,
+    background,
+    layers,
+    frames: [frame],
+    cels: new Map([[frame.id, frameCels]]),
+  };
 }
 
-/** The tile as one picture; references are left out, as in an export. */
+/**
+ * One frame of the tile (the first by default) as one picture; references
+ * are left out, as in an export.
+ */
 export function flattenDocument(
   doc: PigxelDocument,
   skip: LayerKind[] = ["reference"],
+  frameId = doc.frames[0]!.id,
 ): Uint8ClampedArray {
   return flatten(
     doc.layers,
-    (id) => doc.pixels.get(id),
+    (id) => celOf(doc.cels, frameId, id),
     doc.width * doc.height * 4,
     skip,
   );
@@ -108,7 +128,6 @@ type FileLayer = {
   locked: boolean;
   opacity: number;
   blend: string;
-  pixels?: string;
   collapsed?: boolean;
   children?: FileLayer[];
 };
@@ -127,15 +146,27 @@ export function serializePigxel(doc: PigxelDocument): string {
           collapsed: layer.collapsed,
           children: layer.children.map(toFile),
         }
-      : { ...base, pixels: toBase64(doc.pixels.get(layer.id)!) };
+      : base;
   };
+  const layerIds = new Set(pixelLayerIds(doc.layers));
+  const cels = doc.frames.flatMap((frame) =>
+    [...(doc.cels.get(frame.id) ?? [])]
+      .filter(([layer]) => layerIds.has(layer))
+      .map(([layer, pixels]) => ({
+        frame: frame.id,
+        layer,
+        pixels: toBase64(pixels),
+      })),
+  );
   return JSON.stringify({
     format: "pigxel",
     version: PIGXEL_VERSION,
     width: doc.width,
     height: doc.height,
     background: doc.background,
+    frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
     layers: doc.layers.map(toFile),
+    cels,
   });
 }
 
@@ -161,7 +192,6 @@ export function parsePigxel(text: string): PigxelDocument {
     );
   const background =
     BACKGROUNDS.find((b) => b === file.background) ?? "transparent";
-  const pixels = new Map<string, Uint8ClampedArray>();
   const readPixels = (value: unknown) => {
     if (typeof value !== "string") throw DAMAGED();
     let data: Uint8ClampedArray;
@@ -174,21 +204,39 @@ export function parsePigxel(text: string): PigxelDocument {
     return data;
   };
 
-  const layers =
-    file.version === 1
-      ? readVersion1(file.layers, background, readPixels, pixels)
-      : readLayers(file.layers, readPixels, pixels, new Set(), true);
+  let layers: Layer[];
+  let frames: Frame[];
+  let cels: Cels;
+  if (file.version >= 3) {
+    layers = readLayers(file.layers, new Set(), true);
+    frames = readFrames(file.frames);
+    cels = readCels(file.cels, frames, layers, readPixels);
+  } else {
+    // Older files are a single frame, with the pixels inside the layers.
+    const pixels = new Map<string, Uint8ClampedArray>();
+    const keep: OnPixelLayer = (id, entry) =>
+      pixels.set(id, readPixels(entry.pixels));
+    layers =
+      file.version === 1
+        ? readVersion1(file.layers, background, keep)
+        : readLayers(file.layers, new Set(), true, keep);
+    const frame = createFrame();
+    frames = [frame];
+    cels = new Map([[frame.id, pixels]]);
+  }
   if (!pixelLayerIds(layers).length)
     throw new PigxelFileError("This Pigxel file has no pixels.");
-  return { width, height, background, layers, pixels };
+  return { width, height, background, layers, frames, cels };
 }
+
+/** Called for each layer with pixels, with the layer's id and its file entry. */
+type OnPixelLayer = (id: string, entry: Record<string, unknown>) => void;
 
 /** Version 1: a flat list, the first layer holding the background colour. */
 function readVersion1(
   list: unknown,
   background: Background,
-  readPixels: (value: unknown) => Uint8ClampedArray,
-  pixels: Map<string, Uint8ClampedArray>,
+  onPixelLayer: OnPixelLayer,
 ): Layer[] {
   if (!Array.isArray(list)) return [];
   return list.map((entry, index) => {
@@ -200,7 +248,7 @@ function readVersion1(
       typeof entry.name === "string" ? entry.name : `Layer ${index + 1}`,
     );
     const opacity = typeof entry.opacity === "number" ? entry.opacity : 1;
-    pixels.set(layer.id, readPixels(entry.pixels));
+    onPixelLayer(layer.id, entry);
     return {
       ...layer,
       visible: entry.visible !== false,
@@ -209,13 +257,12 @@ function readVersion1(
   });
 }
 
-/** Version 2: the layer tree, checked layer by layer. */
+/** The layer tree (versions 2 and 3), checked layer by layer. */
 function readLayers(
   list: unknown,
-  readPixels: (value: unknown) => Uint8ClampedArray,
-  pixels: Map<string, Uint8ClampedArray>,
   ids: Set<string>,
   topLevel: boolean,
+  onPixelLayer?: OnPixelLayer,
 ): Layer[] {
   if (!Array.isArray(list)) throw DAMAGED();
   return list.map((entry, index): Layer => {
@@ -228,12 +275,7 @@ function readLayers(
       kind === "background" && !isBackground ? "normal" : kind,
       typeof entry.name === "string" ? entry.name.slice(0, 100) : "Layer",
     );
-    // Ids tie pixels to layers, so a missing or repeated one gets a new id.
-    const id =
-      typeof entry.id === "string" && entry.id && !ids.has(entry.id)
-        ? entry.id
-        : layer.id;
-    ids.add(id);
+    const id = uniqueId(entry.id, ids, layer.id);
     const settings = {
       id,
       visible: entry.visible !== false,
@@ -250,11 +292,52 @@ function readLayers(
         ...layer,
         ...settings,
         collapsed: entry.collapsed === true,
-        children: readLayers(entry.children, readPixels, pixels, ids, false),
+        children: readLayers(entry.children, ids, false, onPixelLayer),
       };
-    pixels.set(id, readPixels(entry.pixels));
+    onPixelLayer?.(id, entry);
     return { ...layer, ...settings };
   });
+}
+
+/** Version 3 frames: at least one, each with a duration in range. */
+function readFrames(list: unknown): Frame[] {
+  if (!Array.isArray(list) || !list.length) throw DAMAGED();
+  const ids = new Set<string>();
+  return list.map((entry) => {
+    if (!isObject(entry)) throw DAMAGED();
+    const frame = createFrame(
+      clampDuration(Number(entry.duration ?? DEFAULT_FRAME_DURATION)),
+    );
+    return { ...frame, id: uniqueId(entry.id, ids, frame.id) };
+  });
+}
+
+/** Version 3 cels; those of unknown frames or layers are left out. */
+function readCels(
+  list: unknown,
+  frames: Frame[],
+  layers: Layer[],
+  readPixels: (value: unknown) => Uint8ClampedArray,
+): Cels {
+  if (!Array.isArray(list)) throw DAMAGED();
+  const cels: Cels = new Map(frames.map((frame) => [frame.id, new Map()]));
+  const layerIds = new Set(pixelLayerIds(layers));
+  for (const entry of list) {
+    if (!isObject(entry)) throw DAMAGED();
+    const frameCels = cels.get(String(entry.frame));
+    const layer = String(entry.layer);
+    if (frameCels && layerIds.has(layer))
+      frameCels.set(layer, readPixels(entry.pixels));
+  }
+  return cels;
+}
+
+/** Ids tie cels to layers and frames, so a missing or repeated one gets `fresh`. */
+function uniqueId(value: unknown, ids: Set<string>, fresh: string) {
+  const id =
+    typeof value === "string" && value && !ids.has(value) ? value : fresh;
+  ids.add(id);
+  return id;
 }
 
 /** A safe file name ending in .pigxel. */

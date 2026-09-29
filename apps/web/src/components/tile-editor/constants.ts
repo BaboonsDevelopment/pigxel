@@ -34,6 +34,9 @@ export type Command =
   | "layerBelow"
   | "newLayer"
   | "clearLayer"
+  | "newFrame"
+  | "previousFrame"
+  | "nextFrame"
   | "penSmaller"
   | "penBigger";
 

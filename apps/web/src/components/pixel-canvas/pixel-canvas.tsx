@@ -46,7 +46,7 @@ import {
   type PenSettings,
   type Point,
 } from "./pen";
-import type { LayersApi } from "./use-layers";
+import type { SpriteApi } from "./use-sprite";
 
 type Stroke = {
   /** The tool that started the stroke: pen, brush, eraser or line. */
@@ -60,8 +60,8 @@ type Stroke = {
 
 /**
  * Lets the page work with the canvas from outside, e.g. the AI. Pixel reads
- * and writes go to the active layer; the checks for empty space and the
- * snapshots look at the whole tile.
+ * and writes go to the active cel (the active layer in the active frame); the
+ * checks for empty space and the snapshots look at the whole frame.
  */
 export type PixelCanvasHandle = {
   size: Size;
@@ -93,7 +93,7 @@ export function PixelCanvas({
   tool,
   pen,
   scale,
-  layers,
+  sprite,
   highlight,
   onPickColor,
   ref,
@@ -102,14 +102,14 @@ export function PixelCanvas({
   pen: PenSettings;
   /** Screen pixels per tile pixel. */
   scale: number;
-  layers: LayersApi;
+  sprite: SpriteApi;
   /** An area to point out, e.g. where a picture would go. */
   highlight?: Area | null;
   /** Called with the colour the pipette (or Alt+click) picked up. */
   onPickColor?: (color: string) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
-  const { size } = layers;
+  const { size } = sprite;
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -125,18 +125,19 @@ export function PixelCanvas({
   const resolveFrame = useRef<(area: Area | null) => void>(null);
   // Erasing the Background paints its colour; other layers become transparent.
   const eraseFill =
-    layers.active?.kind === "background"
-      ? backgroundColor(layers.background)
+    sprite.activeLayer?.kind === "background"
+      ? backgroundColor(sprite.background)
       : null;
 
-  // The screen shows every layer combined, references included. It repaints
-  // when a layer's pixels or settings change, not on every render.
+  // The screen shows the active frame, every layer combined, references
+  // included. It repaints when a cel, a layer or the frame changes, not on
+  // every render.
   const paintScreen = useEffectEvent(() => {
     screenRef.current
       ?.getContext("2d")
       ?.putImageData(
         new ImageData(
-          layers.composite() as Uint8ClampedArray<ArrayBuffer>,
+          sprite.composite() as Uint8ClampedArray<ArrayBuffer>,
           size.w,
           size.h,
         ),
@@ -144,7 +145,7 @@ export function PixelCanvas({
         0,
       );
   });
-  useLayoutEffect(() => paintScreen(), [layers.version, layers.tree, size]);
+  useLayoutEffect(() => paintScreen(), [sprite.version, sprite.tree, sprite.frameId, size]);
 
   const finishSelection = useCallback((area: Area | null) => {
     resolveSelection.current?.(area);
@@ -161,22 +162,23 @@ export function PixelCanvas({
   }, []);
 
   useImperativeHandle(ref, () => {
-    const ctx = () => layers.context();
+    // Reads leave an empty cel alone; writes make it first.
+    const ctx = (create = false) => sprite.context(create);
     // The tile as the AI sees it: no references, no Background.
     const content = () =>
       new ImageData(
-        layers.composite([
+        sprite.composite([
           "reference",
           "background",
         ]) as Uint8ClampedArray<ArrayBuffer>,
         size.w,
         size.h,
       );
-    const tile = () => canvasOf(layers.composite(["reference"]), size);
+    const tile = () => canvasOf(sprite.composite(["reference"]), size);
     return {
       size,
       draw(pixels, area) {
-        const c = ctx();
+        const c = ctx(true);
         if (!c) return;
         // Keep what is under the picture's transparent pixels.
         const target = c.getImageData(area.x, area.y, area.w, area.h);
@@ -184,28 +186,28 @@ export function PixelCanvas({
           if (pixels[i + 3]) target.data.set(pixels.subarray(i, i + 4), i);
         }
         c.putImageData(target, area.x, area.y);
-        layers.commit(layers.activeId);
+        sprite.commit();
       },
       read(area) {
         const image = ctx()?.getImageData(area.x, area.y, area.w, area.h);
         return image?.data ?? new Uint8ClampedArray(area.w * area.h * 4);
       },
       write(pixels, area) {
-        ctx()?.putImageData(
+        ctx(true)?.putImageData(
           new ImageData(new Uint8ClampedArray(pixels), area.w, area.h),
           area.x,
           area.y,
         );
-        layers.commit(layers.activeId);
+        sprite.commit();
       },
       clear() {
-        const c = ctx();
+        const c = ctx(true);
         if (!c) return;
         if (eraseFill) {
           c.fillStyle = eraseFill;
           c.fillRect(0, 0, size.w, size.h);
         } else c.clearRect(0, 0, size.w, size.h);
-        layers.commit(layers.activeId);
+        sprite.commit();
       },
       readTile(area) {
         const image = tile()
@@ -217,10 +219,10 @@ export function PixelCanvas({
       freeArea: () => largestEmptyArea(content()),
       snapshot: (area, background) => tileSnapshot(tile(), area, background),
       snapshotLayer(area, background) {
-        const pixels = ctx()?.getImageData(0, 0, size.w, size.h).data;
-        return pixels
-          ? tileSnapshot(canvasOf(pixels, size), area, background)
-          : "";
+        const pixels =
+          ctx()?.getImageData(0, 0, size.w, size.h).data ??
+          new Uint8ClampedArray(size.w * size.h * 4);
+        return tileSnapshot(canvasOf(pixels, size), area, background);
       },
       selectArea() {
         resolveSelection.current?.(null);
@@ -237,7 +239,7 @@ export function PixelCanvas({
         });
       },
     };
-  }, [layers, size, eraseFill]);
+  }, [sprite, size, eraseFill]);
 
   useEffect(() => {
     if (!selecting) return;
@@ -266,7 +268,7 @@ export function PixelCanvas({
   // Tools that don't lay down the pen colour show only the outline of their tip.
   const hoverOutline = tool === "pipette" || tool === "eraser";
   // Only the pipette works on a layer that can't be drawn on.
-  const blocked = !layers.canPaint && tool !== "pipette";
+  const blocked = !sprite.canPaint && tool !== "pipette";
 
   // Redraws the whole stroke, so pixel-perfect can take back a corner it already painted.
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
@@ -287,7 +289,7 @@ export function PixelCanvas({
         else ctx.fillRect(x + r.dx, y + r.dy, r.w, r.h);
       }
     }
-    layers.touched();
+    sprite.touched();
   };
 
   // The pipette picks what is seen, all layers combined.
@@ -319,7 +321,7 @@ export function PixelCanvas({
       image.data.set(rgba, i * 4);
     }
     ctx.putImageData(image, 0, 0);
-    layers.commit(layers.activeId);
+    sprite.commit();
   };
 
   const startStroke = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -329,8 +331,10 @@ export function PixelCanvas({
     // Alt+click picks a colour whatever the tool, as in Aseprite.
     if (tool === "pipette" || (e.altKey && e.button === 0))
       return pickColor(point);
-    const ctx = layers.context();
-    if (blocked || !ctx) return;
+    if (blocked) return;
+    // A layer with nothing in this frame yet gets its cel now.
+    const ctx = sprite.context(true);
+    if (!ctx) return;
     const erase = e.button === 2 || tool === "eraser";
     if (tool === "bucket") return fillAt(ctx, point, erase);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -350,7 +354,7 @@ export function PixelCanvas({
     const point = pixelAt(e);
     setHover(point);
     const current = stroke.current;
-    const ctx = layers.context();
+    const ctx = sprite.context();
     if (!current || !ctx) return;
     let points: Point[];
     if (current.tool === "line") {
@@ -372,7 +376,7 @@ export function PixelCanvas({
     if (!stroke.current) return;
     lastPoint.current = stroke.current.points.at(-1) ?? lastPoint.current;
     stroke.current = null;
-    layers.commit(layers.activeId);
+    sprite.commit();
   };
 
   const startSelect = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -406,7 +410,7 @@ export function PixelCanvas({
   const endResize = () => {
     drag.current = null;
     setPending(null);
-    if (pending && !sameSize(pending, size)) layers.resize(pending);
+    if (pending && !sameSize(pending, size)) sprite.resize(pending);
   };
 
   return (
