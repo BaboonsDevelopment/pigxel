@@ -12,19 +12,7 @@ import {
   SectionTitle,
   textLinkClassName,
 } from "@pigxel/ui/components/typography";
-
-export type FileItem = {
-  id: string;
-  name: string;
-  modified?: string;
-  /** A small image of the tile, when the place keeps one. */
-  thumbnail?: string | null;
-};
-
-type Listing =
-  | { state: "loading" }
-  | { state: "ready"; items: FileItem[] }
-  | { state: "error"; message: string };
+import type { FileItem, Listing } from "../constants";
 
 /** A list of saved tiles in one place (Pigxel cloud or Google Drive) to pick one to open. */
 export function FilesDialog({

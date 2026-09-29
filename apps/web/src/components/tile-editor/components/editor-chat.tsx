@@ -21,14 +21,12 @@ import { paintedBounds } from "@/lib/edit/raster";
 import { mergeRedraw } from "@/lib/edit/redraw";
 import { imageToPixelArt } from "@/lib/image/helpers";
 import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
-
-/** Share of an area that may already be drawn on before a new picture there counts as covering art. */
-const MAX_OVERLAP = 0.03;
+import { MAX_OVERLAP } from "../constants";
 
 /**
  * The AI chat, wired to the canvas. It pulls in the AI, editing and
  * picture-to-pixel-art code, so the editor loads it separately (see
- * tile-editor.tsx) and drawing is ready before it arrives.
+ * editor.tsx) and drawing is ready before it arrives.
  */
 export default function EditorChat({
   canvas,
