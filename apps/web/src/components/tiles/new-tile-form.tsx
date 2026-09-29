@@ -115,7 +115,7 @@ function Form({ userId, drive, driveError }: FormProps) {
     if (!draft) {
       setError(
         location
-          ? "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from Your tiles."
+          ? "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from My projects."
           : "This browser won’t keep the tile. Allow site data for Pigxel, or remove some tiles from this browser.",
       );
       setBusy(false);
