@@ -23,6 +23,7 @@ import {
 } from "@/components/pixel-canvas/use-sprite";
 import { Timeline } from "@/components/timeline/timeline";
 import { usePlayback } from "@/components/timeline/use-playback";
+import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
@@ -38,7 +39,8 @@ import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
 // Loaded on their own so the canvas is ready first: the chat brings the AI,
-// editing and picture-to-pixel-art code; the file picker opens on demand.
+// editing and picture-to-pixel-art code; the file picker and export open on
+// demand.
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
@@ -46,6 +48,7 @@ const EditorChat = dynamic(() => import("./editor-chat"), {
 const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
 });
+const ExportDialog = dynamic(() => import("./export-dialog"), { ssr: false });
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -60,6 +63,10 @@ export function Editor({
 }: EditorProps & { draft: Draft; image: PigxelDocument }) {
   const router = useRouter();
   const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [exporting, setExporting] = useState(false);
+  // Kept while the tile is open, so Export comes back with the last choices.
+  const [exportSettings, setExportSettings] =
+    useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [scale, setScale] = useState(DEFAULT_SCALE);
@@ -114,6 +121,7 @@ export function Editor({
   const commands: Record<Command, () => void> = {
     save: file.save,
     open: file.openFromComputer,
+    export: () => setExporting(true),
     undo: sprite.undo,
     redo: sprite.redo,
     zoomIn: () => setScale((s) => zoom(s, -1)),
@@ -165,6 +173,7 @@ export function Editor({
         playback={playback}
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
+        onExport={() => setExporting(true)}
       />
       <div className="col-span-3 flex min-h-12 items-center border-b bg-background px-4 py-2">
         <ToolOptions tool={tool} pen={pen} onChange={setPen} />
@@ -206,6 +215,21 @@ export function Editor({
           draftId={draft.id}
           file={file}
           onClose={() => setOpening(null)}
+        />
+      )}
+      {exporting && (
+        <ExportDialog
+          source={{
+            name: file.name,
+            size: sprite.size,
+            frames: sprite.frames,
+            frameId: sprite.frameId,
+            background: sprite.background,
+            picture: (id) => sprite.composite(["reference"], id),
+          }}
+          settings={exportSettings}
+          onChange={setExportSettings}
+          onClose={() => setExporting(false)}
         />
       )}
     </div>

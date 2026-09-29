@@ -76,6 +76,8 @@ Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/do
 
 The editor opens and saves `.pigxel` files: versioned JSON with the tile size and base64 RGBA pixels (see `apps/web/src/lib/pigxel-file/format.ts`). **Open** reads a file from the computer or Google Drive; **Save** downloads it or saves it to Google Drive. `Ctrl/⌘+S` saves back to where the tile came from, and `Ctrl/⌘+O` opens a file from the computer.
 
+**File → Export…** (`Ctrl/⌘+E`) saves the tile as a picture, scaled up by a whole number (1–20×) so pixels stay sharp: a **PNG** or **JPEG** of the frame on screen (a JPEG goes on the tile's background, white when it is transparent), a looping **GIF** of every frame with their durations, or a **sprite sheet** PNG of every frame in a row, column or grid, optionally with a JSON file in Aseprite's format that game engines read. Hidden and reference layers are left out. The code is in `apps/web/src/lib/export/`; GIFs are encoded there without a library.
+
 ### Pigxel cloud
 
 Tiles kept in **Pigxel cloud** (the default on `/tiles/new`) are stored in Supabase: the `.pigxel` file goes to the private `tiles` Storage bucket at `<user id>/<tile id>.pigxel`, and the `tiles` table holds the name, size, background and a small thumbnail for **Your tiles**. Row-level security on both limits each person to their own tiles, so the browser uses its normal session and no secret key is involved. Cloud tiles autosave like Drive ones; the editor can also move a tile between Pigxel cloud and Google Drive (**Save → Move to …**). Apply `supabase/migrations/20260928180000_tiles.sql` (SQL editor, or `supabase db push`) to create the table, bucket and policies.

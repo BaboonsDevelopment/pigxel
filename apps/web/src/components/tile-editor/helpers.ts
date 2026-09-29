@@ -35,6 +35,7 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
     if (e.altKey) return null;
     if (code === "KeyS" && !shift) return command("save");
     if (code === "KeyO" && !shift) return command("open");
+    if (code === "KeyE" && !shift) return command("export");
     if (isTyping(e.target)) return null;
     if (code === "KeyZ") return command(shift ? "redo" : "undo");
     if (code === "KeyY") return command("redo");
