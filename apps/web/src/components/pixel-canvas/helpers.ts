@@ -134,21 +134,35 @@ export function largestEmptyArea(image: ImageData): Area | null {
     : null;
 }
 
-/** An enlarged PNG of the tile on a flat background, for the AI to look at. */
-export function tileSnapshot(canvas: HTMLCanvasElement): string {
-  const k = Math.max(
-    1,
-    Math.floor(SNAPSHOT_SIDE / Math.max(canvas.width, canvas.height)),
-  );
+/**
+ * An enlarged PNG of the tile (or an `area` of it) on a flat background, for
+ * the AI to look at or redraw.
+ */
+export function tileSnapshot(
+  canvas: HTMLCanvasElement,
+  area: Area = { x: 0, y: 0, w: canvas.width, h: canvas.height },
+  background = SNAPSHOT_BACKGROUND,
+): string {
+  const k = Math.max(1, Math.floor(SNAPSHOT_SIDE / Math.max(area.w, area.h)));
   const out = document.createElement("canvas");
-  out.width = canvas.width * k;
-  out.height = canvas.height * k;
+  out.width = area.w * k;
+  out.height = area.h * k;
   const ctx = out.getContext("2d");
   if (!ctx) return "";
-  ctx.fillStyle = SNAPSHOT_BACKGROUND;
+  ctx.fillStyle = background;
   ctx.fillRect(0, 0, out.width, out.height);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(canvas, 0, 0, out.width, out.height);
+  ctx.drawImage(
+    canvas,
+    area.x,
+    area.y,
+    area.w,
+    area.h,
+    0,
+    0,
+    out.width,
+    out.height,
+  );
   return out.toDataURL("image/png");
 }
 
@@ -199,4 +213,8 @@ export function adjustFrame(
   const [x, w] = axis(start.x, start.w, dx, edges.left, edges.right, tile.w);
   const [y, h] = axis(start.y, start.h, dy, edges.top, edges.bottom, tile.h);
   return { x, y, w, h };
+}
+
+export function sameArea(a: Area, b: Area) {
+  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 }
