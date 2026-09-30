@@ -21,6 +21,7 @@ import {
   samePixels,
 } from "../helpers";
 import { toArt } from "./pictures";
+import { checkEdit } from "./review";
 
 /** New cels by frame id, written back as one undo step. */
 type Cels = Map<string, Uint8ClampedArray>;
@@ -95,7 +96,7 @@ export async function edit(chat: Chat, action: TileAction) {
   });
 
   /** Writes the new cels back and says what was done; false when it failed. */
-  const done = (cels: Cels | null, image?: string) => {
+  const done = ({ cels, image, fixed }: Made) => {
     if (!cels) return false;
     const same = [...cels].every(([frame, cel]) =>
       samePixels(cel, canvas.readCel(layerId, frame)),
@@ -109,13 +110,56 @@ export async function edit(chat: Chat, action: TileAction) {
     }
     canvas.writeCels(layerId, cels);
     const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
-    const content = (plan.value.summary || "Done.") + many;
+    const content =
+      (plan.value.summary || "Done.") +
+      many +
+      (fixed ? `\nChecked and fixed: ${fixed}` : "");
     chat.append({ role: "assistant", content, image });
     return true;
   };
-  const redrawn = async () => {
-    const result = await redraw(chat, layerId, plan.value, steps);
-    return done(result?.cels ?? null, result?.image);
+
+  /** The edit made with `instruction` in every frame. */
+  const make = async (instruction: string): Promise<Made> => {
+    const edit = { ...plan.value, instruction };
+    if (edit.mode === "ops")
+      return { cels: await editPixels(chat, layerId, edit, steps) };
+    if (edit.mode === "move") return { cels: move(chat, layerId, steps) };
+    return (await redraw(chat, layerId, edit, steps)) ?? { cels: null };
+  };
+
+  /**
+   * Makes the edit, has the frame on screen checked and, when the check
+   * finds a problem, makes it once more with a better instruction (that one
+   * is not checked again). A move copies pixels exactly, and a redraw of
+   * several frames is paid per frame, so neither is made twice.
+   */
+  const run = async () => {
+    chat.setPending(true);
+    const made = await make(plan.value.instruction);
+    const step = steps.find((s) => s.frame === current) ?? steps[0]!;
+    const after = made.cels?.get(step.frame);
+    const again =
+      plan.value.mode === "ops" ||
+      (plan.value.mode === "redraw" && steps.length === 1);
+    const review =
+      after && again
+        ? await checkEdit(chat, {
+            request: action.request,
+            instruction: plan.value.instruction,
+            layerId,
+            frame: step.frame,
+            source: step.source,
+            target: step.target,
+            after,
+          })
+        : null;
+    const remade = review ? await make(review.instruction) : null;
+    chat.setPending(false);
+    return done(
+      remade?.cels
+        ? { ...remade, fixed: review!.problem || "the result looked wrong." }
+        : made,
+    );
   };
 
   if (plan.value.mode === "redraw" && steps.length > 1) {
@@ -124,18 +168,16 @@ export async function edit(chat: Chat, action: TileAction) {
       content: `This changes ${steps.length} frames of the layer "${names.get(layerId)}", one picture each.`,
       button: {
         label: `Redraw ${steps.length} frames`,
-        run: redrawn,
+        run,
       },
     });
     return;
   }
-  chat.setPending(true);
-  if (plan.value.mode === "ops")
-    done(await editPixels(chat, layerId, plan.value, steps));
-  else if (plan.value.mode === "move") done(move(chat, layerId, steps));
-  else await redrawn();
-  chat.setPending(false);
+  await run();
 }
+
+/** An edit made in every frame (null cels when it failed). */
+type Made = { cels: Cels | null; image?: string; fixed?: string };
 
 /** Exact pixel operations in each frame (free); null when one failed. */
 async function editPixels(
@@ -204,7 +246,6 @@ async function redraw(
 ): Promise<{ cels: Cels; image: string } | null> {
   const { canvas } = chat;
   const size = canvas.size();
-  chat.setPending(true);
   const results = await Promise.all(
     steps.map((step) =>
       redrawArea(
@@ -215,7 +256,6 @@ async function redraw(
       ).catch(() => UNREACHABLE),
     ),
   );
-  chat.setPending(false);
   const pictures: string[] = [];
   for (const result of results) {
     if (!result.ok) {

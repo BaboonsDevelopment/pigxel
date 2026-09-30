@@ -1,19 +1,25 @@
 import { GRID, OPS } from "@/lib/edit/constants";
 import {
+  ANIMATION_REVIEW_RULES,
   ANIMATION_RULES,
   ASPECT_RATIOS,
   EDIT_RESPONSE_RULES,
   EDIT_CRAFT_RULES,
+  EDIT_REVIEW_RULES,
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
   MAX_FRAMES,
+  MAX_REDRAWN_FRAMES,
   MAX_TRACKS,
   PLACEMENT_RULES,
   PLAN_RULES,
+  REFERENCE_RULES,
 } from "./constants";
 import type {
+  AnimationFixes,
   AnimationPlan,
   AnimationReply,
+  AnimationReviewReply,
   AnimationTrack,
   ChatMessage,
   Rect,
@@ -24,9 +30,12 @@ export function buildImagePrompt(
   subject: string,
   width: number,
   height: number,
+  /** Whether pictures to draw from come with the prompt. */
+  withReferences = false,
 ): string {
   return [
     subject,
+    ...(withReferences ? [REFERENCE_RULES] : []),
     `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
     ...IMAGE_STYLE_RULES,
   ].join(" ");
@@ -286,6 +295,150 @@ export function buildAnimationPrompt(args: {
     `REQUEST: ${args.request}`,
     ANIMATION_RULES,
   ].join("\n\n");
+}
+
+/** Asks the checker whether an edit came out right (see EDIT_REVIEW_RULES). */
+export function buildEditReviewPrompt(request: string, instruction: string) {
+  return [
+    `REQUEST: ${request}`,
+    `INSTRUCTION GIVEN: ${instruction}`,
+    EDIT_REVIEW_RULES,
+  ].join("\n\n");
+}
+
+/** Asks the checker whether an animation works (see ANIMATION_REVIEW_RULES). */
+export function buildAnimationReviewPrompt(
+  request: string,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+) {
+  const tracks = plan.tracks
+    .map((t, i) => {
+      const frames =
+        t.kind === "sheet"
+          ? t.poses.map((p, f) => `  frame ${f + 1}: ${p || "(not seen)"}`)
+          : t.path.map(
+              (r, f) => `  frame ${f + 1}: ${r ? box(r) : "(not seen)"}`,
+            );
+      return [`${i}: ${t.kind} "${t.name}" — ${t.subject}`, ...frames].join(
+        "\n",
+      );
+    })
+    .join("\n");
+  return [
+    `Each frame is the ${width}x${height} pixel tile; frameCount ${plan.frameCount}.`,
+    `REQUEST: ${request}`,
+    `TRACKS:\n${tracks}`,
+    ANIMATION_REVIEW_RULES,
+  ].join("\n\n");
+}
+
+/**
+ * A plan sent back from the browser, fitted to the tile again with its tracks
+ * in the same places: what a check reads of it.
+ */
+export function refitPlan(
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationPlan {
+  const count = Math.round(Number(plan.frameCount));
+  const frameCount = Number.isFinite(count)
+    ? Math.max(2, Math.min(MAX_FRAMES, count))
+    : 2;
+  const perFrame = <T>(list: T[], fit: (item: T | undefined) => T) =>
+    Array.from({ length: frameCount }, (_, i) =>
+      fit(Array.isArray(list) ? list[i] : undefined),
+    );
+  const text = (value: unknown, max: number) =>
+    String(value ?? "").slice(0, max);
+  const tracks = plan.tracks.slice(0, MAX_TRACKS).map((t): AnimationTrack => {
+    const name = text(t.name, 40);
+    const subject = text(t.subject, 300);
+    return t.kind === "prop"
+      ? {
+          kind: "prop",
+          name,
+          subject,
+          copy: null,
+          grab: null,
+          path: perFrame(t.path, (r) =>
+            r ? clampRect(r, width, height) : null,
+          ),
+        }
+      : {
+          kind: "sheet",
+          name,
+          subject,
+          reuse: null,
+          box: clampRect(t.box, width, height),
+          poses: perFrame(t.poses, (p) => text(p, 200)),
+        };
+  });
+  return { name: "", frameCount, duration: 0, tracks, summary: "" };
+}
+
+/**
+ * The checker's answer as fixes that fit the plan: an order only for a sheet,
+ * as frame indexes where it is seen (identity dropped); redraws of frames it is
+ * seen in, at most MAX_REDRAWN_FRAMES in all; a path only for a prop, one box
+ * inside the tile per frame. An answer saying all is fine gives no fixes.
+ */
+export function clampAnimationFixes(
+  reply: AnimationReviewReply,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationFixes {
+  if (reply.ok) return { problem: "", tracks: [] };
+  const n = plan.frameCount;
+  let redraws = MAX_REDRAWN_FRAMES;
+  const done = new Set<number>();
+  const tracks = reply.fixes.flatMap((fix): AnimationFixes["tracks"] => {
+    const track = plan.tracks[fix.track];
+    if (!track || done.has(fix.track)) return [];
+    done.add(fix.track);
+    if (track.kind === "prop") {
+      const path =
+        Array.isArray(fix.path) && fix.path.length === n
+          ? fix.path.map((r) =>
+              r && r.visible !== false && r.w > 0 && r.h > 0
+                ? clampRect(r, width, height)
+                : null,
+            )
+          : null;
+      return path?.some(Boolean)
+        ? [{ track: fix.track, order: null, redraw: [], path }]
+        : [];
+    }
+    const seen = (f: number) => Number.isInteger(f) && !!track.poses[f];
+    const asked = Array.isArray(fix.order) && fix.order.length === n;
+    const order = Array.from({ length: n }, (_, i) =>
+      asked && seen(i) && seen(fix.order[i]! - 1) ? fix.order[i]! - 1 : i,
+    );
+    const redraw = (Array.isArray(fix.redraw) ? fix.redraw : [])
+      .map((r) => ({
+        frame: r.frame - 1,
+        pose: String(r.pose ?? "").trim() || track.poses[r.frame - 1] || "",
+      }))
+      .filter((r, i, all) => {
+        const first = all.findIndex((o) => o.frame === r.frame) === i;
+        return seen(r.frame) && first && redraws-- > 0;
+      });
+    const reordered = order.some((f, i) => f !== i);
+    return reordered || redraw.length
+      ? [
+          {
+            track: fix.track,
+            order: reordered ? order : null,
+            redraw,
+            path: null,
+          },
+        ]
+      : [];
+  });
+  return { problem: tracks.length ? reply.problem : "", tracks };
 }
 
 /**

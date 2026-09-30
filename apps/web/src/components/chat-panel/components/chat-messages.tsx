@@ -33,6 +33,19 @@ export function ChatMessages({
           }
         >
           {message.content}
+          {message.role === "user" && message.references && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {message.references.map((reference, r) => (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimize
+                <img
+                  key={r}
+                  src={reference}
+                  alt={`Reference ${r + 1}`}
+                  className="size-16 rounded-md object-cover"
+                />
+              ))}
+            </div>
+          )}
           {message.placements && (
             <div className="mt-2 flex flex-col gap-1.5">
               {message.placements.map((placement) => (

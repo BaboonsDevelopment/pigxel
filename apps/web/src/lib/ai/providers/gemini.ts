@@ -15,7 +15,9 @@ import { fetchWithin, tryModels } from "../fallback";
 import {
   INTENTS,
   readAnimation,
+  readAnimationReview,
   readEdit,
+  readEditReview,
   readPlacement,
   readPlan,
   readRect,
@@ -74,8 +76,12 @@ export function createGeminiProvider(
       delays,
     );
 
-  /** A JSON answer to `prompt` about the picture `tile`, shaped by `schema`. */
-  const look = async (prompt: string, tile: GeneratedImage, schema: object) =>
+  /** A JSON answer to `prompt` about the pictures, shaped by `schema`. */
+  const look = async (
+    prompt: string,
+    pictures: GeneratedImage | GeneratedImage[],
+    schema: object,
+  ) =>
     textOf(
       await request(models.text, {
         contents: [
@@ -83,7 +89,9 @@ export function createGeminiProvider(
             role: "user",
             parts: [
               { text: prompt },
-              { inlineData: { mimeType: tile.mimeType, data: tile.base64 } },
+              ...[pictures].flat().map((p) => ({
+                inlineData: { mimeType: p.mimeType, data: p.base64 },
+              })),
             ],
           },
         ],
@@ -158,8 +166,17 @@ export function createGeminiProvider(
       return readEdit(textOf(parts));
     },
 
-    generate: (prompt, aspectRatio, small = true) =>
-      draw([{ text: prompt }], aspectRatio, small),
+    generate: (prompt, aspectRatio, small = true, references = []) =>
+      draw(
+        [
+          { text: prompt },
+          ...references.map((p) => ({
+            inlineData: { mimeType: p.mimeType, data: p.base64 },
+          })),
+        ],
+        aspectRatio,
+        small,
+      ),
 
     redraw: (prompt, picture, aspectRatio, small = true) =>
       draw(
@@ -237,6 +254,42 @@ export function createGeminiProvider(
         }),
       );
       return readAnimation(text);
+    },
+
+    async reviewEdit(prompt, before, after) {
+      const text = await look(
+        prompt,
+        [before, after],
+        object({ ok: BOOLEAN, problem: STRING, instruction: STRING }),
+      );
+      return readEditReview(text);
+    },
+
+    async reviewAnimation(prompt, frames) {
+      const text = await look(
+        prompt,
+        frames,
+        object({
+          ok: BOOLEAN,
+          problem: STRING,
+          fixes: {
+            type: "ARRAY",
+            items: object({
+              track: INTEGER,
+              order: { type: "ARRAY", items: INTEGER },
+              redraw: {
+                type: "ARRAY",
+                items: object({ frame: INTEGER, pose: STRING }),
+              },
+              path: {
+                type: "ARRAY",
+                items: object({ ...RECT.properties, visible: BOOLEAN }),
+              },
+            }),
+          },
+        }),
+      );
+      return readAnimationReview(text);
     },
   };
 }
