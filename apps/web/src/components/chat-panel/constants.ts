@@ -18,6 +18,14 @@ export type LayerInfo = {
   box: Area | null;
 };
 
+/**
+ * The full-size picture from the AI that a layer's drawing was made from:
+ * edits start from it, not from the small pixel version, so they keep the
+ * detail. `area` is where it was put; `box` what was drawn then, to tell
+ * whether the layer was changed since (then the picture no longer fits).
+ */
+export type PictureSource = { image: string; area: Area; box: Area | null };
+
 /** A separate drawn thing in the current frame, and the layer it is on. */
 export type TileObject = { area: Area; layerId: string };
 
@@ -55,17 +63,29 @@ export type CanvasBridge = {
     layerId: string,
     frameId: string,
     area: Area,
-    background: string,
+    /** Null keeps it transparent. */
+    background: string | null,
   ) => string;
   /**
    * Adds a layer called `name` showing `pixels` in every frame. With
    * `replace`, the other drawing layers are hidden (not deleted), so the new
    * picture takes the place of what was drawn.
    */
-  addLayer: (name: string, pixels: Uint8ClampedArray, replace: boolean) => void;
+  addLayer: (
+    name: string,
+    pixels: Uint8ClampedArray,
+    replace: boolean,
+  ) => string;
+  /**
+   * Moves what a layer shows inside `area` to a new layer called `name`
+   * above it, as one undo step; returns the new layer's id.
+   */
+  cutToLayer: (layerId: string, area: Area, name: string) => string;
   addAnimation: (spec: AnimationSpec) => void;
   /** Starts playing the animation. */
   play: () => void;
+  /** Takes back the last change, as Ctrl+Z; false when there is none. */
+  undo: () => boolean;
   selectArea: () => Promise<Area | null>;
   /** Lets the user move and resize a proposed area; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
@@ -98,6 +118,8 @@ export type Chat = {
   say: (content: string) => void;
   setPending: (pending: boolean) => void;
   setError: (error: string | null) => void;
+  /** The pictures layers were made from, by layer id. */
+  sources: Map<string, PictureSource>;
 };
 
 export const UNREACHABLE = {

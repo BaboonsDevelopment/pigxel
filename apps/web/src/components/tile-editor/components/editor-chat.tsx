@@ -119,15 +119,18 @@ function createBridge(
     addLayer(name, pixels, replace) {
       // Something new that doesn't move is there in every frame.
       const cels = new Map(sprite().frames.map((f) => [f.id, pixels]));
-      sprite().addLayer("normal", {
+      return sprite().addLayer("normal", {
         name,
         cels,
         reuseEmpty: true,
         hideOthers: replace,
       });
     },
+    cutToLayer: (layerId, area, name) =>
+      sprite().cutToLayer(layerId, area, name),
     addAnimation: (spec) => sprite().addAnimation(spec),
     play: () => latest().playback.play(),
+    undo: () => sprite().undo(),
     selectArea: async () => (await canvas()?.selectArea()) ?? null,
     adjustArea: async (area) => (await canvas()?.adjustArea(area)) ?? null,
     highlight: (area) => latest().onHighlight(area),

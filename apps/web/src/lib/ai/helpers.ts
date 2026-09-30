@@ -12,22 +12,31 @@ import {
 } from "./constants";
 import type {
   AnimationPlan,
+  Backdrop,
   AnimationReply,
   AnimationTrack,
   ChatMessage,
   Rect,
 } from "./types";
 
-/** Wraps a subject description in the pixel-art style rules for a grid size. */
+/**
+ * Asks for a new sprite the way a sprite sheet frame is asked for: a game
+ * sprite of the target size, drawn smaller than the picture with space
+ * around it. That gives crisp small pixels and detail; a sprite told to fill
+ * the whole picture comes out as a blurry mosaic of huge pixels. The empty
+ * space is cropped off afterwards (see lib/image/pipeline.ts).
+ */
 export function buildImagePrompt(
   subject: string,
   width: number,
   height: number,
+  backdrop: Backdrop,
 ): string {
   return [
-    subject,
-    `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
+    `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
+    `It is a ${width}x${height} pixel sprite drawn with small crisp pixels, centred on the picture with empty space around it.`,
     ...IMAGE_STYLE_RULES,
+    ...IMAGE_BACKGROUND_RULES[backdrop],
   ].join(" ");
 }
 
@@ -114,21 +123,43 @@ export function buildEditUserMessage(grid: string, request: string): string {
 
 /**
  * Asks the image model to redraw a picture of the edited object for the
- * target grid. It gets the same pixel style and magenta-background rules as a
- * new picture, so the result goes through the same pipeline into pixels.
+ * target grid. It gets the same pixel style and background rules as a new
+ * picture, so the result goes through the same pipeline into pixels.
  */
 export function buildRedrawPrompt(
   instruction: string,
   width: number,
   height: number,
+  backdrop: Backdrop,
+  {
+    masked = false,
+    enlarged = false,
+  }: {
+    /** Only a marked part of the picture may change. */
+    masked?: boolean;
+    /** The picture is a small sprite shown enlarged, in big blocky pixels. */
+    enlarged?: boolean;
+  } = {},
 ): string {
   return [
-    `Redraw this pixel art sprite as a ${width}x${height} pixel sprite: ${instruction}.`,
-    "Keep its design, colours, outline, proportions and pose exactly as they are",
-    "unless the instruction changes them. The subject fills the frame.",
-    IMAGE_STYLE_RULES[0],
-    ...IMAGE_BACKGROUND_RULES,
-  ].join(" ");
+    `Edit this pixel art sprite (${width}x${height} pixels): ${instruction}.`,
+    masked
+      ? "Change only the masked region; every pixel outside it stays exactly as it is."
+      : "",
+    // Copying the blocks of an enlarged sprite gives a coarse, smeared
+    // mosaic; asked for fine pixels, the model draws in the quality of a new
+    // picture, and the result is brought back to the sprite's size anyway.
+    enlarged
+      ? "The picture is a small sprite shown enlarged in big blocky pixels. Draw the result as a detailed game sprite with small crisp pixels, not big blocks, keeping its design, colours and framing."
+      : "Make the requested change clearly visible, in the same pixel art style.",
+    "Everything the instruction does not mention stays exactly as it is: same design,",
+    "colours, outline, proportions and pose, at the same place and the same size.",
+    "Keep the framing of the picture: the sprite fills it exactly as in the original.",
+    ...IMAGE_STYLE_RULES.slice(0, 4),
+    ...IMAGE_BACKGROUND_RULES[backdrop],
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
@@ -234,6 +265,7 @@ export function buildSheetPrompt(args: {
   cellH: number;
   layout: SheetLayout;
   fromReference: boolean;
+  backdrop: Backdrop;
 }): string {
   const { cols, rows } = args.layout;
   const frames = args.poses.map((pose, i) => `${i + 1}. ${pose}`).join(" ");
@@ -246,8 +278,8 @@ export function buildSheetPrompt(args: {
     `Frames: ${frames}`,
     args.poses.length < cols * rows ? "Leave the remaining cells empty." : "",
     "No grid lines, no numbers, no labels.",
-    ...IMAGE_STYLE_RULES.slice(0, 3),
-    ...IMAGE_BACKGROUND_RULES,
+    ...IMAGE_STYLE_RULES.slice(0, 4),
+    ...IMAGE_BACKGROUND_RULES[args.backdrop],
   ]
     .filter(Boolean)
     .join(" ");
@@ -260,6 +292,9 @@ export function buildAnimationPrompt(args: {
   height: number;
   /** Drawn layers, with the box of what is drawn in the current frame. */
   layers: { name: string; box: Rect | null }[];
+  /** Separate drawn things in the current frame, and the layer each is on. */
+  objects: Rect[];
+  objectLayers: string[];
   frames: number;
 }): string {
   const layers = args.layers.length
@@ -273,6 +308,7 @@ export function buildAnimationPrompt(args: {
   return [
     `The picture is a ${args.width}x${args.height} pixel art tile, shown enlarged; light grey means empty.`,
     `LAYERS (what is already drawn):\n${layers}`,
+    `OBJECTS (separate drawn things, in tile pixels):\n${objectList(args.objects, args.objectLayers)}`,
     `FRAMES: ${args.frames || "(not said)"}`,
     `REQUEST: ${args.request}`,
     ANIMATION_RULES,
@@ -291,6 +327,7 @@ export function clampAnimationPlan(
   height: number,
   layerCount: number,
   asked: number,
+  objectCount: number,
 ): AnimationPlan {
   const count = Math.round(Number(asked || reply.frameCount));
   const frameCount = Number.isFinite(count)
@@ -309,7 +346,21 @@ export function clampAnimationPlan(
       const path = perFrame(t.path, null).map((r) =>
         r && r.visible !== false ? clampRect(r, width, height) : null,
       );
-      return path.some(Boolean) ? [{ kind: "prop", name, subject, path }] : [];
+      const layer =
+        Number.isInteger(t.reuse) && t.reuse >= 0 && t.reuse < layerCount
+          ? t.reuse
+          : null;
+      const grab =
+        t.grab?.w > 0 && t.grab.h > 0
+          ? { layer, area: clampRect(t.grab, width, height) }
+          : null;
+      const copy =
+        !grab && Number.isInteger(t.copy) && t.copy >= 0 && t.copy < objectCount
+          ? t.copy
+          : null;
+      return path.some(Boolean)
+        ? [{ kind: "prop", name, subject, copy, grab, path }]
+        : [];
     }
     const poses = perFrame(t.poses, "").map((p) => String(p).trim());
     if (!poses.some(Boolean) || !t.box) return [];

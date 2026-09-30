@@ -9,7 +9,7 @@ import * as frameList from "@/lib/sprite/frames";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
-import { MAX_UNDO, type Size } from "./constants";
+import { MAX_UNDO, type Area, type Size } from "./constants";
 
 /** Layer settings the panel can change. */
 export type LayerPatch = Partial<
@@ -236,11 +236,13 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     onChange();
   };
 
+  /** Takes back the last change; false when there is none. */
   const undo = () => {
     const back = history.undo(past.current);
-    if (!back) return;
+    if (!back) return false;
     restore(back.present);
     past.current = back;
+    return true;
   };
 
   const redo = () => {
@@ -294,6 +296,40 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     putCels(layer.id, pixels);
     setLayerId(layer.id);
     changeTree(next);
+    return layer.id;
+  };
+
+  /**
+   * Moves what `id` shows inside `area` (in every frame it has a cel) to a
+   * new layer called `name` right above it, in one undo step; returns the
+   * new layer's id.
+   */
+  const cutToLayer = (id: string, area: Area, name: string) => {
+    const layer = layerTree.createLayer("normal", name);
+    const inside = (i: number) => {
+      const x = (i / 4) % size.w;
+      const y = Math.floor(i / 4 / size.w);
+      return (
+        x >= area.x && y >= area.y && x < area.x + area.w && y < area.y + area.h
+      );
+    };
+    for (const frame of frames) {
+      const pixels = cels.pixels(frame.id, id);
+      if (!pixels) continue;
+      const cut = new Uint8ClampedArray(pixels.length);
+      const kept = new Uint8ClampedArray(pixels);
+      for (let i = 0; i < pixels.length; i += 4)
+        if (inside(i)) {
+          cut.set(pixels.subarray(i, i + 4), i);
+          kept.fill(0, i, i + 4);
+        }
+      putCels(layer.id, [[frame.id, cut]]);
+      putCels(id, [[frame.id, kept]]);
+    }
+    setLayerId(layer.id);
+    changeTree(
+      layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, id)),
+    );
     return layer.id;
   };
 
@@ -446,6 +482,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
+    cutToLayer,
     addAnimation,
     selectLayer: setLayerId,
     addLayer,

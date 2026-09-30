@@ -7,10 +7,15 @@ import {
   objectMask,
 } from "@/lib/edit/objects";
 import { applyOps, parseOps } from "@/lib/edit/ops";
-import { mergeRedraw } from "@/lib/edit/redraw";
+import {
+  alignToOriginal,
+  mergeRedraw,
+  paletteOf,
+  snapToPalette,
+} from "@/lib/edit/redraw";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { imageToPixelArt } from "@/lib/image/helpers";
-import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
+import { GENERATED_PICTURE_STEPS, type Step } from "@/lib/image/pipeline";
 
 /**
  * Pure changes to a cel (full-tile RGBA of `size`) that the AI flows make:
@@ -18,11 +23,47 @@ import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
  * which cels to change and write them all back as one undo step.
  */
 
-/** A picture from the AI (a data URL), turned into pixel art at the area's size. */
-export async function toArt(dataUrl: string, area: Size): Promise<Bitmap> {
+/**
+ * A picture from the AI (a data URL), turned into pixel art at the area's
+ * size: a new picture (cropped to its subject) or a redraw (kept as framed).
+ */
+export async function toArt(
+  dataUrl: string,
+  area: Size,
+  steps: Step[] = GENERATED_PICTURE_STEPS,
+): Promise<Bitmap> {
   const image = await (await fetch(dataUrl)).blob();
-  return imageToPixelArt(image, area.w, area.h, GENERATED_PICTURE_STEPS);
+  return imageToPixelArt(image, area.w, area.h, steps);
 }
+
+/**
+ * A picture made smaller (at most `side` pixels a side) as a PNG data URL,
+ * so it can be sent back to the AI as a reference. Browser only.
+ */
+export async function shrinkPicture(
+  dataUrl: string,
+  side: number,
+): Promise<string> {
+  const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+  try {
+    const k = Math.min(1, side / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * k);
+    canvas.height = Math.round(bitmap.height * k);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return dataUrl;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  } finally {
+    bitmap.close();
+  }
+}
+
+/** Whether two areas are the same, or both missing. */
+export const sameBox = (a: Area | null, b: Area | null) =>
+  a === b ||
+  (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
 
 /** An empty cel. */
 export const emptyCel = (size: Size): Uint8ClampedArray =>
@@ -51,6 +92,9 @@ export function drawnBox(cel: Uint8ClampedArray, size: Size): Area | null {
   return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/** Which drawn things an edit is about: those it changes and those it keeps. */
+export type EditScope = { changing: Area[]; keep: Area[] };
+
 /**
  * Pixels an edit of `area` may not change: neighbours reaching into it and
  * the objects the plan said to keep.
@@ -59,37 +103,41 @@ function protectedMask(
   cel: Uint8ClampedArray,
   size: Size,
   area: Area,
-  keep: Area[],
+  { changing, keep }: EditScope,
 ) {
-  const mask = neighbourMask(cel, size.w, size.h, area);
+  const mask = neighbourMask(cel, size.w, size.h, area, changing);
   objectMask(cel, size.w, size.h, keep).forEach((k, i) => k && (mask[i] = 1));
   return mask;
 }
 
 /**
  * Runs a precise edit's operations inside `area`; drawings that only reach
- * into it (a neighbour's edge) and the objects in `keep` stay as they are.
+ * into it (a neighbour's edge) and the objects kept stay as they are.
  */
 export function applyEdit(
   cel: Uint8ClampedArray,
   size: Size,
   edit: { ops: string[]; palette: Record<string, string> },
   area: Area,
-  keep: Area[],
+  scope: EditScope,
 ): { cel: Uint8ClampedArray; applied: number } {
   const { ops } = parseOps(edit.ops);
   const result = applyOps(cel, size.w, ops, edit.palette, area);
-  const mask = protectedMask(cel, size, area, keep);
+  const mask = protectedMask(cel, size, area, scope);
   return { cel: keepMasked(cel, result.pixels, mask), applied: result.applied };
 }
 
-/** Puts a redrawn picture of `area` back, changing only what differs. */
+/**
+ * Puts a redrawn picture of `area` back, in the art's own colours and
+ * changing only what differs, and nothing outside `only`.
+ */
 export function applyRedraw(
   cel: Uint8ClampedArray,
   size: Size,
   art: Bitmap,
   area: Area,
-  keep: Area[],
+  scope: EditScope,
+  only: Area = area,
 ): Uint8ClampedArray {
   const after = new Uint8ClampedArray(cel);
   const current = new Uint8ClampedArray(area.w * area.h * 4);
@@ -97,12 +145,26 @@ export function applyRedraw(
     const from = ((area.y + y) * size.w + area.x) * 4;
     current.set(cel.subarray(from, from + area.w * 4), y * area.w * 4);
   }
-  const merged = mergeRedraw(current, art.rgba);
+  const redrawn = snapToPalette(
+    alignToOriginal(current, art.rgba, area.w, area.h),
+    paletteOf(cel),
+  );
+  const merged = mergeRedraw(current, redrawn);
   for (let y = 0; y < area.h; y++) {
     const row = merged.subarray(y * area.w * 4, (y + 1) * area.w * 4);
     after.set(row, ((area.y + y) * size.w + area.x) * 4);
   }
-  return keepMasked(cel, after, protectedMask(cel, size, area, keep));
+  const mask = protectedMask(cel, size, area, scope);
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++)
+      if (
+        x < only.x ||
+        y < only.y ||
+        x >= only.x + only.w ||
+        y >= only.y + only.h
+      )
+        mask[y * size.w + x] = 1;
+  return keepMasked(cel, after, mask);
 }
 
 /**
@@ -118,7 +180,7 @@ export function replaceObject(
   target: Area,
 ): Uint8ClampedArray {
   const { rest } = liftObjectsInside(cel, size.w, size.h, source);
-  return paint(rest, size, art.rgba, target);
+  return paint(rest, size, snapToPalette(art.rgba, paletteOf(cel)), target);
 }
 
 /** Moves the drawings inside `source` so its corner lands on `to`, pixel for pixel. */
@@ -182,4 +244,11 @@ export function unionOf(areas: Area[]): Area | null {
   const right = Math.max(...areas.map((a) => a.x + a.w));
   const bottom = Math.max(...areas.map((a) => a.y + a.h));
   return { x, y, w: right - x, h: bottom - y };
+}
+
+/** Whether two cels hold exactly the same pixels. */
+export function samePixels(a: Uint8ClampedArray, b: Uint8ClampedArray) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

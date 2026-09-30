@@ -1,4 +1,8 @@
-import { MAX_OBJECTS, MIN_OBJECT_PIXELS } from "./constants";
+import {
+  MAX_OBJECTS,
+  MIN_OBJECT_PIXELS,
+  PART_OF_EDIT_SHARE,
+} from "./constants";
 import type { Rect } from "./raster";
 
 /** A separate drawn thing: its box and the numbers of its pixels. */
@@ -90,24 +94,35 @@ export function liftObjectsInside(
   return { rest, lifted };
 }
 
+const sameBox = (a: Rect, b: Rect) =>
+  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+/** Share of `box` that lies inside `area`. */
+function shareInside(box: Rect, area: Rect) {
+  const w = Math.min(box.x + box.w, area.x + area.w) - Math.max(box.x, area.x);
+  const h = Math.min(box.y + box.h, area.y + area.h) - Math.max(box.y, area.y);
+  return w > 0 && h > 0 ? (w * h) / (box.w * box.h) : 0;
+}
+
 /**
- * Marks the pixels of drawn things that reach into `area` without lying fully
- * inside it: neighbours an edit of `area` must leave exactly as they are.
+ * Marks the pixels of drawn things that only reach into `area`: neighbours
+ * an edit of `area` must leave exactly as they are. Things lying mostly
+ * inside it (an orb sticking out a little) and those whose boxes are in
+ * `changing` (a character whose held orb is edited) belong to the edit and
+ * may change.
  */
 export function neighbourMask(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
   area: Rect,
+  changing: Rect[] = [],
 ): Uint8Array {
   const mask = new Uint8Array(width * height);
-  const touches = (b: Rect) =>
-    b.x < area.x + area.w &&
-    b.x + b.w > area.x &&
-    b.y < area.y + area.h &&
-    b.y + b.h > area.y;
   for (const c of components(pixels, width, height)) {
-    if (inside(c.box, area) || !touches(c.box)) continue;
+    const share = shareInside(c.box, area);
+    if (share === 0 || share >= PART_OF_EDIT_SHARE) continue;
+    if (changing.some((r) => sameBox(r, c.box))) continue;
     for (const i of c.members) mask[i] = 1;
   }
   return mask;

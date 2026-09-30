@@ -3,6 +3,7 @@ import {
   CHAT_PROMPT,
   IMAGE_RETRY_DELAYS_MS,
   OPENAI_BASE_URL,
+  OPENAI_HIGH_FIDELITY_MODELS,
   OPENAI_IMAGE_SIZES,
   OPENAI_IMAGE_TIMEOUT_MS,
   ROUTER_PROMPT,
@@ -42,8 +43,8 @@ type Completion = {
 
 export function createOpenAiProvider(
   apiKey: string,
-  /** Models to try in order, for text and for pictures. */
-  models: { text: string[]; image: string[] },
+  /** Models to try in order: for talk, for plans and pixel edits, for pictures. */
+  models: { text: string[]; smart: string[]; image: string[] },
   /** gpt-image quality: low, medium or high. */
   quality: string,
 ): AiProvider {
@@ -58,10 +59,14 @@ export function createOpenAiProvider(
     throw errorForStatus("OpenAI", res.status, detail);
   };
 
-  /** The model's answer; with `schema`, JSON in exactly that shape. */
-  const complete = (messages: Message[], schema?: object) =>
+  /** The answer of one of `candidates`; with `schema`, JSON in exactly that shape. */
+  const complete = (
+    candidates: string[],
+    messages: Message[],
+    schema?: object,
+  ) =>
     tryModels(
-      models.text,
+      candidates,
       async (model) => {
         const res = await fetchWithin(
           `${OPENAI_BASE_URL}/chat/completions`,
@@ -92,6 +97,7 @@ export function createOpenAiProvider(
   /** A JSON answer to `prompt` about the picture `tile`, shaped by `schema`. */
   const look = (prompt: string, tile: GeneratedImage, schema: object) =>
     complete(
+      models.smart,
       [
         {
           role: "user",
@@ -107,11 +113,18 @@ export function createOpenAiProvider(
       schema,
     );
 
-  /** Draws `prompt`, or changes `picture` as it says. */
+  /** A picture as an uploaded PNG file. */
+  const file = (picture: GeneratedImage) =>
+    new Blob([Buffer.from(picture.base64, "base64")], {
+      type: picture.mimeType,
+    });
+
+  /** Draws `prompt`, or changes `picture` (only where `mask` is clear) as it says. */
   const draw = (
     prompt: string,
     aspectRatio: string,
     picture?: GeneratedImage,
+    mask?: GeneratedImage,
   ): Promise<GeneratedImage> =>
     tryModels(
       models.image,
@@ -124,13 +137,11 @@ export function createOpenAiProvider(
           form.append("prompt", prompt);
           form.append("size", size);
           form.append("quality", quality);
-          form.append(
-            "image",
-            new Blob([Buffer.from(picture.base64, "base64")], {
-              type: picture.mimeType,
-            }),
-            "picture.png",
-          );
+          form.append("background", "transparent");
+          form.append("image", file(picture), "picture.png");
+          if (mask) form.append("mask", file(mask), "mask.png");
+          if (OPENAI_HIGH_FIDELITY_MODELS.includes(model))
+            form.append("input_fidelity", "high");
           res = await fetchWithin(
             `${OPENAI_BASE_URL}/images/edits`,
             { method: "POST", headers: { authorization }, body: form },
@@ -142,7 +153,15 @@ export function createOpenAiProvider(
             {
               method: "POST",
               headers: { authorization, "content-type": "application/json" },
-              body: JSON.stringify({ model, prompt, size, quality, n: 1 }),
+              body: JSON.stringify({
+                model,
+                prompt,
+                size,
+                quality,
+                background: "transparent",
+                output_format: "png",
+                n: 1,
+              }),
             },
             OPENAI_IMAGE_TIMEOUT_MS,
           );
@@ -159,9 +178,11 @@ export function createOpenAiProvider(
 
   return {
     aspectRatios: Object.keys(OPENAI_IMAGE_SIZES),
+    backdrop: "transparent",
 
     async route(messages) {
       const text = await complete(
+        models.text,
         [{ role: "system", content: ROUTER_PROMPT }, ...messages],
         object({
           intent: { type: "string", enum: [...INTENTS] },
@@ -176,10 +197,14 @@ export function createOpenAiProvider(
     },
 
     chat: (messages) =>
-      complete([{ role: "system", content: CHAT_PROMPT }, ...messages]),
+      complete(models.text, [
+        { role: "system", content: CHAT_PROMPT },
+        ...messages,
+      ]),
 
     async edit(system, user) {
       const text = await complete(
+        models.smart,
         [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -191,8 +216,8 @@ export function createOpenAiProvider(
 
     generate: (prompt, aspectRatio) => draw(prompt, aspectRatio),
 
-    redraw: (prompt, picture, aspectRatio) =>
-      draw(prompt, aspectRatio, picture),
+    redraw: (prompt, picture, aspectRatio, mask) =>
+      draw(prompt, aspectRatio, picture, mask),
 
     async compose(prompt, tile) {
       return readRect(await look(prompt, tile, RECT));
@@ -220,6 +245,7 @@ export function createOpenAiProvider(
           mode: { type: "string", enum: ["ops", "move", "redraw"] },
           objects: array(INTEGER),
           keep: array(INTEGER),
+          area: RECT,
           target: RECT,
           instruction: STRING,
           summary: STRING,
@@ -245,6 +271,8 @@ export function createOpenAiProvider(
               subject: STRING,
               reuse: INTEGER,
               box: RECT,
+              copy: INTEGER,
+              grab: RECT,
               poses: array(STRING),
               path: array(object({ ...RECT.properties, visible: BOOLEAN })),
             }),
