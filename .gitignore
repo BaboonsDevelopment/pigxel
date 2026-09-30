@@ -13,3 +13,6 @@ supabase/.temp/
 supabase/.branches/
 .pnpm-store/
 .claude/settings.local.json
+
+# Visual Studio
+.vs/

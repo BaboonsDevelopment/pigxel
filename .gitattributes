@@ -1,0 +1,3 @@
+# Keep LF line endings on every OS, as Prettier expects (Windows would
+# otherwise check files out with CRLF when core.autocrlf is on).
+* text=auto eol=lf
