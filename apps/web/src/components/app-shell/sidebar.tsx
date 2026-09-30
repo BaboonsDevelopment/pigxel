@@ -7,16 +7,15 @@ import type { ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Profile } from "@/lib/auth/session";
 import pig from "../../../public/art/pigxel-mascot-sitting.png";
+import { AccountMenu } from "./account-menu";
 import {
   BookIcon,
-  ChevronRightIcon,
   FolderIcon,
   HomeIcon,
-  SettingsIcon,
   SparklesIcon,
   TelescopeIcon,
 } from "./icons";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
+import { PatchNotesCard } from "./patch-notes-card";
 import { SidebarScene } from "./sidebar-scene";
 
 type NavItem = {
@@ -42,19 +41,13 @@ const MAIN: NavItem[] = [
   },
   { label: "Explore", icon: <TelescopeIcon /> },
   { label: "AI Studio", icon: <SparklesIcon /> },
-];
-
-const FOOTER: NavItem[] = [
   { label: "Tutorials", icon: <BookIcon /> },
-  {
-    label: "Settings",
-    icon: <SettingsIcon />,
-    href: "/settings",
-    match: (p) => p === "/settings" || p.startsWith("/settings/"),
-  },
 ];
 
-/** The app’s navigation: logo, pages, a pixel landscape and the account. */
+/**
+ * The app’s navigation: logo, pages, a pixel landscape, the latest patch
+ * notes and the account (Profile, Settings, Sign out).
+ */
 export function Sidebar({
   profile,
   onNavigate,
@@ -93,22 +86,12 @@ export function Sidebar({
 
       <SidebarScene />
 
-      <ul className="space-y-1 px-3 pt-2 pb-3">{FOOTER.map(item)}</ul>
+      <PatchNotesCard
+        active={path === "/patch-notes"}
+        onNavigate={onNavigate}
+      />
 
-      <Link
-        href={profile.username ? `/u/${profile.username}` : "/settings/profile"}
-        onClick={onNavigate}
-        className="mx-3 mb-4 flex items-center gap-3 rounded-xl border-t border-border px-2 pt-3 pb-1 transition-colors hover:bg-white/50"
-      >
-        <ProfileAvatar name={profile.name} url={profile.avatarUrl} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">
-            {profile.name}
-          </span>
-          <span className="block text-xs text-muted-foreground">Free plan</span>
-        </span>
-        <ChevronRightIcon />
-      </Link>
+      <AccountMenu profile={profile} onNavigate={onNavigate} />
     </nav>
   );
 }
