@@ -13,6 +13,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *
  * {
  *   "format": "pigxel",
+ *   "id": "…",
  *   "version": 5,
  *   "width": 32,
  *   "height": 32,
@@ -67,6 +68,12 @@ export function backgroundColor(background: Background) {
 
 /** A tile: its size, layer tree, frames and the pixels of every cel. */
 export type PigxelDocument = {
+  /**
+   * The tile's own id, kept in its file so the tile keeps it wherever it is
+   * saved or opened (the AI chat is stored under it). Files without one get
+   * a new one.
+   */
+  id: string;
   width: number;
   height: number;
   background: Background;
@@ -103,6 +110,7 @@ export function blankDocument(
   }
   layers.push(createLayer("normal", "Layer 1"));
   return {
+    id: crypto.randomUUID(),
     width,
     height,
     background,
@@ -144,6 +152,8 @@ type FileLayer = {
 
 export class PigxelFileError extends Error {}
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const DAMAGED = () => new PigxelFileError("This Pigxel file is damaged.");
 
 export function serializePigxel(doc: PigxelDocument): string {
@@ -171,6 +181,7 @@ export function serializePigxel(doc: PigxelDocument): string {
   return JSON.stringify({
     format: "pigxel",
     version: PIGXEL_VERSION,
+    id: doc.id,
     width: doc.width,
     height: doc.height,
     background: doc.background,
@@ -242,9 +253,14 @@ export function parsePigxel(text: string): PigxelDocument {
   }
   if (!pixelLayerIds(layers).length)
     throw new PigxelFileError("This Pigxel file has no pixels.");
+  // Older files have no id, and a damaged one is replaced.
+  const id =
+    typeof file.id === "string" && UUID.test(file.id)
+      ? file.id
+      : crypto.randomUUID();
   // Files before version 5 have no palette; neither may a hand-edited one.
   const palette = readPalette(file.palette) ?? [...DEFAULT_PALETTE];
-  return { width, height, background, layers, frames, cels, palette };
+  return { id, width, height, background, layers, frames, cels, palette };
 }
 
 /** Called for each layer with pixels, with the layer's id and its file entry. */

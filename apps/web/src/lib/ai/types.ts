@@ -43,13 +43,6 @@ export type Route = {
 
 export type GeneratedImage = { mimeType: string; base64: string };
 
-/**
- * What is behind the subject of a generated picture: real transparency, or a
- * flat magenta the model paints for models that can't do transparency, keyed
- * out afterwards.
- */
-export type Backdrop = "transparent" | "chroma";
-
 /** A rectangle of tile pixels. */
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -83,8 +76,6 @@ export type PlanReply = {
   mode: EditPlan["mode"];
   objects: number[];
   keep: number[];
-  /** The box around exactly what changes. */
-  area: Rect;
   target: Rect;
   instruction: string;
   summary: string;
@@ -184,12 +175,6 @@ export type AnimationReply = {
 };
 
 export interface AiProvider {
-  /** The frame shapes (width:height) its image model draws. */
-  readonly aspectRatios: string[];
-  /** What its pictures have behind the subject. */
-  readonly backdrop: Backdrop;
-  /** Whether `redraw` can be limited to a part of the picture with a mask. */
-  readonly masks: boolean;
   /** Decides what the user wants. Text model. */
   route(messages: ChatMessage[]): Promise<Route>;
   /** Plain conversation. Text model. */
@@ -203,8 +188,6 @@ export interface AiProvider {
     prompt: string,
     picture: GeneratedImage,
     aspectRatio: string,
-    /** Where it may change: transparent there, opaque elsewhere; same size as `picture`. */
-    mask?: GeneratedImage,
   ): Promise<GeneratedImage>;
   /** Looks at the tile and picks where a new subject fits the scene. Text model. */
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;

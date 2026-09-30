@@ -48,7 +48,7 @@ export default function EditorChat({
       () => canvas.current,
     ),
   );
-  return <ChatPanel canvas={bridge} />;
+  return <ChatPanel canvas={bridge} tileId={sprite.id} />;
 }
 
 /** What the bridge reads, always the latest. */

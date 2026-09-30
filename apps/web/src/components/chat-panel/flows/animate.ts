@@ -9,6 +9,7 @@ import type {
 } from "@/lib/ai/types";
 import { liftObjectsInside } from "@/lib/edit/objects";
 import { cropBitmap, resizeNearest, type Bitmap } from "@/lib/image/bitmap";
+import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import { sheetToFrames } from "@/lib/image/sheet";
 import {
   UNREACHABLE,
@@ -17,7 +18,7 @@ import {
   type TileObject,
 } from "../constants";
 import { emptyCel, paint } from "../helpers";
-import { referenceBackground, toArt } from "./pictures";
+import { toArt } from "./pictures";
 
 /** A track drawn into its cels, one per frame (null where it is not seen). */
 type Drawn = { cels: (Uint8ClampedArray | null)[]; image: string };
@@ -264,7 +265,7 @@ async function drawSheet(
         reused.id,
         canvas.frameId(),
         reused.box,
-        await referenceBackground(),
+        CHROMA_KEY_HEX,
       )
     : null;
   const visible = track.poses.filter(Boolean);

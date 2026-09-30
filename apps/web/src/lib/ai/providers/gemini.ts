@@ -1,7 +1,6 @@
 import "server-only";
 import {
   CHAT_PROMPT,
-  GEMINI_ASPECT_RATIOS,
   GEMINI_BASE_URL,
   IMAGE_ATTEMPT_TIMEOUT_MS,
   IMAGE_RETRY_DELAYS_MS,
@@ -22,10 +21,7 @@ import {
 } from "../replies";
 import type { AiProvider, ChatMessage, GeneratedImage } from "../types";
 
-/**
- * Google Gemini. Kept as an alternative to OpenAI; used when AI_PROVIDER is
- * "gemini" (see provider.ts).
- */
+/** Google Gemini: the text models and the image models. */
 
 type GeminiPart = {
   text?: string;
@@ -41,8 +37,8 @@ type GeminiContent = {
 
 export function createGeminiProvider(
   apiKey: string,
-  /** Models to try in order: for talk, for plans and pixel edits, for pictures. */
-  models: { text: string[]; smart: string[]; image: string[] },
+  /** Models to try in order, for text and for pictures. */
+  models: { text: string[]; image: string[] },
 ): AiProvider {
   /** Sends a request, moving on to the next model when one can't answer. */
   const request = (
@@ -76,7 +72,7 @@ export function createGeminiProvider(
   /** A JSON answer to `prompt` about the picture `tile`, shaped by `schema`. */
   const look = async (prompt: string, tile: GeneratedImage, schema: object) =>
     textOf(
-      await request(models.smart, {
+      await request(models.text, {
         contents: [
           {
             role: "user",
@@ -106,11 +102,6 @@ export function createGeminiProvider(
     );
 
   return {
-    aspectRatios: GEMINI_ASPECT_RATIOS,
-    backdrop: "chroma",
-    // No mask: the edit is still limited to its part when put on the tile.
-    masks: false,
-
     async route(messages) {
       const parts = await request(models.text, {
         contents: toContents(messages),
@@ -139,7 +130,7 @@ export function createGeminiProvider(
     },
 
     async edit(system, user) {
-      const parts = await request(models.smart, {
+      const parts = await request(models.text, {
         contents: [{ role: "user", parts: [{ text: user }] }],
         systemInstruction: { parts: [{ text: system }] },
         generationConfig: {
@@ -192,7 +183,6 @@ export function createGeminiProvider(
           mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
           objects: { type: "ARRAY", items: INTEGER },
           keep: { type: "ARRAY", items: INTEGER },
-          area: RECT,
           target: RECT,
           instruction: STRING,
           summary: STRING,

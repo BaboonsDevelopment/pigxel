@@ -1,5 +1,4 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
-import type { Backdrop } from "./types";
 
 /**
  * Waits between rounds: each round tries every model once, so a busy model is
@@ -12,53 +11,19 @@ export const IMAGE_RETRY_DELAYS_MS = [2_000];
 export const TEXT_ATTEMPT_TIMEOUT_MS = 20_000;
 export const IMAGE_ATTEMPT_TIMEOUT_MS = 40_000;
 
-// ── OpenAI (the provider in use) ───────────────────────────────────────────
-
-export const OPENAI_BASE_URL = "https://api.openai.com/v1";
-/**
- * Cheap text models that read pictures and answer in strict JSON, tried in
- * order after `AI_MODEL`.
- */
-export const OPENAI_TEXT_MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-/**
- * Stronger text models for the work that needs care: planning edits,
- * placements and animations, and precise pixel edits. Tried in order after
- * `AI_SMART_MODEL`.
- */
-export const OPENAI_SMART_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
-/** Image models, tried in order after `AI_IMAGE_MODEL`; the mini one costs less. */
-export const OPENAI_IMAGE_MODELS = ["gpt-image-1-mini", "gpt-image-1"];
-/** The picture sizes gpt-image draws, by frame shape (width:height). */
-export const OPENAI_IMAGE_SIZES: Record<string, string> = {
-  "1:1": "1024x1024",
-  "3:2": "1536x1024",
-  "2:3": "1024x1536",
-};
-/**
- * Image models that can keep an edited picture's details (faces above all)
- * close to the original ("input_fidelity": "high"); the mini model can't.
- */
-export const OPENAI_HIGH_FIDELITY_MODELS = ["gpt-image-1"];
-/** Picture quality when `AI_IMAGE_QUALITY` isn't set: low, medium or high. */
-export const OPENAI_IMAGE_QUALITY = "medium";
-/** gpt-image can take a minute or more for one picture. */
-export const OPENAI_IMAGE_TIMEOUT_MS = 150_000;
-
-// ── Google Gemini (kept as an alternative, AI_PROVIDER=gemini) ─────────────
-
 export const GEMINI_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta";
 /**
  * Free text models, tried in order after `AI_MODEL`. Google often answers 503
  * for one model while another is fine, so there are several.
  */
-export const GEMINI_TEXT_MODELS = [
+export const TEXT_MODELS = [
   "gemini-3.6-flash",
   "gemini-3.7-flash",
   "gemini-3.1-flash-lite",
 ];
 /** Paid image models, tried in order after `AI_IMAGE_MODEL` (≈$0.03–0.05 each). */
-export const GEMINI_IMAGE_MODELS = [
+export const IMAGE_MODELS = [
   "gemini-3.1-flash-image",
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
@@ -109,39 +74,26 @@ export const CHAT_PROMPT =
   "You are the assistant of Pigxel, a pixel art editor. Answer briefly in plain " +
   "text, in the user's language. Never write JSON or pretend to call tools.";
 
-/**
- * Keeps the subject alone so it can be cut out; shared by new pictures,
- * redraws and sprite sheets. A model that draws real transparency (OpenAI)
- * gets `transparent`; one that can't (Gemini) paints a flat magenta
- * background that is keyed out afterwards (see cut-out-background.ts).
- */
-export const IMAGE_BACKGROUND_RULES: Record<Backdrop, string[]> = {
-  transparent: [
-    "The background is fully transparent.",
-    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
-    "no shadow cast behind or beneath it, no vignette.",
-    "No text, no watermark, no border, no extra objects.",
-  ],
-  chroma: [
-    `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
-    `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
-    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
-    "no shadow cast behind or beneath it, no vignette.",
-    "No text, no watermark, no border, no extra objects.",
-  ],
-};
-
-/** How a sprite is drawn; the background rules come after these. */
-export const IMAGE_STYLE_RULES = [
-  "crisp hard-edged pixels, no anti-aliasing, no blur.",
-  "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
-  "Rich hand-placed shading with hue-shifted shadows and highlights, texture on materials (cloth, metal, fur, stone), one clear light source from the top left.",
-  "Muted, atmospheric palette with a few strong accent colours, dark outline.",
-  "The subject is complete — nothing cropped by the edges.",
+/** Appended to every generation prompt so the model draws a clean sprite. */
+/** Keeps the background cut-out-able; shared by new pictures and redraws. */
+export const IMAGE_BACKGROUND_RULES = [
+  `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
+  `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
+  "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
+  "no shadow cast behind or beneath it, no vignette.",
+  "No text, no watermark, no border, no extra objects.",
 ];
 
-/** Frame shapes Gemini's image models accept, as width:height. */
-export const GEMINI_ASPECT_RATIOS = [
+export const IMAGE_STYLE_RULES = [
+  "crisp hard-edged pixels, no anti-aliasing.",
+  "Chunky low-detail sprite: big simple shapes and a clear, readable silhouette, no tiny details.",
+  "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
+  "The subject is centred, fills the frame, and is complete — nothing cropped.",
+  ...IMAGE_BACKGROUND_RULES,
+];
+
+/** Frame shapes the image model accepts, as width:height. */
+export const ASPECT_RATIOS = [
   "1:1",
   "2:3",
   "3:2",
@@ -184,19 +136,8 @@ mode:
 
 objects: the numbers of ALL objects that change, from OBJECTS. Things are
 often drawn in several pieces: an aura, magic effects, particles or a held
-item are separate objects — include every piece of what changes. Things that
-touch are one object (a character with an orb in its hand): when a part of it
-changes, include that object. An empty list means the whole tile or the
-selected area.
-
-area: the box in tile pixels (x, y of the top-left, w, h) around exactly what
-changes. Usually the box of those objects; when only a part of an object
-changes (the orb in the hand, the eyes of a face), box just that part, with a
-pixel or two of margin. Keep it as small as the change allows: everything
-outside it is kept pixel for pixel. For changes in several places (the hand
-and the face), box all of them together. When something is added, the box
-also covers the empty space where it goes (the ground around the feet for
-skulls at the feet).
+item are separate objects — include every piece of what changes. An empty
+list means the whole tile or the selected area.
 
 keep: the numbers of objects that must stay exactly as they are but belong
 to the scene being changed — for example the character when only its aura
