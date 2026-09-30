@@ -41,6 +41,13 @@ export const MAX_HISTORY = 12;
 /** How many of them the placement planner sees, to know what was drawn. */
 export const PLACEMENT_HISTORY = 6;
 
+/**
+ * Pictures the user attaches to a message, to draw from: how many at most,
+ * and how the router hears of them (it gets only text).
+ */
+export const MAX_REFERENCES = 3;
+export const REFERENCES_NOTE = "[reference pictures attached]";
+
 export const ROUTER_PROMPT = `You follow a conversation in a pixel art editor. Classify the user's LATEST
 message; earlier messages are context, so short follow-ups like "and a dog too",
 "make it bigger" or "now blue" mean what they refer to. Set intent to:
@@ -74,7 +81,11 @@ For generate also set:
   ("Monkey", "Red Apple").
 For animate also set frames: the number of frames they asked for, 0 when
 they did not say.
-Otherwise leave where and name empty, count 1 and frames 0.`;
+Otherwise leave where and name empty, count 1 and frames 0.
+A message ending in ${REFERENCES_NOTE} came with pictures to draw from
+("draw this", "in this style", "make him like this"): drawing something from
+them is generate, and subject says what to take from them ("the fox from the
+reference picture", "a knight in the style of the reference picture").`;
 
 /** For plain conversation, so the model answers in words, not fake tool calls. */
 export const CHAT_PROMPT =
@@ -90,6 +101,12 @@ export const IMAGE_BACKGROUND_RULES = [
   "no shadow cast behind or beneath it, no vignette.",
   "No text, no watermark, no border, no extra objects.",
 ];
+
+/** Added to a generation prompt when the user attached pictures to draw from. */
+export const REFERENCE_RULES =
+  "Use the attached picture(s) as reference for what the subject looks like " +
+  "(design, shapes, colours, proportions), redrawn in the pixel art style " +
+  "below; copy nothing else from them (no background, no text).";
 
 export const IMAGE_STYLE_RULES = [
   "crisp hard-edged pixels, no anti-aliasing.",
@@ -261,3 +278,48 @@ ends where it can start again.
 
 summary: one or two short sentences for the user, in the language of the
 request, saying what the animation will show.`;
+
+// ── Checks ─────────────────────────────────────────────────────────────────
+// A finished edit or animation is looked at once (free text model) before it
+// is applied; what is found is fixed once, and the fix is not checked again.
+
+/** Most frames one check may have drawn again (paid, one picture each). */
+export const MAX_REDRAWN_FRAMES = 2;
+
+export const EDIT_REVIEW_RULES = `Picture 1 is a pixel art layer before an edit,
+picture 2 the same area after it (enlarged; light grey means empty).
+Judge only the edit: was REQUEST done, and did the art stay intact? Problems:
+the request visibly not done; the art broken (holes, smeared or melted shapes,
+lost outline, stray pixels, cut-off parts); things changed that the request did
+not ask for; the subject changed far more than asked (another design, size or
+palette).
+ok: true when the result is acceptable, even if not perfect. Say false only for
+a clear, visible problem; then problem is one short sentence for the user in
+the language of REQUEST, and instruction is a better English instruction for
+one more attempt that avoids it (what to change, and what to leave exactly as
+it is). When ok, problem and instruction are "".`;
+
+export const ANIMATION_REVIEW_RULES = `The picture shows every frame of a pixel
+art animation side by side, frame 1 on the left, separated by dark lines
+(enlarged; light grey means empty). Only what moves is shown. TRACKS lists what
+was planned for each frame.
+Check: the frames come in the right order for the motion; each frame shows the
+thing once (never two of it, no missing or cut-off parts, no leftover
+scraps); poses match the plan and flow smoothly; a prop moves along a
+believable path (a throw is an arc, things fall down) and starts or stops at the
+right moment (leaves the hand when it is thrown).
+ok: true when it works, even if not perfect; then fixes is empty. Fix only
+clear, visible problems; never change what works.
+fixes: one per track that needs a fix; track is its number in TRACKS.
+- order: for a sheet whose drawings are right but in the wrong frames, or has a
+  broken frame that a neighbouring drawing can stand in for: one frame number
+  per frame (frameCount numbers, counted from 1), saying whose drawing that
+  frame shows. Frames where it is not seen keep their own number. Otherwise
+  empty.
+- redraw: for a sheet frame that is broken and no other drawing fits: the frame
+  number and a short description of the pose it must show; at most
+  ${MAX_REDRAWN_FRAMES} in all. Otherwise empty.
+- path: for a prop moving wrongly: exactly frameCount boxes in tile pixels,
+  visible false where it is not seen. Otherwise empty.
+problem: one short sentence for the user in the language of REQUEST saying what
+was fixed; "" when ok.`;

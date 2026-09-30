@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ResizeHandle } from "@/components/resize-handle";
 import { sendMessage } from "@/lib/ai/actions";
+import { REFERENCES_NOTE } from "@/lib/ai/constants";
 import { loadChat, saveChat } from "@/lib/chat/history";
 import { findPicture, keepPicture } from "@/lib/chat/pictures";
 import { ChatComposer } from "./components/chat-composer";
@@ -46,6 +47,8 @@ export function ChatPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // Pictures attached to the message being written, to draw from.
+  const [references, setReferences] = useState<string[]>([]);
   const [selectArea, setSelectArea] = useState(false);
   const [width, setWidth] = useState(PANEL_WIDTH.initial);
   const [collapsed, setCollapsed] = useState(false);
@@ -101,10 +104,11 @@ export function ChatPanel({
       all.map((m, i) => (i === index ? { ...m, ...patch } : m)),
     );
 
-  const chatWith = (history: ChatEntry[]): Chat => ({
+  const chatWith = (history: ChatEntry[], references: string[] = []): Chat => ({
     canvas,
     messages: history,
     selectArea,
+    references,
     append,
     say: (content) => append({ role: "assistant", content }),
     setPending,
@@ -112,16 +116,25 @@ export function ChatPanel({
   });
 
   const send = async (text: string) => {
+    const attached = references;
     const conversation: ChatEntry[] = [
       ...messages,
-      { role: "user", content: text },
+      {
+        role: "user",
+        content: text,
+        ...(attached.length && { references: attached }),
+      },
     ];
     setMessages(conversation);
+    setReferences([]);
     setError(null);
     setPending(true);
-    // Pictures stay on the client; the server only needs the text.
+    // Pictures stay on the client; the router only hears that there are some.
     const result = await sendMessage(
-      conversation.map(({ role, content }) => ({ role, content })),
+      conversation.map(({ role, content, references }) => ({
+        role,
+        content: references?.length ? `${content} ${REFERENCES_NOTE}` : content,
+      })),
     ).catch(() => UNREACHABLE);
     setPending(false);
 
@@ -129,11 +142,12 @@ export function ChatPanel({
       // Unanswered: take the message back so resending is one Enter.
       setMessages(messages);
       setDraft((current) => current || text);
+      setReferences((current) => (current.length ? current : attached));
       setError(result.error);
       return;
     }
     const { action } = result.value;
-    const chat = chatWith(conversation);
+    const chat = chatWith(conversation, attached);
     if (!action) append(result.value);
     else if (action.kind === "generate") await generate(chat, action);
     else if (action.kind === "animate") await animate(chat, action);
@@ -162,7 +176,7 @@ export function ChatPanel({
     change(index, { placements: undefined });
     setError(null);
     const drawn = await drawOnNewLayer(
-      chatWith(messages),
+      chatWith(messages, entry.references),
       action.request,
       action.name || "Picture",
       [area],
@@ -226,6 +240,8 @@ export function ChatPanel({
       <ChatComposer
         draft={draft}
         onDraft={setDraft}
+        references={references}
+        onReferences={setReferences}
         selectArea={selectArea}
         onSelectArea={setSelectArea}
         pending={pending || !loaded}

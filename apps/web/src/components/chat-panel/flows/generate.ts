@@ -37,9 +37,12 @@ export async function drawOnNewLayer(
   const { canvas } = chat;
   const largest = areas.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   chat.setPending(true);
-  const result = await generateImage(subject, largest.w, largest.h).catch(
-    () => UNREACHABLE,
-  );
+  const result = await generateImage(
+    subject,
+    largest.w,
+    largest.h,
+    chat.references,
+  ).catch(() => UNREACHABLE);
   if (result.ok) {
     const art = await toArt(result.value, largest);
     const size = canvas.size();
@@ -100,6 +103,7 @@ async function offerPlacements(chat: Chat, action: TileAction) {
     content: "There is already something on the tile. How should I add it?",
     action: { ...action, name: layerName(action) },
     placements,
+    references: chat.references,
   });
 }
 
