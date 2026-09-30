@@ -13,21 +13,32 @@ export const dynamic = "force-dynamic";
 /** How many recent projects Home shows before the "New project" card. */
 const RECENT = 4;
 
+/** Home: ways to start something new, then the latest projects. */
 export default async function Home() {
   const user = await requireUser();
   const cloudTiles = await listCloudTilesOnServer(user.id, RECENT);
   return (
     <div className="relative">
       <PixelBackdrop />
-      <Page className="relative max-w-6xl">
-        <section aria-labelledby="recent-heading">
+      <Page className="relative max-w-[88rem]">
+        <section aria-labelledby="start-heading">
+          <h1
+            id="start-heading"
+            className="mb-4 font-display text-2xl tracking-tight"
+          >
+            Start creating
+          </h1>
+          <StartCreating />
+        </section>
+
+        <section aria-labelledby="recent-heading" className="mt-12">
           <div className="mb-4 flex items-end justify-between gap-4">
-            <h1
+            <h2
               id="recent-heading"
               className="font-display text-2xl tracking-tight"
             >
               Recent projects
-            </h1>
+            </h2>
             <Link
               href="/tiles"
               className="text-xs font-medium text-[#9a78d0] hover:underline"
@@ -40,16 +51,6 @@ export default async function Home() {
             cloudTiles={cloudTiles}
             limit={RECENT}
           />
-        </section>
-
-        <section aria-labelledby="start-heading" className="mt-12">
-          <h2
-            id="start-heading"
-            className="mb-4 font-display text-2xl tracking-tight"
-          >
-            Start creating
-          </h2>
-          <StartCreating />
         </section>
       </Page>
     </div>
