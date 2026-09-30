@@ -70,7 +70,7 @@ export function RecentProjects(props: {
   limit: number;
 }) {
   // Local tiles live in this browser's storage, so the row waits for the client.
-  if (!useIsClient()) return <div className="min-h-52" />;
+  if (!useIsClient()) return <div className="min-h-44" />;
   return <Row {...props} />;
 }
 
@@ -97,7 +97,7 @@ function Row({
           {cloud.error}
         </FormMessage>
       )}
-      <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {projects.map((project) =>
           project.kind === "local" ? (
             <ProjectCard
@@ -166,7 +166,7 @@ function ProjectCard({
   menu: Parameters<typeof ProjectMenu>[0]["items"];
 }) {
   const face = (
-    <span className="relative block aspect-[5/4] overflow-hidden bg-checker">
+    <span className="relative block aspect-[16/10] overflow-hidden bg-checker">
       <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-has-[:focus-visible]:scale-105 group-has-[:focus-visible]:blur-[2px] motion-reduce:transition-none [&>*]:size-full [&>*]:object-cover [&>*]:[image-rendering:pixelated]">
         {thumbnail}
       </span>
@@ -195,7 +195,7 @@ function ProjectCard({
           {face}
         </button>
       )}
-      <div className="flex h-11 items-center justify-between gap-2 border-t pr-1.5 pl-3">
+      <div className="flex h-9 items-center justify-between gap-2 border-t pr-1 pl-3">
         <span className="truncate font-mono text-sm">{name}</span>
         <ProjectMenu
           label={`More for ${name}`}
@@ -271,7 +271,7 @@ function NewProjectCard() {
   return (
     <Link
       href="/tiles/new"
-      className="flex h-full min-h-40 items-center justify-center gap-2.5 rounded-xl border bg-card font-mono text-sm tracking-wide transition-colors hover:border-[#f7cfdc] hover:bg-[#fde2ea] focus-visible:bg-[#fde2ea]"
+      className="flex h-full min-h-32 items-center justify-center gap-2.5 rounded-xl border bg-card font-mono text-sm tracking-wide transition-colors hover:border-[#f7cfdc] hover:bg-[#fde2ea] focus-visible:bg-[#fde2ea]"
     >
       <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">
         <path
