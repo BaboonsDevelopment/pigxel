@@ -13,6 +13,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * {
  *   "format": "pigxel",
  *   "version": 4,
+ *   "id": "…",
  *   "width": 32,
  *   "height": 32,
  *   "background": "white",
@@ -63,6 +64,12 @@ export function backgroundColor(background: Background) {
 
 /** A tile: its size, layer tree, frames and the pixels of every cel. */
 export type PigxelDocument = {
+  /**
+   * The tile's own id, kept in its file so the tile keeps it wherever it is
+   * saved or opened (the AI chat is stored under it). Files without one get
+   * a new one.
+   */
+  id: string;
   width: number;
   height: number;
   background: Background;
@@ -97,6 +104,7 @@ export function blankDocument(
   }
   layers.push(createLayer("normal", "Layer 1"));
   return {
+    id: crypto.randomUUID(),
     width,
     height,
     background,
@@ -137,6 +145,8 @@ type FileLayer = {
 
 export class PigxelFileError extends Error {}
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const DAMAGED = () => new PigxelFileError("This Pigxel file is damaged.");
 
 export function serializePigxel(doc: PigxelDocument): string {
@@ -164,6 +174,7 @@ export function serializePigxel(doc: PigxelDocument): string {
   return JSON.stringify({
     format: "pigxel",
     version: PIGXEL_VERSION,
+    id: doc.id,
     width: doc.width,
     height: doc.height,
     background: doc.background,
@@ -234,7 +245,12 @@ export function parsePigxel(text: string): PigxelDocument {
   }
   if (!pixelLayerIds(layers).length)
     throw new PigxelFileError("This Pigxel file has no pixels.");
-  return { width, height, background, layers, frames, cels };
+  // Older files have no id, and a damaged one is replaced.
+  const id =
+    typeof file.id === "string" && UUID.test(file.id)
+      ? file.id
+      : crypto.randomUUID();
+  return { id, width, height, background, layers, frames, cels };
 }
 
 /** Called for each layer with pixels, with the layer's id and its file entry. */

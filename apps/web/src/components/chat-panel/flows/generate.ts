@@ -14,6 +14,7 @@ import {
   type Placement,
 } from "../constants";
 import { copyObject, drawnBox, emptyCel, paint } from "../helpers";
+import { keepPicture } from "@/lib/chat/pictures";
 import { toArt } from "./pictures";
 
 /** The name for a new picture's layer: the router's, or the subject's start. */
@@ -50,9 +51,10 @@ export async function drawOnNewLayer(
     );
     const layerId = canvas.addLayer(name, cel, replace);
     // One picture in one place: later edits can start from it.
-    if (areas.length === 1)
+    const picture = areas.length === 1 && (await keepPicture(result.value));
+    if (picture)
       chat.sources.set(layerId, {
-        image: result.value,
+        picture,
         area: largest,
         box: drawnBox(cel, size),
       });

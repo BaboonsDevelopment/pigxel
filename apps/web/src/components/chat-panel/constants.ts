@@ -1,6 +1,7 @@
 import type { Area, Size } from "@/components/pixel-canvas/constants";
 import type { AnimationSpec } from "@/components/pixel-canvas/use-sprite";
 import type { ChatMessage } from "@/lib/ai/types";
+import type { SavedSource } from "@/lib/chat/history";
 
 export const SUGGESTIONS = [
   "make the eyes red",
@@ -21,10 +22,11 @@ export type LayerInfo = {
 /**
  * The full-size picture from the AI that a layer's drawing was made from:
  * edits start from it, not from the small pixel version, so they keep the
- * detail. `area` is where it was put; `box` what was drawn then, to tell
- * whether the layer was changed since (then the picture no longer fits).
+ * detail. `picture` is its id in the browser's cache, `area` where it was
+ * put, `box` what was drawn then, to tell whether the layer was changed
+ * since (then the picture no longer fits).
  */
-export type PictureSource = { image: string; area: Area; box: Area | null };
+export type PictureSource = SavedSource;
 
 /** A separate drawn thing in the current frame, and the layer it is on. */
 export type TileObject = { area: Area; layerId: string };
@@ -102,6 +104,8 @@ export type Placement = {
 /** A chat message plus what only the browser keeps: pictures and choices. */
 export type ChatEntry = ChatMessage & {
   image?: string;
+  /** The id of `image` in the browser's cache, once kept there. */
+  picture?: string;
   placements?: Placement[];
   /** A step that waits for the user, e.g. paid pictures to confirm. */
   button?: { label: string; run: () => Promise<boolean> };

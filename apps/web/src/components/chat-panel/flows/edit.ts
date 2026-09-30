@@ -24,6 +24,7 @@ import {
   samePixels,
   type EditScope,
 } from "../helpers";
+import { findPicture, keepPicture } from "@/lib/chat/pictures";
 import { referenceBackground, shrinkPicture, toArt } from "./pictures";
 
 /** New cels by frame id, written back as one undo step. */
@@ -145,14 +146,14 @@ export async function edit(chat: Chat, action: TileAction) {
     return true;
   };
   const redrawn = async () => {
-    const picture = pictureFor(chat, layerId, steps);
-    if (picture) {
+    const found = await pictureFor(chat, layerId, steps);
+    if (found) {
       const result = await redrawPicture(
         chat,
         layerId,
         plan.value,
         steps[0]!,
-        picture,
+        found,
       );
       return done(result?.cels ?? null, result?.image, result?.picture);
     }
@@ -237,18 +238,28 @@ function move(chat: Chat, layerId: string, steps: Step[]): Cels {
 /** Largest side of a picture sent back to the AI (keeps the request small). */
 const PICTURE_SIDE = 512;
 
+/** A layer's picture from the AI, found in the browser's cache. */
+type Found = { source: PictureSource; image: string };
+
 /**
  * The picture the layer was made from, when an in-place edit of one frame
- * can start from it: the layer must still show what was made from it.
+ * can start from it: the layer must still show what was made from it, and
+ * the picture must still be in this browser's cache.
  */
-function pictureFor(chat: Chat, layerId: string, steps: Step[]) {
+async function pictureFor(
+  chat: Chat,
+  layerId: string,
+  steps: Step[],
+): Promise<Found | null> {
   const [step] = steps;
-  const picture = chat.sources.get(layerId);
-  if (!picture || steps.length !== 1 || !step) return null;
+  const source = chat.sources.get(layerId);
+  if (!source || steps.length !== 1 || !step) return null;
   if (!sameRect(step.source, step.target)) return null;
   const cel = chat.canvas.readCel(layerId, step.frame);
   const box = drawnBox(cel, chat.canvas.size());
-  return box && picture.box && sameRect(box, picture.box) ? picture : null;
+  if (!box || !source.box || !sameRect(box, source.box)) return null;
+  const image = await findPicture(source.picture);
+  return image ? { source, image } : null;
 }
 
 /**
@@ -262,35 +273,38 @@ async function redrawPicture(
   layerId: string,
   plan: EditPlan,
   step: Step,
-  picture: PictureSource,
-): Promise<{ cels: Cels; image: string; picture: PictureSource } | null> {
+  { source, image }: Found,
+): Promise<{ cels: Cels; image: string; picture?: PictureSource } | null> {
   const { canvas } = chat;
   const size = canvas.size();
   chat.setPending(true);
   const result = await redrawArea(
     plan.instruction,
-    await shrinkPicture(picture.image, PICTURE_SIDE),
-    picture.area.w,
-    picture.area.h,
+    await shrinkPicture(image, PICTURE_SIDE),
+    source.area.w,
+    source.area.h,
   ).catch(() => UNREACHABLE);
   chat.setPending(false);
   if (!result.ok) {
     chat.setError(result.error);
     return null;
   }
-  const art = await toArt(result.value, picture.area);
+  const art = await toArt(result.value, source.area);
   const cel = applyRedraw(
     canvas.readCel(layerId, step.frame),
     size,
     art,
-    picture.area,
+    source.area,
     step.scope,
     step.source,
   );
+  const picture = await keepPicture(result.value);
   return {
     cels: new Map([[step.frame, cel]]),
     image: result.value,
-    picture: { ...picture, image: result.value, box: drawnBox(cel, size) },
+    picture: picture
+      ? { ...source, picture, box: drawnBox(cel, size) }
+      : undefined,
   };
 }
 

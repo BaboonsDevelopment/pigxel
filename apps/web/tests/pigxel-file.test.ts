@@ -23,6 +23,7 @@ function document(width: number, height: number): PigxelDocument {
   const layer = createLayer("normal", "Layer 1");
   const frame = createFrame();
   return {
+    id: crypto.randomUUID(),
     width,
     height,
     background: "transparent",
@@ -92,6 +93,7 @@ describe(".pigxel format", () => {
     ];
     const frame = createFrame();
     const original: PigxelDocument = {
+      id: crypto.randomUUID(),
       width: 3,
       height: 2,
       background: "transparent",
@@ -288,5 +290,18 @@ describe("pigxelFileName", () => {
     expect(pigxelFileName("Grass.PIGXEL")).toBe("Grass.pigxel");
     expect(pigxelFileName('a/b\\c:*?"<>|')).toBe("abc.pigxel");
     expect(pigxelFileName("   ")).toBe("Untitled.pigxel");
+  });
+});
+
+describe("the tile's own id", () => {
+  it("is kept in the file, and given to files without a usable one", () => {
+    const doc = document(1, 1);
+    expect(parsePigxel(serializePigxel(doc)).id).toBe(doc.id);
+    const saved = JSON.parse(serializePigxel(doc));
+    for (const id of [undefined, "not an id", 7]) {
+      const parsed = parsePigxel(file({ ...saved, id }));
+      expect(parsed.id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(parsed.id).not.toBe(doc.id);
+    }
   });
 });
