@@ -181,13 +181,21 @@ export interface AiProvider {
   chat(messages: ChatMessage[]): Promise<string>;
   /** Precise edit: reads the tile grid, answers with operations. Text model. */
   edit(system: string, user: string): Promise<EditReply>;
-  /** Draws a new picture. Image model (paid). */
-  generate(prompt: string, aspectRatio: string): Promise<GeneratedImage>;
-  /** Changes a picture of an area. Image model (paid). */
+  /**
+   * Draws a new picture. Image model (paid). `small` (default) asks for a
+   * smaller, cheaper picture where the model allows it.
+   */
+  generate(
+    prompt: string,
+    aspectRatio: string,
+    small?: boolean,
+  ): Promise<GeneratedImage>;
+  /** Changes a picture of an area. Image model (paid); `small` as above. */
   redraw(
     prompt: string,
     picture: GeneratedImage,
     aspectRatio: string,
+    small?: boolean,
   ): Promise<GeneratedImage>;
   /** Looks at the tile and picks where a new subject fits the scene. Text model. */
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;

@@ -28,6 +28,13 @@ export const IMAGE_MODELS = [
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
 ];
+/**
+ * Image models that draw at a chosen size, and the size for a single picture:
+ * it is shrunk to a tile anyway, and a smaller picture costs less. Sprite
+ * sheets hold several poses, so they keep the default size.
+ */
+export const SIZED_IMAGE_MODELS = ["gemini-3.1-flash-image"];
+export const SMALL_IMAGE_SIZE = "512";
 
 /** How many recent messages the AI sees, so it follows the conversation. */
 export const MAX_HISTORY = 12;
