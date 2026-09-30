@@ -24,7 +24,9 @@ vi.mock("@/lib/supabase/server", () => ({
     // The tiles page lists Pigxel cloud tiles; none in these tests.
     from: () => ({
       select: () => ({
-        order: () => ({ limit: async () => ({ data: [], error: null }) }),
+        eq: () => ({
+          order: () => ({ limit: async () => ({ data: [], error: null }) }),
+        }),
       }),
     }),
   }),

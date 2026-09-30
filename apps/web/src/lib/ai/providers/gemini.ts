@@ -1,24 +1,31 @@
 import "server-only";
 import {
+  CHAT_PROMPT,
+  GEMINI_ASPECT_RATIOS,
   GEMINI_BASE_URL,
   IMAGE_ATTEMPT_TIMEOUT_MS,
   IMAGE_RETRY_DELAYS_MS,
-  CHAT_PROMPT,
   ROUTER_PROMPT,
   TEXT_ATTEMPT_TIMEOUT_MS,
   TEXT_RETRY_DELAYS_MS,
 } from "../constants";
 import { AiError, errorForStatus } from "../errors";
-import type {
-  AiProvider,
-  ChatMessage,
-  EditReply,
-  GeneratedImage,
-  PlacementReply,
-  PlanReply,
-  Rect,
-  Route,
-} from "../types";
+import { fetchWithin, tryModels } from "../fallback";
+import {
+  INTENTS,
+  readAnimation,
+  readEdit,
+  readPlacement,
+  readPlan,
+  readRect,
+  readRoute,
+} from "../replies";
+import type { AiProvider, ChatMessage, GeneratedImage } from "../types";
+
+/**
+ * Google Gemini. Kept as an alternative to OpenAI; used when AI_PROVIDER is
+ * "gemini" (see provider.ts).
+ */
 
 type GeminiPart = {
   text?: string;
@@ -34,97 +41,43 @@ type GeminiContent = {
 
 export function createGeminiProvider(
   apiKey: string,
-  /** Models to try in order, for text and for pictures. */
-  models: { edit: string[]; generate: string[] },
+  /** Models to try in order: for talk, for plans and pixel edits, for pictures. */
+  models: { text: string[]; smart: string[]; image: string[] },
 ): AiProvider {
-  const attempt = async (
-    model: string,
-    body: object,
-    timeoutMs: number,
-  ): Promise<GeminiPart[]> => {
-    let res: Response;
-    try {
-      res = await fetch(`${GEMINI_BASE_URL}/models/${model}:generateContent`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-    } catch (e) {
-      const timedOut = e instanceof Error && e.name === "TimeoutError";
-      throw new AiError(timedOut ? "timeout" : "failed", String(e));
-    }
-    if (!res.ok) throw errorForStatus(res.status, await res.text());
-    const data = (await res.json()) as GeminiResponse;
-    return data.candidates?.[0]?.content?.parts ?? [];
-  };
-
-  /**
-   * Sends a request, moving on to the next model when one is busy or too
-   * slow, and pausing between rounds when all of them are.
-   */
-  const request = async (
+  /** Sends a request, moving on to the next model when one can't answer. */
+  const request = (
     candidates: string[],
-    contents: GeminiContent[],
-    options: object = {},
+    body: object,
     { timeoutMs = TEXT_ATTEMPT_TIMEOUT_MS, delays = TEXT_RETRY_DELAYS_MS } = {},
-  ) => {
-    for (let round = 0; ; round++) {
-      let last: unknown;
-      for (const model of candidates) {
-        try {
-          return await attempt(model, { contents, ...options }, timeoutMs);
-        } catch (e) {
-          if (!isRetryable(e)) throw e;
-          console.warn(`[ai] ${model} unavailable, trying the next one`);
-          last = e;
-        }
-      }
-      const delay = delays[round];
-      if (delay === undefined) throw last;
-      await sleep(delay);
-    }
-  };
-
-  return {
-    async route(messages) {
-      const parts = await request(models.edit, toContents(messages), {
-        systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: {
-              intent: { type: "STRING", enum: [...INTENTS] },
-              subject: { type: "STRING" },
-              where: { type: "STRING" },
-              count: { type: "INTEGER" },
+  ) =>
+    tryModels(
+      candidates,
+      async (model) => {
+        const res = await fetchWithin(
+          `${GEMINI_BASE_URL}/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-goog-api-key": apiKey,
             },
-            required: ["intent", "subject", "where", "count"],
+            body: JSON.stringify(body),
           },
-        },
-      });
-      const route = parseJson<Route>(textOf(parts));
-      const intent = INTENTS.find((i) => i === route?.intent);
-      // Anything unexpected becomes plain chat: free, and changes nothing.
-      if (!intent) return { intent: "chat", subject: "", where: "", count: 1 };
-      const latest = messages.at(-1)?.content ?? "";
-      const count = Math.round(Number(route?.count));
-      return {
-        intent,
-        subject: route?.subject || latest,
-        where: route?.where ?? "",
-        count: count >= 1 ? Math.min(count, MAX_COUNT) : 1,
-      };
-    },
+          timeoutMs,
+        );
+        if (!res.ok)
+          throw errorForStatus("Gemini", res.status, await res.text());
+        const data = (await res.json()) as GeminiResponse;
+        return data.candidates?.[0]?.content?.parts ?? [];
+      },
+      delays,
+    );
 
-    async place(prompt, tile) {
-      const parts = await request(
-        models.edit,
-        [
+  /** A JSON answer to `prompt` about the picture `tile`, shaped by `schema`. */
+  const look = async (prompt: string, tile: GeneratedImage, schema: object) =>
+    textOf(
+      await request(models.smart, {
+        contents: [
           {
             role: "user",
             parts: [
@@ -133,226 +86,165 @@ export function createGeminiProvider(
             ],
           },
         ],
-        {
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                copyOf: { type: "INTEGER" },
-                areas: { type: "ARRAY", items: RECT_SCHEMA },
-                ask: { type: "BOOLEAN" },
-                question: { type: "STRING" },
-              },
-              required: ["copyOf", "areas", "ask", "question"],
-            },
-          },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
         },
-      );
-      const reply = parseJson<PlacementReply>(textOf(parts));
-      if (!reply || !Array.isArray(reply.areas)) {
-        throw new AiError("failed", "Gemini sent no usable placement.");
-      }
-      return {
-        copyOf: Number.isInteger(reply.copyOf) ? reply.copyOf! : -1,
-        areas: reply.areas,
-        ask: reply.ask === true,
-        question: reply.question ?? "",
-      };
+      }),
+    );
+
+  const draw = async (parts: GeminiContent["parts"], aspectRatio: string) =>
+    firstImage(
+      await request(
+        models.image,
+        {
+          contents: [{ role: "user", parts }],
+          generationConfig: { imageConfig: { aspectRatio } },
+        },
+        { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
+      ),
+    );
+
+  return {
+    aspectRatios: GEMINI_ASPECT_RATIOS,
+    backdrop: "chroma",
+    // No mask: the edit is still limited to its part when put on the tile.
+    masks: false,
+
+    async route(messages) {
+      const parts = await request(models.text, {
+        contents: toContents(messages),
+        systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: object({
+            intent: { type: "STRING", enum: [...INTENTS] },
+            subject: STRING,
+            where: STRING,
+            count: INTEGER,
+            name: STRING,
+            frames: INTEGER,
+          }),
+        },
+      });
+      return readRoute(textOf(parts), messages.at(-1)?.content ?? "");
     },
 
     async chat(messages) {
-      const parts = await request(models.edit, toContents(messages), {
+      const parts = await request(models.text, {
+        contents: toContents(messages),
         systemInstruction: { parts: [{ text: CHAT_PROMPT }] },
       });
       return textOf(parts);
     },
 
     async edit(system, user) {
-      const parts = await request(
-        models.edit,
-        [{ role: "user", parts: [{ text: user }] }],
-        {
-          systemInstruction: { parts: [{ text: system }] },
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                summary: { type: "STRING" },
-                ops: { type: "ARRAY", items: { type: "STRING" } },
-              },
-              required: ["summary", "ops"],
-            },
-          },
+      const parts = await request(models.smart, {
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        systemInstruction: { parts: [{ text: system }] },
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: object({
+            summary: STRING,
+            ops: { type: "ARRAY", items: STRING },
+          }),
         },
-      );
-      const reply = parseJson<EditReply>(textOf(parts));
-      if (!Array.isArray(reply?.ops)) {
-        throw new AiError("failed", "Gemini sent no usable edit.");
-      }
-      return {
-        summary: reply.summary ?? "",
-        ops: reply.ops.filter((o) => typeof o === "string"),
-      };
+      });
+      return readEdit(textOf(parts));
     },
 
-    async generate(prompt, aspectRatio) {
-      const parts = await request(
-        models.generate,
-        [{ role: "user", parts: [{ text: prompt }] }],
-        { generationConfig: { imageConfig: { aspectRatio } } },
-        { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
-      );
-      return firstImage(parts);
-    },
+    generate: (prompt, aspectRatio) => draw([{ text: prompt }], aspectRatio),
 
-    async redraw(prompt, picture, aspectRatio) {
-      const parts = await request(
-        models.generate,
+    redraw: (prompt, picture, aspectRatio) =>
+      draw(
         [
+          { text: prompt },
           {
-            role: "user",
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: picture.mimeType,
-                  data: picture.base64,
-                },
-              },
-            ],
+            inlineData: { mimeType: picture.mimeType, data: picture.base64 },
           },
         ],
-        { generationConfig: { imageConfig: { aspectRatio } } },
-        { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
-      );
-      return firstImage(parts);
-    },
+        aspectRatio,
+      ),
 
     async compose(prompt, tile) {
-      const parts = await request(
-        models.edit,
-        [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: tile.mimeType, data: tile.base64 } },
-            ],
-          },
-        ],
-        {
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                x: { type: "INTEGER" },
-                y: { type: "INTEGER" },
-                w: { type: "INTEGER" },
-                h: { type: "INTEGER" },
-              },
-              required: ["x", "y", "w", "h"],
-            },
-          },
-        },
+      return readRect(await look(prompt, tile, RECT));
+    },
+
+    async place(prompt, tile) {
+      const text = await look(
+        prompt,
+        tile,
+        object({
+          copyOf: INTEGER,
+          areas: { type: "ARRAY", items: RECT },
+          ask: BOOLEAN,
+          question: STRING,
+        }),
       );
-      const rect = parseJson<Rect>(textOf(parts));
-      const { x, y, w, h } = rect ?? {};
-      if (x === undefined || y === undefined || !w || !h) {
-        throw new AiError("failed", "Gemini sent no usable area.");
-      }
-      return { x, y, w, h };
+      return readPlacement(text);
     },
 
     async plan(prompt, tile) {
-      const rect = {
-        type: "OBJECT",
-        properties: {
-          x: { type: "INTEGER" },
-          y: { type: "INTEGER" },
-          w: { type: "INTEGER" },
-          h: { type: "INTEGER" },
-        },
-        required: ["x", "y", "w", "h"],
-      };
-      const parts = await request(
-        models.edit,
-        [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: tile.mimeType, data: tile.base64 } },
-            ],
-          },
-        ],
-        {
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: "OBJECT",
-              properties: {
-                mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
-                objects: { type: "ARRAY", items: { type: "INTEGER" } },
-                keep: { type: "ARRAY", items: { type: "INTEGER" } },
-                target: rect,
-                instruction: { type: "STRING" },
-                summary: { type: "STRING" },
-                question: { type: "STRING" },
-              },
-              required: [
-                "mode",
-                "objects",
-                "keep",
-                "target",
-                "instruction",
-                "summary",
-                "question",
-              ],
-            },
-          },
-        },
+      const text = await look(
+        prompt,
+        tile,
+        object({
+          mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
+          objects: { type: "ARRAY", items: INTEGER },
+          keep: { type: "ARRAY", items: INTEGER },
+          area: RECT,
+          target: RECT,
+          instruction: STRING,
+          summary: STRING,
+          question: STRING,
+        }),
       );
-      const reply = parseJson<PlanReply>(textOf(parts));
-      if (!reply?.instruction || !reply.target) {
-        throw new AiError("failed", "Gemini sent no usable plan.");
-      }
-      return {
-        mode:
-          reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
-        objects: (reply.objects ?? []).filter(Number.isInteger),
-        keep: (reply.keep ?? []).filter(Number.isInteger),
-        target: reply.target,
-        instruction: reply.instruction,
-        summary: reply.summary ?? "",
-        question: reply.question ?? "",
-      };
+      return readPlan(text);
+    },
+
+    async animate(prompt, tile) {
+      const text = await look(
+        prompt,
+        tile,
+        object({
+          name: STRING,
+          frameCount: INTEGER,
+          duration: INTEGER,
+          summary: STRING,
+          tracks: {
+            type: "ARRAY",
+            items: object({
+              kind: { type: "STRING", enum: ["sheet", "prop"] },
+              name: STRING,
+              subject: STRING,
+              reuse: INTEGER,
+              box: RECT,
+              copy: INTEGER,
+              grab: RECT,
+              poses: { type: "ARRAY", items: STRING },
+              path: {
+                type: "ARRAY",
+                items: object({ ...RECT.properties, visible: BOOLEAN }),
+              },
+            }),
+          },
+        }),
+      );
+      return readAnimation(text);
     },
   };
 }
 
-function isRetryable(e: unknown): boolean {
-  return (
-    e instanceof AiError &&
-    (e.code === "overloaded" ||
-      e.code === "rate_limited" ||
-      e.code === "timeout")
-  );
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function parseJson<T>(text: string): Partial<T> | null {
-  try {
-    return JSON.parse(text) as Partial<T>;
-  } catch {
-    return null;
-  }
-}
-
-const INTENTS = ["generate", "edit", "chat"] as const;
+// Gemini's schema format: upper-case types, every listed property required.
+const STRING = { type: "STRING" };
+const INTEGER = { type: "INTEGER" };
+const BOOLEAN = { type: "BOOLEAN" };
+const object = <P extends Record<string, object>>(properties: P) => ({
+  type: "OBJECT",
+  properties,
+  required: Object.keys(properties),
+});
+const RECT = object({ x: INTEGER, y: INTEGER, w: INTEGER, h: INTEGER });
 
 const textOf = (parts: GeminiPart[]) => parts.map((p) => p.text ?? "").join("");
 
@@ -368,17 +260,3 @@ const toContents = (messages: ChatMessage[]): GeminiContent[] =>
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
-
-/** Most pictures one request may add at once. */
-const MAX_COUNT = 12;
-
-const RECT_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    x: { type: "INTEGER" },
-    y: { type: "INTEGER" },
-    w: { type: "INTEGER" },
-    h: { type: "INTEGER" },
-  },
-  required: ["x", "y", "w", "h"],
-};

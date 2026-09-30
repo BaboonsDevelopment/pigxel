@@ -41,6 +41,8 @@ export type FileStatus = {
   connect?: boolean;
 };
 
+export type TileFile = ReturnType<typeof useTileFile>;
+
 type Sync = "idle" | "saving" | "saved" | "failed";
 
 /** How long editing must pause before the tile autosaves to its location. */

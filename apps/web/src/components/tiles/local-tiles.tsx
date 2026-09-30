@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { SectionTitle } from "@pigxel/ui/components/typography";
-import { listDrafts, removeDraft, type Draft } from "@/lib/pigxel-file/draft";
+import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import {
   PIGXEL_EXTENSION,
   parsePigxel,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useIsClient } from "@/lib/use-is-client";
+import { confirmRemoveLocalTile } from "./tile-actions";
 import { TileThumbnail } from "./tile-thumbnail";
 
 type LocalTile = Draft & { image: PigxelDocument };
@@ -54,13 +55,7 @@ function List({
   const tiles = limit ? allTiles.slice(0, limit) : allTiles;
 
   const remove = (tile: LocalTile) => {
-    const question =
-      tile.location?.kind === "drive"
-        ? `Remove “${tile.name}” from this browser? It stays in Google Drive${tile.dirty ? ", without the changes not yet saved there" : ""}.`
-        : `“${tile.name}” is only kept in this browser. Remove it for good?`;
-    if (!window.confirm(question)) return;
-    removeDraft(userId, tile.id);
-    setTiles(readTiles(userId));
+    if (confirmRemoveLocalTile(userId, tile)) setTiles(readTiles(userId));
   };
 
   if (tiles.length === 0)

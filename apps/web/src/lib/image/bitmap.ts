@@ -3,6 +3,8 @@ import type { RGB } from "./quantize";
 /** RGBA pixels with their size; what every pipeline step takes and returns. */
 export type Bitmap = { rgba: Uint8ClampedArray; w: number; h: number };
 export type Size = { w: number; h: number };
+/** A rectangle of pixels. */
+export type Box = { x: number; y: number } & Size;
 
 /** Channel `c` (0 r, 1 g, 2 b, 3 a) of pixel number `i`. */
 export const channel = (image: Bitmap, i: number, c: number) =>
@@ -38,3 +40,45 @@ export const copyBitmap = (image: Bitmap): Bitmap => ({
   ...image,
   rgba: new Uint8ClampedArray(image.rgba),
 });
+
+/** `image` at `w × h`, nearest neighbour, so pixel art stays crisp. */
+export function resizeNearest(image: Bitmap, w: number, h: number): Bitmap {
+  if (image.w === w && image.h === h) return image;
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(image.h - 1, Math.floor((y * image.h) / h));
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(image.w - 1, Math.floor((x * image.w) / w));
+      const from = (sy * image.w + sx) * 4;
+      rgba.set(image.rgba.subarray(from, from + 4), (y * w + x) * 4);
+    }
+  }
+  return { rgba, w, h };
+}
+
+/** The box around the opaque pixels, or null when there are none. */
+export function opaqueBox(image: Bitmap): Box | null {
+  let [x0, y0, x1, y1] = [image.w, image.h, -1, -1];
+  for (let i = 0; i < image.w * image.h; i++) {
+    if (!isOpaque(image, i)) continue;
+    const x = i % image.w;
+    const y = (i - x) / image.w;
+    [x0, y0, x1, y1] = [
+      Math.min(x0, x),
+      Math.min(y0, y),
+      Math.max(x1, x),
+      Math.max(y1, y),
+    ];
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/** The part of `image` inside `box`. */
+export function cropBitmap(image: Bitmap, box: Box): Bitmap {
+  const rgba = new Uint8ClampedArray(box.w * box.h * 4);
+  for (let y = 0; y < box.h; y++) {
+    const from = ((box.y + y) * image.w + box.x) * 4;
+    rgba.set(image.rgba.subarray(from, from + box.w * 4), y * box.w * 4);
+  }
+  return { rgba, w: box.w, h: box.h };
+}

@@ -15,10 +15,11 @@ export type ProfileRow = {
   avatar_path: string | null;
   visibility: Visibility;
   created_at: string;
+  premium_since: string | null;
 };
 
 export const PROFILE_COLUMNS =
-  "id, username, display_name, bio, links, avatar_kind, provider_avatar_url, avatar_path, visibility, created_at";
+  "id, username, display_name, bio, links, avatar_kind, provider_avatar_url, avatar_path, visibility, created_at, premium_since";
 
 /** An artist's profile as the pages show it. */
 export type ArtistProfile = {
@@ -34,7 +35,12 @@ export type ArtistProfile = {
   providerAvatarUrl: string | null;
   visibility: Visibility;
   joinedAt: string;
+  /** When they became premium; null on Free. */
+  premiumSince: string | null;
 };
+
+/** Pinned arts at the top of a profile; the database checks it too. */
+export const MAX_PINS = 4;
 
 /** A cloud tile as a profile shows it. */
 export type ProfileTile = {
@@ -75,12 +81,23 @@ export function toArtistProfile(row: ProfileRow): ArtistProfile {
     providerAvatarUrl: row.provider_avatar_url,
     visibility: row.visibility,
     joinedAt: row.created_at,
+    premiumSince: row.premium_since,
   };
+}
+
+/** "September 2026", or null for a date that doesn't parse. */
+export function monthLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /** "Joined September 2026". */
 export function joinedLabel(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return `Joined ${date.toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}`;
+  const month = monthLabel(iso);
+  return month && `Joined ${month}`;
 }

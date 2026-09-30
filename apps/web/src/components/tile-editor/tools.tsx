@@ -1,16 +1,5 @@
-import type { ReactNode } from "react";
-import type { PaintTool } from "@/components/pixel-canvas/pen";
 import { pixelIcon } from "@/components/pixel-icon";
-
-export type ToolId = PaintTool;
-
-export type Tool = {
-  id: ToolId;
-  label: string;
-  /** Single key that selects the tool, as in Aseprite. */
-  shortcut: string;
-  icon: ReactNode;
-};
+import type { Tool } from "./constants";
 
 export const TOOLS: Tool[] = [
   {

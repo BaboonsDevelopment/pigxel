@@ -1,10 +1,15 @@
-import { MAX_OBJECTS, MIN_OBJECT_PIXELS } from "./constants";
-import type { Rect } from "./raster";
+import {
+  MAX_OBJECTS,
+  MIN_OBJECT_PIXELS,
+  PART_OF_EDIT_SHARE,
+} from "./constants";
+import { sameRect, type Rect } from "./raster";
 
-type Component = { box: Rect; members: number[] };
+/** A separate drawn thing: its box and the numbers of its pixels. */
+export type Component = { box: Rect; members: number[] };
 
 /** Groups touching opaque pixels (diagonals too) into separate drawn things. */
-function components(
+export function components(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
@@ -89,24 +94,32 @@ export function liftObjectsInside(
   return { rest, lifted };
 }
 
+/** Share of `box` that lies inside `area`. */
+function shareInside(box: Rect, area: Rect) {
+  const w = Math.min(box.x + box.w, area.x + area.w) - Math.max(box.x, area.x);
+  const h = Math.min(box.y + box.h, area.y + area.h) - Math.max(box.y, area.y);
+  return w > 0 && h > 0 ? (w * h) / (box.w * box.h) : 0;
+}
+
 /**
- * Marks the pixels of drawn things that reach into `area` without lying fully
- * inside it: neighbours an edit of `area` must leave exactly as they are.
+ * Marks the pixels of drawn things that only reach into `area`: neighbours
+ * an edit of `area` must leave exactly as they are. Things lying mostly
+ * inside it (an orb sticking out a little) and those whose boxes are in
+ * `changing` (a character whose held orb is edited) belong to the edit and
+ * may change.
  */
 export function neighbourMask(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
   area: Rect,
+  changing: Rect[] = [],
 ): Uint8Array {
   const mask = new Uint8Array(width * height);
-  const touches = (b: Rect) =>
-    b.x < area.x + area.w &&
-    b.x + b.w > area.x &&
-    b.y < area.y + area.h &&
-    b.y + b.h > area.y;
   for (const c of components(pixels, width, height)) {
-    if (inside(c.box, area) || !touches(c.box)) continue;
+    const share = shareInside(c.box, area);
+    if (share === 0 || share >= PART_OF_EDIT_SHARE) continue;
+    if (changing.some((r) => sameRect(r, c.box))) continue;
     for (const i of c.members) mask[i] = 1;
   }
   return mask;
@@ -156,8 +169,7 @@ export function objectMask(
   boxes: Rect[],
 ): Uint8Array {
   const mask = new Uint8Array(width * height);
-  const listed = (b: Rect) =>
-    boxes.some((r) => r.x === b.x && r.y === b.y && r.w === b.w && r.h === b.h);
+  const listed = (b: Rect) => boxes.some((r) => sameRect(r, b));
   for (const c of components(pixels, width, height)) {
     if (!listed(c.box)) continue;
     for (const i of c.members) mask[i] = 1;

@@ -123,6 +123,12 @@ export function placeAbove(tree: Layer[], id: string | null): Place {
   return { parentId: found.parent?.id ?? null, index: found.index + 1 };
 }
 
+/** The place right above a layer's group, for taking it out; null at the top level. */
+export function placeOutside(tree: Layer[], id: string): Place | null {
+  const parent = findLayer(tree, id)?.parent;
+  return parent ? placeAbove(tree, parent.id) : null;
+}
+
 /** A layer as the panel lists it, with where it sits in the tree. */
 export type PanelRow = { layer: Layer; depth: number } & Place;
 

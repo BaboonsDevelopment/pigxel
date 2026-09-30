@@ -76,6 +76,7 @@
   /* Loaded with next/font in the app's root layout. */
   --font-sans: var(--font-poppins), Arial, Helvetica, sans-serif;
   --font-display: var(--font-fredoka), var(--font-poppins), sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, monospace;
 }
 
 @layer base {
@@ -95,4 +96,15 @@
   background-color: #ffffff;
   background-image: repeating-conic-gradient(#e7e1e4 0 25%, transparent 0 50%);
   background-size: 12px 12px;
+}
+
+/* A slow bob for the decorative pixels behind Home. */
+@keyframes pixel-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
