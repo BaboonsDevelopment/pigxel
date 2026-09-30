@@ -21,6 +21,11 @@ export const FRINGE_MAGENTA = 40;
 export const FRINGE_PASSES = 2;
 /** Pixels trimmed off the whole outline afterwards, at picture resolution. */
 export const EDGE_TRIM = 1;
+/**
+ * Share of a picture that must already be see-through for its background to
+ * count as transparent, so nothing is keyed out.
+ */
+export const TRANSPARENT_SHARE = 0.05;
 
 // ── Recover the model's own pixel grid ─────────────────────────────────────
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ResizeHandle } from "@/components/resize-handle";
 import { sendMessage } from "@/lib/ai/actions";
 import { ChatComposer } from "./components/chat-composer";
@@ -14,6 +14,7 @@ import {
   type CanvasBridge,
   type Chat,
   type ChatEntry,
+  type PictureSource,
   type Placement,
 } from "./constants";
 import { animate } from "./flows/animate";
@@ -34,6 +35,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
   const [selectArea, setSelectArea] = useState(false);
   const [width, setWidth] = useState(PANEL_WIDTH.initial);
   const [collapsed, setCollapsed] = useState(false);
+  const sources = useRef(new Map<string, PictureSource>());
 
   const append = (entry: ChatEntry) => setMessages((all) => [...all, entry]);
   const change = (index: number, patch: Partial<ChatEntry>) =>
@@ -49,6 +51,7 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     say: (content) => append({ role: "assistant", content }),
     setPending,
     setError,
+    sources: sources.current,
   });
 
   const send = async (text: string) => {
@@ -77,6 +80,12 @@ export function ChatPanel({ canvas }: { canvas: CanvasBridge }) {
     if (!action) append(result.value);
     else if (action.kind === "generate") await generate(chat, action);
     else if (action.kind === "animate") await animate(chat, action);
+    else if (action.kind === "undo")
+      chat.say(
+        canvas.undo()
+          ? "Took back the last change. Ask again (or press Ctrl+Z) to go further back."
+          : "There is nothing to take back.",
+      );
     else await edit(chat, action);
   };
 

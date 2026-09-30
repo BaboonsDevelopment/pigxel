@@ -13,7 +13,8 @@ import {
   type Chat,
   type Placement,
 } from "../constants";
-import { copyObject, emptyCel, paint, toArt } from "../helpers";
+import { copyObject, drawnBox, emptyCel, paint } from "../helpers";
+import { toArt } from "./pictures";
 
 /** The name for a new picture's layer: the router's, or the subject's start. */
 const layerName = (action: TileAction) =>
@@ -47,7 +48,14 @@ export async function drawOnNewLayer(
         paint(pixels, size, resizeNearest(art, area.w, area.h).rgba, area),
       emptyCel(size),
     );
-    canvas.addLayer(name, cel, replace);
+    const layerId = canvas.addLayer(name, cel, replace);
+    // One picture in one place: later edits can start from it.
+    if (areas.length === 1)
+      chat.sources.set(layerId, {
+        image: result.value,
+        area: largest,
+        box: drawnBox(cel, size),
+      });
     const many = areas.length > 1 ? ` ×${areas.length}` : "";
     const hidden = replace
       ? " The other layers are hidden, not deleted: show them again in the timeline."

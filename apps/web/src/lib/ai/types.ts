@@ -1,6 +1,6 @@
 /** Something the user asked the AI to do to the tile, rather than just talk. */
 export type TileAction = {
-  kind: "generate" | "edit" | "animate";
+  kind: "generate" | "edit" | "animate" | "undo";
   /**
    * For generate: a clean subject description; for animate: what happens;
    * for edit: the user's words.
@@ -43,6 +43,13 @@ export type Route = {
 
 export type GeneratedImage = { mimeType: string; base64: string };
 
+/**
+ * What is behind the subject of a generated picture: real transparency, or a
+ * flat magenta the model paints for models that can't do transparency, keyed
+ * out afterwards.
+ */
+export type Backdrop = "transparent" | "chroma";
+
 /** A rectangle of tile pixels. */
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -76,6 +83,8 @@ export type PlanReply = {
   mode: EditPlan["mode"];
   objects: number[];
   keep: number[];
+  /** The box around exactly what changes. */
+  area: Rect;
   target: Rect;
   instruction: string;
   summary: string;
@@ -126,6 +135,18 @@ export type PropTrack = {
   kind: "prop";
   name: string;
   subject: string;
+  /**
+   * The number of an object already drawn on the tile (from the objects the
+   * planner was shown) whose own pixels fly; nothing new is drawn.
+   */
+  copy: number | null;
+  /**
+   * A thing drawn as part of a layer (a skull held in a hand): the box
+   * around it and the layer's number (null when the planner didn't say; the
+   * layer drawn there is used). It is cut out into a layer of its own first,
+   * and its pixels fly.
+   */
+  grab: { layer: number | null; area: Rect } | null;
   path: (Rect | null)[];
 };
 
@@ -155,6 +176,8 @@ export type AnimationReply = {
     subject: string;
     reuse: number;
     box: Rect;
+    copy: number;
+    grab: Rect;
     poses: string[];
     path: (Rect & { visible: boolean })[];
   }[];
@@ -163,6 +186,10 @@ export type AnimationReply = {
 export interface AiProvider {
   /** The frame shapes (width:height) its image model draws. */
   readonly aspectRatios: string[];
+  /** What its pictures have behind the subject. */
+  readonly backdrop: Backdrop;
+  /** Whether `redraw` can be limited to a part of the picture with a mask. */
+  readonly masks: boolean;
   /** Decides what the user wants. Text model. */
   route(messages: ChatMessage[]): Promise<Route>;
   /** Plain conversation. Text model. */
@@ -176,6 +203,8 @@ export interface AiProvider {
     prompt: string,
     picture: GeneratedImage,
     aspectRatio: string,
+    /** Where it may change: transparent there, opaque elsewhere; same size as `picture`. */
+    mask?: GeneratedImage,
   ): Promise<GeneratedImage>;
   /** Looks at the tile and picks where a new subject fits the scene. Text model. */
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;

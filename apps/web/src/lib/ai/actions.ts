@@ -21,6 +21,7 @@ import {
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
+  Backdrop,
   AnimationPlan,
   ChatMessage,
   EditPlan,
@@ -29,6 +30,7 @@ import type {
   Rect,
 } from "@/lib/ai/types";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
+import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";
 
 const MAX_GRID = 256;
@@ -80,6 +82,15 @@ export async function sendMessage(
   });
 }
 
+/**
+ * What the image model puts behind a subject. Pictures sent to it as a
+ * reference match: transparent, or on the magenta it keys out.
+ */
+export async function imageBackdrop(): Promise<Backdrop> {
+  await requireUser();
+  return getAiProvider().backdrop;
+}
+
 /** Draws `subject` as pixel art for a `width × height` grid; returns a data URL. */
 export async function generateImage(
   subject: string,
@@ -93,7 +104,7 @@ export async function generateImage(
   return attempt("generateImage", async () => {
     const ai = getAiProvider();
     const { mimeType, base64 } = await ai.generate(
-      buildImagePrompt(subject, width, height),
+      buildImagePrompt(subject, width, height, ai.backdrop),
       closestAspectRatio(width, height, ai.aspectRatios),
     );
     return `data:${mimeType};base64,${base64}`;
@@ -123,18 +134,34 @@ export async function redrawArea(
   picture: string,
   width: number,
   height: number,
+  options: {
+    /** A PNG data URL of the same size, transparent where the picture may change. */
+    mask?: string | null;
+    /** The picture is the tile's pixels shown enlarged, not the AI's own picture. */
+    enlarged?: boolean;
+  } = {},
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
-  if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
-    return { ok: false, error: "That area cannot be redrawn." };
-  }
+  const maskPng = options.mask ? PNG_DATA_URL.exec(options.mask)?.[1] : null;
+  const valid =
+    request.trim() &&
+    png &&
+    maskPng !== undefined &&
+    validSize(width) &&
+    validSize(height);
+  if (!valid) return { ok: false, error: "That area cannot be redrawn." };
   return attempt("redrawArea", async () => {
     const ai = getAiProvider();
+    const mask = ai.masks && maskPng ? maskPng : null;
     const { mimeType, base64 } = await ai.redraw(
-      buildRedrawPrompt(request, width, height),
-      { mimeType: "image/png", base64: png },
+      buildRedrawPrompt(request, width, height, ai.backdrop, {
+        masked: !!mask,
+        enlarged: options.enlarged === true,
+      }),
+      { mimeType: "image/png", base64: png! },
       closestAspectRatio(width, height, ai.aspectRatios),
+      mask ? { mimeType: "image/png", base64: mask } : undefined,
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -210,8 +237,12 @@ export async function planEdit(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
+    // What changes: the selection, else the planner's box around it (which
+    // may be part of an object), else the objects' boxes, else all drawn.
+    const boxed = reply.area.w > 0 && reply.area.h > 0 ? reply.area : null;
     const source = clampRect(
       args.selection ??
+        boxed ??
         unionOf(
           [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
         ) ??
@@ -232,26 +263,18 @@ export async function planEdit(args: {
       .map((i) => args.objects[i])
       .filter((r): r is Rect => !!r);
     const objects = reply.objects.filter((i) => !!args.objects[i]);
-    // Kept objects stay where they are, so the edit happens in place.
     return {
-      ...reply,
+      mode: reply.mode,
       objects,
       source,
+      // Kept objects stay where they are, so the edit happens in place.
       target: keep.length ? source : target,
       keep,
+      instruction: reply.instruction,
+      summary: reply.summary,
+      question: reply.question,
     };
   });
-}
-
-/** The box around all given rectangles; null when there are none. */
-function unionOf(rects: (Rect | undefined)[]): Rect | null {
-  const found = rects.filter((r): r is Rect => !!r);
-  if (!found.length) return null;
-  const x = Math.min(...found.map((r) => r.x));
-  const y = Math.min(...found.map((r) => r.y));
-  const right = Math.max(...found.map((r) => r.x + r.w));
-  const bottom = Math.max(...found.map((r) => r.y + r.h));
-  return { x, y, w: right - x, h: bottom - y };
 }
 
 /**
@@ -330,12 +353,25 @@ export async function planAnimation(args: {
   width: number;
   height: number;
   layers: { name: string; box: Rect | null }[];
+  objects: Rect[];
+  /** The name of the layer each object is on. */
+  objectLayers: string[];
   frames: number;
 }): Promise<AiResult<AnimationPlan>> {
   await requireUser();
   const { request, width, height } = args;
   const png = PNG_DATA_URL.exec(args.tile)?.[1];
+  // Input from the browser is untrusted, and a page still running older
+  // code may leave lists out.
+  const list = <T>(value: T[] | undefined) =>
+    Array.isArray(value) ? value : [];
+  const layers = list(args.layers);
+  const objects = list(args.objects);
+  const objectLayers = list(args.objectLayers).map((n) =>
+    String(n).slice(0, 40),
+  );
   const valid =
+    typeof request === "string" &&
     request.trim() &&
     png &&
     validSize(width) &&
@@ -343,14 +379,24 @@ export async function planAnimation(args: {
     Number.isInteger(args.frames) &&
     args.frames >= 0 &&
     args.frames <= MAX_FRAMES &&
-    args.layers.length <= MAX_OBJECTS;
+    layers.length <= MAX_OBJECTS &&
+    objects.length <= MAX_OBJECTS &&
+    objects.every((r) => [r.x, r.y, r.w, r.h].every(Number.isInteger));
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
   return attempt("planAnimation", async () => {
     const reply = await getAiProvider().animate(
       buildAnimationPrompt({
-        ...args,
-        layers: args.layers.map((l) => ({ ...l, name: l.name.slice(0, 40) })),
+        request,
+        width,
+        height,
+        frames: args.frames,
+        layers: layers.map((l) => ({
+          ...l,
+          name: String(l.name).slice(0, 40),
+        })),
+        objects,
+        objectLayers,
       }),
       { mimeType: "image/png", base64: png! },
     );
@@ -358,8 +404,9 @@ export async function planAnimation(args: {
       reply,
       width,
       height,
-      args.layers.length,
+      layers.length,
       args.frames,
+      objects.length,
     );
   });
 }
@@ -402,6 +449,7 @@ export async function generateSheet(args: {
       ...args,
       layout,
       fromReference: !!reference,
+      backdrop: ai.backdrop,
     });
     const { mimeType, base64 } = reference
       ? await ai.redraw(

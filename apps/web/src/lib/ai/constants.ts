@@ -1,4 +1,5 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
+import type { Backdrop } from "./types";
 
 /**
  * Waits between rounds: each round tries every model once, so a busy model is
@@ -19,6 +20,12 @@ export const OPENAI_BASE_URL = "https://api.openai.com/v1";
  * order after `AI_MODEL`.
  */
 export const OPENAI_TEXT_MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
+/**
+ * Stronger text models for the work that needs care: planning edits,
+ * placements and animations, and precise pixel edits. Tried in order after
+ * `AI_SMART_MODEL`.
+ */
+export const OPENAI_SMART_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
 /** Image models, tried in order after `AI_IMAGE_MODEL`; the mini one costs less. */
 export const OPENAI_IMAGE_MODELS = ["gpt-image-1-mini", "gpt-image-1"];
 /** The picture sizes gpt-image draws, by frame shape (width:height). */
@@ -27,6 +34,11 @@ export const OPENAI_IMAGE_SIZES: Record<string, string> = {
   "3:2": "1536x1024",
   "2:3": "1024x1536",
 };
+/**
+ * Image models that can keep an edited picture's details (faces above all)
+ * close to the original ("input_fidelity": "high"); the mini model can't.
+ */
+export const OPENAI_HIGH_FIDELITY_MODELS = ["gpt-image-1"];
 /** Picture quality when `AI_IMAGE_QUALITY` isn't set: low, medium or high. */
 export const OPENAI_IMAGE_QUALITY = "medium";
 /** gpt-image can take a minute or more for one picture. */
@@ -65,6 +77,8 @@ message; earlier messages are context, so short follow-ups like "and a dog too",
 - edit: any change to what is already drawn — recolour, outline, erase, move,
   resize, add a detail to it (a hat, a sword), change a pose, expression,
   clothes or style.
+- undo: they want the last change taken back or the picture as it was
+  before ("undo", "put it back", "верни як було").
 - animate: they want movement over several frames — an animation, a loop, a
   character doing an action ("a monkey that throws a grenade", "make the cat
   walk", "animate the flag waving"), new or already drawn.
@@ -95,23 +109,35 @@ export const CHAT_PROMPT =
   "You are the assistant of Pigxel, a pixel art editor. Answer briefly in plain " +
   "text, in the user's language. Never write JSON or pretend to call tools.";
 
-/** Appended to every generation prompt so the model draws a clean sprite. */
-/** Keeps the background cut-out-able; shared by new pictures and redraws. */
-export const IMAGE_BACKGROUND_RULES = [
-  `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
-  `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
-  "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
-  "no shadow cast behind or beneath it, no vignette.",
-  "No text, no watermark, no border, no extra objects.",
-];
+/**
+ * Keeps the subject alone so it can be cut out; shared by new pictures,
+ * redraws and sprite sheets. A model that draws real transparency (OpenAI)
+ * gets `transparent`; one that can't (Gemini) paints a flat magenta
+ * background that is keyed out afterwards (see cut-out-background.ts).
+ */
+export const IMAGE_BACKGROUND_RULES: Record<Backdrop, string[]> = {
+  transparent: [
+    "The background is fully transparent.",
+    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
+    "no shadow cast behind or beneath it, no vignette.",
+    "No text, no watermark, no border, no extra objects.",
+  ],
+  chroma: [
+    `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
+    `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
+    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
+    "no shadow cast behind or beneath it, no vignette.",
+    "No text, no watermark, no border, no extra objects.",
+  ],
+};
 
+/** How a sprite is drawn; the background rules come after these. */
 export const IMAGE_STYLE_RULES = [
   "crisp hard-edged pixels, no anti-aliasing, no blur.",
   "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
   "Rich hand-placed shading with hue-shifted shadows and highlights, texture on materials (cloth, metal, fur, stone), one clear light source from the top left.",
   "Muted, atmospheric palette with a few strong accent colours, dark outline.",
-  "The subject is centred, fills the frame, and is complete — nothing cropped.",
-  ...IMAGE_BACKGROUND_RULES,
+  "The subject is complete — nothing cropped by the edges.",
 ];
 
 /** Frame shapes Gemini's image models accept, as width:height. */
@@ -158,8 +184,19 @@ mode:
 
 objects: the numbers of ALL objects that change, from OBJECTS. Things are
 often drawn in several pieces: an aura, magic effects, particles or a held
-item are separate objects — include every piece of what changes. An empty
-list means the whole tile or the selected area.
+item are separate objects — include every piece of what changes. Things that
+touch are one object (a character with an orb in its hand): when a part of it
+changes, include that object. An empty list means the whole tile or the
+selected area.
+
+area: the box in tile pixels (x, y of the top-left, w, h) around exactly what
+changes. Usually the box of those objects; when only a part of an object
+changes (the orb in the hand, the eyes of a face), box just that part, with a
+pixel or two of margin. Keep it as small as the change allows: everything
+outside it is kept pixel for pixel. For changes in several places (the hand
+and the face), box all of them together. When something is added, the box
+also covers the empty space where it goes (the ground around the feet for
+skulls at the feet).
 
 keep: the numbers of objects that must stay exactly as they are but belong
 to the scene being changed — for example the character when only its aura
@@ -245,11 +282,30 @@ ${MAX_TRACKS} (each costs one picture). Things that do not move are not tracks.
   already exploded). Follow a believable path (a throw is an arc) with even
   spacing, and keep its size unless it comes closer or goes away.
   box: its size in the first frame it is seen; poses: empty.
-When a character holds something that later flies off, the character's
-poses show it in the hand until it is thrown, and a prop shows it from the
-frame it leaves the hand.
+  copy: when it is already drawn as a separate object in OBJECTS, that
+  object's number: its own pixels fly, nothing new is drawn. Otherwise -1.
+  grab: when it is already drawn but not as a separate object (a skull held
+  in a hand, touching it), the box in tile pixels around just that thing,
+  tight, and reuse = the number of its layer in LAYERS: it is cut out into a
+  layer of its own and its own pixels fly. Otherwise all zeros.
+When a character holds something that flies off, that thing is always a
+prop of its own (copy or grab), never part of the character's poses. Its
+path gives its place in every frame: in the hand, moving with it, until it
+is thrown, then along its flight. The character's poses show the hand
+without it (holding nothing), as the thing is drawn by the prop.
+Something never appears twice in a frame: in a sheet's pose and as a prop.
+Example: "the necromancer throws the skull in his hand", with the skull drawn
+in his hand on layer 0 "Necromancer" → two tracks: a sheet "Necromancer"
+(reuse 0; poses: wind-up holding nothing, throw, follow-through) and a prop
+"Skull" (grab: the tight box around the skull in his hand, reuse 0, copy -1;
+path: in the hand for the wind-up, then forward along an arc).
 reuse: when the request animates something already drawn (from LAYERS), that
-layer's number, so its look is kept; otherwise -1. Only a sheet can reuse.
+layer's number, so its look is kept; otherwise -1. A sheet reuses the layer
+it animates; a prop with grab names the layer the thing is cut from.
+
+Never add a new thing for something already drawn: animate it (reuse) or
+move its own pixels (copy or grab). Add tracks only for what the request asks to
+move; no extra effects, trails or objects unless asked.
 
 Keep everything inside the tile, where it fits the scene. Motion is smooth:
 neighbouring frames differ a little. A looping action (walk, idle, waving)

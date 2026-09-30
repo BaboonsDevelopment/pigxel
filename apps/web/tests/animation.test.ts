@@ -10,6 +10,9 @@ import { clampAnimationPlan, sheetLayout } from "@/lib/ai/helpers";
 import type { AnimationReply } from "@/lib/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { posesToFrames, splitSheet } from "@/lib/image/sheet";
+import { cropToContent } from "@/lib/image/steps/crop-to-content";
+import { neighbourMask } from "@/lib/edit/objects";
+import { alignToOriginal, paletteOf, snapToPalette } from "@/lib/edit/redraw";
 
 /** A `w × h` bitmap with an opaque `color` rectangle at `x`, `y`. */
 function drawing(
@@ -54,6 +57,8 @@ describe("animation plan", () => {
     subject: "a brown monkey holding a grenade",
     reuse: -1,
     box: { x: 2, y: 4, w: 40, h: 40 },
+    copy: -1,
+    grab: { x: 0, y: 0, w: 0, h: 0 },
     poses: ["wind up", "throw", "follow through"],
     path: [],
   };
@@ -63,6 +68,8 @@ describe("animation plan", () => {
     subject: "a small green grenade",
     reuse: -1,
     box: { x: 0, y: 0, w: 6, h: 6 },
+    copy: -1,
+    grab: { x: 0, y: 0, w: 0, h: 0 },
     poses: [],
     path: [
       { x: 0, y: 0, w: 6, h: 6, visible: false },
@@ -82,7 +89,7 @@ describe("animation plan", () => {
   });
 
   it("keeps boxes in the tile and gives one pose and place per frame", () => {
-    const plan = clampAnimationPlan(reply(), 32, 32, 0, 0);
+    const plan = clampAnimationPlan(reply(), 32, 32, 0, 0, 0);
     expect(plan.frameCount).toBe(3);
     const [monkey, grenade] = plan.tracks;
     expect(monkey).toMatchObject({ kind: "sheet", reuse: null });
@@ -94,16 +101,17 @@ describe("animation plan", () => {
     expect(grenade.path[2]!.x + grenade.path[2]!.w).toBeLessThanOrEqual(32);
   });
   it("follows the frame count asked for and stays within limits", () => {
-    const plan = clampAnimationPlan(reply(), 64, 64, 0, 5);
+    const plan = clampAnimationPlan(reply(), 64, 64, 0, 5, 0);
     expect(plan.frameCount).toBe(5);
     expect(plan.tracks[0]).toMatchObject({ poses: [...sheet.poses, "", ""] });
     expect(
-      clampAnimationPlan(reply({ frameCount: 99 }), 64, 64, 0, 0).frameCount,
+      clampAnimationPlan(reply({ frameCount: 99 }), 64, 64, 0, 0, 0).frameCount,
     ).toBe(MAX_FRAMES);
     const many = clampAnimationPlan(
       reply({ tracks: [sheet, sheet, sheet, sheet, prop] }),
       64,
       64,
+      0,
       0,
       0,
     );
@@ -122,6 +130,7 @@ describe("animation plan", () => {
       64,
       2,
       0,
+      0,
     );
     expect(plan.tracks).toHaveLength(1);
     expect(plan.tracks[0]).toMatchObject({ reuse: 1 });
@@ -131,6 +140,7 @@ describe("animation plan", () => {
         64,
         64,
         2,
+        0,
         0,
       ).tracks[0],
     ).toMatchObject({ reuse: null });
@@ -187,6 +197,131 @@ describe("edits across frames", () => {
       y: 44,
       w: 20,
       h: 20,
+    });
+  });
+});
+
+describe("what an edit may change", () => {
+  it("protects neighbours but not things lying mostly inside the area", () => {
+    // A 2×2 speck half inside the 9×4 area, a 2×6 bar mostly outside it.
+    const cel = drawing(10, 10, [
+      { x: 3, y: 3, w: 2, h: 2 },
+      { x: 8, y: 0, w: 2, h: 6 },
+    ]).rgba;
+    const area = { x: 0, y: 0, w: 4, h: 4 };
+    const mask = neighbourMask(cel, 10, 10, { ...area, w: 9 });
+    expect(mask[3 * 10 + 3]).toBe(0);
+    expect(mask[0 * 10 + 8]).toBe(1);
+    // In a smaller area, the speck lies mostly outside: a neighbour again.
+    expect(neighbourMask(cel, 10, 10, area)[3 * 10 + 3]).toBe(1);
+  });
+});
+
+describe("redraws keep the art's colours", () => {
+  it("snaps near colours to the art's palette and keeps new ones", () => {
+    const art = new Uint8ClampedArray([
+      ...[100, 50, 20, 255], // brown, almost the art's
+      ...[250, 220, 40, 255], // yellow, new
+      ...[0, 0, 0, 0], // empty
+    ]);
+    const palette = paletteOf(new Uint8ClampedArray([96, 54, 22, 255]));
+    expect([...snapToPalette(art, palette)]).toEqual([
+      ...[96, 54, 22, 255],
+      ...[250, 220, 40, 255],
+      ...[0, 0, 0, 0],
+    ]);
+  });
+});
+
+describe("lining a redraw up with the original", () => {
+  const box = (pixels: Uint8ClampedArray) => drawnBox(pixels, { w: 20, h: 20 });
+
+  it("moves and scales a drawing that came back a little off", () => {
+    const before = drawing(20, 20, [{ x: 5, y: 5, w: 10, h: 10 }]).rgba;
+    const after = drawing(20, 20, [{ x: 6, y: 5, w: 11, h: 10 }]).rgba;
+    expect(box(alignToOriginal(before, after, 20, 20))).toEqual({
+      x: 5,
+      y: 5,
+      w: 10,
+      h: 10,
+    });
+  });
+  it("leaves a clearly different drawing (a hat added on top) as it is", () => {
+    const before = drawing(20, 20, [{ x: 5, y: 8, w: 10, h: 10 }]).rgba;
+    const after = drawing(20, 20, [{ x: 5, y: 2, w: 10, h: 16 }]).rgba;
+    expect(alignToOriginal(before, after, 20, 20)).toBe(after);
+  });
+});
+
+describe("new pictures", () => {
+  it("crop the empty space around the subject before shrinking", () => {
+    const picture = drawing(40, 30, [{ x: 10, y: 5, w: 8, h: 12 }]);
+    const cropped = cropToContent(picture);
+    expect([cropped.w, cropped.h]).toEqual([8, 12]);
+    expect(drawnBox(cropped.rgba, cropped)).toEqual({
+      x: 0,
+      y: 0,
+      w: 8,
+      h: 12,
+    });
+  });
+});
+
+describe("animating what is already drawn", () => {
+  const prop = {
+    kind: "prop",
+    name: "Skull",
+    subject: "the skull in his hand",
+    reuse: -1,
+    box: { x: 0, y: 0, w: 0, h: 0 },
+    grab: { x: 0, y: 0, w: 0, h: 0 },
+    poses: [],
+    path: [
+      { x: 20, y: 10, w: 6, h: 6, visible: false },
+      { x: 30, y: 8, w: 6, h: 6, visible: true },
+    ],
+  };
+  it("flies the pixels of a drawn object it copies", () => {
+    const plan = clampAnimationPlan(
+      { tracks: [{ ...prop, copy: 2 }] },
+      32,
+      32,
+      0,
+      2,
+      3,
+    );
+    expect(plan.tracks[0]).toMatchObject({ kind: "prop", copy: 2 });
+  });
+  it("draws a new prop when it copies no known object", () => {
+    for (const copy of [-1, 3, 1.5]) {
+      const plan = clampAnimationPlan(
+        { tracks: [{ ...prop, copy }] },
+        32,
+        32,
+        0,
+        2,
+        3,
+      );
+      expect(plan.tracks[0]).toMatchObject({ kind: "prop", copy: null });
+    }
+  });
+  it("cuts a held thing out of its layer, given a box and the layer", () => {
+    const plan = clampAnimationPlan(
+      {
+        tracks: [
+          { ...prop, reuse: 1, copy: 0, grab: { x: 28, y: 10, w: 8, h: 8 } },
+        ],
+      },
+      32,
+      32,
+      2,
+      2,
+      3,
+    );
+    expect(plan.tracks[0]).toMatchObject({
+      kind: "prop",
+      copy: null,
+      grab: { layer: 1, area: { x: 28, y: 10, w: 4, h: 8 } },
     });
   });
 });

@@ -7,22 +7,19 @@ import {
   objectMask,
 } from "@/lib/edit/objects";
 import { applyOps, parseOps } from "@/lib/edit/ops";
-import { mergeRedraw } from "@/lib/edit/redraw";
-import type { Bitmap } from "@/lib/image/bitmap";
-import { imageToPixelArt } from "@/lib/image/helpers";
-import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
+import {
+  alignToOriginal,
+  mergeRedraw,
+  paletteOf,
+  snapToPalette,
+} from "@/lib/edit/redraw";
+import { cropBitmap, opaqueBox, type Bitmap } from "@/lib/image/bitmap";
 
 /**
  * Pure changes to a cel (full-tile RGBA of `size`) that the AI flows make:
  * each takes the cel as it is and returns it changed, so the flows decide
  * which cels to change and write them all back as one undo step.
  */
-
-/** A picture from the AI (a data URL), turned into pixel art at the area's size. */
-export async function toArt(dataUrl: string, area: Size): Promise<Bitmap> {
-  const image = await (await fetch(dataUrl)).blob();
-  return imageToPixelArt(image, area.w, area.h, GENERATED_PICTURE_STEPS);
-}
 
 /** An empty cel. */
 export const emptyCel = (size: Size): Uint8ClampedArray =>
@@ -37,19 +34,11 @@ export const paint = (
 ) => drawOnEmpty(cel, size.w, art, area);
 
 /** The box around what is drawn on a cel, or null when it is empty. */
-export function drawnBox(cel: Uint8ClampedArray, size: Size): Area | null {
-  let [x0, y0, x1, y1] = [size.w, size.h, -1, -1];
-  for (let i = 3, p = 0; i < cel.length; i += 4, p++) {
-    if (!cel[i]) continue;
-    const x = p % size.w;
-    const y = (p - x) / size.w;
-    x0 = Math.min(x0, x);
-    y0 = Math.min(y0, y);
-    x1 = Math.max(x1, x);
-    y1 = Math.max(y1, y);
-  }
-  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
-}
+export const drawnBox = (cel: Uint8ClampedArray, size: Size): Area | null =>
+  opaqueBox({ rgba: cel, ...size });
+
+/** Which drawn things an edit is about: those it changes and those it keeps. */
+export type EditScope = { changing: Area[]; keep: Area[] };
 
 /**
  * Pixels an edit of `area` may not change: neighbours reaching into it and
@@ -59,50 +48,64 @@ function protectedMask(
   cel: Uint8ClampedArray,
   size: Size,
   area: Area,
-  keep: Area[],
+  { changing, keep }: EditScope,
 ) {
-  const mask = neighbourMask(cel, size.w, size.h, area);
+  const mask = neighbourMask(cel, size.w, size.h, area, changing);
   objectMask(cel, size.w, size.h, keep).forEach((k, i) => k && (mask[i] = 1));
   return mask;
 }
 
 /**
  * Runs a precise edit's operations inside `area`; drawings that only reach
- * into it (a neighbour's edge) and the objects in `keep` stay as they are.
+ * into it (a neighbour's edge) and the objects kept stay as they are.
  */
 export function applyEdit(
   cel: Uint8ClampedArray,
   size: Size,
   edit: { ops: string[]; palette: Record<string, string> },
   area: Area,
-  keep: Area[],
+  scope: EditScope,
 ): { cel: Uint8ClampedArray; applied: number } {
   const { ops } = parseOps(edit.ops);
   const result = applyOps(cel, size.w, ops, edit.palette, area);
-  const mask = protectedMask(cel, size, area, keep);
+  const mask = protectedMask(cel, size, area, scope);
   return { cel: keepMasked(cel, result.pixels, mask), applied: result.applied };
 }
 
-/** Puts a redrawn picture of `area` back, changing only what differs. */
+/**
+ * Puts a redrawn picture of `area` back, in the art's own colours and
+ * changing only what differs, and nothing outside `only`.
+ */
 export function applyRedraw(
   cel: Uint8ClampedArray,
   size: Size,
   art: Bitmap,
   area: Area,
-  keep: Area[],
+  scope: EditScope,
+  only: Area = area,
 ): Uint8ClampedArray {
   const after = new Uint8ClampedArray(cel);
-  const current = new Uint8ClampedArray(area.w * area.h * 4);
-  for (let y = 0; y < area.h; y++) {
-    const from = ((area.y + y) * size.w + area.x) * 4;
-    current.set(cel.subarray(from, from + area.w * 4), y * area.w * 4);
-  }
-  const merged = mergeRedraw(current, art.rgba);
+  const current = cropBitmap({ rgba: cel, ...size }, area).rgba;
+  const redrawn = snapToPalette(
+    alignToOriginal(current, art.rgba, area.w, area.h),
+    paletteOf(cel),
+  );
+  const merged = mergeRedraw(current, redrawn);
   for (let y = 0; y < area.h; y++) {
     const row = merged.subarray(y * area.w * 4, (y + 1) * area.w * 4);
     after.set(row, ((area.y + y) * size.w + area.x) * 4);
   }
-  return keepMasked(cel, after, protectedMask(cel, size, area, keep));
+  const mask = protectedMask(cel, size, area, scope);
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++)
+      if (
+        x < only.x ||
+        y < only.y ||
+        x >= only.x + only.w ||
+        y >= only.y + only.h
+      )
+        mask[y * size.w + x] = 1;
+  return keepMasked(cel, after, mask);
 }
 
 /**
@@ -118,7 +121,7 @@ export function replaceObject(
   target: Area,
 ): Uint8ClampedArray {
   const { rest } = liftObjectsInside(cel, size.w, size.h, source);
-  return paint(rest, size, art.rgba, target);
+  return paint(rest, size, snapToPalette(art.rgba, paletteOf(cel)), target);
 }
 
 /** Moves the drawings inside `source` so its corner lands on `to`, pixel for pixel. */
@@ -174,12 +177,9 @@ export function follow(
   };
 }
 
-/** The box around every given area, or null when there are none. */
-export function unionOf(areas: Area[]): Area | null {
-  if (!areas.length) return null;
-  const x = Math.min(...areas.map((a) => a.x));
-  const y = Math.min(...areas.map((a) => a.y));
-  const right = Math.max(...areas.map((a) => a.x + a.w));
-  const bottom = Math.max(...areas.map((a) => a.y + a.h));
-  return { x, y, w: right - x, h: bottom - y };
+/** Whether two cels hold exactly the same pixels. */
+export function samePixels(a: Uint8ClampedArray, b: Uint8ClampedArray) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
 }

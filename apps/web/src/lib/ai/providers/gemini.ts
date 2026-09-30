@@ -41,8 +41,8 @@ type GeminiContent = {
 
 export function createGeminiProvider(
   apiKey: string,
-  /** Models to try in order, for text and for pictures. */
-  models: { text: string[]; image: string[] },
+  /** Models to try in order: for talk, for plans and pixel edits, for pictures. */
+  models: { text: string[]; smart: string[]; image: string[] },
 ): AiProvider {
   /** Sends a request, moving on to the next model when one can't answer. */
   const request = (
@@ -76,7 +76,7 @@ export function createGeminiProvider(
   /** A JSON answer to `prompt` about the picture `tile`, shaped by `schema`. */
   const look = async (prompt: string, tile: GeneratedImage, schema: object) =>
     textOf(
-      await request(models.text, {
+      await request(models.smart, {
         contents: [
           {
             role: "user",
@@ -107,6 +107,9 @@ export function createGeminiProvider(
 
   return {
     aspectRatios: GEMINI_ASPECT_RATIOS,
+    backdrop: "chroma",
+    // No mask: the edit is still limited to its part when put on the tile.
+    masks: false,
 
     async route(messages) {
       const parts = await request(models.text, {
@@ -136,7 +139,7 @@ export function createGeminiProvider(
     },
 
     async edit(system, user) {
-      const parts = await request(models.text, {
+      const parts = await request(models.smart, {
         contents: [{ role: "user", parts: [{ text: user }] }],
         systemInstruction: { parts: [{ text: system }] },
         generationConfig: {
@@ -189,6 +192,7 @@ export function createGeminiProvider(
           mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
           objects: { type: "ARRAY", items: INTEGER },
           keep: { type: "ARRAY", items: INTEGER },
+          area: RECT,
           target: RECT,
           instruction: STRING,
           summary: STRING,
@@ -215,6 +219,8 @@ export function createGeminiProvider(
               subject: STRING,
               reuse: INTEGER,
               box: RECT,
+              copy: INTEGER,
+              grab: RECT,
               poses: { type: "ARRAY", items: STRING },
               path: {
                 type: "ARRAY",

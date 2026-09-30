@@ -4,6 +4,20 @@ export type RGBA = { r: number; g: number; b: number; a: number };
 
 export const TRANSPARENT: RGBA = { r: 0, g: 0, b: 0, a: 0 };
 
+export const sameRect = (a: Rect, b: Rect) =>
+  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+/** The box around every given rectangle, or null when there are none. */
+export function unionOf(rects: (Rect | undefined)[]): Rect | null {
+  const found = rects.filter((r): r is Rect => !!r);
+  if (!found.length) return null;
+  const x = Math.min(...found.map((r) => r.x));
+  const y = Math.min(...found.map((r) => r.y));
+  const right = Math.max(...found.map((r) => r.x + r.w));
+  const bottom = Math.max(...found.map((r) => r.y + r.h));
+  return { x, y, w: right - x, h: bottom - y };
+}
+
 export function hexToRgba(hex: string): RGBA {
   const v = hex.replace("#", "");
   const full = v.length === 3 ? [...v].map((c) => c + c).join("") : v;

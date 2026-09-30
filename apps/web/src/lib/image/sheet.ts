@@ -1,5 +1,5 @@
 import { components, type Component } from "@/lib/edit/objects";
-import type { Bitmap, Size } from "./bitmap";
+import { cropBitmap, type Bitmap, type Size } from "./bitmap";
 import { decodeImage } from "./decode";
 import { imageToSprite } from "./quantize";
 import { cutOutBackground } from "./steps/cut-out-background";
@@ -110,21 +110,13 @@ export function posesToFrames(
   let next = 0;
   return poses.map((pose) => {
     if (!pose) return null;
-    const slot = removeStrayPixels(crop(small, next++ * w, 0, w, h));
+    const slot = removeStrayPixels(
+      cropBitmap(small, { x: next++ * w, y: 0, w, h }),
+    );
     const frame = blank(box.w, box.h);
     paste(frame, slot, Math.floor((box.w - w) / 2), box.h - h);
     return frame;
   });
-}
-
-/** The `w × h` part of `image` at `x`, `y`. */
-function crop(image: Bitmap, x: number, y: number, w: number, h: number) {
-  const out = blank(w, h);
-  for (let row = 0; row < h; row++) {
-    const from = ((y + row) * image.w + x) * 4;
-    out.rgba.set(image.rgba.subarray(from, from + w * 4), row * w * 4);
-  }
-  return out;
 }
 
 /**
