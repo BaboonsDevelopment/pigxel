@@ -112,6 +112,7 @@ describe("profiles", () => {
     avatar_path: null,
     visibility: "public",
     created_at: "2026-09-29T10:00:00Z",
+    premium_since: null,
   };
   it("show the chosen picture", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://project.supabase.co");

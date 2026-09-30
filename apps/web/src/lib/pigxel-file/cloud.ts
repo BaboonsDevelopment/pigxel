@@ -39,9 +39,16 @@ const filePath = (row: { id: string; user_id: string }) =>
 
 /** The person's cloud tiles, most recently changed first. */
 export async function listCloudTiles(): Promise<CloudTileSummary[]> {
-  const { data, error } = await createClient()
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new CloudError("Sign in again to see your tiles.");
+  const { data, error } = await supabase
     .from("tiles")
     .select("id, user_id, name, width, height, thumbnail, updated_at")
+    // Others' public tiles are readable too; this list is only your own.
+    .eq("user_id", session.user.id)
     .order("updated_at", { ascending: false })
     .limit(200);
   if (error) throw new CloudError("Couldn’t load your Pigxel cloud tiles.");

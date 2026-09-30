@@ -9,8 +9,14 @@ import { Page } from "@pigxel/ui/components/page";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { ProfileGallery } from "@/components/profile/profile-gallery";
 import { ProfileHeader } from "@/components/profile/profile-header";
+import { ProfileStats } from "@/components/profile/profile-stats";
 import { requireUser } from "@/lib/auth/session";
-import { findProfile, listProfileTiles } from "@/lib/profile/server";
+import {
+  findProfile,
+  getFollowStats,
+  getProfileActivity,
+  listProfileTiles,
+} from "@/lib/profile/server";
 import { normalizeUsername, usernameError } from "@/lib/profile/validation";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +57,11 @@ export default async function ArtistProfilePage({ params }: Props) {
 
   const { profile } = lookup;
   const isOwner = profile.id === user.id;
-  const { tiles, count } = await listProfileTiles(profile.id);
+  const [{ tiles, count }, follows, activity] = await Promise.all([
+    listProfileTiles(profile.id),
+    getFollowStats(profile.id, user.id),
+    getProfileActivity(profile.id),
+  ]);
 
   return (
     <Page>
@@ -64,7 +74,19 @@ export default async function ArtistProfilePage({ params }: Props) {
         </Notice>
       )}
 
-      <ProfileHeader profile={profile} artCount={count} isOwner={isOwner} />
+      <ProfileHeader profile={profile} isOwner={isOwner} follows={follows} />
+
+      <ProfileGallery tiles={tiles} isOwner={isOwner}>
+        <ProfileStats
+          activity={activity}
+          artCount={count}
+          publishedCount={
+            isOwner
+              ? tiles.filter((tile) => tile.visibility === "public").length
+              : undefined
+          }
+        />
+      </ProfileGallery>
 
       {tiles.length === 0 ? (
         <EmptyState
@@ -89,15 +111,12 @@ export default async function ArtistProfilePage({ params }: Props) {
           }
         />
       ) : (
-        <>
-          <ProfileGallery tiles={tiles} isOwner={isOwner} />
-          {isOwner && (
-            <FormMessage className="mt-8 text-xs">
-              Only tiles saved to Pigxel cloud appear here. Private arts are
-              visible to you alone; publish them to show them on your profile.
-            </FormMessage>
-          )}
-        </>
+        isOwner && (
+          <FormMessage className="mt-8 text-xs">
+            Only tiles saved to Pigxel cloud appear here. Private arts are
+            visible to you alone; publish them to show them on your profile.
+          </FormMessage>
+        )
       )}
     </Page>
   );

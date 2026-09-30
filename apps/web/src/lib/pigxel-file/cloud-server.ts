@@ -8,6 +8,7 @@ import { toSummary, type CloudTileSummary } from "./cloud";
  * server-rendered pages; empty if unavailable.
  */
 export async function listCloudTilesOnServer(
+  userId: string,
   limit = 200,
 ): Promise<CloudTileSummary[]> {
   if (!isSupabaseConfigured()) return [];
@@ -15,6 +16,8 @@ export async function listCloudTilesOnServer(
   const { data, error } = await supabase
     .from("tiles")
     .select("id, user_id, name, width, height, thumbnail, updated_at")
+    // Others' public tiles are readable too; this list is only your own.
+    .eq("user_id", userId)
     .order("updated_at", { ascending: false })
     .limit(limit);
   // Also covers the tiles table not being set up yet.

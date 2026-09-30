@@ -12,10 +12,8 @@ export const metadata: Metadata = { title: "My projects · Pigxel" };
 export const dynamic = "force-dynamic";
 
 export default async function Tiles() {
-  const [user, cloudTiles] = await Promise.all([
-    requireUser(),
-    listCloudTilesOnServer(),
-  ]);
+  const user = await requireUser();
+  const cloudTiles = await listCloudTilesOnServer(user.id);
   return (
     <Page>
       <PageHeader

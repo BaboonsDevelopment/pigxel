@@ -114,3 +114,56 @@ export async function listProfileTiles(
     })),
   };
 }
+
+/** How many follow the artist, and whether the viewer is one of them. */
+export async function getFollowStats(
+  profileId: string,
+  viewerId: string,
+): Promise<{ followers: number; following: boolean }> {
+  const supabase = await createClient();
+  const [all, mine] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("followee_id", profileId),
+    supabase
+      .from("follows")
+      .select("follower_id")
+      .eq("followee_id", profileId)
+      .eq("follower_id", viewerId)
+      .maybeSingle(),
+  ]);
+  return { followers: all.count ?? 0, following: Boolean(mine.data) };
+}
+
+export type ProfileActivity = {
+  /** Arts worked on per UTC day, keyed "YYYY-MM-DD", over about the last year. */
+  days: Map<string, number>;
+  /** Midnight UTC today, where the heatmap ends. */
+  today: number;
+};
+
+export async function getProfileActivity(
+  profileId: string,
+): Promise<ProfileActivity> {
+  const now = new Date();
+  const today = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("profile_activity", {
+    profile_id: profileId,
+  });
+  if (error || !data) return { days: new Map(), today };
+  return {
+    days: new Map(
+      (data as { day: string; arts: number }[]).map((row) => [
+        row.day,
+        row.arts,
+      ]),
+    ),
+    today,
+  };
+}
