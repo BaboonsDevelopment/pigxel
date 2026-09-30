@@ -1,10 +1,17 @@
 "use server";
 
-import { MAX_FRAMES, MAX_HISTORY, PLACEMENT_HISTORY } from "@/lib/ai/constants";
+import {
+  MAX_FRAMES,
+  MAX_HISTORY,
+  MAX_REFERENCES,
+  PLACEMENT_HISTORY,
+} from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
   buildAnimationPrompt,
+  buildAnimationReviewPrompt,
   buildComposePrompt,
+  buildEditReviewPrompt,
   buildEditSystemPrompt,
   buildEditUserMessage,
   buildImagePrompt,
@@ -12,20 +19,23 @@ import {
   buildPlanPrompt,
   buildRedrawPrompt,
   buildSheetPrompt,
+  clampAnimationFixes,
   clampAnimationPlan,
   clampRect,
   closestAspectRatio,
+  refitPlan,
   sheetLayout,
   type SheetLayout,
 } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
-  Backdrop,
+  AnimationFixes,
   AnimationPlan,
   ChatMessage,
   EditPlan,
   EditReply,
+  EditReview,
   PlacementPlan,
   Rect,
 } from "@/lib/ai/types";
@@ -36,6 +46,9 @@ import { requireUser } from "@/lib/auth/session";
 const MAX_GRID = 256;
 /** A PNG data URL of at most ~1.5 MB, capturing its base64 payload. */
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]{1,2000000})$/;
+/** A picture the user attached, the same size at most: its type and payload. */
+const IMAGE_DATA_URL =
+  /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/;
 /** Guards against oversized requests; a full 256×256 tile grid is ~70k. */
 const MAX_GRID_TEXT = 100_000;
 
@@ -82,30 +95,33 @@ export async function sendMessage(
   });
 }
 
-/**
- * What the image model puts behind a subject. Pictures sent to it as a
- * reference match: transparent, or on the magenta it keys out.
- */
-export async function imageBackdrop(): Promise<Backdrop> {
-  await requireUser();
-  return getAiProvider().backdrop;
-}
-
 /** Draws `subject` as pixel art for a `width × height` grid; returns a data URL. */
 export async function generateImage(
   subject: string,
   width: number,
   height: number,
+  /** Pictures the user attached to draw from, as data URLs. */
+  references: string[] = [],
 ): Promise<AiResult<string>> {
   await requireUser();
-  if (!subject.trim() || !validSize(width) || !validSize(height)) {
+  const pictures = (Array.isArray(references) ? references : []).map((r) =>
+    IMAGE_DATA_URL.exec(String(r)),
+  );
+  if (
+    !subject.trim() ||
+    !validSize(width) ||
+    !validSize(height) ||
+    pictures.length > MAX_REFERENCES ||
+    pictures.some((p) => !p)
+  ) {
     return { ok: false, error: "That area cannot be used for a picture." };
   }
   return attempt("generateImage", async () => {
-    const ai = getAiProvider();
-    const { mimeType, base64 } = await ai.generate(
-      buildImagePrompt(subject, width, height, ai.backdrop),
-      closestAspectRatio(width, height, ai.aspectRatios),
+    const { mimeType, base64 } = await getAiProvider().generate(
+      buildImagePrompt(subject, width, height, pictures.length > 0),
+      closestAspectRatio(width, height),
+      true,
+      pictures.map((p) => ({ mimeType: p![1]!, base64: p![2]! })),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -134,34 +150,17 @@ export async function redrawArea(
   picture: string,
   width: number,
   height: number,
-  options: {
-    /** A PNG data URL of the same size, transparent where the picture may change. */
-    mask?: string | null;
-    /** The picture is the tile's pixels shown enlarged, not the AI's own picture. */
-    enlarged?: boolean;
-  } = {},
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
-  const maskPng = options.mask ? PNG_DATA_URL.exec(options.mask)?.[1] : null;
-  const valid =
-    request.trim() &&
-    png &&
-    maskPng !== undefined &&
-    validSize(width) &&
-    validSize(height);
-  if (!valid) return { ok: false, error: "That area cannot be redrawn." };
+  if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
+    return { ok: false, error: "That area cannot be redrawn." };
+  }
   return attempt("redrawArea", async () => {
-    const ai = getAiProvider();
-    const mask = ai.masks && maskPng ? maskPng : null;
-    const { mimeType, base64 } = await ai.redraw(
-      buildRedrawPrompt(request, width, height, ai.backdrop, {
-        masked: !!mask,
-        enlarged: options.enlarged === true,
-      }),
-      { mimeType: "image/png", base64: png! },
-      closestAspectRatio(width, height, ai.aspectRatios),
-      mask ? { mimeType: "image/png", base64: mask } : undefined,
+    const { mimeType, base64 } = await getAiProvider().redraw(
+      buildRedrawPrompt(request, width, height),
+      { mimeType: "image/png", base64: png },
+      closestAspectRatio(width, height),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -237,12 +236,8 @@ export async function planEdit(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
-    // What changes: the selection, else the planner's box around it (which
-    // may be part of an object), else the objects' boxes, else all drawn.
-    const boxed = reply.area.w > 0 && reply.area.h > 0 ? reply.area : null;
     const source = clampRect(
       args.selection ??
-        boxed ??
         unionOf(
           [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
         ) ??
@@ -412,6 +407,72 @@ export async function planAnimation(args: {
 }
 
 /**
+ * Looks at an edit before it is applied: `before` and `after` are PNG data
+ * URLs of the same area of the layer. Free (text model).
+ */
+export async function reviewEdit(args: {
+  request: string;
+  instruction: string;
+  before: string;
+  after: string;
+}): Promise<AiResult<EditReview>> {
+  await requireUser();
+  const before = PNG_DATA_URL.exec(args.before)?.[1];
+  const after = PNG_DATA_URL.exec(args.after)?.[1];
+  if (!args.request?.trim() || !before || !after)
+    return { ok: false, error: "The edit could not be checked." };
+  return attempt("reviewEdit", () =>
+    getAiProvider().reviewEdit(
+      buildEditReviewPrompt(
+        args.request.slice(0, 1000),
+        String(args.instruction ?? "").slice(0, 1000),
+      ),
+      { mimeType: "image/png", base64: before },
+      { mimeType: "image/png", base64: after },
+    ),
+  );
+}
+
+/**
+ * Looks at an animation before it is applied: `frames` is a PNG data URL of
+ * its frames side by side, `plan` what they were drawn from. Free (text model).
+ */
+export async function reviewAnimation(args: {
+  request: string;
+  plan: AnimationPlan;
+  frames: string;
+  width: number;
+  height: number;
+}): Promise<AiResult<AnimationFixes>> {
+  await requireUser();
+  const { width, height } = args;
+  const png = PNG_DATA_URL.exec(args.frames)?.[1];
+  const valid =
+    typeof args.request === "string" &&
+    png &&
+    validSize(width) &&
+    validSize(height) &&
+    Array.isArray(args.plan?.tracks);
+  if (!valid)
+    return { ok: false, error: "The animation could not be checked." };
+  return attempt("reviewAnimation", async () => {
+    // The plan comes back from the browser: it is fitted to the tile again
+    // before the checker hears of it, and the answer is fitted to it.
+    const plan = refitPlan(args.plan, width, height);
+    const reply = await getAiProvider().reviewAnimation(
+      buildAnimationReviewPrompt(
+        args.request.slice(0, 1000),
+        plan,
+        width,
+        height,
+      ),
+      { mimeType: "image/png", base64: png! },
+    );
+    return clampAnimationFixes(reply, plan, width, height);
+  });
+}
+
+/**
  * Draws `subject` in every pose as one sprite sheet (paid), each cell sized
  * for `cellW × cellH` tile pixels. With `reference` (a PNG data URL of what
  * is already drawn), its look is kept. Returns the picture and its grid.
@@ -439,25 +500,20 @@ export async function generateSheet(args: {
 
   return attempt("generateSheet", async () => {
     const ai = getAiProvider();
-    const layout = sheetLayout(
-      args.poses.length,
-      args.cellW,
-      args.cellH,
-      ai.aspectRatios,
-    );
+    const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const prompt = buildSheetPrompt({
       ...args,
       layout,
       fromReference: !!reference,
-      backdrop: ai.backdrop,
     });
     const { mimeType, base64 } = reference
       ? await ai.redraw(
           prompt,
           { mimeType: "image/png", base64: reference },
           layout.aspectRatio,
+          false,
         )
-      : await ai.generate(prompt, layout.aspectRatio);
+      : await ai.generate(prompt, layout.aspectRatio, false);
     return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }

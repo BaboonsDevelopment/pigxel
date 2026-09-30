@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Card } from "@pigxel/ui/components/card";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import {
+  Lead,
+  SectionTitle,
+  textLinkClassName,
+} from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
@@ -19,6 +24,15 @@ export default async function SubscriptionSettings() {
           Plus, Pro and Ultimate plans are coming soon. When they arrive, you’ll
           upgrade, change your payment method and see invoices here.
         </Lead>
+        <p className="mt-4 text-sm">
+          <Link href="/pricing" className={textLinkClassName}>
+            See plans and pricing
+          </Link>
+          {" · "}
+          <Link href="/refunds" className={textLinkClassName}>
+            Refund Policy
+          </Link>
+        </p>
       </Card>
     </section>
   );

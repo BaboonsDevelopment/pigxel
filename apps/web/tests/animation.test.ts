@@ -1,18 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { drawnBox, follow } from "@/components/chat-panel/helpers";
+import { drawnBox, follow, frameStrip } from "@/components/chat-panel/helpers";
+import { ASPECT_RATIOS, MAX_FRAMES, MAX_TRACKS } from "@/lib/ai/constants";
 import {
-  GEMINI_ASPECT_RATIOS,
-  MAX_FRAMES,
-  MAX_TRACKS,
-  OPENAI_IMAGE_SIZES,
-} from "@/lib/ai/constants";
-import { clampAnimationPlan, sheetLayout } from "@/lib/ai/helpers";
-import type { AnimationReply } from "@/lib/ai/types";
+  clampAnimationFixes,
+  clampAnimationPlan,
+  sheetLayout,
+} from "@/lib/ai/helpers";
+import type { AnimationPlan, AnimationReply } from "@/lib/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { posesToFrames, splitSheet } from "@/lib/image/sheet";
-import { cropToContent } from "@/lib/image/steps/crop-to-content";
-import { neighbourMask } from "@/lib/edit/objects";
-import { alignToOriginal, paletteOf, snapToPalette } from "@/lib/edit/redraw";
 
 /** A `w × h` bitmap with an opaque `color` rectangle at `x`, `y`. */
 function drawing(
@@ -29,24 +25,14 @@ function drawing(
 }
 
 describe("sprite sheet layout", () => {
-  const openai = Object.keys(OPENAI_IMAGE_SIZES);
-
   it("fits every frame in a grid of a shape the image model can draw", () => {
-    for (const ratios of [openai, GEMINI_ASPECT_RATIOS])
-      for (const count of [1, 2, 4, 6, 8, 12]) {
-        const layout = sheetLayout(count, 32, 32, ratios);
-        expect(layout.cols * layout.rows).toBeGreaterThanOrEqual(count);
-        expect(ratios).toContain(layout.aspectRatio);
-      }
-    expect(sheetLayout(4, 32, 32, openai)).toMatchObject({ cols: 2, rows: 2 });
-    expect(sheetLayout(3, 16, 48, GEMINI_ASPECT_RATIOS)).toMatchObject({
-      cols: 3,
-      rows: 1,
-    });
-    // Only square, landscape and portrait: six square frames fill a 2:3 grid exactly.
-    const six = sheetLayout(6, 32, 32, openai);
-    expect(six.cols * six.rows).toBe(6);
-    expect(["2:3", "3:2"]).toContain(six.aspectRatio);
+    for (const count of [1, 2, 4, 6, 8, 12]) {
+      const layout = sheetLayout(count, 32, 32);
+      expect(layout.cols * layout.rows).toBeGreaterThanOrEqual(count);
+      expect(ASPECT_RATIOS).toContain(layout.aspectRatio);
+    }
+    expect(sheetLayout(4, 32, 32)).toMatchObject({ cols: 2, rows: 2 });
+    expect(sheetLayout(3, 16, 48)).toMatchObject({ cols: 3, rows: 1 });
   });
 });
 
@@ -148,6 +134,20 @@ describe("animation plan", () => {
 });
 
 describe("sprite sheet to frames", () => {
+  it("reads poses as drawn, even on another grid than asked for", () => {
+    // Asked for 3×2, drawn 2×3: poses of widths 10..15, each with a small
+    // separate part (a carrot) close to it.
+    const rects = [0, 1, 2, 3, 4, 5].flatMap((i) => {
+      const x = (i % 2) * 50 + 5;
+      const y = Math.floor(i / 2) * 50 + 5;
+      return [
+        { x, y, w: 10 + i, h: 20 },
+        { x: x + 12 + i, y: y + 5, w: 3, h: 3 },
+      ];
+    });
+    const poses = splitSheet(drawing(100, 150, rects), { cols: 3, rows: 2 }, 6);
+    expect(poses.map((p) => p?.w)).toEqual([15, 16, 17, 18, 19, 20]);
+  });
   it("gives each cell its own pose, even one reaching past the cell", () => {
     // Three cells of about 13px; the second pose reaches into the first, the third is empty.
     const sheet = drawing(40, 20, [
@@ -197,72 +197,6 @@ describe("edits across frames", () => {
       y: 44,
       w: 20,
       h: 20,
-    });
-  });
-});
-
-describe("what an edit may change", () => {
-  it("protects neighbours but not things lying mostly inside the area", () => {
-    // A 2×2 speck half inside the 9×4 area, a 2×6 bar mostly outside it.
-    const cel = drawing(10, 10, [
-      { x: 3, y: 3, w: 2, h: 2 },
-      { x: 8, y: 0, w: 2, h: 6 },
-    ]).rgba;
-    const area = { x: 0, y: 0, w: 4, h: 4 };
-    const mask = neighbourMask(cel, 10, 10, { ...area, w: 9 });
-    expect(mask[3 * 10 + 3]).toBe(0);
-    expect(mask[0 * 10 + 8]).toBe(1);
-    // In a smaller area, the speck lies mostly outside: a neighbour again.
-    expect(neighbourMask(cel, 10, 10, area)[3 * 10 + 3]).toBe(1);
-  });
-});
-
-describe("redraws keep the art's colours", () => {
-  it("snaps near colours to the art's palette and keeps new ones", () => {
-    const art = new Uint8ClampedArray([
-      ...[100, 50, 20, 255], // brown, almost the art's
-      ...[250, 220, 40, 255], // yellow, new
-      ...[0, 0, 0, 0], // empty
-    ]);
-    const palette = paletteOf(new Uint8ClampedArray([96, 54, 22, 255]));
-    expect([...snapToPalette(art, palette)]).toEqual([
-      ...[96, 54, 22, 255],
-      ...[250, 220, 40, 255],
-      ...[0, 0, 0, 0],
-    ]);
-  });
-});
-
-describe("lining a redraw up with the original", () => {
-  const box = (pixels: Uint8ClampedArray) => drawnBox(pixels, { w: 20, h: 20 });
-
-  it("moves and scales a drawing that came back a little off", () => {
-    const before = drawing(20, 20, [{ x: 5, y: 5, w: 10, h: 10 }]).rgba;
-    const after = drawing(20, 20, [{ x: 6, y: 5, w: 11, h: 10 }]).rgba;
-    expect(box(alignToOriginal(before, after, 20, 20))).toEqual({
-      x: 5,
-      y: 5,
-      w: 10,
-      h: 10,
-    });
-  });
-  it("leaves a clearly different drawing (a hat added on top) as it is", () => {
-    const before = drawing(20, 20, [{ x: 5, y: 8, w: 10, h: 10 }]).rgba;
-    const after = drawing(20, 20, [{ x: 5, y: 2, w: 10, h: 16 }]).rgba;
-    expect(alignToOriginal(before, after, 20, 20)).toBe(after);
-  });
-});
-
-describe("new pictures", () => {
-  it("crop the empty space around the subject before shrinking", () => {
-    const picture = drawing(40, 30, [{ x: 10, y: 5, w: 8, h: 12 }]);
-    const cropped = cropToContent(picture);
-    expect([cropped.w, cropped.h]).toEqual([8, 12]);
-    expect(drawnBox(cropped.rgba, cropped)).toEqual({
-      x: 0,
-      y: 0,
-      w: 8,
-      h: 12,
     });
   });
 });
@@ -323,5 +257,111 @@ describe("animating what is already drawn", () => {
       copy: null,
       grab: { layer: 1, area: { x: 28, y: 10, w: 4, h: 8 } },
     });
+  });
+});
+
+describe("checking an animation", () => {
+  const plan: AnimationPlan = {
+    name: "Beaver Hops",
+    frameCount: 4,
+    duration: 100,
+    summary: "",
+    tracks: [
+      {
+        kind: "sheet",
+        name: "Beaver",
+        subject: "a beaver",
+        reuse: null,
+        box: { x: 0, y: 0, w: 16, h: 16 },
+        poses: ["crouch", "jump", "land", ""],
+      },
+      {
+        kind: "prop",
+        name: "Carrot",
+        subject: "a carrot",
+        copy: null,
+        grab: null,
+        path: [null, { x: 2, y: 2, w: 4, h: 4 }, null, null],
+      },
+    ],
+  };
+  const fixes = (fix: object, ok = false) =>
+    clampAnimationFixes(
+      { ok, problem: "Frames were mixed up.", fixes: [fix as never] },
+      plan,
+      32,
+      32,
+    );
+
+  it("fixes nothing when all is fine", () => {
+    expect(fixes({ track: 0, order: [2, 1, 3, 4] }, true)).toEqual({
+      problem: "",
+      tracks: [],
+    });
+  });
+  it("puts a sheet's drawings in order, only among frames it is seen in", () => {
+    const [fix] = fixes({ track: 0, order: [2, 1, 3, 1], redraw: [] }).tracks;
+    expect(fix).toMatchObject({ track: 0, order: [1, 0, 2, 3], path: null });
+    // Unchanged order and nothing else to do: no fix.
+    expect(fixes({ track: 0, order: [1, 2, 3, 4] }).tracks).toEqual([]);
+  });
+  it("draws again only a few frames the sheet is seen in", () => {
+    const [fix] = fixes({
+      track: 0,
+      order: [],
+      redraw: [
+        { frame: 2, pose: "high jump" },
+        { frame: 2, pose: "again" },
+        { frame: 4, pose: "hidden frame" },
+        { frame: 1, pose: "" },
+        { frame: 3, pose: "one too many" },
+      ],
+    }).tracks;
+    expect(fix?.redraw).toEqual([
+      { frame: 1, pose: "high jump" },
+      { frame: 0, pose: "crouch" },
+    ]);
+  });
+  it("gives a prop a new path inside the tile, one box per frame", () => {
+    const box = { x: 30, y: 0, w: 8, h: 4, visible: true };
+    const hidden = { ...box, visible: false };
+    const [fix] = fixes({
+      track: 1,
+      path: [hidden, box, box, hidden],
+    }).tracks;
+    expect(fix?.path).toEqual([
+      null,
+      { x: 30, y: 0, w: 2, h: 4 },
+      { x: 30, y: 0, w: 2, h: 4 },
+      null,
+    ]);
+    expect(fixes({ track: 1, path: [box] }).tracks).toEqual([]);
+    expect(fixes({ track: 5, path: [box, box, box, box] }).tracks).toEqual([]);
+  });
+});
+
+describe("frames shown to the checker", () => {
+  it("lays frames side by side with a line between, layers stacked", () => {
+    const size = { w: 2, h: 1 };
+    const red = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]);
+    const blue = new Uint8ClampedArray([0, 0, 0, 0, 0, 0, 255, 255]);
+    const strip = frameStrip(
+      [
+        [red, null],
+        [blue, blue],
+      ],
+      2,
+      size,
+      [9, 9, 9],
+    );
+    expect(strip.w).toBe(5);
+    const pixel = (x: number) => [...strip.rgba.subarray(x * 4, x * 4 + 4)];
+    expect([0, 1, 2, 3, 4].map(pixel)).toEqual([
+      [255, 0, 0, 255],
+      [0, 0, 255, 255],
+      [9, 9, 9, 255],
+      [0, 0, 0, 0],
+      [0, 0, 255, 255],
+    ]);
   });
 });

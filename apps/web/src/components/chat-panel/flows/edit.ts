@@ -1,18 +1,16 @@
 import type { Area } from "@/components/pixel-canvas/constants";
-import { snapshotMask } from "@/components/pixel-canvas/helpers";
 import { editTile, planEdit, redrawArea } from "@/lib/ai/actions";
 import type { EditPlan, TileAction } from "@/lib/ai/types";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
-import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
+import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import {
   ASK_FRAME,
   ASK_SELECT,
   NO_LAYER,
   UNREACHABLE,
   type Chat,
-  type PictureSource,
 } from "../constants";
 import {
   applyEdit,
@@ -20,11 +18,10 @@ import {
   follow,
   moveObject,
   replaceObject,
-  drawnBox,
   samePixels,
-  type EditScope,
 } from "../helpers";
-import { referenceBackground, shrinkPicture, toArt } from "./pictures";
+import { toArt } from "./pictures";
+import { checkEdit } from "./review";
 
 /** New cels by frame id, written back as one undo step. */
 type Cels = Map<string, Uint8ClampedArray>;
@@ -34,18 +31,7 @@ type Cels = Map<string, Uint8ClampedArray>;
  * the frame on screen; in other frames the drawing may sit elsewhere, so
  * there the edit covers all of it and follows the planned move or resize.
  */
-/**
- * One frame's part of an edit. `source` is what changes and `target` where
- * the result goes; `context` is what the image model is shown around it
- * (the whole drawing), so a redraw of a part fits the rest.
- */
-type Step = {
-  frame: string;
-  source: Area;
-  target: Area;
-  context: Area;
-  scope: EditScope;
-};
+type Step = { frame: string; source: Area; target: Area; keep: Area[] };
 
 /**
  * Any change to what is drawn. The planner looks at the tile and decides what
@@ -97,34 +83,20 @@ export async function edit(chat: Chat, action: TileAction) {
   const current = canvas.frameId();
   const frames = canvas.framesOf(layerId);
   const steps: Step[] = (frames.length ? frames : [current]).map((frame) => {
-    if (frame === current) {
-      const changing = plan.value.objects.flatMap(
-        (i) => objects[i]?.area ?? [],
-      );
-      return {
-        frame,
-        source,
-        target,
-        context: unionOf([source, ...changing]) ?? source,
-        scope: { changing, keep: plan.value.keep },
-      };
-    }
+    if (frame === current)
+      return { frame, source, target, keep: plan.value.keep };
     const cel = canvas.readCel(layerId, frame);
     const drawn = paintedBounds(cel, size.w, tile, EDIT_MARGIN);
     return {
       frame,
       source: drawn,
       target: follow(drawn, source, target, size),
-      context: drawn,
-      scope: { changing: [], keep: [] },
+      keep: [],
     };
   });
 
-  /**
-   * Writes the new cels back and says what was done; false when it failed.
-   * `picture` is what the layer is now made from, if a picture still fits.
-   */
-  const done = (cels: Cels | null, image?: string, picture?: PictureSource) => {
+  /** Writes the new cels back and says what was done; false when it failed. */
+  const done = ({ cels, image, fixed }: Made) => {
     if (!cels) return false;
     const same = [...cels].every(([frame, cel]) =>
       samePixels(cel, canvas.readCel(layerId, frame)),
@@ -137,27 +109,57 @@ export async function edit(chat: Chat, action: TileAction) {
       return false;
     }
     canvas.writeCels(layerId, cels);
-    if (picture) chat.sources.set(layerId, picture);
-    else chat.sources.delete(layerId);
     const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
-    const content = (plan.value.summary || "Done.") + many;
+    const content =
+      (plan.value.summary || "Done.") +
+      many +
+      (fixed ? `\nChecked and fixed: ${fixed}` : "");
     chat.append({ role: "assistant", content, image });
     return true;
   };
-  const redrawn = async () => {
-    const picture = pictureFor(chat, layerId, steps);
-    if (picture) {
-      const result = await redrawPicture(
-        chat,
-        layerId,
-        plan.value,
-        steps[0]!,
-        picture,
-      );
-      return done(result?.cels ?? null, result?.image, result?.picture);
-    }
-    const result = await redraw(chat, layerId, plan.value, steps);
-    return done(result?.cels ?? null, result?.image);
+
+  /** The edit made with `instruction` in every frame. */
+  const make = async (instruction: string): Promise<Made> => {
+    const edit = { ...plan.value, instruction };
+    if (edit.mode === "ops")
+      return { cels: await editPixels(chat, layerId, edit, steps) };
+    if (edit.mode === "move") return { cels: move(chat, layerId, steps) };
+    return (await redraw(chat, layerId, edit, steps)) ?? { cels: null };
+  };
+
+  /**
+   * Makes the edit, has the frame on screen checked and, when the check
+   * finds a problem, makes it once more with a better instruction (that one
+   * is not checked again). A move copies pixels exactly, and a redraw of
+   * several frames is paid per frame, so neither is made twice.
+   */
+  const run = async () => {
+    chat.setPending(true);
+    const made = await make(plan.value.instruction);
+    const step = steps.find((s) => s.frame === current) ?? steps[0]!;
+    const after = made.cels?.get(step.frame);
+    const again =
+      plan.value.mode === "ops" ||
+      (plan.value.mode === "redraw" && steps.length === 1);
+    const review =
+      after && again
+        ? await checkEdit(chat, {
+            request: action.request,
+            instruction: plan.value.instruction,
+            layerId,
+            frame: step.frame,
+            source: step.source,
+            target: step.target,
+            after,
+          })
+        : null;
+    const remade = review ? await make(review.instruction) : null;
+    chat.setPending(false);
+    return done(
+      remade?.cels
+        ? { ...remade, fixed: review!.problem || "the result looked wrong." }
+        : made,
+    );
   };
 
   if (plan.value.mode === "redraw" && steps.length > 1) {
@@ -166,18 +168,16 @@ export async function edit(chat: Chat, action: TileAction) {
       content: `This changes ${steps.length} frames of the layer "${names.get(layerId)}", one picture each.`,
       button: {
         label: `Redraw ${steps.length} frames`,
-        run: redrawn,
+        run,
       },
     });
     return;
   }
-  chat.setPending(true);
-  if (plan.value.mode === "ops")
-    done(await editPixels(chat, layerId, plan.value, steps));
-  else if (plan.value.mode === "move") done(move(chat, layerId, steps));
-  else await redrawn();
-  chat.setPending(false);
+  await run();
 }
+
+/** An edit made in every frame (null cels when it failed). */
+type Made = { cels: Cels | null; image?: string; fixed?: string };
 
 /** Exact pixel operations in each frame (free); null when one failed. */
 async function editPixels(
@@ -205,7 +205,7 @@ async function editPixels(
       size,
       { ops: result.value.ops, palette: grid.palette },
       step.source,
-      step.scope,
+      step.keep,
     );
     cels.set(step.frame, edited.cel);
     applied += edited.applied;
@@ -234,66 +234,6 @@ function move(chat: Chat, layerId: string, steps: Step[]): Cels {
   );
 }
 
-/** Largest side of a picture sent back to the AI (keeps the request small). */
-const PICTURE_SIDE = 512;
-
-/**
- * The picture the layer was made from, when an in-place edit of one frame
- * can start from it: the layer must still show what was made from it.
- */
-function pictureFor(chat: Chat, layerId: string, steps: Step[]) {
-  const [step] = steps;
-  const picture = chat.sources.get(layerId);
-  if (!picture || steps.length !== 1 || !step) return null;
-  if (!sameRect(step.source, step.target)) return null;
-  const cel = chat.canvas.readCel(layerId, step.frame);
-  const box = drawnBox(cel, chat.canvas.size());
-  return box && picture.box && sameRect(box, picture.box) ? picture : null;
-}
-
-/**
- * An edit made on the full-size picture the layer came from (paid): the
- * model changes that picture, it is turned into pixels exactly as the first
- * time, and only the part the plan named changes on the tile. Keeps the
- * detail a redraw of the small pixel version would lose.
- */
-async function redrawPicture(
-  chat: Chat,
-  layerId: string,
-  plan: EditPlan,
-  step: Step,
-  picture: PictureSource,
-): Promise<{ cels: Cels; image: string; picture: PictureSource } | null> {
-  const { canvas } = chat;
-  const size = canvas.size();
-  chat.setPending(true);
-  const result = await redrawArea(
-    plan.instruction,
-    await shrinkPicture(picture.image, PICTURE_SIDE),
-    picture.area.w,
-    picture.area.h,
-  ).catch(() => UNREACHABLE);
-  chat.setPending(false);
-  if (!result.ok) {
-    chat.setError(result.error);
-    return null;
-  }
-  const art = await toArt(result.value, picture.area);
-  const cel = applyRedraw(
-    canvas.readCel(layerId, step.frame),
-    size,
-    art,
-    picture.area,
-    step.scope,
-    step.source,
-  );
-  return {
-    cels: new Map([[step.frame, cel]]),
-    image: result.value,
-    picture: { ...picture, image: result.value, box: drawnBox(cel, size) },
-  };
-}
-
 /**
  * The image model redraws each frame's part (paid), all at once; the new
  * cels and the first picture, or null when one failed.
@@ -306,30 +246,16 @@ async function redraw(
 ): Promise<{ cels: Cels; image: string } | null> {
   const { canvas } = chat;
   const size = canvas.size();
-  chat.setPending(true);
-  const background = await referenceBackground();
-  // An edit in place shows the model the whole drawing and lets it change
-  // only the part (masked); a move or resize redraws the part itself.
-  const inPlace = (step: Step) => sameRect(step.source, step.target);
-  const shown = (step: Step) => (inPlace(step) ? step.context : step.source);
   const results = await Promise.all(
     steps.map((step) =>
       redrawArea(
         plan.instruction,
-        canvas.snapshotCel(layerId, step.frame, shown(step), background),
-        inPlace(step) ? step.context.w : step.target.w,
-        inPlace(step) ? step.context.h : step.target.h,
-        {
-          mask:
-            inPlace(step) && !sameRect(step.context, step.source)
-              ? snapshotMask(step.context, step.source)
-              : null,
-          enlarged: true,
-        },
+        canvas.snapshotCel(layerId, step.frame, step.source, CHROMA_KEY_HEX),
+        step.target.w,
+        step.target.h,
       ).catch(() => UNREACHABLE),
     ),
   );
-  chat.setPending(false);
   const pictures: string[] = [];
   for (const result of results) {
     if (!result.ok) {
@@ -340,24 +266,14 @@ async function redraw(
   }
   const cels: Cels = new Map();
   for (const [i, step] of steps.entries()) {
+    const art = await toArt(pictures[i]!, step.target);
     const cel = canvas.readCel(layerId, step.frame);
-    if (inPlace(step)) {
-      const art = await toArt(
-        pictures[i]!,
-        step.context,
-        REDRAWN_PICTURE_STEPS,
-      );
-      cels.set(
-        step.frame,
-        applyRedraw(cel, size, art, step.context, step.scope, step.source),
-      );
-    } else {
-      const art = await toArt(pictures[i]!, step.target, REDRAWN_PICTURE_STEPS);
-      cels.set(
-        step.frame,
-        replaceObject(cel, size, art, step.source, step.target),
-      );
-    }
+    cels.set(
+      step.frame,
+      sameRect(step.source, step.target)
+        ? applyRedraw(cel, size, art, step.target, step.keep)
+        : replaceObject(cel, size, art, step.source, step.target),
+    );
   }
   return { cels, image: pictures[0]! };
 }

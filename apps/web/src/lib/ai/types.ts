@@ -43,13 +43,6 @@ export type Route = {
 
 export type GeneratedImage = { mimeType: string; base64: string };
 
-/**
- * What is behind the subject of a generated picture: real transparency, or a
- * flat magenta the model paints for models that can't do transparency, keyed
- * out afterwards.
- */
-export type Backdrop = "transparent" | "chroma";
-
 /** A rectangle of tile pixels. */
 export type Rect = { x: number; y: number; w: number; h: number };
 
@@ -83,8 +76,6 @@ export type PlanReply = {
   mode: EditPlan["mode"];
   objects: number[];
   keep: number[];
-  /** The box around exactly what changes. */
-  area: Rect;
   target: Rect;
   instruction: string;
   summary: string;
@@ -164,6 +155,40 @@ export type AnimationPlan = {
   summary: string;
 };
 
+/**
+ * A look at a finished edit before it is applied: `ok`, or the problem (for
+ * the user, in their language) and a better instruction for one more try.
+ */
+export type EditReview = { ok: boolean; problem: string; instruction: string };
+
+/**
+ * What a look at an animation's frames found wrong, per track (by index):
+ * `order` shows frame i the drawing of frame order[i] (poses out of order, or
+ * a broken one replaced by a neighbour); `redraw` frames get drawn again in
+ * `pose`; `path` is a prop's new path. Nothing to fix gives no tracks.
+ */
+export type AnimationFixes = {
+  problem: string;
+  tracks: {
+    track: number;
+    order: number[] | null;
+    redraw: { frame: number; pose: string }[];
+    path: (Rect | null)[] | null;
+  }[];
+};
+
+/** The animation checker's raw answer; frames are counted from 1. */
+export type AnimationReviewReply = {
+  ok: boolean;
+  problem: string;
+  fixes: {
+    track: number;
+    order: number[];
+    redraw: { frame: number; pose: string }[];
+    path: (Rect & { visible: boolean })[];
+  }[];
+};
+
 /** The animation planner's raw answer: tracks in one flat shape. */
 export type AnimationReply = {
   name: string;
@@ -184,27 +209,29 @@ export type AnimationReply = {
 };
 
 export interface AiProvider {
-  /** The frame shapes (width:height) its image model draws. */
-  readonly aspectRatios: string[];
-  /** What its pictures have behind the subject. */
-  readonly backdrop: Backdrop;
-  /** Whether `redraw` can be limited to a part of the picture with a mask. */
-  readonly masks: boolean;
   /** Decides what the user wants. Text model. */
   route(messages: ChatMessage[]): Promise<Route>;
   /** Plain conversation. Text model. */
   chat(messages: ChatMessage[]): Promise<string>;
   /** Precise edit: reads the tile grid, answers with operations. Text model. */
   edit(system: string, user: string): Promise<EditReply>;
-  /** Draws a new picture. Image model (paid). */
-  generate(prompt: string, aspectRatio: string): Promise<GeneratedImage>;
-  /** Changes a picture of an area. Image model (paid). */
+  /**
+   * Draws a new picture. Image model (paid). `small` (default) asks for a
+   * smaller, cheaper picture where the model allows it.
+   */
+  generate(
+    prompt: string,
+    aspectRatio: string,
+    small?: boolean,
+    /** Pictures the user gave to draw from. */
+    references?: GeneratedImage[],
+  ): Promise<GeneratedImage>;
+  /** Changes a picture of an area. Image model (paid); `small` as above. */
   redraw(
     prompt: string,
     picture: GeneratedImage,
     aspectRatio: string,
-    /** Where it may change: transparent there, opaque elsewhere; same size as `picture`. */
-    mask?: GeneratedImage,
+    small?: boolean,
   ): Promise<GeneratedImage>;
   /** Looks at the tile and picks where a new subject fits the scene. Text model. */
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;
@@ -214,4 +241,15 @@ export interface AiProvider {
   plan(prompt: string, tile: GeneratedImage): Promise<PlanReply>;
   /** Looks at the tile and plans an animation. Text model. */
   animate(prompt: string, tile: GeneratedImage): Promise<AnimationReply>;
+  /** Compares a layer before and after an edit. Text model. */
+  reviewEdit(
+    prompt: string,
+    before: GeneratedImage,
+    after: GeneratedImage,
+  ): Promise<EditReview>;
+  /** Looks at an animation's frames side by side. Text model. */
+  reviewAnimation(
+    prompt: string,
+    frames: GeneratedImage,
+  ): Promise<AnimationReviewReply>;
 }

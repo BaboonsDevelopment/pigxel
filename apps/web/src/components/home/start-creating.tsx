@@ -64,7 +64,7 @@ function StartCard({ start }: { start: Start }) {
         src={start.image}
         alt=""
         sizes="120px"
-        className="h-20 w-auto max-w-[70%] object-contain object-left transition-transform duration-300 ease-out group-hover:-translate-y-1 group-hover:-rotate-2 motion-reduce:transition-none"
+        className="h-14 w-auto max-w-[70%] object-contain object-left transition-transform duration-300 ease-out group-hover:-translate-y-1 group-hover:-rotate-2 motion-reduce:transition-none"
       />
       <span className="mt-auto flex items-end justify-between gap-3">
         <span>
@@ -91,7 +91,7 @@ function StartCard({ start }: { start: Start }) {
     </>
   );
   const className = cn(
-    "group relative flex h-36 flex-col rounded-2xl p-4 transition",
+    "group relative flex h-[7.25rem] flex-col rounded-2xl p-3 transition",
     start.tint,
   );
 
@@ -105,7 +105,7 @@ function StartCard({ start }: { start: Start }) {
       </Link>
     );
   return (
-    <div aria-disabled="true" className={cn(className, "cursor-default")}>
+    <div aria-disabled="true" className={cn(className, "cursor-pointer")}>
       <span className="absolute top-3 right-3 rounded-full bg-white/80 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
         Soon
       </span>

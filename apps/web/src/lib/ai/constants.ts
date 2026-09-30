@@ -1,5 +1,4 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
-import type { Backdrop } from "./types";
 
 /**
  * Waits between rounds: each round tries every model once, so a busy model is
@@ -12,62 +11,42 @@ export const IMAGE_RETRY_DELAYS_MS = [2_000];
 export const TEXT_ATTEMPT_TIMEOUT_MS = 20_000;
 export const IMAGE_ATTEMPT_TIMEOUT_MS = 40_000;
 
-// ── OpenAI (the provider in use) ───────────────────────────────────────────
-
-export const OPENAI_BASE_URL = "https://api.openai.com/v1";
-/**
- * Cheap text models that read pictures and answer in strict JSON, tried in
- * order after `AI_MODEL`.
- */
-export const OPENAI_TEXT_MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
-/**
- * Stronger text models for the work that needs care: planning edits,
- * placements and animations, and precise pixel edits. Tried in order after
- * `AI_SMART_MODEL`.
- */
-export const OPENAI_SMART_MODELS = ["gpt-4.1", "gpt-4.1-mini"];
-/** Image models, tried in order after `AI_IMAGE_MODEL`; the mini one costs less. */
-export const OPENAI_IMAGE_MODELS = ["gpt-image-1-mini", "gpt-image-1"];
-/** The picture sizes gpt-image draws, by frame shape (width:height). */
-export const OPENAI_IMAGE_SIZES: Record<string, string> = {
-  "1:1": "1024x1024",
-  "3:2": "1536x1024",
-  "2:3": "1024x1536",
-};
-/**
- * Image models that can keep an edited picture's details (faces above all)
- * close to the original ("input_fidelity": "high"); the mini model can't.
- */
-export const OPENAI_HIGH_FIDELITY_MODELS = ["gpt-image-1"];
-/** Picture quality when `AI_IMAGE_QUALITY` isn't set: low, medium or high. */
-export const OPENAI_IMAGE_QUALITY = "medium";
-/** gpt-image can take a minute or more for one picture. */
-export const OPENAI_IMAGE_TIMEOUT_MS = 150_000;
-
-// ── Google Gemini (kept as an alternative, AI_PROVIDER=gemini) ─────────────
-
 export const GEMINI_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta";
 /**
  * Free text models, tried in order after `AI_MODEL`. Google often answers 503
  * for one model while another is fine, so there are several.
  */
-export const GEMINI_TEXT_MODELS = [
+export const TEXT_MODELS = [
   "gemini-3.6-flash",
   "gemini-3.7-flash",
   "gemini-3.1-flash-lite",
 ];
 /** Paid image models, tried in order after `AI_IMAGE_MODEL` (≈$0.03–0.05 each). */
-export const GEMINI_IMAGE_MODELS = [
+export const IMAGE_MODELS = [
   "gemini-3.1-flash-image",
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
 ];
+/**
+ * Image models that draw at a chosen size, and the size for a single picture:
+ * it is shrunk to a tile anyway, and a smaller picture costs less. Sprite
+ * sheets hold several poses, so they keep the default size.
+ */
+export const SIZED_IMAGE_MODELS = ["gemini-3.1-flash-image"];
+export const SMALL_IMAGE_SIZE = "512";
 
 /** How many recent messages the AI sees, so it follows the conversation. */
 export const MAX_HISTORY = 12;
 /** How many of them the placement planner sees, to know what was drawn. */
 export const PLACEMENT_HISTORY = 6;
+
+/**
+ * Pictures the user attaches to a message, to draw from: how many at most,
+ * and how the router hears of them (it gets only text).
+ */
+export const MAX_REFERENCES = 3;
+export const REFERENCES_NOTE = "[reference pictures attached]";
 
 export const ROUTER_PROMPT = `You follow a conversation in a pixel art editor. Classify the user's LATEST
 message; earlier messages are context, so short follow-ups like "and a dog too",
@@ -102,46 +81,43 @@ For generate also set:
   ("Monkey", "Red Apple").
 For animate also set frames: the number of frames they asked for, 0 when
 they did not say.
-Otherwise leave where and name empty, count 1 and frames 0.`;
+Otherwise leave where and name empty, count 1 and frames 0.
+A message ending in ${REFERENCES_NOTE} came with pictures to draw from
+("draw this", "in this style", "make him like this"): drawing something from
+them is generate, and subject says what to take from them ("the fox from the
+reference picture", "a knight in the style of the reference picture").`;
 
 /** For plain conversation, so the model answers in words, not fake tool calls. */
 export const CHAT_PROMPT =
   "You are the assistant of Pigxel, a pixel art editor. Answer briefly in plain " +
   "text, in the user's language. Never write JSON or pretend to call tools.";
 
-/**
- * Keeps the subject alone so it can be cut out; shared by new pictures,
- * redraws and sprite sheets. A model that draws real transparency (OpenAI)
- * gets `transparent`; one that can't (Gemini) paints a flat magenta
- * background that is keyed out afterwards (see cut-out-background.ts).
- */
-export const IMAGE_BACKGROUND_RULES: Record<Backdrop, string[]> = {
-  transparent: [
-    "The background is fully transparent.",
-    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
-    "no shadow cast behind or beneath it, no vignette.",
-    "No text, no watermark, no border, no extra objects.",
-  ],
-  chroma: [
-    `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
-    `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
-    "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
-    "no shadow cast behind or beneath it, no vignette.",
-    "No text, no watermark, no border, no extra objects.",
-  ],
-};
-
-/** How a sprite is drawn; the background rules come after these. */
-export const IMAGE_STYLE_RULES = [
-  "crisp hard-edged pixels, no anti-aliasing, no blur.",
-  "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
-  "Rich hand-placed shading with hue-shifted shadows and highlights, texture on materials (cloth, metal, fur, stone), one clear light source from the top left.",
-  "Muted, atmospheric palette with a few strong accent colours, dark outline.",
-  "The subject is complete — nothing cropped by the edges.",
+/** Appended to every generation prompt so the model draws a clean sprite. */
+/** Keeps the background cut-out-able; shared by new pictures and redraws. */
+export const IMAGE_BACKGROUND_RULES = [
+  `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
+  `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
+  "Nothing is behind the subject: no backdrop, no scenery, no ground, no platform,",
+  "no shadow cast behind or beneath it, no vignette.",
+  "No text, no watermark, no border, no extra objects.",
 ];
 
-/** Frame shapes Gemini's image models accept, as width:height. */
-export const GEMINI_ASPECT_RATIOS = [
+/** Added to a generation prompt when the user attached pictures to draw from. */
+export const REFERENCE_RULES =
+  "Use the attached picture(s) as reference for what the subject looks like " +
+  "(design, shapes, colours, proportions), redrawn in the pixel art style " +
+  "below; copy nothing else from them (no background, no text).";
+
+export const IMAGE_STYLE_RULES = [
+  "crisp hard-edged pixels, no anti-aliasing.",
+  "Chunky low-detail sprite: big simple shapes and a clear, readable silhouette, no tiny details.",
+  "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
+  "The subject is centred, fills the frame, and is complete — nothing cropped.",
+  ...IMAGE_BACKGROUND_RULES,
+];
+
+/** Frame shapes the image model accepts, as width:height. */
+export const ASPECT_RATIOS = [
   "1:1",
   "2:3",
   "3:2",
@@ -184,19 +160,8 @@ mode:
 
 objects: the numbers of ALL objects that change, from OBJECTS. Things are
 often drawn in several pieces: an aura, magic effects, particles or a held
-item are separate objects — include every piece of what changes. Things that
-touch are one object (a character with an orb in its hand): when a part of it
-changes, include that object. An empty list means the whole tile or the
-selected area.
-
-area: the box in tile pixels (x, y of the top-left, w, h) around exactly what
-changes. Usually the box of those objects; when only a part of an object
-changes (the orb in the hand, the eyes of a face), box just that part, with a
-pixel or two of margin. Keep it as small as the change allows: everything
-outside it is kept pixel for pixel. For changes in several places (the hand
-and the face), box all of them together. When something is added, the box
-also covers the empty space where it goes (the ground around the feet for
-skulls at the feet).
+item are separate objects — include every piece of what changes. An empty
+list means the whole tile or the selected area.
 
 keep: the numbers of objects that must stay exactly as they are but belong
 to the scene being changed — for example the character when only its aura
@@ -313,3 +278,48 @@ ends where it can start again.
 
 summary: one or two short sentences for the user, in the language of the
 request, saying what the animation will show.`;
+
+// ── Checks ─────────────────────────────────────────────────────────────────
+// A finished edit or animation is looked at once (free text model) before it
+// is applied; what is found is fixed once, and the fix is not checked again.
+
+/** Most frames one check may have drawn again (paid, one picture each). */
+export const MAX_REDRAWN_FRAMES = 2;
+
+export const EDIT_REVIEW_RULES = `Picture 1 is a pixel art layer before an edit,
+picture 2 the same area after it (enlarged; light grey means empty).
+Judge only the edit: was REQUEST done, and did the art stay intact? Problems:
+the request visibly not done; the art broken (holes, smeared or melted shapes,
+lost outline, stray pixels, cut-off parts); things changed that the request did
+not ask for; the subject changed far more than asked (another design, size or
+palette).
+ok: true when the result is acceptable, even if not perfect. Say false only for
+a clear, visible problem; then problem is one short sentence for the user in
+the language of REQUEST, and instruction is a better English instruction for
+one more attempt that avoids it (what to change, and what to leave exactly as
+it is). When ok, problem and instruction are "".`;
+
+export const ANIMATION_REVIEW_RULES = `The picture shows every frame of a pixel
+art animation side by side, frame 1 on the left, separated by dark lines
+(enlarged; light grey means empty). Only what moves is shown. TRACKS lists what
+was planned for each frame.
+Check: the frames come in the right order for the motion; each frame shows the
+thing once (never two of it, no missing or cut-off parts, no leftover
+scraps); poses match the plan and flow smoothly; a prop moves along a
+believable path (a throw is an arc, things fall down) and starts or stops at the
+right moment (leaves the hand when it is thrown).
+ok: true when it works, even if not perfect; then fixes is empty. Fix only
+clear, visible problems; never change what works.
+fixes: one per track that needs a fix; track is its number in TRACKS.
+- order: for a sheet whose drawings are right but in the wrong frames, or has a
+  broken frame that a neighbouring drawing can stand in for: one frame number
+  per frame (frameCount numbers, counted from 1), saying whose drawing that
+  frame shows. Frames where it is not seen keep their own number. Otherwise
+  empty.
+- redraw: for a sheet frame that is broken and no other drawing fits: the frame
+  number and a short description of the pose it must show; at most
+  ${MAX_REDRAWN_FRAMES} in all. Otherwise empty.
+- path: for a prop moving wrongly: exactly frameCount boxes in tile pixels,
+  visible false where it is not seen. Otherwise empty.
+problem: one short sentence for the user in the language of REQUEST saying what
+was fixed; "" when ok.`;

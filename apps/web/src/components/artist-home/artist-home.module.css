@@ -624,6 +624,18 @@
   font-size: 11px;
   flex: 1;
 }
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11px;
+}
+.footerLinks a {
+  color: #7d7179;
+}
+.footerLinks a:hover {
+  color: var(--pink);
+}
 .footer > span,
 .footer > a:last-child {
   font-size: 10px;

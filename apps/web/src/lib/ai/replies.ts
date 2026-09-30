@@ -1,7 +1,9 @@
 import { AiError } from "./errors";
 import type {
   AnimationReply,
+  AnimationReviewReply,
   EditReply,
+  EditReview,
   PlacementReply,
   PlanReply,
   Rect,
@@ -89,11 +91,31 @@ export function readPlan(text: string): PlanReply {
     mode: reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
     objects: (reply.objects ?? []).filter(Number.isInteger),
     keep: (reply.keep ?? []).filter(Number.isInteger),
-    area: reply.area ?? reply.target,
     target: reply.target,
     instruction: reply.instruction,
     summary: reply.summary ?? "",
     question: reply.question ?? "",
+  };
+}
+
+/** A broken answer counts as "fine": a check never blocks the result. */
+export function readEditReview(text: string): EditReview {
+  const reply = parseJson<EditReview>(text);
+  const instruction = String(reply?.instruction ?? "").trim();
+  return {
+    ok: reply?.ok !== false || !instruction,
+    problem: String(reply?.problem ?? ""),
+    instruction,
+  };
+}
+
+/** Checked in detail by clampAnimationFixes (helpers.ts). */
+export function readAnimationReview(text: string): AnimationReviewReply {
+  const reply = parseJson<AnimationReviewReply>(text);
+  return {
+    ok: reply?.ok !== false,
+    problem: String(reply?.problem ?? ""),
+    fixes: Array.isArray(reply?.fixes) ? reply.fixes : [],
   };
 }
 

@@ -528,6 +528,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   };
 
   return {
+    /** The tile's own id (see PigxelDocument). */
+    id: initial.id,
     size,
     tree,
     frames,
@@ -588,6 +590,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       ),
     /** The tile as a document, for saving. Its pixels are shared: never modify them. */
     document: (): PigxelDocument => ({
+      id: initial.id,
       width: size.w,
       height: size.h,
       background,

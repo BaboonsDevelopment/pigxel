@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Brand } from "@/components/brand";
+import { LEGAL_LINKS } from "@/lib/legal";
 import coast from "../../../public/art/sunlit-coast.png";
 import forest from "../../../public/art/secret-shrine.png";
 import night from "../../../public/art/after-hours.png";
@@ -424,6 +425,13 @@ export function ArtistHome() {
       <footer className={styles.footer}>
         <Brand />
         <p>A little pig. A lot of possibility.</p>
+        <nav aria-label="Policies" className={styles.footerLinks}>
+          {LEGAL_LINKS.map((link) => (
+            <Link key={link.href} href={link.href}>
+              {link.label}
+            </Link>
+          ))}
+        </nav>
         <span>© {new Date().getFullYear()} Pigxel</span>
         <a href="#main">Back to top ↑</a>
       </footer>

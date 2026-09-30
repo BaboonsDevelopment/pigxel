@@ -1,42 +1,43 @@
 import { GRID, OPS } from "@/lib/edit/constants";
 import {
+  ANIMATION_REVIEW_RULES,
   ANIMATION_RULES,
+  ASPECT_RATIOS,
   EDIT_RESPONSE_RULES,
   EDIT_CRAFT_RULES,
+  EDIT_REVIEW_RULES,
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
   MAX_FRAMES,
+  MAX_REDRAWN_FRAMES,
   MAX_TRACKS,
   PLACEMENT_RULES,
   PLAN_RULES,
+  REFERENCE_RULES,
 } from "./constants";
 import type {
+  AnimationFixes,
   AnimationPlan,
-  Backdrop,
   AnimationReply,
+  AnimationReviewReply,
   AnimationTrack,
   ChatMessage,
   Rect,
 } from "./types";
 
-/**
- * Asks for a new sprite the way a sprite sheet frame is asked for: a game
- * sprite of the target size, drawn smaller than the picture with space
- * around it. That gives crisp small pixels and detail; a sprite told to fill
- * the whole picture comes out as a blurry mosaic of huge pixels. The empty
- * space is cropped off afterwards (see lib/image/pipeline.ts).
- */
+/** Wraps a subject description in the pixel-art style rules for a grid size. */
 export function buildImagePrompt(
   subject: string,
   width: number,
   height: number,
-  backdrop: Backdrop,
+  /** Whether pictures to draw from come with the prompt. */
+  withReferences = false,
 ): string {
   return [
-    `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
-    `It is a ${width}x${height} pixel sprite drawn with small crisp pixels, centred on the picture with empty space around it.`,
+    subject,
+    ...(withReferences ? [REFERENCE_RULES] : []),
+    `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
     ...IMAGE_STYLE_RULES,
-    ...IMAGE_BACKGROUND_RULES[backdrop],
   ].join(" ");
 }
 
@@ -46,13 +47,9 @@ function ratioDistance(ratio: string, width: number, height: number) {
   return Math.abs(Math.log(w / h) - Math.log(width / height));
 }
 
-/** The frame shape in `ratios` (those the image model draws) closest to `width × height`. */
-export function closestAspectRatio(
-  width: number,
-  height: number,
-  ratios: string[],
-): string {
-  return ratios.reduce((best, r) =>
+/** The supported frame shape closest to `width × height`. */
+export function closestAspectRatio(width: number, height: number): string {
+  return ASPECT_RATIOS.reduce((best, r) =>
     ratioDistance(r, width, height) < ratioDistance(best, width, height)
       ? r
       : best,
@@ -130,36 +127,14 @@ export function buildRedrawPrompt(
   instruction: string,
   width: number,
   height: number,
-  backdrop: Backdrop,
-  {
-    masked = false,
-    enlarged = false,
-  }: {
-    /** Only a marked part of the picture may change. */
-    masked?: boolean;
-    /** The picture is a small sprite shown enlarged, in big blocky pixels. */
-    enlarged?: boolean;
-  } = {},
 ): string {
   return [
-    `Edit this pixel art sprite (${width}x${height} pixels): ${instruction}.`,
-    masked
-      ? "Change only the masked region; every pixel outside it stays exactly as it is."
-      : "",
-    // Copying the blocks of an enlarged sprite gives a coarse, smeared
-    // mosaic; asked for fine pixels, the model draws in the quality of a new
-    // picture, and the result is brought back to the sprite's size anyway.
-    enlarged
-      ? "The picture is a small sprite shown enlarged in big blocky pixels. Draw the result as a detailed game sprite with small crisp pixels, not big blocks, keeping its design, colours and framing."
-      : "Make the requested change clearly visible, in the same pixel art style.",
-    "Everything the instruction does not mention stays exactly as it is: same design,",
-    "colours, outline, proportions and pose, at the same place and the same size.",
-    "Keep the framing of the picture: the sprite fills it exactly as in the original.",
-    ...IMAGE_STYLE_RULES.slice(0, 4),
-    ...IMAGE_BACKGROUND_RULES[backdrop],
-  ]
-    .filter(Boolean)
-    .join(" ");
+    `Redraw this pixel art sprite as a ${width}x${height} pixel sprite: ${instruction}.`,
+    "Keep its design, colours, outline, proportions and pose exactly as they are",
+    "unless the instruction changes them. The subject fills the frame.",
+    IMAGE_STYLE_RULES[0],
+    ...IMAGE_BACKGROUND_RULES,
+  ].join(" ");
 }
 
 const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
@@ -236,15 +211,13 @@ export function sheetLayout(
   count: number,
   cellW: number,
   cellH: number,
-  /** The frame shapes the image model draws. */
-  ratios: string[],
 ): SheetLayout {
   let best = { cols: count, rows: 1, aspectRatio: "1:1", score: Infinity };
   for (let cols = 1; cols <= count; cols++) {
     const rows = Math.ceil(count / cols);
     const w = cols * cellW;
     const h = rows * cellH;
-    const aspectRatio = closestAspectRatio(w, h, ratios);
+    const aspectRatio = closestAspectRatio(w, h);
     const empty = cols * rows - count;
     const score = ratioDistance(aspectRatio, w, h) + empty * 0.05;
     if (score < best.score) best = { cols, rows, aspectRatio, score };
@@ -265,21 +238,30 @@ export function buildSheetPrompt(args: {
   cellH: number;
   layout: SheetLayout;
   fromReference: boolean;
-  backdrop: Backdrop;
 }): string {
   const { cols, rows } = args.layout;
-  const frames = args.poses.map((pose, i) => `${i + 1}. ${pose}`).join(" ");
+  // Every frame gets its cell by name: models told only "left to right" still
+  // fill sheets column by column now and then.
+  const frames = args.poses
+    .map(
+      (pose, i) =>
+        `Frame ${i + 1} in row ${Math.floor(i / cols) + 1}, column ${(i % cols) + 1}: ${pose}.`,
+    )
+    .join(" ");
   return [
-    `A pixel art sprite sheet of ${args.poses.length} animation frames on a grid of ${cols} columns and ${rows} rows of equal cells, read left to right, top to bottom.`,
+    `A pixel art sprite sheet of ${args.poses.length} animation frames on a grid of exactly ${cols} columns and ${rows} rows of equal cells.`,
+    `The frames go in reading order: fill the top row from left to right, then the next row from left to right; never fill a column top to bottom.`,
     args.fromReference
       ? `Every frame shows the subject of the attached picture (${args.subject}) with exactly its design, colours, outline and proportions.`
       : `Every frame shows the same subject: ${args.subject}.`,
     `Each cell is a ${args.cellW}x${args.cellH} pixel sprite. The subject has the same size, colours and design in every frame, seen from the same camera, on the same baseline, centred in its cell with empty space around it; only the pose changes.`,
-    `Frames: ${frames}`,
-    args.poses.length < cols * rows ? "Leave the remaining cells empty." : "",
+    frames,
+    args.poses.length < cols * rows
+      ? "Leave the remaining cells at the end of the last row empty."
+      : "",
     "No grid lines, no numbers, no labels.",
-    ...IMAGE_STYLE_RULES.slice(0, 4),
-    ...IMAGE_BACKGROUND_RULES[args.backdrop],
+    ...IMAGE_STYLE_RULES.slice(0, 3),
+    ...IMAGE_BACKGROUND_RULES,
   ]
     .filter(Boolean)
     .join(" ");
@@ -313,6 +295,150 @@ export function buildAnimationPrompt(args: {
     `REQUEST: ${args.request}`,
     ANIMATION_RULES,
   ].join("\n\n");
+}
+
+/** Asks the checker whether an edit came out right (see EDIT_REVIEW_RULES). */
+export function buildEditReviewPrompt(request: string, instruction: string) {
+  return [
+    `REQUEST: ${request}`,
+    `INSTRUCTION GIVEN: ${instruction}`,
+    EDIT_REVIEW_RULES,
+  ].join("\n\n");
+}
+
+/** Asks the checker whether an animation works (see ANIMATION_REVIEW_RULES). */
+export function buildAnimationReviewPrompt(
+  request: string,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+) {
+  const tracks = plan.tracks
+    .map((t, i) => {
+      const frames =
+        t.kind === "sheet"
+          ? t.poses.map((p, f) => `  frame ${f + 1}: ${p || "(not seen)"}`)
+          : t.path.map(
+              (r, f) => `  frame ${f + 1}: ${r ? box(r) : "(not seen)"}`,
+            );
+      return [`${i}: ${t.kind} "${t.name}" — ${t.subject}`, ...frames].join(
+        "\n",
+      );
+    })
+    .join("\n");
+  return [
+    `Each frame is the ${width}x${height} pixel tile; frameCount ${plan.frameCount}.`,
+    `REQUEST: ${request}`,
+    `TRACKS:\n${tracks}`,
+    ANIMATION_REVIEW_RULES,
+  ].join("\n\n");
+}
+
+/**
+ * A plan sent back from the browser, fitted to the tile again with its tracks
+ * in the same places: what a check reads of it.
+ */
+export function refitPlan(
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationPlan {
+  const count = Math.round(Number(plan.frameCount));
+  const frameCount = Number.isFinite(count)
+    ? Math.max(2, Math.min(MAX_FRAMES, count))
+    : 2;
+  const perFrame = <T>(list: T[], fit: (item: T | undefined) => T) =>
+    Array.from({ length: frameCount }, (_, i) =>
+      fit(Array.isArray(list) ? list[i] : undefined),
+    );
+  const text = (value: unknown, max: number) =>
+    String(value ?? "").slice(0, max);
+  const tracks = plan.tracks.slice(0, MAX_TRACKS).map((t): AnimationTrack => {
+    const name = text(t.name, 40);
+    const subject = text(t.subject, 300);
+    return t.kind === "prop"
+      ? {
+          kind: "prop",
+          name,
+          subject,
+          copy: null,
+          grab: null,
+          path: perFrame(t.path, (r) =>
+            r ? clampRect(r, width, height) : null,
+          ),
+        }
+      : {
+          kind: "sheet",
+          name,
+          subject,
+          reuse: null,
+          box: clampRect(t.box, width, height),
+          poses: perFrame(t.poses, (p) => text(p, 200)),
+        };
+  });
+  return { name: "", frameCount, duration: 0, tracks, summary: "" };
+}
+
+/**
+ * The checker's answer as fixes that fit the plan: an order only for a sheet,
+ * as frame indexes where it is seen (identity dropped); redraws of frames it is
+ * seen in, at most MAX_REDRAWN_FRAMES in all; a path only for a prop, one box
+ * inside the tile per frame. An answer saying all is fine gives no fixes.
+ */
+export function clampAnimationFixes(
+  reply: AnimationReviewReply,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationFixes {
+  if (reply.ok) return { problem: "", tracks: [] };
+  const n = plan.frameCount;
+  let redraws = MAX_REDRAWN_FRAMES;
+  const done = new Set<number>();
+  const tracks = reply.fixes.flatMap((fix): AnimationFixes["tracks"] => {
+    const track = plan.tracks[fix.track];
+    if (!track || done.has(fix.track)) return [];
+    done.add(fix.track);
+    if (track.kind === "prop") {
+      const path =
+        Array.isArray(fix.path) && fix.path.length === n
+          ? fix.path.map((r) =>
+              r && r.visible !== false && r.w > 0 && r.h > 0
+                ? clampRect(r, width, height)
+                : null,
+            )
+          : null;
+      return path?.some(Boolean)
+        ? [{ track: fix.track, order: null, redraw: [], path }]
+        : [];
+    }
+    const seen = (f: number) => Number.isInteger(f) && !!track.poses[f];
+    const asked = Array.isArray(fix.order) && fix.order.length === n;
+    const order = Array.from({ length: n }, (_, i) =>
+      asked && seen(i) && seen(fix.order[i]! - 1) ? fix.order[i]! - 1 : i,
+    );
+    const redraw = (Array.isArray(fix.redraw) ? fix.redraw : [])
+      .map((r) => ({
+        frame: r.frame - 1,
+        pose: String(r.pose ?? "").trim() || track.poses[r.frame - 1] || "",
+      }))
+      .filter((r, i, all) => {
+        const first = all.findIndex((o) => o.frame === r.frame) === i;
+        return seen(r.frame) && first && redraws-- > 0;
+      });
+    const reordered = order.some((f, i) => f !== i);
+    return reordered || redraw.length
+      ? [
+          {
+            track: fix.track,
+            order: reordered ? order : null,
+            redraw,
+            path: null,
+          },
+        ]
+      : [];
+  });
+  return { problem: tracks.length ? reply.problem : "", tracks };
 }
 
 /**

@@ -18,14 +18,6 @@ export type LayerInfo = {
   box: Area | null;
 };
 
-/**
- * The full-size picture from the AI that a layer's drawing was made from:
- * edits start from it, not from the small pixel version, so they keep the
- * detail. `area` is where it was put; `box` what was drawn then, to tell
- * whether the layer was changed since (then the picture no longer fits).
- */
-export type PictureSource = { image: string; area: Area; box: Area | null };
-
 /** A separate drawn thing in the current frame, and the layer it is on. */
 export type TileObject = { area: Area; layerId: string };
 
@@ -102,6 +94,13 @@ export type Placement = {
 /** A chat message plus what only the browser keeps: pictures and choices. */
 export type ChatEntry = ChatMessage & {
   image?: string;
+  /**
+   * Pictures the user attached to draw from (data URLs); kept on the
+   * message that asks where a picture goes, too, to draw from them then.
+   */
+  references?: string[];
+  /** The id of `image` in the browser's cache, once kept there. */
+  picture?: string;
   placements?: Placement[];
   /** A step that waits for the user, e.g. paid pictures to confirm. */
   button?: { label: string; run: () => Promise<boolean> };
@@ -114,12 +113,12 @@ export type Chat = {
   messages: ChatEntry[];
   /** Whether the user wants to pick the area on the tile first. */
   selectArea: boolean;
+  /** Pictures attached to the latest message, to draw from. */
+  references: string[];
   append: (entry: ChatEntry) => void;
   say: (content: string) => void;
   setPending: (pending: boolean) => void;
   setError: (error: string | null) => void;
-  /** The pictures layers were made from, by layer id. */
-  sources: Map<string, PictureSource>;
 };
 
 export const UNREACHABLE = {
@@ -137,6 +136,20 @@ export const NO_LAYER =
 
 /** Share of an area that may already be drawn on before a new picture there counts as covering art. */
 export const MAX_OVERLAP = 0.03;
+
+/**
+ * Attached pictures are shrunk to this many pixels a side at most, and saved
+ * at this quality, so a few of them fit in one request to the server.
+ */
+export const REFERENCE_SIDE = 512;
+export const REFERENCE_QUALITY = 0.9;
+
+/** How big each frame is shown to the AI that checks an animation, in screen pixels at most. */
+export const REVIEW_FRAME_SIDE = 128;
+/** Tile pixels shown around an edit to the AI that checks it, so it sees what the edit touches. */
+export const REVIEW_MARGIN = 4;
+/** The colour of the line between frames shown to the checker. */
+export const REVIEW_DIVIDER: [number, number, number] = [32, 32, 32];
 
 /** The panel's width in pixels, changed by dragging its left edge. */
 export const PANEL_WIDTH = { initial: 340, min: 260, max: 640 };
