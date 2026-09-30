@@ -7,12 +7,7 @@ import {
   objectMask,
 } from "@/lib/edit/objects";
 import { applyOps, parseOps } from "@/lib/edit/ops";
-import {
-  alignToOriginal,
-  mergeRedraw,
-  paletteOf,
-  snapToPalette,
-} from "@/lib/edit/redraw";
+import { mergeRedraw } from "@/lib/edit/redraw";
 import { cropBitmap, opaqueBox, type Bitmap } from "@/lib/image/bitmap";
 
 /**
@@ -37,9 +32,6 @@ export const paint = (
 export const drawnBox = (cel: Uint8ClampedArray, size: Size): Area | null =>
   opaqueBox({ rgba: cel, ...size });
 
-/** Which drawn things an edit is about: those it changes and those it keeps. */
-export type EditScope = { changing: Area[]; keep: Area[] };
-
 /**
  * Pixels an edit of `area` may not change: neighbours reaching into it and
  * the objects the plan said to keep.
@@ -48,64 +40,46 @@ function protectedMask(
   cel: Uint8ClampedArray,
   size: Size,
   area: Area,
-  { changing, keep }: EditScope,
+  keep: Area[],
 ) {
-  const mask = neighbourMask(cel, size.w, size.h, area, changing);
+  const mask = neighbourMask(cel, size.w, size.h, area);
   objectMask(cel, size.w, size.h, keep).forEach((k, i) => k && (mask[i] = 1));
   return mask;
 }
 
 /**
  * Runs a precise edit's operations inside `area`; drawings that only reach
- * into it (a neighbour's edge) and the objects kept stay as they are.
+ * into it (a neighbour's edge) and the objects in `keep` stay as they are.
  */
 export function applyEdit(
   cel: Uint8ClampedArray,
   size: Size,
   edit: { ops: string[]; palette: Record<string, string> },
   area: Area,
-  scope: EditScope,
+  keep: Area[],
 ): { cel: Uint8ClampedArray; applied: number } {
   const { ops } = parseOps(edit.ops);
   const result = applyOps(cel, size.w, ops, edit.palette, area);
-  const mask = protectedMask(cel, size, area, scope);
+  const mask = protectedMask(cel, size, area, keep);
   return { cel: keepMasked(cel, result.pixels, mask), applied: result.applied };
 }
 
-/**
- * Puts a redrawn picture of `area` back, in the art's own colours and
- * changing only what differs, and nothing outside `only`.
- */
+/** Puts a redrawn picture of `area` back, changing only what differs. */
 export function applyRedraw(
   cel: Uint8ClampedArray,
   size: Size,
   art: Bitmap,
   area: Area,
-  scope: EditScope,
-  only: Area = area,
+  keep: Area[],
 ): Uint8ClampedArray {
   const after = new Uint8ClampedArray(cel);
   const current = cropBitmap({ rgba: cel, ...size }, area).rgba;
-  const redrawn = snapToPalette(
-    alignToOriginal(current, art.rgba, area.w, area.h),
-    paletteOf(cel),
-  );
-  const merged = mergeRedraw(current, redrawn);
+  const merged = mergeRedraw(current, art.rgba);
   for (let y = 0; y < area.h; y++) {
     const row = merged.subarray(y * area.w * 4, (y + 1) * area.w * 4);
     after.set(row, ((area.y + y) * size.w + area.x) * 4);
   }
-  const mask = protectedMask(cel, size, area, scope);
-  for (let y = 0; y < size.h; y++)
-    for (let x = 0; x < size.w; x++)
-      if (
-        x < only.x ||
-        y < only.y ||
-        x >= only.x + only.w ||
-        y >= only.y + only.h
-      )
-        mask[y * size.w + x] = 1;
-  return keepMasked(cel, after, mask);
+  return keepMasked(cel, after, protectedMask(cel, size, area, keep));
 }
 
 /**
@@ -121,7 +95,7 @@ export function replaceObject(
   target: Area,
 ): Uint8ClampedArray {
   const { rest } = liftObjectsInside(cel, size.w, size.h, source);
-  return paint(rest, size, snapToPalette(art.rgba, paletteOf(cel)), target);
+  return paint(rest, size, art.rgba, target);
 }
 
 /** Moves the drawings inside `source` so its corner lands on `to`, pixel for pixel. */

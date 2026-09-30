@@ -134,39 +134,13 @@ export function canvasOf(pixels: Uint8ClampedArray, size: Size) {
  * An enlarged PNG of the tile (or an `area` of it) on a flat background, for
  * the AI to look at or redraw.
  */
-/** How much a snapshot of `area` is enlarged, so the AI sees it clearly. */
-const snapshotScale = (area: Area) =>
-  Math.max(1, Math.floor(SNAPSHOT_SIDE / Math.max(area.w, area.h)));
-
-/**
- * A mask for a snapshot of `area` (the same size): transparent over `part`,
- * which the image model may change, opaque everywhere else.
- */
-export function snapshotMask(area: Area, part: Area): string {
-  const k = snapshotScale(area);
-  const out = document.createElement("canvas");
-  out.width = area.w * k;
-  out.height = area.h * k;
-  const ctx = out.getContext("2d");
-  if (!ctx) return "";
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, out.width, out.height);
-  ctx.clearRect(
-    (part.x - area.x) * k,
-    (part.y - area.y) * k,
-    part.w * k,
-    part.h * k,
-  );
-  return out.toDataURL("image/png");
-}
-
 export function tileSnapshot(
   canvas: HTMLCanvasElement,
   area: Area = { x: 0, y: 0, w: canvas.width, h: canvas.height },
   /** Null keeps the background transparent. */
   background: string | null = SNAPSHOT_BACKGROUND,
 ): string {
-  const k = snapshotScale(area);
+  const k = Math.max(1, Math.floor(SNAPSHOT_SIDE / Math.max(area.w, area.h)));
   const out = document.createElement("canvas");
   out.width = area.w * k;
   out.height = area.h * k;

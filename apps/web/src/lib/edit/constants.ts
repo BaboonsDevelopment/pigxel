@@ -13,11 +13,6 @@ export const GRID = {
 export const MIN_OBJECT_PIXELS = 6;
 /** How many drawn things the planner is told about, biggest first. */
 export const MAX_OBJECTS = 24;
-/**
- * A drawn thing with at least this share of its box inside an edited area
- * is part of the edit; with less, it is a neighbour that stays as it is.
- */
-export const PART_OF_EDIT_SHARE = 0.5;
 
 /** Pixels kept around the drawing when the edit area is cropped to it. */
 export const EDIT_MARGIN = 2;
@@ -63,17 +58,4 @@ export const OPS = [
  * A redrawn pixel this close to the original keeps the original colour, so
  * only what the AI really changed lands on the tile.
  */
-export const REDRAW_KEEP_DISTANCE = 16;
-/**
- * A redrawn pixel this close to a colour of the art it changes takes that
- * colour, so a redraw keeps the art's palette.
- */
-export const REDRAW_SNAP_DISTANCE = 24;
-/**
- * How far (as a share of its size) a redrawn drawing may be off in size or
- * place and still be lined up with the original; bigger differences are
- * meant (a hat makes it taller) and stay.
- */
-export const REDRAW_ALIGN_SLACK = 0.12;
-/** How many of the art's colours a redraw is matched against. */
-export const MAX_SNAP_COLORS = 64;
+export const REDRAW_KEEP_DISTANCE = 48;

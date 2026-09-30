@@ -13,8 +13,7 @@ import {
   type Chat,
   type Placement,
 } from "../constants";
-import { copyObject, drawnBox, emptyCel, paint } from "../helpers";
-import { keepPicture } from "@/lib/chat/pictures";
+import { copyObject, emptyCel, paint } from "../helpers";
 import { toArt } from "./pictures";
 
 /** The name for a new picture's layer: the router's, or the subject's start. */
@@ -49,15 +48,7 @@ export async function drawOnNewLayer(
         paint(pixels, size, resizeNearest(art, area.w, area.h).rgba, area),
       emptyCel(size),
     );
-    const layerId = canvas.addLayer(name, cel, replace);
-    // One picture in one place: later edits can start from it.
-    const picture = areas.length === 1 && (await keepPicture(result.value));
-    if (picture)
-      chat.sources.set(layerId, {
-        picture,
-        area: largest,
-        box: drawnBox(cel, size),
-      });
+    canvas.addLayer(name, cel, replace);
     const many = areas.length > 1 ? ` ×${areas.length}` : "";
     const hidden = replace
       ? " The other layers are hidden, not deleted: show them again in the timeline."

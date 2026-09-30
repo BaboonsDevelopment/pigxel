@@ -89,7 +89,6 @@ export function readPlan(text: string): PlanReply {
     mode: reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
     objects: (reply.objects ?? []).filter(Number.isInteger),
     keep: (reply.keep ?? []).filter(Number.isInteger),
-    area: reply.area ?? reply.target,
     target: reply.target,
     instruction: reply.instruction,
     summary: reply.summary ?? "",

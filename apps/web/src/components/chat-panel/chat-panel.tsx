@@ -16,7 +16,6 @@ import {
   type CanvasBridge,
   type Chat,
   type ChatEntry,
-  type PictureSource,
   type Placement,
 } from "./constants";
 import { animate } from "./flows/animate";
@@ -50,7 +49,6 @@ export function ChatPanel({
   const [selectArea, setSelectArea] = useState(false);
   const [width, setWidth] = useState(PANEL_WIDTH.initial);
   const [collapsed, setCollapsed] = useState(false);
-  const sources = useRef(new Map<string, PictureSource>());
   // Pictures already in the browser's cache, by data URL, to keep each once.
   const kept = useRef(new Map<string, string>());
 
@@ -68,7 +66,6 @@ export function ChatPanel({
           }),
         );
         if (!active) return;
-        sources.current = new Map(Object.entries(saved.sources));
         setMessages(restored);
       }
       setLoaded(true);
@@ -93,10 +90,7 @@ export function ChatPanel({
           return { role, content, ...(id && { picture: id }) };
         }),
       );
-      await saveChat(tileId, {
-        messages: saved,
-        sources: Object.fromEntries(sources.current),
-      }).catch(() => false);
+      await saveChat(tileId, { messages: saved }).catch(() => false);
     }, SAVE_DELAY);
     return () => clearTimeout(timer);
   }, [loaded, messages, tileId]);
@@ -115,7 +109,6 @@ export function ChatPanel({
     say: (content) => append({ role: "assistant", content }),
     setPending,
     setError,
-    sources: sources.current,
   });
 
   const send = async (text: string) => {

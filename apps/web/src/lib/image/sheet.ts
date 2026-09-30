@@ -1,5 +1,5 @@
 import { components, type Component } from "@/lib/edit/objects";
-import { cropBitmap, type Bitmap, type Size } from "./bitmap";
+import { cropBitmap, type Bitmap, type Box, type Size } from "./bitmap";
 import { decodeImage } from "./decode";
 import { imageToSprite } from "./quantize";
 import { cutOutBackground } from "./steps/cut-out-background";
@@ -12,6 +12,11 @@ export type Grid = { cols: number; rows: number };
 
 /** Specks smaller than this (in sheet pixels) are noise, not part of a pose. */
 const MIN_PART = 3;
+/**
+ * Drawn things closer than this share of the sheet's shorter side belong to
+ * one pose; poses on a sheet are drawn with more space between them.
+ */
+const POSE_GAP = 0.02;
 
 /** An empty `w × h` bitmap. */
 const blank = (w: number, h: number): Bitmap => ({
@@ -35,28 +40,113 @@ function paste(to: Bitmap, from: Bitmap, x: number, y: number) {
   }
 }
 
+/** A pose on the sheet: the drawn things it is made of, and their box. */
+type Group = { parts: Component[]; box: Box; size: number };
+
+const centre = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+const around = (a: Box, b: Box): Box => {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return {
+    x,
+    y,
+    w: Math.max(a.x + a.w, b.x + b.w) - x,
+    h: Math.max(a.y + a.h, b.y + b.h) - y,
+  };
+};
+const near = (a: Box, b: Box, gap: number) =>
+  a.x - gap < b.x + b.w &&
+  b.x - gap < a.x + a.w &&
+  a.y - gap < b.y + b.h &&
+  b.y - gap < a.y + a.h;
+
 /**
- * The poses of a cut-out sprite sheet, one per cell: each separate drawn
- * thing goes to the cell its centre lies in, so a pose reaching a little
- * past its cell stays whole. Cells with nothing drawn give null.
+ * The poses as the model actually drew them, whatever grid it used (it often
+ * draws 2×3 when asked for 3×2): drawn things close together make one pose
+ * (a beaver and the carrot it holds), and the poses are read row by row, left
+ * to right. Null when they don't come out as \`count\` poses.
+ */
+function findPoses(parts: Component[], count: number, gap: number) {
+  let groups: Group[] = parts.map((p) => ({
+    parts: [p],
+    box: p.box,
+    size: p.members.length,
+  }));
+  // Join what lies within \`gap\` of each other until nothing more joins.
+  for (let joined = true; joined;) {
+    joined = false;
+    for (let i = 0; i < groups.length && !joined; i++)
+      for (let j = i + 1; j < groups.length && !joined; j++) {
+        const [a, b] = [groups[i]!, groups[j]!];
+        if (!near(a.box, b.box, gap)) continue;
+        groups[i] = {
+          parts: [...a.parts, ...b.parts],
+          box: around(a.box, b.box),
+          size: a.size + b.size,
+        };
+        groups.splice(j, 1);
+        joined = true;
+      }
+  }
+  // Stray bits that stand apart join the pose nearest to them.
+  while (groups.length > count) {
+    groups.sort((a, b) => a.size - b.size);
+    const [small, ...rest] = groups as [Group, ...Group[]];
+    const c = centre(small.box);
+    const distance = (g: Group) =>
+      Math.hypot(centre(g.box).x - c.x, centre(g.box).y - c.y);
+    const target = rest.reduce((a, b) => (distance(b) < distance(a) ? b : a));
+    target.parts.push(...small.parts);
+    target.box = around(target.box, small.box);
+    target.size += small.size;
+    groups = rest;
+  }
+  if (groups.length !== count) return null;
+  // Rows: a pose starts a new row when its centre is below the row's poses.
+  groups.sort((a, b) => centre(a.box).y - centre(b.box).y);
+  const rows: Group[][] = [];
+  for (const g of groups) {
+    const row = rows.at(-1);
+    const top = row?.[0];
+    if (row && top && centre(g.box).y < top.box.y + top.box.h) row.push(g);
+    else rows.push([g]);
+  }
+  return rows.flatMap((row) =>
+    row.sort((a, b) => centre(a.box).x - centre(b.box).x).map((g) => g.parts),
+  );
+}
+
+/** The drawn things by cell of the \`grid\` their centres lie in. */
+function byGrid(image: Bitmap, parts: Component[], grid: Grid, count: number) {
+  const cellW = image.w / grid.cols;
+  const cellH = image.h / grid.rows;
+  const cells: Component[][] = Array.from({ length: count }, () => []);
+  for (const part of parts) {
+    const { x, y } = centre(part.box);
+    const col = Math.min(grid.cols - 1, Math.floor(x / cellW));
+    const row = Math.min(grid.rows - 1, Math.floor(y / cellH));
+    cells[row * grid.cols + col]?.push(part);
+  }
+  return cells;
+}
+
+/**
+ * The poses of a cut-out sprite sheet, in order. They are found as drawn
+ * (see findPoses); when that fails, each drawn thing goes to the cell of the
+ * asked-for \`grid\` its centre lies in. Missing poses give null.
  */
 export function splitSheet(
   image: Bitmap,
   grid: Grid,
   count: number,
 ): (Bitmap | null)[] {
-  const cellW = image.w / grid.cols;
-  const cellH = image.h / grid.rows;
-  const cells: Component[][] = Array.from({ length: count }, () => []);
-  for (const part of components(image.rgba, image.w, image.h)) {
-    if (part.members.length < MIN_PART) continue;
-    const col = Math.floor((part.box.x + part.box.w / 2) / cellW);
-    const row = Math.floor((part.box.y + part.box.h / 2) / cellH);
-    const index =
-      Math.min(grid.rows - 1, row) * grid.cols + Math.min(grid.cols - 1, col);
-    cells[index]?.push(part);
-  }
-  return cells.map((parts) => {
+  const parts = components(image.rgba, image.w, image.h).filter(
+    (p) => p.members.length >= MIN_PART,
+  );
+  const gap = Math.max(1, Math.round(Math.min(image.w, image.h) * POSE_GAP));
+  const poses =
+    findPoses(parts, count, gap) ?? byGrid(image, parts, grid, count);
+  return poses.map((parts) => {
     if (!parts.length) return null;
     const x0 = Math.min(...parts.map((p) => p.box.x));
     const y0 = Math.min(...parts.map((p) => p.box.y));

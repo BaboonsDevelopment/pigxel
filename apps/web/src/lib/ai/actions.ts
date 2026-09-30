@@ -21,7 +21,6 @@ import {
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
-  Backdrop,
   AnimationPlan,
   ChatMessage,
   EditPlan,
@@ -82,15 +81,6 @@ export async function sendMessage(
   });
 }
 
-/**
- * What the image model puts behind a subject. Pictures sent to it as a
- * reference match: transparent, or on the magenta it keys out.
- */
-export async function imageBackdrop(): Promise<Backdrop> {
-  await requireUser();
-  return getAiProvider().backdrop;
-}
-
 /** Draws `subject` as pixel art for a `width × height` grid; returns a data URL. */
 export async function generateImage(
   subject: string,
@@ -102,10 +92,9 @@ export async function generateImage(
     return { ok: false, error: "That area cannot be used for a picture." };
   }
   return attempt("generateImage", async () => {
-    const ai = getAiProvider();
-    const { mimeType, base64 } = await ai.generate(
-      buildImagePrompt(subject, width, height, ai.backdrop),
-      closestAspectRatio(width, height, ai.aspectRatios),
+    const { mimeType, base64 } = await getAiProvider().generate(
+      buildImagePrompt(subject, width, height),
+      closestAspectRatio(width, height),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -134,34 +123,17 @@ export async function redrawArea(
   picture: string,
   width: number,
   height: number,
-  options: {
-    /** A PNG data URL of the same size, transparent where the picture may change. */
-    mask?: string | null;
-    /** The picture is the tile's pixels shown enlarged, not the AI's own picture. */
-    enlarged?: boolean;
-  } = {},
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
-  const maskPng = options.mask ? PNG_DATA_URL.exec(options.mask)?.[1] : null;
-  const valid =
-    request.trim() &&
-    png &&
-    maskPng !== undefined &&
-    validSize(width) &&
-    validSize(height);
-  if (!valid) return { ok: false, error: "That area cannot be redrawn." };
+  if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
+    return { ok: false, error: "That area cannot be redrawn." };
+  }
   return attempt("redrawArea", async () => {
-    const ai = getAiProvider();
-    const mask = ai.masks && maskPng ? maskPng : null;
-    const { mimeType, base64 } = await ai.redraw(
-      buildRedrawPrompt(request, width, height, ai.backdrop, {
-        masked: !!mask,
-        enlarged: options.enlarged === true,
-      }),
-      { mimeType: "image/png", base64: png! },
-      closestAspectRatio(width, height, ai.aspectRatios),
-      mask ? { mimeType: "image/png", base64: mask } : undefined,
+    const { mimeType, base64 } = await getAiProvider().redraw(
+      buildRedrawPrompt(request, width, height),
+      { mimeType: "image/png", base64: png },
+      closestAspectRatio(width, height),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -237,12 +209,8 @@ export async function planEdit(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
-    // What changes: the selection, else the planner's box around it (which
-    // may be part of an object), else the objects' boxes, else all drawn.
-    const boxed = reply.area.w > 0 && reply.area.h > 0 ? reply.area : null;
     const source = clampRect(
       args.selection ??
-        boxed ??
         unionOf(
           [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
         ) ??
@@ -439,17 +407,11 @@ export async function generateSheet(args: {
 
   return attempt("generateSheet", async () => {
     const ai = getAiProvider();
-    const layout = sheetLayout(
-      args.poses.length,
-      args.cellW,
-      args.cellH,
-      ai.aspectRatios,
-    );
+    const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const prompt = buildSheetPrompt({
       ...args,
       layout,
       fromReference: !!reference,
-      backdrop: ai.backdrop,
     });
     const { mimeType, base64 } = reference
       ? await ai.redraw(
