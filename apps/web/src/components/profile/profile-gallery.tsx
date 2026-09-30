@@ -6,25 +6,24 @@ import {
   setTilePinned,
   setTileVisibility,
 } from "@/app/(app)/u/[username]/actions";
-import type { ProfileTile } from "@/lib/profile/profile";
+import { MAX_PINS, type ProfileTile } from "@/lib/profile/profile";
 import { ArtCard } from "./art-card";
-
-/** How many arts fit in the pinned row; the server checks it too. */
-const MAX_PINS = 6;
 
 type Change = Pick<ProfileTile, "id"> &
   Partial<Pick<ProfileTile, "visibility" | "pinOrder">>;
 
 /**
- * Pinned arts, then the rest. The owner's publish and pin changes show at
+ * Pinned arts, then `children` (the activity row), then the rest. The owner's publish and pin changes show at
  * once and roll back by themselves if the server turns them down.
  */
 export function ProfileGallery({
   tiles,
   isOwner,
+  children,
 }: {
   tiles: ProfileTile[];
   isOwner: boolean;
+  children?: ReactNode;
 }) {
   const [shown, applyChange] = useOptimistic(tiles, (all, change: Change) =>
     all.map((tile) => (tile.id === change.id ? { ...tile, ...change } : tile)),
@@ -89,9 +88,16 @@ export function ProfileGallery({
 
   return (
     <>
-      {pinned.length > 0 && (
-        <Gallery title="Pinned">{pinned.map(card)}</Gallery>
+      {(pinned.length > 0 || (isOwner && shown.length > 0)) && (
+        <Gallery title="Pinned">
+          {pinned.map(card)}
+          {isOwner &&
+            Array.from({ length: MAX_PINS - pinned.length }, (_, i) => (
+              <EmptyPin key={i} />
+            ))}
+        </Gallery>
       )}
+      {children}
       {rest.length > 0 && (
         <Gallery title={pinned.length > 0 ? "All arts" : "Arts"}>
           {rest.map(card)}
@@ -109,5 +115,17 @@ function Gallery({ title, children }: { title: string; children: ReactNode }) {
         {children}
       </ul>
     </section>
+  );
+}
+
+/** A free pinned slot, shown to the owner. */
+function EmptyPin() {
+  return (
+    <li className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary-soft bg-white/50 p-4 text-center text-xs text-muted-foreground">
+      <span aria-hidden="true" className="text-lg text-primary">
+        ✦
+      </span>
+      Pin an art from below to show it here
+    </li>
   );
 }

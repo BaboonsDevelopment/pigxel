@@ -6,17 +6,24 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "@/lib/auth/session";
 import pig from "../../../public/art/pigxel-mascot-sitting.png";
 import { CloseIcon, MenuIcon } from "./icons";
+import { NotificationBell } from "./notification-bell";
+import { SearchButton } from "./search-dialog";
 import { Sidebar } from "./sidebar";
 
 /**
- * The signed-in layout: the sidebar on the left and the page on the right.
+ * The signed-in layout: the sidebar on the left, and the page on the right
+ * under a top bar with search and notifications.
  * On narrow screens the sidebar becomes a menu that slides in from the left.
  */
 export function AppShell({
+  userId,
   profile,
+  unreadNotifications,
   children,
 }: {
+  userId: string;
   profile: Profile;
+  unreadNotifications: number;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -59,22 +66,26 @@ export function AppShell({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:hidden">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:border-0 md:bg-transparent md:px-8">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
-            className="flex size-10 items-center justify-center rounded-lg text-foreground hover:bg-white/60"
+            className="flex size-10 items-center justify-center rounded-lg text-foreground hover:bg-white/60 md:hidden"
           >
             <MenuIcon />
           </button>
-          <Link href="/home" className="flex items-center gap-2">
+          <Link href="/home" className="flex items-center gap-2 md:hidden">
             <Image src={pig} alt="" width={30} className="h-auto" />
             <span className="font-display text-xl font-semibold text-foreground">
               Pigxel
             </span>
           </Link>
+          <div className="ml-auto flex items-center gap-2.5">
+            <SearchButton userId={userId} />
+            <NotificationBell unread={unreadNotifications} />
+          </div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>

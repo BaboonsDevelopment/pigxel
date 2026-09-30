@@ -1,86 +1,137 @@
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
-import { Lead, PageTitle } from "@pigxel/ui/components/typography";
-import { joinedLabel, type ArtistProfile } from "@/lib/profile/profile";
+import {
+  joinedLabel,
+  monthLabel,
+  type ArtistProfile,
+} from "@/lib/profile/profile";
 import { linkTitle } from "@/lib/profile/validation";
+import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
 
-/** Avatar, names, description, links and counts at the top of a profile. */
+/**
+ * The hero at the top of a profile: avatar, names, premium and joined
+ * badges, bio and links, with Follow for visitors or Edit for the owner.
+ */
 export function ProfileHeader({
   profile,
-  artCount,
   isOwner,
+  follows,
 }: {
   profile: ArtistProfile;
-  artCount: number;
   isOwner: boolean;
+  follows: { followers: number; following: boolean };
 }) {
   const joined = joinedLabel(profile.joinedAt);
+  const premium = profile.premiumSince && monthLabel(profile.premiumSince);
   return (
-    <header className="flex flex-col gap-6 sm:flex-row sm:items-start">
-      <ProfileAvatar
-        name={profile.name}
-        url={profile.avatarUrl}
-        className="size-24 text-3xl sm:size-28"
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <PageTitle className="text-2xl sm:text-3xl">
-              {profile.name}
-            </PageTitle>
-            <Lead className="mt-1">
-              @{profile.username}
-              {joined && <> · {joined}</>}
-            </Lead>
-          </div>
-          {isOwner && (
-            <Link
-              href="/settings/profile"
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              Edit profile
-            </Link>
-          )}
-        </div>
-
-        <p className="mt-4 text-sm">
-          <span className="font-semibold tabular-nums">{artCount}</span>{" "}
-          <span className="text-muted-foreground">
-            {artCount === 1 ? "art" : "arts"}
-          </span>
-        </p>
-
-        {profile.bio && (
-          <p className="mt-4 max-w-prose text-sm leading-relaxed whitespace-pre-line break-words">
-            {profile.bio}
-          </p>
-        )}
-
-        {profile.links.length > 0 && (
-          <ul className="mt-4 flex flex-wrap gap-2">
-            {profile.links.map((link) => (
-              <li key={link.url}>
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="nofollow noopener noreferrer ugc"
-                  title={link.url}
+    <header className="relative overflow-hidden rounded-3xl bg-linear-120 from-[#efe4fb] via-[#f6e6f3] to-[#fbe3ea] p-6 shadow-[0_10px_30px_-18px_rgb(120_80_160/0.45)] sm:p-8">
+      <HeroPixels />
+      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start">
+        <ProfileAvatar
+          name={profile.name}
+          url={profile.avatarUrl}
+          className="size-24 text-3xl ring-4 ring-white/80 sm:size-32 sm:text-4xl"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="font-display text-3xl tracking-tight break-words sm:text-4xl">
+                {profile.name}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                @{profile.username}
+              </p>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {premium && (
+                  <li className="inline-flex items-center gap-1.5 rounded-full bg-linear-90 from-[#a47be0] to-[#e57fa6] px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                    <span aria-hidden="true">✦</span> Premium since {premium}
+                  </li>
+                )}
+                {joined && (
+                  <li className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-xs text-muted-foreground">
+                    {joined}
+                  </li>
+                )}
+              </ul>
+            </div>
+            {isOwner ? (
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <Link
+                  href="/settings/profile"
                   className={buttonVariants({
                     variant: "secondary",
-                    size: "sm",
-                    className: "max-w-64 rounded-full text-sm font-normal",
+                    size: "lg",
+                    className: "rounded-full bg-white/80 px-6",
                   })}
                 >
-                  <LinkIcon />
-                  <span className="truncate">{linkTitle(link)}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+                  Edit profile
+                </Link>
+                <FollowerCount count={follows.followers} />
+              </div>
+            ) : (
+              <FollowButton
+                profileId={profile.id}
+                name={profile.name}
+                {...follows}
+              />
+            )}
+          </div>
+
+          {profile.bio && (
+            <p className="mt-4 max-w-prose text-sm leading-relaxed whitespace-pre-line break-words">
+              {profile.bio}
+            </p>
+          )}
+
+          {profile.links.length > 0 && (
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {profile.links.map((link) => (
+                <li key={link.url}>
+                  <a
+                    href={link.url}
+                    target="_blank"
+                    rel="nofollow noopener noreferrer ugc"
+                    title={link.url}
+                    className={buttonVariants({
+                      variant: "secondary",
+                      size: "sm",
+                      className:
+                        "max-w-64 rounded-full border-white/0 bg-white/70 text-sm font-normal",
+                    })}
+                  >
+                    <LinkIcon />
+                    <span className="truncate">{linkTitle(link)}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </header>
+  );
+}
+
+/** A few soft pixels in the hero's corners. */
+function HeroPixels() {
+  const pixels: [string, string, number][] = [
+    ["12%", "58%", 10],
+    ["22%", "62%", 6],
+    ["70%", "92%", 12],
+    ["82%", "88%", 7],
+    ["8%", "94%", 8],
+  ];
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {pixels.map(([top, left, size]) => (
+        <span
+          key={`${top}${left}`}
+          className="absolute bg-white/60"
+          style={{ top, left, width: size, height: size }}
+        />
+      ))}
+    </div>
   );
 }
 

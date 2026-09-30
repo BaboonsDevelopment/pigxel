@@ -2,11 +2,8 @@
 
 import { refresh } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
-import type { Visibility } from "@/lib/profile/profile";
+import { MAX_PINS, type Visibility } from "@/lib/profile/profile";
 import { createClient } from "@/lib/supabase/server";
-
-/** How many arts fit in the pinned row at the top of a profile. */
-const MAX_PINS = 6;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Result = { error?: string };
@@ -71,6 +68,35 @@ export async function setTilePinned(
       .eq("id", tileId)
       .eq("user_id", user.id);
     if (error) return { error: "Couldn’t change this art. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return done();
+}
+
+/** Follows an artist, or stops following them. */
+export async function setFollowing(
+  profileId: string,
+  following: boolean,
+): Promise<Result> {
+  const user = await requireUser();
+  if (!UUID.test(profileId) || profileId === user.id)
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = following
+      ? await supabase
+          .from("follows")
+          .upsert(
+            { followee_id: profileId },
+            { onConflict: "follower_id,followee_id", ignoreDuplicates: true },
+          )
+      : await supabase
+          .from("follows")
+          .delete()
+          .eq("follower_id", user.id)
+          .eq("followee_id", profileId);
+    if (error) return { error: "Couldn’t change that. Try again." };
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }
