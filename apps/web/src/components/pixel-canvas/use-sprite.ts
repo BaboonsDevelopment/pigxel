@@ -50,7 +50,13 @@ export type AnimationSpec = {
 };
 
 /** The tile at one point of its history. Unchanged cels share their pixels. */
-type Snapshot = { tree: Layer[]; frames: Frame[]; size: Size; cels: Cels };
+type Snapshot = {
+  tree: Layer[];
+  frames: Frame[];
+  size: Size;
+  cels: Cels;
+  palette: string[];
+};
 
 /**
  * The tile being edited, as Aseprite calls it a sprite: a layer tree, a list
@@ -71,11 +77,23 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   });
   const [tree, setTree] = useState(initial.layers);
   const [frames, setFrames] = useState(initial.frames);
-  const [layerId, setLayerId] = useState(
+  const [palette, setPaletteState] = useState(initial.palette);
+  const [layerId, setLayerIdState] = useState(
     () =>
       layerTree.pixelLayerIds(initial.layers).at(-1) ?? initial.layers[0]!.id,
   );
-  const [frameId, setFrameId] = useState(initial.frames[0]!.id);
+  const [frameId, setFrameIdState] = useState(initial.frames[0]!.id);
+  // Called before another cel becomes the active one, e.g. to put down a
+  // floating selection on the cel it belongs to.
+  const beforeLeave = useRef<(() => void) | null>(null);
+  const setLayerId = (id: string) => {
+    if (id !== layerId) beforeLeave.current?.();
+    setLayerIdState(id);
+  };
+  const setFrameId = (id: string) => {
+    if (id !== frameId) beforeLeave.current?.();
+    setFrameIdState(id);
+  };
   // Bumped when what the screen shows changes, so the canvas repaints.
   const [version, setVersion] = useState(0);
   const [cels] = useState(() => new CelCanvases(initial.cels, size));
@@ -87,6 +105,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       frames: initial.frames,
       size,
       cels: initial.cels,
+      palette: initial.palette,
     }),
   );
 
@@ -143,13 +162,19 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
    * those erased to nothing are removed.
    */
   const finish = (
-    next: { tree?: Layer[]; frames?: Frame[]; size?: Size } = {},
+    next: {
+      tree?: Layer[];
+      frames?: Frame[];
+      size?: Size;
+      palette?: string[];
+    } = {},
   ) => {
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
       frames: next.frames ?? frames,
       size: next.size ?? size,
       cels: new Map(),
+      palette: next.palette ?? palette,
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
@@ -178,6 +203,42 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   const commit = () => {
     touched();
     finish();
+  };
+
+  /**
+   * Throws away what was drawn on the active cel since the last finished
+   * change, e.g. a floating selection that is cancelled.
+   */
+  const revert = () => {
+    const canvas = cels.get(frameId, layerId);
+    if (!canvas || !changed.current.has(canvas)) return;
+    const kept = frameList.celOf(past.current.present.cels, frameId, layerId);
+    if (kept) cels.set(frameId, layerId, size, kept);
+    else cels.delete(frameId, layerId);
+    changed.current.delete(canvas);
+    repaint();
+  };
+
+  /**
+   * Changes the active cel's pixels with `change` (which gets them and
+   * returns new ones, or null to leave them), as one undo step.
+   */
+  const editCel = (
+    change: (pixels: Uint8ClampedArray) => Uint8ClampedArray | null,
+  ) => {
+    if (!layerTree.canPaint(tree, layerId)) return;
+    const pixels =
+      cels.pixels(frameId, layerId) ??
+      new Uint8ClampedArray(size.w * size.h * 4);
+    const next = change(pixels);
+    const ctx = next && context(true);
+    if (!next || !ctx) return;
+    ctx.putImageData(
+      new ImageData(new Uint8ClampedArray(next), size.w, size.h),
+      0,
+      0,
+    );
+    commit();
   };
 
   /** Empties the active cel; on the Background it goes back to the colour. */
@@ -226,11 +287,14 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     setTree(snapshot.tree);
     setFrames(snapshot.frames);
     setSize(snapshot.size);
+    setPaletteState(snapshot.palette);
     if (!layerTree.findLayer(snapshot.tree, layerId))
-      setLayerId(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
+      setLayerIdState(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
     if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
       const at = frameList.frameIndex(frames, frameId);
-      setFrameId(snapshot.frames[Math.min(at, snapshot.frames.length - 1)]!.id);
+      setFrameIdState(
+        snapshot.frames[Math.min(at, snapshot.frames.length - 1)]!.id,
+      );
     }
     repaint();
     onChange();
@@ -457,13 +521,23 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
 
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
 
+  /** Changes the tile's palette, as one undo step. */
+  const setPalette = (next: string[]) => {
+    setPaletteState(next);
+    finish({ palette: next });
+  };
+
   return {
     size,
     tree,
     frames,
     background,
+    palette,
+    setPalette,
     layerId,
     activeLayer,
+    /** What erasing the active layer leaves: the Background's colour, or null for transparency. */
+    eraseFill: fillOf(layerId),
     frameId,
     /** Whether the tools may draw on the active layer. */
     canPaint: layerTree.canPaint(tree, layerId),
@@ -472,6 +546,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     composite,
     touched,
     commit,
+    revert,
+    editCel,
     clearCel,
     resize,
     undo,
@@ -485,6 +561,10 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     cutToLayer,
     addAnimation,
     selectLayer: setLayerId,
+    /** Registers what to do before another cel becomes the active one. */
+    onLeaveCel: (callback: () => void) => {
+      beforeLeave.current = callback;
+    },
     addLayer,
     canRemoveLayer,
     removeLayer,
@@ -511,6 +591,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       width: size.w,
       height: size.h,
       background,
+      palette,
       layers: tree,
       frames,
       cels: new Map(

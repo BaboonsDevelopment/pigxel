@@ -120,5 +120,13 @@ export const GRID_STYLE: CSSProperties = {
   ].join(", "),
 };
 
+/** The grid every few pixels (View › Grid); `backgroundSize` is set from its size and the zoom. */
+export const MAJOR_GRID_STYLE: CSSProperties = {
+  backgroundImage: [
+    "linear-gradient(to right, rgba(59,130,246,0.55) 1px, transparent 1px)",
+    "linear-gradient(to bottom, rgba(59,130,246,0.55) 1px, transparent 1px)",
+  ].join(", "),
+};
+
 /** How many finished changes Ctrl+Z can step back through. */
 export const MAX_UNDO = 100;
