@@ -1,10 +1,17 @@
 "use server";
 
-import { MAX_FRAMES, MAX_HISTORY, PLACEMENT_HISTORY } from "@/lib/ai/constants";
+import {
+  MAX_FRAMES,
+  MAX_HISTORY,
+  MAX_REFERENCES,
+  PLACEMENT_HISTORY,
+} from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
   buildAnimationPrompt,
+  buildAnimationReviewPrompt,
   buildComposePrompt,
+  buildEditReviewPrompt,
   buildEditSystemPrompt,
   buildEditUserMessage,
   buildImagePrompt,
@@ -12,19 +19,23 @@ import {
   buildPlanPrompt,
   buildRedrawPrompt,
   buildSheetPrompt,
+  clampAnimationFixes,
   clampAnimationPlan,
   clampRect,
   closestAspectRatio,
+  refitPlan,
   sheetLayout,
   type SheetLayout,
 } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
+  AnimationFixes,
   AnimationPlan,
   ChatMessage,
   EditPlan,
   EditReply,
+  EditReview,
   PlacementPlan,
   Rect,
 } from "@/lib/ai/types";
@@ -35,6 +46,9 @@ import { requireUser } from "@/lib/auth/session";
 const MAX_GRID = 256;
 /** A PNG data URL of at most ~1.5 MB, capturing its base64 payload. */
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]{1,2000000})$/;
+/** A picture the user attached, the same size at most: its type and payload. */
+const IMAGE_DATA_URL =
+  /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/;
 /** Guards against oversized requests; a full 256×256 tile grid is ~70k. */
 const MAX_GRID_TEXT = 100_000;
 
@@ -86,15 +100,28 @@ export async function generateImage(
   subject: string,
   width: number,
   height: number,
+  /** Pictures the user attached to draw from, as data URLs. */
+  references: string[] = [],
 ): Promise<AiResult<string>> {
   await requireUser();
-  if (!subject.trim() || !validSize(width) || !validSize(height)) {
+  const pictures = (Array.isArray(references) ? references : []).map((r) =>
+    IMAGE_DATA_URL.exec(String(r)),
+  );
+  if (
+    !subject.trim() ||
+    !validSize(width) ||
+    !validSize(height) ||
+    pictures.length > MAX_REFERENCES ||
+    pictures.some((p) => !p)
+  ) {
     return { ok: false, error: "That area cannot be used for a picture." };
   }
   return attempt("generateImage", async () => {
     const { mimeType, base64 } = await getAiProvider().generate(
-      buildImagePrompt(subject, width, height),
+      buildImagePrompt(subject, width, height, pictures.length > 0),
       closestAspectRatio(width, height),
+      true,
+      pictures.map((p) => ({ mimeType: p![1]!, base64: p![2]! })),
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -376,6 +403,72 @@ export async function planAnimation(args: {
       args.frames,
       objects.length,
     );
+  });
+}
+
+/**
+ * Looks at an edit before it is applied: `before` and `after` are PNG data
+ * URLs of the same area of the layer. Free (text model).
+ */
+export async function reviewEdit(args: {
+  request: string;
+  instruction: string;
+  before: string;
+  after: string;
+}): Promise<AiResult<EditReview>> {
+  await requireUser();
+  const before = PNG_DATA_URL.exec(args.before)?.[1];
+  const after = PNG_DATA_URL.exec(args.after)?.[1];
+  if (!args.request?.trim() || !before || !after)
+    return { ok: false, error: "The edit could not be checked." };
+  return attempt("reviewEdit", () =>
+    getAiProvider().reviewEdit(
+      buildEditReviewPrompt(
+        args.request.slice(0, 1000),
+        String(args.instruction ?? "").slice(0, 1000),
+      ),
+      { mimeType: "image/png", base64: before },
+      { mimeType: "image/png", base64: after },
+    ),
+  );
+}
+
+/**
+ * Looks at an animation before it is applied: `frames` is a PNG data URL of
+ * its frames side by side, `plan` what they were drawn from. Free (text model).
+ */
+export async function reviewAnimation(args: {
+  request: string;
+  plan: AnimationPlan;
+  frames: string;
+  width: number;
+  height: number;
+}): Promise<AiResult<AnimationFixes>> {
+  await requireUser();
+  const { width, height } = args;
+  const png = PNG_DATA_URL.exec(args.frames)?.[1];
+  const valid =
+    typeof args.request === "string" &&
+    png &&
+    validSize(width) &&
+    validSize(height) &&
+    Array.isArray(args.plan?.tracks);
+  if (!valid)
+    return { ok: false, error: "The animation could not be checked." };
+  return attempt("reviewAnimation", async () => {
+    // The plan comes back from the browser: it is fitted to the tile again
+    // before the checker hears of it, and the answer is fitted to it.
+    const plan = refitPlan(args.plan, width, height);
+    const reply = await getAiProvider().reviewAnimation(
+      buildAnimationReviewPrompt(
+        args.request.slice(0, 1000),
+        plan,
+        width,
+        height,
+      ),
+      { mimeType: "image/png", base64: png! },
+    );
+    return clampAnimationFixes(reply, plan, width, height);
   });
 }
 

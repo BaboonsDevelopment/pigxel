@@ -105,7 +105,7 @@ function StartCard({ start }: { start: Start }) {
       </Link>
     );
   return (
-    <div aria-disabled="true" className={cn(className, "cursor-default")}>
+    <div aria-disabled="true" className={cn(className, "cursor-pointer")}>
       <span className="absolute top-3 right-3 rounded-full bg-white/80 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
         Soon
       </span>

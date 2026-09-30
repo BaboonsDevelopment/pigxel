@@ -1,6 +1,12 @@
-import type { Area } from "@/components/pixel-canvas/constants";
+import type { Area, Size } from "@/components/pixel-canvas/constants";
+import { canvasOf, tileSnapshot } from "@/components/pixel-canvas/helpers";
 import type { AnimationSpec } from "@/components/pixel-canvas/use-sprite";
-import { generateImage, generateSheet, planAnimation } from "@/lib/ai/actions";
+import {
+  generateImage,
+  generateSheet,
+  planAnimation,
+  redrawArea,
+} from "@/lib/ai/actions";
 import type {
   AnimationPlan,
   PropTrack,
@@ -19,9 +25,17 @@ import {
 } from "../constants";
 import { emptyCel, paint } from "../helpers";
 import { toArt } from "./pictures";
+import { checkAnimation } from "./review";
 
-/** A track drawn into its cels, one per frame (null where it is not seen). */
-type Drawn = { cels: (Uint8ClampedArray | null)[]; image: string };
+/**
+ * A track drawn into its cels, one per frame (null where it is not seen);
+ * a prop keeps its `art`, to be placed again when its path changes.
+ */
+type Drawn = {
+  cels: (Uint8ClampedArray | null)[];
+  image: string;
+  art?: Bitmap;
+};
 
 /** What a failed step says; the flow stops there and changes nothing. */
 class StepError extends Error {}
@@ -72,7 +86,7 @@ export async function animate(chat: Chat, action: TileAction) {
       .join("\n"),
     button: {
       label: paid ? `Generate animation · ${pictures}` : "Make the animation",
-      run: () => draw(chat, plan.value, layers, objects, held),
+      run: () => draw(chat, action.request, plan.value, layers, objects, held),
     },
   });
 }
@@ -163,7 +177,8 @@ function describe(
  */
 async function draw(
   chat: Chat,
-  plan: AnimationPlan,
+  request: string,
+  first: AnimationPlan,
   layers: LayerInfo[],
   objects: TileObject[],
   held: Map<PropTrack, Held>,
@@ -190,12 +205,18 @@ async function draw(
   chat.setError(null);
   try {
     const drawn = await Promise.all(
-      plan.tracks.map((track) =>
+      first.tracks.map((track) =>
         track.kind === "sheet"
           ? drawSheet(chat, track, layers)
           : drawProp(chat, track, objects, cut.get(track)),
       ),
     );
+    const { plan, problem } = await fix(chat, request, first, drawn);
+    // Things are cut out by track, so fixed tracks keep their place.
+    const cutOf = (i: number) => {
+      const track = first.tracks[i];
+      return track?.kind === "prop" ? cut.get(track) : undefined;
+    };
     const replaced = new Set(
       plan.tracks.flatMap((t) =>
         t.kind === "sheet" && t.reuse !== null ? [layers[t.reuse]?.id] : [],
@@ -212,14 +233,12 @@ async function draw(
           replaces:
             track.kind === "sheet" && track.reuse !== null
               ? layers[track.reuse]?.id
-              : track.kind === "prop"
-                ? cut.get(track)?.layerId
-                : undefined,
+              : cutOf(i)?.layerId,
         })),
         // A copied thing leaves its layer once it flies, unless that layer
         // is redrawn by a sheet anyway.
-        ...plan.tracks.flatMap((track) =>
-          track.kind === "prop" && track.copy !== null && !cut.has(track)
+        ...plan.tracks.flatMap((track, i) =>
+          track.kind === "prop" && track.copy !== null && !cutOf(i)
             ? leaving(chat, track, objects[track.copy], replaced)
             : [],
         ),
@@ -234,7 +253,8 @@ async function draw(
         image: drawn[i]!.image,
       });
     chat.say(
-      `Done: "${plan.name}", ${plan.frameCount} frames. It is playing now.`,
+      `Done: "${plan.name}", ${plan.frameCount} frames. It is playing now.` +
+        (problem ? `\nChecked and fixed: ${problem}` : ""),
     );
     return true;
   } catch (e) {
@@ -296,6 +316,87 @@ async function drawSheet(
 }
 
 /**
+ * Has the drawn frames checked once and fixes, in `drawn`, what the check
+ * found: a sheet's frames put in order, or drawn again (paid, a few at most);
+ * a prop moved along a better path. The fixes are not checked again. The
+ * plan with the new paths, and what was fixed ("" when nothing was).
+ */
+async function fix(
+  chat: Chat,
+  request: string,
+  plan: AnimationPlan,
+  drawn: Drawn[],
+): Promise<{ plan: AnimationPlan; problem: string }> {
+  const fixes = await checkAnimation(
+    chat,
+    request,
+    plan,
+    drawn.map((d) => d.cels),
+  );
+  if (!fixes) return { plan, problem: "" };
+  const size = chat.canvas.size();
+  const tracks = [...plan.tracks];
+  await Promise.all(
+    fixes.tracks.map(async ({ track: i, order, redraw, path }) => {
+      const track = tracks[i];
+      const d = drawn[i];
+      if (!track || !d) return;
+      if (track.kind === "prop") {
+        if (path && d.art) {
+          tracks[i] = { ...track, path };
+          d.cels = placed(d.art, path, size);
+        }
+        return;
+      }
+      if (order) d.cels = order.map((f) => d.cels[f] ?? null);
+      const redrawn = new Set(redraw.map((r) => r.frame));
+      const cels = await Promise.all(
+        redraw.map((r) => redrawFrame(chat, track, d.cels, r, redrawn)),
+      );
+      redraw.forEach((r, n) => {
+        const cel = cels[n];
+        // A frame that could not be drawn again stays as it was.
+        if (cel) d.cels[r.frame] = cel;
+      });
+    }),
+  );
+  return { plan: { ...plan, tracks }, problem: fixes.problem };
+}
+
+/**
+ * One frame of a sheet drawn again in `pose` (paid), looking like the
+ * nearest frame that is kept; null when that fails.
+ */
+async function redrawFrame(
+  chat: Chat,
+  track: SheetTrack,
+  cels: Drawn["cels"],
+  { frame, pose }: { frame: number; pose: string },
+  redrawn: Set<number>,
+) {
+  const size = chat.canvas.size();
+  const kept = cels
+    .map((cel, i) => ({ cel, i }))
+    .filter(({ cel, i }) => cel && !redrawn.has(i))
+    .sort((a, b) => Math.abs(a.i - frame) - Math.abs(b.i - frame))[0]?.cel;
+  if (!kept) return null;
+  const result = await redrawArea(
+    `The same ${track.subject}, now in this pose: ${pose}. Keep exactly its design, colours, outline, size and proportions.`,
+    tileSnapshot(canvasOf(kept, size), track.box, CHROMA_KEY_HEX),
+    track.box.w,
+    track.box.h,
+  ).catch(() => UNREACHABLE);
+  if (!result.ok) return null;
+  const [art] = await sheetToFrames(
+    await (await fetch(result.value)).blob(),
+    { cols: 1, rows: 1 },
+    1,
+    track.box,
+  );
+  return art ? paint(emptyCel(size), size, art.rgba, track.box) : null;
+}
+
+/**
  * The layer a copied thing flies from, without the thing from the frame it
  * is first seen flying; none when the layer is redrawn anyway.
  */
@@ -333,38 +434,35 @@ async function drawProp(
 ): Promise<Drawn> {
   const { canvas } = chat;
   const size = canvas.size();
-  const place = (art: Bitmap) =>
-    track.path.map((box) =>
-      box
-        ? paint(
-            emptyCel(size),
-            size,
-            resizeNearest(art, box.w, box.h).rgba,
-            box,
-          )
-        : null,
-    );
+  const drawn = (art: Bitmap, image: string) => ({
+    cels: placed(art, track.path, size),
+    image,
+    art,
+  });
   if (cut)
-    return {
-      cels: place(areaPixels(chat, cut.layerId, cut.area)),
-      image: canvas.snapshot(cut.area),
-    };
+    return drawn(
+      areaPixels(chat, cut.layerId, cut.area),
+      canvas.snapshot(cut.area),
+    );
   const object = track.copy !== null ? objects[track.copy] : undefined;
   if (object)
-    return {
-      cels: place(objectPixels(chat, object)),
-      image: canvas.snapshot(object.area),
-    };
+    return drawn(objectPixels(chat, object), canvas.snapshot(object.area));
   const boxes = track.path.filter((r) => r !== null);
   const largest = boxes.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   const result = await generateImage(track.subject, largest.w, largest.h).catch(
     () => UNREACHABLE,
   );
   if (!result.ok) throw new StepError(result.error);
-  return {
-    cels: place(await toArt(result.value, largest)),
-    image: result.value,
-  };
+  return drawn(await toArt(result.value, largest), result.value);
+}
+
+/** `art` placed in each frame's box of `path`, scaled to fit it. */
+function placed(art: Bitmap, path: PropTrack["path"], size: Size) {
+  return path.map((box) =>
+    box
+      ? paint(emptyCel(size), size, resizeNearest(art, box.w, box.h).rgba, box)
+      : null,
+  );
 }
 
 /** What a layer shows in `area` of the current frame, as a picture. */
