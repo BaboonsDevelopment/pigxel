@@ -10,6 +10,7 @@ import {
   serializePigxel,
   type PigxelDocument,
 } from "@/lib/pigxel-file/format";
+import { DEFAULT_PALETTE } from "@/lib/palette/presets";
 import { celOf, createFrame } from "@/lib/sprite/frames";
 
 function pixels(width: number, height: number, seed = 37) {
@@ -30,6 +31,7 @@ function document(width: number, height: number): PigxelDocument {
     layers: [layer],
     frames: [frame],
     cels: new Map([[frame.id, new Map([[layer.id, pixels(width, height)]])]]),
+    palette: ["#000000", "#ff004d"],
   };
 }
 
@@ -56,7 +58,7 @@ describe(".pigxel format", () => {
   it("writes a versioned document with frames, layer settings and cels", () => {
     expect(valid).toMatchObject({
       format: "pigxel",
-      version: 4,
+      version: 5,
       width: 2,
       height: 2,
       frames: [{ duration: 100 }],
@@ -99,6 +101,7 @@ describe(".pigxel format", () => {
       background: "transparent",
       layers,
       frames: [frame],
+      palette: [],
       cels: new Map([
         [
           frame.id,
@@ -140,9 +143,23 @@ describe(".pigxel format", () => {
     }
   });
   it("rejects files from a newer version", () => {
-    expect(() => parsePigxel(file({ ...valid, version: 5 }))).toThrow(
+    expect(() => parsePigxel(file({ ...valid, version: 6 }))).toThrow(
       "newer version",
     );
+  });
+  it("round-trips the palette, and gives older files the default one", () => {
+    expect(valid.palette).toEqual(["#000000", "#ff004d"]);
+    expect(parsePigxel(file(valid)).palette).toEqual(["#000000", "#ff004d"]);
+    const v4 = { ...valid, version: 4 };
+    delete v4.palette;
+    expect(parsePigxel(file(v4)).palette).toEqual(DEFAULT_PALETTE);
+  });
+  it("keeps only valid palette colours, lowercase and once each", () => {
+    const messy = {
+      ...valid,
+      palette: ["#FF004D", "#ff004d", "red", 7, "#12345", "#0a0b0c"],
+    };
+    expect(parsePigxel(file(messy)).palette).toEqual(["#ff004d", "#0a0b0c"]);
   });
   it("rejects invalid sizes, damaged pixels, kinds and frames", () => {
     for (const size of [0, 257, 1.5, "32"]) {

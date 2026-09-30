@@ -1,5 +1,6 @@
 import { deflateSync, inflateSync } from "fflate";
 import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
+import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
@@ -12,8 +13,8 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *
  * {
  *   "format": "pigxel",
- *   "version": 4,
  *   "id": "…",
+ *   "version": 5,
  *   "width": 32,
  *   "height": 32,
  *   "background": "white",
@@ -25,7 +26,8 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *       "locked": false, "opacity": 255, "blend": "normal", "collapsed": false,
  *       "children": [ …layers… ] }
  *   ],
- *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …]
+ *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …],
+ *   "palette": ["#1d2b53", …]
  * }
  *
  * `frames` are the animation in playing order, each shown for `duration`
@@ -37,8 +39,10 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * there. `opacity`
  * runs 0–255 and `blend` is one of the blend modes in lib/layers.
  * `background` (default "transparent") is what the eraser paints on the
- * Background layer.
+ * Background layer. `palette` is the tile's colours to paint from, as
+ * `#rrggbb`, at most 256.
  *
+ * Version 4 was the same without a palette (a tile gets the default one).
  * Version 3 was the same with uncompressed cels. Version 2 had no frames: every layer but a group carried its `pixels`.
  * Version 1 had only a flat list of `{ name, visible, opacity (0–1), pixels }`
  * layers; those two are read as one frame. All are still read. Bump `version` whenever the
@@ -47,7 +51,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 4;
+export const PIGXEL_VERSION = 5;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -78,6 +82,8 @@ export type PigxelDocument = {
   /** In playing order; at least one. */
   frames: Frame[];
   cels: Cels;
+  /** Colours to paint from, as `#rrggbb`. */
+  palette: string[];
 };
 
 /**
@@ -111,6 +117,7 @@ export function blankDocument(
     layers,
     frames: [frame],
     cels: new Map([[frame.id, frameCels]]),
+    palette: [...DEFAULT_PALETTE],
   };
 }
 
@@ -181,6 +188,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
     layers: doc.layers.map(toFile),
     cels,
+    palette: doc.palette,
   });
 }
 
@@ -250,7 +258,9 @@ export function parsePigxel(text: string): PigxelDocument {
     typeof file.id === "string" && UUID.test(file.id)
       ? file.id
       : crypto.randomUUID();
-  return { id, width, height, background, layers, frames, cels };
+  // Files before version 5 have no palette; neither may a hand-edited one.
+  const palette = readPalette(file.palette) ?? [...DEFAULT_PALETTE];
+  return { id, width, height, background, layers, frames, cels, palette };
 }
 
 /** Called for each layer with pixels, with the layer's id and its file entry. */
