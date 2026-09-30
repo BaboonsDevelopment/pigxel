@@ -188,6 +188,8 @@ export interface AiProvider {
   readonly aspectRatios: string[];
   /** What its pictures have behind the subject. */
   readonly backdrop: Backdrop;
+  /** Whether `redraw` can be limited to a part of the picture with a mask. */
+  readonly masks: boolean;
   /** Decides what the user wants. Text model. */
   route(messages: ChatMessage[]): Promise<Route>;
   /** Plain conversation. Text model. */

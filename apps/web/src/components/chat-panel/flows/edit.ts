@@ -1,10 +1,11 @@
 import type { Area } from "@/components/pixel-canvas/constants";
-import { sameArea, snapshotMask } from "@/components/pixel-canvas/helpers";
+import { snapshotMask } from "@/components/pixel-canvas/helpers";
 import { editTile, planEdit, redrawArea } from "@/lib/ai/actions";
 import type { EditPlan, TileAction } from "@/lib/ai/types";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
-import { paintedBounds } from "@/lib/edit/raster";
+import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
+import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
 import {
   ASK_FRAME,
   ASK_SELECT,
@@ -19,16 +20,11 @@ import {
   follow,
   moveObject,
   replaceObject,
-  samePixels,
   drawnBox,
-  sameBox,
-  shrinkPicture,
-  toArt,
-  unionOf,
+  samePixels,
   type EditScope,
 } from "../helpers";
-import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
-import { referenceBackground } from "./reference";
+import { referenceBackground, shrinkPicture, toArt } from "./pictures";
 
 /** New cels by frame id, written back as one undo step. */
 type Cels = Map<string, Uint8ClampedArray>;
@@ -91,7 +87,7 @@ export async function edit(chat: Chat, action: TileAction) {
 
   const { source } = plan.value;
   let target = plan.value.target;
-  if (!sameArea(source, target)) {
+  if (!sameRect(source, target)) {
     chat.say(plan.value.question || ASK_FRAME);
     const adjusted = await canvas.adjustArea(target);
     if (!adjusted) return chat.say("Cancelled, nothing changed.");
@@ -249,11 +245,10 @@ function pictureFor(chat: Chat, layerId: string, steps: Step[]) {
   const [step] = steps;
   const picture = chat.sources.get(layerId);
   if (!picture || steps.length !== 1 || !step) return null;
-  if (!sameArea(step.source, step.target)) return null;
+  if (!sameRect(step.source, step.target)) return null;
   const cel = chat.canvas.readCel(layerId, step.frame);
-  return sameBox(drawnBox(cel, chat.canvas.size()), picture.box)
-    ? picture
-    : null;
+  const box = drawnBox(cel, chat.canvas.size());
+  return box && picture.box && sameRect(box, picture.box) ? picture : null;
 }
 
 /**
@@ -315,7 +310,7 @@ async function redraw(
   const background = await referenceBackground();
   // An edit in place shows the model the whole drawing and lets it change
   // only the part (masked); a move or resize redraws the part itself.
-  const inPlace = (step: Step) => sameArea(step.source, step.target);
+  const inPlace = (step: Step) => sameRect(step.source, step.target);
   const shown = (step: Step) => (inPlace(step) ? step.context : step.source);
   const results = await Promise.all(
     steps.map((step) =>
@@ -326,7 +321,7 @@ async function redraw(
         inPlace(step) ? step.context.h : step.target.h,
         {
           mask:
-            inPlace(step) && !sameArea(step.context, step.source)
+            inPlace(step) && !sameRect(step.context, step.source)
               ? snapshotMask(step.context, step.source)
               : null,
           enlarged: true,

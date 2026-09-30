@@ -239,7 +239,3 @@ export function adjustFrame(
   const [y, h] = axis(start.y, start.h, dy, edges.top, edges.bottom, tile.h);
   return { x, y, w, h };
 }
-
-export function sameArea(a: Area, b: Area) {
-  return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-}

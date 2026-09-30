@@ -179,6 +179,7 @@ export function createOpenAiProvider(
   return {
     aspectRatios: Object.keys(OPENAI_IMAGE_SIZES),
     backdrop: "transparent",
+    masks: true,
 
     async route(messages) {
       const text = await complete(

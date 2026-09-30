@@ -13,7 +13,8 @@ import {
   type Chat,
   type Placement,
 } from "../constants";
-import { copyObject, drawnBox, emptyCel, paint, toArt } from "../helpers";
+import { copyObject, drawnBox, emptyCel, paint } from "../helpers";
+import { toArt } from "./pictures";
 
 /** The name for a new picture's layer: the router's, or the subject's start. */
 const layerName = (action: TileAction) =>

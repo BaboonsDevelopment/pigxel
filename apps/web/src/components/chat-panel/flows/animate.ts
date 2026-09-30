@@ -1,3 +1,4 @@
+import type { Area } from "@/components/pixel-canvas/constants";
 import type { AnimationSpec } from "@/components/pixel-canvas/use-sprite";
 import { generateImage, generateSheet, planAnimation } from "@/lib/ai/actions";
 import type {
@@ -6,9 +7,8 @@ import type {
   SheetTrack,
   TileAction,
 } from "@/lib/ai/types";
-import { resizeNearest, type Bitmap } from "@/lib/image/bitmap";
-import type { Area } from "@/components/pixel-canvas/constants";
 import { liftObjectsInside } from "@/lib/edit/objects";
+import { cropBitmap, resizeNearest, type Bitmap } from "@/lib/image/bitmap";
 import { sheetToFrames } from "@/lib/image/sheet";
 import {
   UNREACHABLE,
@@ -16,8 +16,8 @@ import {
   type LayerInfo,
   type TileObject,
 } from "../constants";
-import { emptyCel, paint, toArt } from "../helpers";
-import { referenceBackground } from "./reference";
+import { emptyCel, paint } from "../helpers";
+import { referenceBackground, toArt } from "./pictures";
 
 /** A track drawn into its cels, one per frame (null where it is not seen). */
 type Drawn = { cels: (Uint8ClampedArray | null)[]; image: string };
@@ -369,14 +369,8 @@ async function drawProp(
 /** What a layer shows in `area` of the current frame, as a picture. */
 function areaPixels(chat: Chat, layerId: string, area: Area): Bitmap {
   const { canvas } = chat;
-  const size = canvas.size();
   const cel = canvas.readCel(layerId, canvas.frameId());
-  const rgba = new Uint8ClampedArray(area.w * area.h * 4);
-  for (let y = 0; y < area.h; y++) {
-    const from = ((area.y + y) * size.w + area.x) * 4;
-    rgba.set(cel.subarray(from, from + area.w * 4), y * area.w * 4);
-  }
-  return { rgba, w: area.w, h: area.h };
+  return cropBitmap({ rgba: cel, ...canvas.size() }, area);
 }
 
 /** Just the pixels of a drawn object (not its neighbours), as a picture of its box. */

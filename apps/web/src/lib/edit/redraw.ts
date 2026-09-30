@@ -1,28 +1,10 @@
-import { resizeNearest } from "@/lib/image/bitmap";
+import { cropBitmap, opaqueBox, resizeNearest } from "@/lib/image/bitmap";
 import {
   MAX_SNAP_COLORS,
   REDRAW_ALIGN_SLACK,
   REDRAW_KEEP_DISTANCE,
   REDRAW_SNAP_DISTANCE,
 } from "./constants";
-import type { Rect } from "./raster";
-
-/** The box around the opaque pixels of a `w`-wide picture, or null. */
-function opaqueBox(pixels: Uint8ClampedArray, w: number): Rect | null {
-  let [x0, y0, x1, y1] = [Infinity, Infinity, -1, -1];
-  for (let i = 3, p = 0; i < pixels.length; i += 4, p++) {
-    if (!pixels[i]) continue;
-    const x = p % w;
-    const y = (p - x) / w;
-    [x0, y0, x1, y1] = [
-      Math.min(x0, x),
-      Math.min(y0, y),
-      Math.max(x1, x),
-      Math.max(y1, y),
-    ];
-  }
-  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
-}
 
 /**
  * Lines a redrawn picture up with the drawing it replaces (both `w × h`).
@@ -37,8 +19,8 @@ export function alignToOriginal(
   w: number,
   h: number,
 ): Uint8ClampedArray {
-  const from = opaqueBox(after, w);
-  const to = opaqueBox(before, w);
+  const from = opaqueBox({ rgba: after, w, h });
+  const to = opaqueBox({ rgba: before, w, h });
   if (!from || !to) return after;
   const off = (a: number, b: number, size: number) =>
     Math.abs(a - b) > size * REDRAW_ALIGN_SLACK;
@@ -49,13 +31,8 @@ export function alignToOriginal(
     off(from.h, to.h, to.h)
   )
     return after;
-  const crop = new Uint8ClampedArray(from.w * from.h * 4);
-  for (let y = 0; y < from.h; y++) {
-    const start = ((from.y + y) * w + from.x) * 4;
-    crop.set(after.subarray(start, start + from.w * 4), y * from.w * 4);
-  }
   const fitted = resizeNearest(
-    { rgba: crop, w: from.w, h: from.h },
+    cropBitmap({ rgba: after, w, h }, from),
     to.w,
     to.h,
   );

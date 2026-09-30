@@ -108,6 +108,8 @@ export function createGeminiProvider(
   return {
     aspectRatios: GEMINI_ASPECT_RATIOS,
     backdrop: "chroma",
+    // No mask: the edit is still limited to its part when put on the tile.
+    masks: false,
 
     async route(messages) {
       const parts = await request(models.text, {

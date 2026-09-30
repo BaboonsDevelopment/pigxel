@@ -30,6 +30,7 @@ import type {
   Rect,
 } from "@/lib/ai/types";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
+import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";
 
 const MAX_GRID = 256;
@@ -152,14 +153,15 @@ export async function redrawArea(
   if (!valid) return { ok: false, error: "That area cannot be redrawn." };
   return attempt("redrawArea", async () => {
     const ai = getAiProvider();
+    const mask = ai.masks && maskPng ? maskPng : null;
     const { mimeType, base64 } = await ai.redraw(
       buildRedrawPrompt(request, width, height, ai.backdrop, {
-        masked: !!maskPng,
+        masked: !!mask,
         enlarged: options.enlarged === true,
       }),
       { mimeType: "image/png", base64: png! },
       closestAspectRatio(width, height, ai.aspectRatios),
-      maskPng ? { mimeType: "image/png", base64: maskPng } : undefined,
+      mask ? { mimeType: "image/png", base64: mask } : undefined,
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -273,17 +275,6 @@ export async function planEdit(args: {
       question: reply.question,
     };
   });
-}
-
-/** The box around all given rectangles; null when there are none. */
-function unionOf(rects: (Rect | undefined)[]): Rect | null {
-  const found = rects.filter((r): r is Rect => !!r);
-  if (!found.length) return null;
-  const x = Math.min(...found.map((r) => r.x));
-  const y = Math.min(...found.map((r) => r.y));
-  const right = Math.max(...found.map((r) => r.x + r.w));
-  const bottom = Math.max(...found.map((r) => r.y + r.h));
-  return { x, y, w: right - x, h: bottom - y };
 }
 
 /**

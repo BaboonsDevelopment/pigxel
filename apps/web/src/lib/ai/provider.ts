@@ -78,6 +78,7 @@ export function getAiProvider(): AiProvider {
     ...text,
     aspectRatios: image.aspectRatios,
     backdrop: image.backdrop,
+    masks: image.masks,
     generate: image.generate,
     redraw: image.redraw,
   };

@@ -3,7 +3,7 @@ import {
   MIN_OBJECT_PIXELS,
   PART_OF_EDIT_SHARE,
 } from "./constants";
-import type { Rect } from "./raster";
+import { sameRect, type Rect } from "./raster";
 
 /** A separate drawn thing: its box and the numbers of its pixels. */
 export type Component = { box: Rect; members: number[] };
@@ -94,9 +94,6 @@ export function liftObjectsInside(
   return { rest, lifted };
 }
 
-const sameBox = (a: Rect, b: Rect) =>
-  a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
-
 /** Share of `box` that lies inside `area`. */
 function shareInside(box: Rect, area: Rect) {
   const w = Math.min(box.x + box.w, area.x + area.w) - Math.max(box.x, area.x);
@@ -122,7 +119,7 @@ export function neighbourMask(
   for (const c of components(pixels, width, height)) {
     const share = shareInside(c.box, area);
     if (share === 0 || share >= PART_OF_EDIT_SHARE) continue;
-    if (changing.some((r) => sameBox(r, c.box))) continue;
+    if (changing.some((r) => sameRect(r, c.box))) continue;
     for (const i of c.members) mask[i] = 1;
   }
   return mask;
@@ -172,8 +169,7 @@ export function objectMask(
   boxes: Rect[],
 ): Uint8Array {
   const mask = new Uint8Array(width * height);
-  const listed = (b: Rect) =>
-    boxes.some((r) => r.x === b.x && r.y === b.y && r.w === b.w && r.h === b.h);
+  const listed = (b: Rect) => boxes.some((r) => sameRect(r, b));
   for (const c of components(pixels, width, height)) {
     if (!listed(c.box)) continue;
     for (const i of c.members) mask[i] = 1;
