@@ -5,12 +5,44 @@ export { linePoints, type Point };
 
 /** What a click on the tile does. */
 export type PaintTool =
-  "pen" | "brush" | "eraser" | "line" | "bucket" | "pipette";
+  | "pen"
+  | "brush"
+  | "eraser"
+  | "line"
+  | "rect"
+  | "ellipse"
+  | "bucket"
+  | "pipette"
+  | "marquee"
+  | "lasso"
+  | "wand"
+  | "move";
+
+/** Tools that pick pixels or move them rather than paint. */
+export const SELECTION_TOOLS: readonly PaintTool[] = [
+  "marquee",
+  "lasso",
+  "wand",
+  "move",
+];
 
 /** Settings of the painting tools, shared by all tiles. */
 export type PenSettings = {
-  /** CSS color every tool paints with. */
+  /** The primary `#rrggbb` colour: the left button paints with it. */
   color: string;
+  /** The secondary colour: the right button paints with it; X swaps the two. */
+  secondary: string;
+  /** Colours painted with lately, newest first. */
+  recent: string[];
+  /** Rectangles and ellipses come out filled rather than outlined. */
+  fillShapes: boolean;
+  /**
+   * How the pen and brush change pixels: "simple" paints the colour,
+   * "shading" moves each pixel one step along the palette (Aseprite's shading ink).
+   */
+  ink: "simple" | "shading";
+  /** How much of what the tools cover gets painted, in %: under 100 dithers. */
+  density: number;
   /** Width and height of the square pen and line, in tile pixels. */
   size: number;
   /** Removes the corner pixel from L-shaped steps in freehand strokes. */
@@ -19,7 +51,7 @@ export type PenSettings = {
   brushSize: number;
   /** Width and height of the square eraser, in tile pixels. */
   eraserSize: number;
-  /** The bucket fills only the connected area, not every pixel of that colour. */
+  /** The bucket and magic wand take only the connected area, not every pixel of that colour. */
   contiguous: boolean;
 };
 
@@ -27,6 +59,11 @@ export const MIN_PEN_SIZE = 1;
 export const MAX_PEN_SIZE = 16;
 export const DEFAULT_PEN: PenSettings = {
   color: "#000000",
+  secondary: "#ffffff",
+  recent: [],
+  fillShapes: false,
+  ink: "simple",
+  density: 100,
   size: 1,
   pixelPerfect: true,
   brushSize: 3,
@@ -101,6 +138,16 @@ export function brushTip(size: number, round: boolean): TipRect[] {
     if (w > 0) rows.push({ dx, dy, w, h: 1 });
   }
   return rows;
+}
+
+/** The end of a shape dragged from `from` to `to`, made a square when `square`. */
+export function squareFrom(from: Point, to: Point, square: boolean): Point {
+  if (!square) return to;
+  const side = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+  return {
+    x: from.x + (to.x < from.x ? -side : side),
+    y: from.y + (to.y < from.y ? -side : side),
+  };
 }
 
 /**

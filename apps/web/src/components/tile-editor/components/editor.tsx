@@ -12,11 +12,24 @@ import {
 import { cn } from "@pigxel/ui/lib/utils";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
+import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
+import { rgbaOf, type Stamp } from "@/components/pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
+import {
+  pasteSource,
+  useSelection,
+} from "@/components/pixel-canvas/use-selection";
+import {
+  DEFAULT_VIEW,
+  GRID_SIZES,
+  ONION_FRAMES,
+  type CanvasView,
+} from "@/components/pixel-canvas/view";
+import type { MenuSections } from "@/components/menu/constants";
 import {
   useSprite,
   type SpriteApi,
@@ -24,16 +37,20 @@ import {
 import { Timeline } from "@/components/timeline/timeline";
 import { usePlayback } from "@/components/timeline/use-playback";
 import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
+import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
+import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
-import { shortcutFor, sizeKey } from "../helpers";
+import { isTyping, shortcutFor, sizeKey } from "../helpers";
+import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
 import { useTileFile } from "../use-tile-file";
 import { ChatPlaceholder } from "./chat-placeholder";
+import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
@@ -70,6 +87,10 @@ export function Editor({
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
+  // A picture the pen and brush paint with, from Edit › Use as brush.
+  const [stamp, setStamp] = useState<Stamp | null>(null);
+  const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
@@ -97,6 +118,7 @@ export function Editor({
     tile.current = sprite;
   });
   const playback = usePlayback(sprite);
+  const selection = useSelection(sprite);
 
   // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
@@ -122,21 +144,219 @@ export function Editor({
     save: file.save,
     open: file.openFromComputer,
     export: () => setExporting(true),
-    undo: sprite.undo,
-    redo: sprite.redo,
+    // Undo first takes back lifted or pasted pixels that aren't down yet.
+    undo: () => {
+      if (!selection.cancel()) sprite.undo();
+    },
+    redo: () => {
+      if (!selection.floating) sprite.redo();
+    },
     zoomIn: () => setScale((s) => zoom(s, -1)),
     zoomOut: () => setScale((s) => zoom(s, 1)),
     zoomReset: () => setScale(DEFAULT_SCALE),
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
-    clearLayer: sprite.clearCel,
+    clearLayer: () => (selection.mask ? selection.clear() : sprite.clearCel()),
     newFrame: () => sprite.addFrame(true),
     previousFrame: () => sprite.stepFrame(-1),
     nextFrame: () => sprite.stepFrame(1),
     penSmaller: () => resizePen(-1),
     penBigger: () => resizePen(1),
+    swapColors: () =>
+      setPen((p) => ({ ...p, color: p.secondary, secondary: p.color })),
+    selectAll: selection.selectAll,
+    deselect: selection.deselect,
+    invertSelection: selection.invert,
+    copy: () => void selection.copy(),
+    cut: () => {
+      if (selection.copy()) selection.clear();
+    },
+    // Pasted pixels float until dropped, so the Move tool is ready for them.
+    paste: () => {
+      if (selection.paste()) setTool("move");
+    },
+    dropSelection: selection.drop,
+    flipHorizontal: () => selection.transform("flipHorizontal"),
+    flipVertical: () => selection.transform("flipVertical"),
+    rotateRight: () => selection.transform("rotateRight"),
+    nudgeUp: () => void selection.nudge(0, -1),
+    nudgeDown: () => void selection.nudge(0, 1),
+    nudgeLeft: () => void selection.nudge(-1, 0),
+    nudgeRight: () => void selection.nudge(1, 0),
+    toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
   };
+
+  /** Changes the active cel (inside the selection, if any) as one step. */
+  const applyEffect = (
+    change: (
+      pixels: Uint8ClampedArray,
+      mask: Uint8Array | null,
+    ) => Uint8ClampedArray,
+  ) => {
+    selection.drop();
+    sprite.editCel((pixels) => change(pixels, selection.mask));
+  };
+
+  /** The selected pixels become the pen and brush tip, in their own colours. */
+  const useAsBrush = () => {
+    const piece = selection.selectedPiece();
+    if (!piece) return;
+    const pixels = new Uint8ClampedArray(piece.pixels);
+    for (let i = 0; i < piece.mask.length; i++)
+      if (!piece.mask[i]) pixels[i * 4 + 3] = 0;
+    setStamp({ w: piece.w, h: piece.h, pixels });
+    selection.deselect();
+    setTool("pen");
+  };
+
+  const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
+  const editMenu: MenuSections = [
+    [
+      { label: "Undo", shortcut: `${mod}Z`, onSelect: commands.undo },
+      { label: "Redo", shortcut: `${mod}Y`, onSelect: commands.redo },
+    ],
+    [
+      { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
+      { label: "Copy", shortcut: `${mod}C`, onSelect: commands.copy },
+      { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
+      { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
+    ],
+    [
+      {
+        label: "Select all",
+        shortcut: `${mod}A`,
+        onSelect: commands.selectAll,
+      },
+      {
+        label: "Deselect",
+        shortcut: `${mod}D`,
+        onSelect: commands.deselect,
+        disabled: !selection.mask,
+      },
+      {
+        label: "Invert selection",
+        shortcut: `${mod}Shift+I`,
+        onSelect: commands.invertSelection,
+      },
+    ],
+    [
+      {
+        label: "Flip horizontally",
+        shortcut: "Shift+H",
+        onSelect: commands.flipHorizontal,
+      },
+      {
+        label: "Flip vertically",
+        shortcut: "Shift+V",
+        onSelect: commands.flipVertical,
+      },
+      {
+        label: "Rotate 90° right",
+        shortcut: "Shift+R",
+        onSelect: commands.rotateRight,
+      },
+      {
+        label: "Rotate 90° left",
+        onSelect: () => selection.transform("rotateLeft"),
+      },
+    ],
+    [
+      {
+        label: "Outline in primary colour",
+        onSelect: () =>
+          applyEffect((pixels, mask) =>
+            outlined(pixels, sprite.size, rgbaOf(pen.color), mask),
+          ),
+      },
+      {
+        label: "Replace primary colour with secondary",
+        onSelect: () =>
+          applyEffect((pixels, mask) =>
+            replacedColor(
+              pixels,
+              rgbaOf(pen.color),
+              rgbaOf(pen.secondary),
+              mask,
+            ),
+          ),
+      },
+    ],
+    [
+      {
+        label: "Use selection as brush",
+        onSelect: useAsBrush,
+        disabled: !selection.mask,
+      },
+      {
+        label: "Back to the normal brush",
+        onSelect: () => setStamp(null),
+        hidden: !stamp,
+      },
+    ],
+  ];
+  const viewMenu: MenuSections = [
+    [
+      {
+        label: check(view.onion > 0, "Onion skin"),
+        shortcut: "F3",
+        onSelect: commands.toggleOnion,
+      },
+      ...ONION_FRAMES.map((count) => ({
+        label: check(
+          view.onion === count,
+          `Show ${count} frame${count > 1 ? "s" : ""} each way`,
+        ),
+        onSelect: () => setView((v) => ({ ...v, onion: count })),
+      })),
+    ],
+    [
+      {
+        label: check(view.pixelGrid, "Pixel grid"),
+        onSelect: () => setView((v) => ({ ...v, pixelGrid: !v.pixelGrid })),
+      },
+      {
+        label: check(view.gridSize === 0, "No grid"),
+        onSelect: () => setView((v) => ({ ...v, gridSize: 0 })),
+      },
+      ...GRID_SIZES.map((n) => ({
+        label: check(view.gridSize === n, `Grid ${n} × ${n}`),
+        onSelect: () => setView((v) => ({ ...v, gridSize: n })),
+      })),
+    ],
+  ];
+
+  // Pasting: a picture copied in another app, or our own copy.
+  const onPaste = useEffectEvent(async (e: ClipboardEvent) => {
+    if (isTyping(e.target)) return;
+    e.preventDefault();
+    const file = [...(e.clipboardData?.files ?? [])].find((f) =>
+      f.type.startsWith("image/"),
+    );
+    let image = null;
+    if (file) {
+      try {
+        const { rgba, w, h } = await decodeImage(file, 32);
+        image = {
+          x: 0,
+          y: 0,
+          w,
+          h,
+          pixels: rgba,
+          mask: new Uint8Array(w * h).fill(1),
+        };
+      } catch {
+        // Not a picture the browser can read: paste our own copy instead.
+      }
+    }
+    if (selection.paste(pasteSource(image))) setTool("move");
+  });
+
+  useEffect(() => {
+    const listener = (e: ClipboardEvent) => void onPaste(e);
+    window.addEventListener("paste", listener);
+    return () => window.removeEventListener("paste", listener);
+  }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
     const shortcut = shortcutFor(e);
@@ -174,11 +394,35 @@ export function Editor({
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
+        menus={[
+          { label: "Edit", sections: editMenu },
+          { label: "View", sections: viewMenu },
+        ]}
       />
       <div className="col-span-3 flex min-h-12 items-center border-b bg-background px-4 py-2">
-        <ToolOptions tool={tool} pen={pen} onChange={setPen} />
+        <ToolOptions
+          tool={tool}
+          pen={pen}
+          onChange={setPen}
+          selection={selection}
+          view={view}
+          onViewChange={setView}
+          stamp={stamp}
+          onClearStamp={() => setStamp(null)}
+          onUseAsBrush={useAsBrush}
+        />
       </div>
-      <ToolBar tool={tool} onSelect={setTool} />
+      <aside className="flex min-h-0 w-[6.5rem] flex-col border-r bg-background">
+        <ToolBar tool={tool} onSelect={setTool} />
+        <ColorPanel
+          pen={pen}
+          onChange={setPen}
+          palette={sprite.palette}
+          onPaletteChange={sprite.setPalette}
+          frameColors={() => colorsOf(sprite.composite(["reference"]))}
+          fileName={file.name}
+        />
+      </aside>
       <div className="flex min-h-0 flex-col">
         <main
           ref={workspace}
@@ -195,8 +439,24 @@ export function Editor({
               pen={pen}
               scale={scale}
               sprite={sprite}
+              selection={selection}
+              view={view}
+              stamp={stamp}
               highlight={highlight}
-              onPickColor={(color) => setPen((p) => ({ ...p, color }))}
+              onPickColor={(color, slot) =>
+                setPen((p) =>
+                  slot === "primary"
+                    ? { ...p, color }
+                    : { ...p, secondary: color },
+                )
+              }
+              onUseColor={(color) =>
+                setPen((p) =>
+                  p.recent[0] === color
+                    ? p
+                    : { ...p, recent: pushRecent(p.recent, color) },
+                )
+              }
             />
           </div>
         </main>

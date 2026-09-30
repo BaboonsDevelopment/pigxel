@@ -18,6 +18,8 @@ export type Tool = {
   label: string;
   /** Single key that selects the tool, as in Aseprite. */
   shortcut: string;
+  /** The key is pressed with Shift, e.g. Shift+U for the ellipse. */
+  shift?: boolean;
   icon: ReactNode;
 };
 
@@ -39,7 +41,23 @@ export type Command =
   | "previousFrame"
   | "nextFrame"
   | "penSmaller"
-  | "penBigger";
+  | "penBigger"
+  | "swapColors"
+  | "selectAll"
+  | "deselect"
+  | "invertSelection"
+  | "copy"
+  | "cut"
+  | "paste"
+  | "dropSelection"
+  | "flipHorizontal"
+  | "flipVertical"
+  | "rotateRight"
+  | "nudgeUp"
+  | "nudgeDown"
+  | "nudgeLeft"
+  | "nudgeRight"
+  | "toggleOnion";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
 
