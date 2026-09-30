@@ -418,8 +418,9 @@ export async function generateSheet(args: {
           prompt,
           { mimeType: "image/png", base64: reference },
           layout.aspectRatio,
+          false,
         )
-      : await ai.generate(prompt, layout.aspectRatio);
+      : await ai.generate(prompt, layout.aspectRatio, false);
     return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }

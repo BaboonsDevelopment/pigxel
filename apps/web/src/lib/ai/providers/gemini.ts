@@ -5,6 +5,8 @@ import {
   IMAGE_ATTEMPT_TIMEOUT_MS,
   IMAGE_RETRY_DELAYS_MS,
   ROUTER_PROMPT,
+  SIZED_IMAGE_MODELS,
+  SMALL_IMAGE_SIZE,
   TEXT_ATTEMPT_TIMEOUT_MS,
   TEXT_RETRY_DELAYS_MS,
 } from "../constants";
@@ -43,7 +45,8 @@ export function createGeminiProvider(
   /** Sends a request, moving on to the next model when one can't answer. */
   const request = (
     candidates: string[],
-    body: object,
+    /** The request, or one per model when models take different settings. */
+    body: object | ((model: string) => object),
     { timeoutMs = TEXT_ATTEMPT_TIMEOUT_MS, delays = TEXT_RETRY_DELAYS_MS } = {},
   ) =>
     tryModels(
@@ -57,7 +60,9 @@ export function createGeminiProvider(
               "content-type": "application/json",
               "x-goog-api-key": apiKey,
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify(
+              typeof body === "function" ? body(model) : body,
+            ),
           },
           timeoutMs,
         );
@@ -89,14 +94,23 @@ export function createGeminiProvider(
       }),
     );
 
-  const draw = async (parts: GeminiContent["parts"], aspectRatio: string) =>
+  const draw = async (
+    parts: GeminiContent["parts"],
+    aspectRatio: string,
+    small: boolean,
+  ) =>
     firstImage(
       await request(
         models.image,
-        {
+        (model) => ({
           contents: [{ role: "user", parts }],
-          generationConfig: { imageConfig: { aspectRatio } },
-        },
+          generationConfig: {
+            imageConfig:
+              small && SIZED_IMAGE_MODELS.some((m) => model.startsWith(m))
+                ? { aspectRatio, imageSize: SMALL_IMAGE_SIZE }
+                : { aspectRatio },
+          },
+        }),
         { timeoutMs: IMAGE_ATTEMPT_TIMEOUT_MS, delays: IMAGE_RETRY_DELAYS_MS },
       ),
     );
@@ -144,9 +158,10 @@ export function createGeminiProvider(
       return readEdit(textOf(parts));
     },
 
-    generate: (prompt, aspectRatio) => draw([{ text: prompt }], aspectRatio),
+    generate: (prompt, aspectRatio, small = true) =>
+      draw([{ text: prompt }], aspectRatio, small),
 
-    redraw: (prompt, picture, aspectRatio) =>
+    redraw: (prompt, picture, aspectRatio, small = true) =>
       draw(
         [
           { text: prompt },
@@ -155,6 +170,7 @@ export function createGeminiProvider(
           },
         ],
         aspectRatio,
+        small,
       ),
 
     async compose(prompt, tile) {
