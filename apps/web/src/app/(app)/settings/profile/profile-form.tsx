@@ -151,7 +151,8 @@ export function ProfileForm({ profile }: { profile: ArtistProfile }) {
       </fieldset>
 
       <div className="flex items-center gap-4">
-        <Button disabled={pending}>
+        {/* A username already known to be taken or invalid can't be saved. */}
+        <Button disabled={pending || check?.available === false}>
           {pending ? "Saving…" : "Save profile"}
         </Button>
         {state.error && !state.field ? (
