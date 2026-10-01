@@ -102,16 +102,44 @@ export async function listProfileTiles(
   if (error || !data) return { tiles: [], count: 0 };
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      width: row.width,
-      height: row.height,
-      thumbnail: row.thumbnail,
-      visibility: row.visibility,
-      pinOrder: row.pin_order,
-      updatedAt: row.updated_at,
-    })),
+    tiles: (data as TileRow[]).map(toProfileTile),
+  };
+}
+
+const toProfileTile = (row: TileRow): ProfileTile => ({
+  id: row.id,
+  name: row.name,
+  width: row.width,
+  height: row.height,
+  thumbnail: row.thumbnail,
+  visibility: row.visibility,
+  pinOrder: row.pin_order,
+  updatedAt: row.updated_at,
+});
+
+/**
+ * One page of everyone's published arts, newest first, and how many there
+ * are in all. Row-level security leaves out those of private profiles.
+ */
+export async function listPublicTiles(
+  page: number,
+  pageSize: number,
+): Promise<{ tiles: ProfileTile[]; count: number }> {
+  const supabase = await createClient();
+  const from = (page - 1) * pageSize;
+  const { data, count, error } = await supabase
+    .from("tiles")
+    .select(
+      "id, name, width, height, thumbnail, visibility, pin_order, updated_at",
+      { count: "exact" },
+    )
+    .eq("visibility", "public")
+    .order("published_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+  if (error || !data) return { tiles: [], count: 0 };
+  return {
+    count: count ?? data.length,
+    tiles: (data as TileRow[]).map(toProfileTile),
   };
 }
 
