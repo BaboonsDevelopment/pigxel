@@ -29,7 +29,7 @@ export function Pager({
   return (
     <nav
       aria-label="Pages"
-      className="mt-10 flex flex-wrap items-center justify-center gap-2"
+      className="mt-5 flex flex-wrap items-center justify-center gap-2"
     >
       {step(page - 1, "Previous", page > 1)}
       {pageNumbers(page, pages).map((n, i) =>

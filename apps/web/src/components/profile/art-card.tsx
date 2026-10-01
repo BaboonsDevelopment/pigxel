@@ -1,26 +1,17 @@
-import Link from "next/link";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { ProfileTile, TileAuthor } from "@/lib/profile/profile";
-import { LikeButton } from "./like-button";
-import { ProfileAvatar } from "./profile-avatar";
+import type { ProfileTile } from "@/lib/profile/profile";
 
 /** One art on a profile; its owner can publish and pin it from here. */
 export function ArtCard({
   tile,
-  author,
-  like,
   isOwner,
   error,
   onTogglePublic,
   onTogglePin,
 }: {
   tile: ProfileTile;
-  /** Who made it, shown under it outside their own profile. */
-  author?: TileAuthor;
-  /** Its likes and whether the viewer is one of them, next to the author. */
-  like?: { count: number; liked: boolean };
   isOwner: boolean;
   /** Why the last change to this art didn't go through. */
   error?: string;
@@ -58,45 +49,12 @@ export function ArtCard({
           </span>
         )}
       </div>
-      {!author && (
-        <>
-          <p className="mt-2 truncate text-sm font-medium" title={tile.name}>
-            {tile.name}
-          </p>
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {tile.width} × {tile.height}
-          </p>
-        </>
-      )}
-      {author && (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <Link
-            href={`/u/${author.username}`}
-            className="group flex min-w-0 items-center gap-2"
-          >
-            <ProfileAvatar
-              name={author.name}
-              url={author.avatarUrl}
-              className="size-7 text-xs"
-            />
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-sm font-medium group-hover:underline">
-                {author.name}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                @{author.username}
-              </span>
-            </span>
-          </Link>
-          {like && (
-            <LikeButton
-              tileId={tile.id}
-              count={like.count}
-              liked={like.liked}
-            />
-          )}
-        </div>
-      )}
+      <p className="mt-2 truncate text-sm font-medium" title={tile.name}>
+        {tile.name}
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {tile.width} × {tile.height}
+      </p>
       {isOwner && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Button

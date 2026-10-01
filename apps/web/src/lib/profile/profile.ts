@@ -57,6 +57,7 @@ export type ProfileTile = {
 
 /** Who made a published art, as a card shows them. */
 export type TileAuthor = {
+  id: string;
   username: string;
   name: string;
   avatarUrl: string | null;
