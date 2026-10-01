@@ -5,6 +5,7 @@ import {
   MAX_HISTORY,
   MAX_REFERENCES,
   PLACEMENT_HISTORY,
+  SMALL_IMAGE_MAX_SIDE,
 } from "@/lib/ai/constants";
 import { toUserMessage } from "@/lib/ai/errors";
 import {
@@ -42,6 +43,7 @@ import type {
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 
 const MAX_GRID = 256;
 /** A PNG data URL of at most ~1.5 MB, capturing its base64 payload. */
@@ -120,7 +122,7 @@ export async function generateImage(
     const { mimeType, base64 } = await getAiProvider().generate(
       buildImagePrompt(subject, width, height, pictures.length > 0),
       closestAspectRatio(width, height),
-      true,
+      Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
       pictures.map((p) => ({ mimeType: p![1]!, base64: p![2]! })),
     );
     return `data:${mimeType};base64,${base64}`;
@@ -161,6 +163,7 @@ export async function redrawArea(
       buildRedrawPrompt(request, width, height),
       { mimeType: "image/png", base64: png },
       closestAspectRatio(width, height),
+      Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -516,4 +519,42 @@ export async function generateSheet(args: {
       : await ai.generate(prompt, layout.aspectRatio, false);
     return { image: `data:${mimeType};base64,${base64}`, layout };
   });
+}
+
+/** One recorded AI request, for the usage list. */
+export type UsageRow = {
+  step: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+  imageTokens: number;
+  /** Dollars; null when the model had no known price. */
+  cost: number | null;
+  at: string;
+};
+
+/** The signed-in person's most recent AI requests, newest first. */
+export async function listAiUsage(): Promise<UsageRow[]> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ai_usage")
+    .select(
+      "step, model, input_tokens, output_tokens, thinking_tokens, image_tokens, cost_usd, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`Couldn’t load AI usage: ${error.message}`);
+  if (!data) return [];
+  return data.map((row) => ({
+    step: row.step,
+    model: row.model,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    thinkingTokens: row.thinking_tokens,
+    imageTokens: row.image_tokens,
+    cost: row.cost_usd === null ? null : Number(row.cost_usd),
+    at: row.created_at,
+  }));
 }

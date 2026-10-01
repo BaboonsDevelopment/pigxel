@@ -5,6 +5,7 @@ import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
+import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
 import {
   ASK_FRAME,
   ASK_SELECT,
@@ -266,7 +267,7 @@ async function redraw(
   }
   const cels: Cels = new Map();
   for (const [i, step] of steps.entries()) {
-    const art = await toArt(pictures[i]!, step.target);
+    const art = await toArt(pictures[i]!, step.target, REDRAWN_PICTURE_STEPS);
     const cel = canvas.readCel(layerId, step.frame);
     cels.set(
       step.frame,

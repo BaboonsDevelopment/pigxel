@@ -34,9 +34,9 @@ export function buildImagePrompt(
   withReferences = false,
 ): string {
   return [
-    subject,
+    `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
     ...(withReferences ? [REFERENCE_RULES] : []),
-    `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
+    `It is a ${width}x${height} pixel sprite drawn with small crisp pixels, centred on the picture with empty space around it.`,
     ...IMAGE_STYLE_RULES,
   ].join(" ");
 }

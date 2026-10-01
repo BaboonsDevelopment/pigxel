@@ -35,6 +35,12 @@ export const IMAGE_MODELS = [
  */
 export const SIZED_IMAGE_MODELS = ["gemini-3.1-flash-image"];
 export const SMALL_IMAGE_SIZE = "512";
+/**
+ * The largest tile area (longest side) drawn at SMALL_IMAGE_SIZE. A bigger
+ * area needs the default size: at 512 the model's own pixels are too few
+ * and too fine to give it back cleanly, and the art comes out smeared.
+ */
+export const SMALL_IMAGE_MAX_SIDE = 64;
 
 /** How many recent messages the AI sees, so it follows the conversation. */
 export const MAX_HISTORY = 12;
@@ -109,10 +115,11 @@ export const REFERENCE_RULES =
   "below; copy nothing else from them (no background, no text).";
 
 export const IMAGE_STYLE_RULES = [
-  "crisp hard-edged pixels, no anti-aliasing.",
-  "Chunky low-detail sprite: big simple shapes and a clear, readable silhouette, no tiny details.",
-  "Limited palette, bold dark outline, strong volumetric shading with one clear light source from the top left.",
-  "The subject is centred, fills the frame, and is complete — nothing cropped.",
+  "crisp hard-edged pixels, no anti-aliasing, no blur.",
+  "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
+  "Rich hand-placed shading with hue-shifted shadows and highlights, texture on materials (cloth, metal, fur, stone), one clear light source from the top left.",
+  "Muted, atmospheric palette with a few strong accent colours, dark outline.",
+  "The subject is complete — nothing cropped by the edges.",
   ...IMAGE_BACKGROUND_RULES,
 ];
 

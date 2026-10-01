@@ -1,6 +1,6 @@
 import type { Bitmap, Size } from "@/lib/image/bitmap";
 import { imageToPixelArt } from "@/lib/image/helpers";
-import { GENERATED_PICTURE_STEPS } from "@/lib/image/pipeline";
+import { GENERATED_PICTURE_STEPS, type Step } from "@/lib/image/pipeline";
 import { REFERENCE_QUALITY, REFERENCE_SIDE } from "../constants";
 
 /**
@@ -21,8 +21,16 @@ export async function toReference(file: File): Promise<string | null> {
   return canvas.toDataURL("image/webp", REFERENCE_QUALITY);
 }
 
-/** A picture from the AI (a data URL), turned into pixel art at the area's size. Browser only. */
-export async function toArt(dataUrl: string, area: Size): Promise<Bitmap> {
+/**
+ * A picture from the AI (a data URL), turned into pixel art at the area's
+ * size: a new picture (cropped to its subject) or a redraw (kept as framed).
+ * Browser only.
+ */
+export async function toArt(
+  dataUrl: string,
+  area: Size,
+  steps: Step[] = GENERATED_PICTURE_STEPS,
+): Promise<Bitmap> {
   const image = await (await fetch(dataUrl)).blob();
-  return imageToPixelArt(image, area.w, area.h, GENERATED_PICTURE_STEPS);
+  return imageToPixelArt(image, area.w, area.h, steps);
 }
