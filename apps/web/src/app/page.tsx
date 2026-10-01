@@ -1,5 +1,12 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { ArtistHome } from "@/components/artist-home/artist-home";
+import { Landing } from "@/components/landing/landing";
+
+export const metadata: Metadata = {
+  title: "Pigxel — Small pixels. Wild imagination.",
+  description:
+    "A happy little home for pixel art. Draw, animate, and bring your tiny worlds to life in your browser. Try the playful pixel canvas and make a little something.",
+};
 
 export default async function Home({
   searchParams,
@@ -19,5 +26,5 @@ export default async function Home({
     redirect(`/auth/callback?${query}`);
   }
   if (params.error) redirect("/login?error=confirmation");
-  return <ArtistHome />;
+  return <Landing />;
 }

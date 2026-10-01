@@ -1,6 +1,6 @@
 # Pigxel landing artwork
 
-All images were generated with the built-in image-generation tool. The carousel labels its scenes as AI art studies, not community submissions. The mascot follows the user's supplied pink pixel-pig references. Assets are stored in the project under `apps/web/public/art/`.
+All images were generated with the built-in image-generation tool. The landing labels them as AI art studies, not community submissions. The mascot follows the user's supplied pink pixel-pig references. Assets are stored in the project under `apps/web/public/art/`.
 
 ## Pigxel mascot
 
