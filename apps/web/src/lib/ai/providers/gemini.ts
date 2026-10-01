@@ -9,13 +9,13 @@ import {
   SMALL_IMAGE_SIZE,
   TEXT_ATTEMPT_TIMEOUT_MS,
   TEXT_RETRY_DELAYS_MS,
+  THINKING_LEVELS,
 } from "../constants";
 import { AiError, errorForStatus } from "../errors";
 import { fetchWithin, tryModels } from "../fallback";
 import {
   INTENTS,
   readAnimation,
-  readAnimationReview,
   readEdit,
   readEditReview,
   readPlacement,
@@ -24,6 +24,7 @@ import {
   readRoute,
 } from "../replies";
 import type { AiProvider, ChatMessage, GeneratedImage } from "../types";
+import { recordUsage, type GeminiUsage } from "../usage";
 
 /** Google Gemini: the text models and the image models. */
 
@@ -31,7 +32,10 @@ type GeminiPart = {
   text?: string;
   inlineData?: { mimeType?: string; data?: string };
 };
-type GeminiResponse = { candidates?: { content?: { parts?: GeminiPart[] } }[] };
+type GeminiResponse = {
+  candidates?: { content?: { parts?: GeminiPart[] } }[];
+  usageMetadata?: GeminiUsage;
+};
 type GeminiContent = {
   role: "user" | "model";
   parts: (
@@ -46,6 +50,8 @@ export function createGeminiProvider(
 ): AiProvider {
   /** Sends a request, moving on to the next model when one can't answer. */
   const request = (
+    /** Names the request in the usage log, e.g. "route". */
+    step: string,
     candidates: string[],
     /** The request, or one per model when models take different settings. */
     body: object | ((model: string) => object),
@@ -63,7 +69,10 @@ export function createGeminiProvider(
               "x-goog-api-key": apiKey,
             },
             body: JSON.stringify(
-              typeof body === "function" ? body(model) : body,
+              withThinking(
+                model,
+                typeof body === "function" ? body(model) : body,
+              ),
             ),
           },
           timeoutMs,
@@ -71,6 +80,7 @@ export function createGeminiProvider(
         if (!res.ok)
           throw errorForStatus("Gemini", res.status, await res.text());
         const data = (await res.json()) as GeminiResponse;
+        await recordUsage(step, model, data.usageMetadata);
         return data.candidates?.[0]?.content?.parts ?? [];
       },
       delays,
@@ -78,12 +88,13 @@ export function createGeminiProvider(
 
   /** A JSON answer to `prompt` about the pictures, shaped by `schema`. */
   const look = async (
+    step: string,
     prompt: string,
     pictures: GeneratedImage | GeneratedImage[],
     schema: object,
   ) =>
     textOf(
-      await request(models.text, {
+      await request(step, models.text, {
         contents: [
           {
             role: "user",
@@ -103,12 +114,14 @@ export function createGeminiProvider(
     );
 
   const draw = async (
+    step: string,
     parts: GeminiContent["parts"],
     aspectRatio: string,
     small: boolean,
   ) =>
     firstImage(
       await request(
+        step,
         models.image,
         (model) => ({
           contents: [{ role: "user", parts }],
@@ -125,7 +138,7 @@ export function createGeminiProvider(
 
   return {
     async route(messages) {
-      const parts = await request(models.text, {
+      const parts = await request("route", models.text, {
         contents: toContents(messages),
         systemInstruction: { parts: [{ text: ROUTER_PROMPT }] },
         generationConfig: {
@@ -144,7 +157,7 @@ export function createGeminiProvider(
     },
 
     async chat(messages) {
-      const parts = await request(models.text, {
+      const parts = await request("chat", models.text, {
         contents: toContents(messages),
         systemInstruction: { parts: [{ text: CHAT_PROMPT }] },
       });
@@ -152,7 +165,7 @@ export function createGeminiProvider(
     },
 
     async edit(system, user) {
-      const parts = await request(models.text, {
+      const parts = await request("edit", models.text, {
         contents: [{ role: "user", parts: [{ text: user }] }],
         systemInstruction: { parts: [{ text: system }] },
         generationConfig: {
@@ -168,6 +181,7 @@ export function createGeminiProvider(
 
     generate: (prompt, aspectRatio, small = true, references = []) =>
       draw(
+        "generate",
         [
           { text: prompt },
           ...references.map((p) => ({
@@ -180,6 +194,7 @@ export function createGeminiProvider(
 
     redraw: (prompt, picture, aspectRatio, small = true) =>
       draw(
+        "redraw",
         [
           { text: prompt },
           {
@@ -191,11 +206,12 @@ export function createGeminiProvider(
       ),
 
     async compose(prompt, tile) {
-      return readRect(await look(prompt, tile, RECT));
+      return readRect(await look("compose", prompt, tile, RECT));
     },
 
     async place(prompt, tile) {
       const text = await look(
+        "place",
         prompt,
         tile,
         object({
@@ -210,6 +226,7 @@ export function createGeminiProvider(
 
     async plan(prompt, tile) {
       const text = await look(
+        "plan",
         prompt,
         tile,
         object({
@@ -227,6 +244,7 @@ export function createGeminiProvider(
 
     async animate(prompt, tile) {
       const text = await look(
+        "animate",
         prompt,
         tile,
         object({
@@ -258,38 +276,12 @@ export function createGeminiProvider(
 
     async reviewEdit(prompt, before, after) {
       const text = await look(
+        "reviewEdit",
         prompt,
         [before, after],
         object({ ok: BOOLEAN, problem: STRING, instruction: STRING }),
       );
       return readEditReview(text);
-    },
-
-    async reviewAnimation(prompt, frames) {
-      const text = await look(
-        prompt,
-        frames,
-        object({
-          ok: BOOLEAN,
-          problem: STRING,
-          fixes: {
-            type: "ARRAY",
-            items: object({
-              track: INTEGER,
-              order: { type: "ARRAY", items: INTEGER },
-              redraw: {
-                type: "ARRAY",
-                items: object({ frame: INTEGER, pose: STRING }),
-              },
-              path: {
-                type: "ARRAY",
-                items: object({ ...RECT.properties, visible: BOOLEAN }),
-              },
-            }),
-          },
-        }),
-      );
-      return readAnimationReview(text);
     },
   };
 }
@@ -304,6 +296,19 @@ const object = <P extends Record<string, object>>(properties: P) => ({
   required: Object.keys(properties),
 });
 const RECT = object({ x: INTEGER, y: INTEGER, w: INTEGER, h: INTEGER });
+
+/** `body` with the model's thinking level from THINKING_LEVELS, if it has one. */
+function withThinking(model: string, body: { generationConfig?: object }) {
+  const thinkingLevel = THINKING_LEVELS[model];
+  if (!thinkingLevel) return body;
+  return {
+    ...body,
+    generationConfig: {
+      ...body.generationConfig,
+      thinkingConfig: { thinkingLevel },
+    },
+  };
+}
 
 const textOf = (parts: GeminiPart[]) => parts.map((p) => p.text ?? "").join("");
 
