@@ -1,18 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import type { PublicTile } from "@/lib/profile/profile";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { HoverOverlay } from "@/components/tiles/hover-overlay";
 import { LikeButton } from "./components/like-button";
+import { PreviewDialog } from "./components/preview-dialog";
 
 /** A published art on Explore: its author on top, its name and likes below. */
 export function PopularCard({ tile }: { tile: PublicTile }) {
   const { author } = tile;
+  const [previewing, setPreviewing] = useState(false);
   return (
     <li className="group relative overflow-hidden rounded-xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
-      {/* Preview does nothing yet. */}
       <button
         type="button"
         aria-label={`Preview ${tile.name}`}
+        onClick={() => setPreviewing(true)}
         className="block w-full outline-none"
       >
         <span className="relative block aspect-[16/10] overflow-hidden bg-checker">
@@ -46,6 +51,9 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
         <span className="truncate font-mono text-sm">{tile.name}</span>
         <LikeButton tileId={tile.id} count={tile.likes} liked={tile.liked} />
       </div>
+      {previewing && (
+        <PreviewDialog tile={tile} onClose={() => setPreviewing(false)} />
+      )}
     </li>
   );
 }

@@ -34,11 +34,11 @@ export default async function Popular({ searchParams }: Props) {
 
   return (
     <>
-      <h1 className="font-display text-4xl tracking-tight">Popular tiles</h1>
-      <div className="pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <h1 className="font-display text-4xl tracking-tight">Popular tiles</h1>
         <PeriodTabs active={period.value} />
       </div>
-      <div className="pt-8">
+      <div className="pt-5">
         {tiles.length ? (
           <>
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

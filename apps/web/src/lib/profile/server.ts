@@ -122,6 +122,7 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
 const DAY = 24 * 60 * 60 * 1000;
 
 type PublicTileRow = TileRow & {
+  user_id: string;
   author: Pick<
     ProfileRow,
     | "username"
@@ -155,7 +156,7 @@ export async function listPublicTiles(
       { count: "exact" },
     )
     .select(
-      "id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count), mine:tile_likes(user_id)",
+      "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count), mine:tile_likes(user_id)",
     )
     .eq("mine.user_id", viewerId)
     .range(from, from + pageSize - 1);
@@ -167,6 +168,7 @@ export async function listPublicTiles(
     tiles: rows.map((row) => ({
       ...toProfileTile(row),
       author: {
+        id: row.user_id,
         username: row.author.username,
         name: row.author.display_name,
         avatarUrl: avatarUrlOf(row.author),
