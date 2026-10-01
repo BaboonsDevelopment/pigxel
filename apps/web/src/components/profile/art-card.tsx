@@ -10,6 +10,7 @@ import { ProfileAvatar } from "./profile-avatar";
 export function ArtCard({
   tile,
   author,
+  like,
   isOwner,
   error,
   onTogglePublic,
@@ -18,6 +19,8 @@ export function ArtCard({
   tile: ProfileTile;
   /** Who made it, shown under it outside their own profile. */
   author?: TileAuthor;
+  /** Its likes and whether the viewer is one of them, next to the author. */
+  like?: { count: number; liked: boolean };
   isOwner: boolean;
   /** Why the last change to this art didn't go through. */
   error?: string;
@@ -85,7 +88,13 @@ export function ArtCard({
               </span>
             </span>
           </Link>
-          <LikeButton count={0} />
+          {like && (
+            <LikeButton
+              tileId={tile.id}
+              count={like.count}
+              liked={like.liked}
+            />
+          )}
         </div>
       )}
       {isOwner && (

@@ -62,8 +62,12 @@ export type TileAuthor = {
   avatarUrl: string | null;
 };
 
-/** A published art with its author. */
-export type PublicTile = ProfileTile & { author: TileAuthor };
+/** A published art with its author, its likes and whether the viewer liked it. */
+export type PublicTile = ProfileTile & {
+  author: TileAuthor;
+  likes: number;
+  liked: boolean;
+};
 
 export const AVATAR_BUCKET = "avatars";
 

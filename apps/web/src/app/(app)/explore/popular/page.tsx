@@ -19,12 +19,17 @@ type Props = { searchParams: Promise<{ page?: string; period?: string }> };
 
 /** Everyone's arts published in the period chosen, newest first, a page at a time. */
 export default async function Popular({ searchParams }: Props) {
-  await requireUser();
+  const user = await requireUser();
   const params = await searchParams;
   const asked = Number(params.page);
   const page = Number.isInteger(asked) && asked > 1 ? asked : 1;
   const period = PERIODS.find((p) => p.value === params.period) ?? PERIODS[0];
-  const { tiles, count } = await listPublicTiles(page, PAGE_SIZE, period.days);
+  const { tiles, count } = await listPublicTiles(
+    page,
+    PAGE_SIZE,
+    period.days,
+    user.id,
+  );
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
   return (
@@ -42,6 +47,7 @@ export default async function Popular({ searchParams }: Props) {
                   key={tile.id}
                   tile={tile}
                   author={tile.author}
+                  like={{ count: tile.likes, liked: tile.liked }}
                   isOwner={false}
                   onTogglePublic={() => {}}
                   onTogglePin={() => {}}
