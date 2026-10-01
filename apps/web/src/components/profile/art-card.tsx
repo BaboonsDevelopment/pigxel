@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ProfileTile, TileAuthor } from "@/lib/profile/profile";
+import { LikeButton } from "./like-button";
 import { ProfileAvatar } from "./profile-avatar";
 
 /** One art on a profile; its owner can publish and pin it from here. */
@@ -65,17 +66,27 @@ export function ArtCard({
         </>
       )}
       {author && (
-        <Link
-          href={`/u/${author.username}`}
-          className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <ProfileAvatar
-            name={author.name}
-            url={author.avatarUrl}
-            className="size-5 text-[10px]"
-          />
-          <span className="truncate">@{author.username}</span>
-        </Link>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <Link
+            href={`/u/${author.username}`}
+            className="group flex min-w-0 items-center gap-2"
+          >
+            <ProfileAvatar
+              name={author.name}
+              url={author.avatarUrl}
+              className="size-7 text-xs"
+            />
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-sm font-medium group-hover:underline">
+                {author.name}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                @{author.username}
+              </span>
+            </span>
+          </Link>
+          <LikeButton count={0} />
+        </div>
       )}
       {isOwner && (
         <div className="mt-2 flex flex-wrap gap-1.5">
