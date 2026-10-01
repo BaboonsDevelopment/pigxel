@@ -1,17 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
-import { SectionTitle } from "@pigxel/ui/components/typography";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
-import {
-  PIGXEL_EXTENSION,
-  parsePigxel,
-  type PigxelDocument,
-} from "@/lib/pigxel-file/format";
+import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useIsClient } from "@/lib/use-is-client";
+import { ProjectCard } from "./project-card/project-card";
 import { confirmRemoveLocalTile } from "./tile-actions";
 import { TileThumbnail } from "./tile-thumbnail";
 
@@ -21,13 +16,8 @@ type LocalTile = Draft & { image: PigxelDocument };
  * Tiles kept in this browser that aren't in Pigxel cloud: ones stored nowhere
  * else, and Google Drive files opened here. Cloud tiles are listed separately.
  */
-export function LocalTiles(props: {
-  userId: string;
-  hasCloudTiles: boolean;
-  /** Shows only the most recent tiles, e.g. on Home. */
-  limit?: number;
-}) {
-  if (!useIsClient()) return <div className="mt-8 min-h-48" />;
+export function LocalTiles(props: { userId: string; hasCloudTiles: boolean }) {
+  if (!useIsClient()) return <div className="mt-6 min-h-48" />;
   return <List {...props} />;
 }
 
@@ -45,71 +35,50 @@ function readTiles(userId: string): LocalTile[] {
 function List({
   userId,
   hasCloudTiles,
-  limit,
 }: {
   userId: string;
   hasCloudTiles: boolean;
-  limit?: number;
 }) {
-  const [allTiles, setTiles] = useState(() => readTiles(userId));
-  const tiles = limit ? allTiles.slice(0, limit) : allTiles;
-
-  const remove = (tile: LocalTile) => {
-    if (confirmRemoveLocalTile(userId, tile)) setTiles(readTiles(userId));
-  };
+  const [tiles, setTiles] = useState(() => readTiles(userId));
 
   if (tiles.length === 0)
     return hasCloudTiles ? null : (
       <EmptyState
-        className="mt-8"
+        className="mt-6"
         title="No tiles yet"
         description="Create your first tile to start drawing."
       />
     );
 
   return (
-    <section aria-labelledby="local-tiles-heading" className="mt-10">
-      <SectionTitle id="local-tiles-heading" className="mb-4">
+    <section aria-labelledby="local-tiles-heading" className="mt-6">
+      <h2
+        id="local-tiles-heading"
+        className="mb-3 font-display text-xl tracking-tight"
+      >
         In this browser
-      </SectionTitle>
-      <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-4">
+      </h2>
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {tiles.map((tile) => (
-          <li
+          <ProjectCard
             key={tile.id}
-            className="group relative overflow-hidden rounded-lg border"
-          >
-            <Link href={editorUrl(tile.id)} className="block">
-              <span className="flex aspect-square items-center justify-center bg-checker p-4">
-                <TileThumbnail image={tile.image} />
-              </span>
-              <span className="block border-t px-3 py-2">
-                <span className="block truncate text-sm font-medium">
-                  {tile.name}
-                  <span className="font-normal text-muted-foreground">
-                    {PIGXEL_EXTENSION}
-                  </span>
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {tile.location?.kind === "drive"
-                    ? tile.dirty
-                      ? "Google Drive · unsaved changes"
-                      : "Google Drive"
-                    : tile.dirty
-                      ? "Only here · not downloaded"
-                      : "Only here"}
-                </span>
-              </span>
-            </Link>
-            <button
-              type="button"
-              aria-label={`Remove ${tile.name} from this browser`}
-              title="Remove from this browser"
-              onClick={() => remove(tile)}
-              className="absolute top-2 right-2 rounded-md bg-background/90 px-2 py-1 text-xs opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
-            >
-              Remove
-            </button>
-          </li>
+            name={tile.name}
+            thumbnail={<TileThumbnail image={tile.image} />}
+            open={{ href: editorUrl(tile.id) }}
+            menu={[
+              {
+                label:
+                  tile.location?.kind === "drive"
+                    ? "Remove from this browser"
+                    : "Delete",
+                destructive: true,
+                onSelect: () => {
+                  if (confirmRemoveLocalTile(userId, tile))
+                    setTiles(readTiles(userId));
+                },
+              },
+            ]}
+          />
         ))}
       </ul>
     </section>
