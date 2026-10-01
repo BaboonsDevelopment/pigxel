@@ -7,7 +7,8 @@ import {
   PLACEMENT_HISTORY,
   SMALL_IMAGE_MAX_SIDE,
 } from "@/lib/ai/constants";
-import { toUserMessage } from "@/lib/ai/errors";
+import { creditBalance, creditsOf } from "@/lib/ai/credits";
+import { AiError, toUserMessage } from "@/lib/ai/errors";
 import {
   buildAnimationPrompt,
   buildComposePrompt,
@@ -53,8 +54,14 @@ const MAX_GRID_TEXT = 100_000;
 
 const validSize = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
 
+/**
+ * Runs one AI action, if the person has tokens left; any failure becomes a
+ * message for them.
+ */
 async function attempt<T>(label: string, run: () => Promise<T>) {
   try {
+    if ((await creditBalance()).left <= 0)
+      throw new AiError("no_credits", "No AI tokens left.");
     return { ok: true, value: await run() } as const;
   } catch (e) {
     console.error(`[ai] ${label} failed:`, e);
@@ -522,18 +529,8 @@ export async function generateSheet(args: {
   });
 }
 
-/** One recorded AI request, for the usage list. */
-export type UsageRow = {
-  step: string;
-  model: string;
-  inputTokens: number;
-  outputTokens: number;
-  thinkingTokens: number;
-  imageTokens: number;
-  /** Dollars; null when the model had no known price. */
-  cost: number | null;
-  at: string;
-};
+/** One recorded AI request, for the usage list: its step and what it took. */
+export type UsageRow = { step: string; credits: number; at: string };
 
 /** The signed-in person's most recent AI requests, newest first. */
 export async function listAiUsage(): Promise<UsageRow[]> {
@@ -541,21 +538,24 @@ export async function listAiUsage(): Promise<UsageRow[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("ai_usage")
-    .select(
-      "step, model, input_tokens, output_tokens, thinking_tokens, image_tokens, cost_usd, created_at",
-    )
+    .select("step, cost_usd, created_at")
     .order("created_at", { ascending: false })
     .limit(500);
   if (error) throw new Error(`Couldn’t load AI usage: ${error.message}`);
   if (!data) return [];
   return data.map((row) => ({
     step: row.step,
-    model: row.model,
-    inputTokens: row.input_tokens,
-    outputTokens: row.output_tokens,
-    thinkingTokens: row.thinking_tokens,
-    imageTokens: row.image_tokens,
-    cost: row.cost_usd === null ? null : Number(row.cost_usd),
+    credits: creditsOf(Number(row.cost_usd ?? 0)),
     at: row.created_at,
   }));
+}
+
+/** The signed-in person's AI tokens: their allowance and what is left. */
+export async function getAiBalance(): Promise<{
+  limit: number;
+  left: number;
+}> {
+  await requireUser();
+  const { limit, left } = await creditBalance();
+  return { limit, left: Math.floor(left) };
 }

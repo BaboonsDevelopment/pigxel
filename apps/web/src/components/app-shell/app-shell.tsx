@@ -8,6 +8,7 @@ import pig from "../../../public/art/pigxel-mascot-sitting.png";
 import { CloseIcon, MenuIcon } from "./icons";
 import { NotificationBell } from "./notification-bell";
 import { SearchButton } from "./search-dialog";
+import { TokensButton } from "@/components/tokens-button/tokens-button";
 import { Sidebar } from "./sidebar";
 
 /**
@@ -83,6 +84,7 @@ export function AppShell({
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-2.5">
+            <TokensButton />
             <SearchButton userId={userId} />
             <NotificationBell unread={unreadNotifications} />
           </div>

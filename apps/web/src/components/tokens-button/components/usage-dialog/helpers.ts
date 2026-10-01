@@ -1,13 +1,7 @@
 import type { UsageRow } from "@/lib/ai/actions";
 
-/** One thing the person asked for, and the AI requests it took. */
-export type UsageAction = {
-  kind: string;
-  at: string;
-  /** Dollars; null when a request had no known price. */
-  cost: number | null;
-  rows: UsageRow[];
-};
+/** One thing the person asked for, and the tokens it took. */
+export type UsageAction = { kind: string; at: string; credits: number };
 
 /** A longer pause than this starts a new action even without a new message. */
 const GAP_MS = 10 * 60_000;
@@ -39,13 +33,10 @@ export function groupActions(rows: UsageRow[]): UsageAction[] {
   return groups.reverse().map((group) => ({
     kind: kindOf(group),
     at: group[0]!.at,
-    cost: group.some((r) => r.cost === null)
-      ? null
-      : group.reduce((sum, r) => sum + r.cost!, 0),
-    rows: group,
+    credits: group.reduce((sum, r) => sum + r.credits, 0),
   }));
 }
 
-/** "$0.0452", or "—" without a price. */
-export const dollars = (cost: number | null) =>
-  cost === null ? "—" : `$${cost.toFixed(4)}`;
+/** "4 913": whole tokens, grouped by thousands. */
+export const tokens = (credits: number) =>
+  Math.round(credits).toLocaleString("en-US").replace(/,/g, " ");

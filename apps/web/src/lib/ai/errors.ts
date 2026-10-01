@@ -4,6 +4,7 @@ export type AiErrorCode =
   | "timeout"
   | "unavailable"
   | "denied"
+  | "no_credits"
   | "failed";
 
 /** A provider failure with a reason the user can be told. */
@@ -23,6 +24,7 @@ const USER_MESSAGES: Record<AiErrorCode, string> = {
   unavailable: "The AI model isn’t available. Check the model settings.",
   denied:
     "The AI refused the API key. Check the key and the account’s access and billing.",
+  no_credits: "You’ve used all your AI tokens.",
   failed: "Something went wrong with the AI. Try again.",
 };
 
