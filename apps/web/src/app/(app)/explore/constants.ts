@@ -6,3 +6,6 @@ export const PERIODS = [
 ] as const;
 
 export type Period = (typeof PERIODS)[number]["value"];
+
+/** Arts loaded at a time: four whole rows of 5. */
+export const PAGE_SIZE = 20;

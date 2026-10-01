@@ -132,34 +132,41 @@ type PublicTileRow = TileRow & {
     | "provider_avatar_url"
   >;
   likes: { count: number }[];
-  mine: { user_id: string }[];
+  /** Left out for guests. */
+  mine?: { user_id: string }[];
 };
 
+const PUBLIC_TILE_COLUMNS =
+  "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+
 /**
- * One page of everyone's arts published in the last `days` days, most liked
- * in that time first, each with its author, its likes and whether `viewerId`
- * liked it, and how many there are in all — in one request. Row-level security
+ * Up to `limit` of everyone's arts published in the last `days` days,
+ * skipping the first `from`: most liked in that time first, each with its
+ * author, its likes and whether `viewerId` liked it (never, for a guest's
+ * null), and how many there are in all — in one request. Row-level security
  * leaves out those of private profiles.
  */
 export async function listPublicTiles(
-  page: number,
-  pageSize: number,
+  from: number,
+  limit: number,
   days: number,
-  viewerId: string,
+  viewerId: string | null,
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
-  const from = (page - 1) * pageSize;
-  const { data, count, error } = await supabase
+  const query = supabase
     .rpc(
       "popular_tiles",
       { since: new Date(Date.now() - days * DAY).toISOString() },
       { count: "exact" },
     )
     .select(
-      "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count), mine:tile_likes(user_id)",
-    )
-    .eq("mine.user_id", viewerId)
-    .range(from, from + pageSize - 1);
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    );
+  const { data, count, error } = await (
+    viewerId ? query.eq("mine.user_id", viewerId) : query
+  ).range(from, from + limit - 1);
   if (error) console.error("Couldn’t load public arts:", error.message);
   if (error || !data) return { tiles: [], count: 0 };
   const rows = data as unknown as PublicTileRow[];
@@ -174,7 +181,7 @@ export async function listPublicTiles(
         avatarUrl: avatarUrlOf(row.author),
       },
       likes: row.likes[0]?.count ?? 0,
-      liked: row.mine.length > 0,
+      liked: Boolean(row.mine?.length),
     })),
   };
 }

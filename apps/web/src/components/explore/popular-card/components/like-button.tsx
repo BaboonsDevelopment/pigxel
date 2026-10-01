@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { setTileLiked } from "@/app/(app)/explore/actions";
 
@@ -14,20 +14,17 @@ export function LikeButton({
   count: number;
   liked: boolean;
 }) {
-  const [state, apply] = useOptimistic(
-    { liked, count },
-    (_, next: boolean) => ({
-      liked: next,
-      count: count + (next === liked ? 0 : next ? 1 : -1),
-    }),
-  );
+  // Kept here: the feed holds the arts it loaded and doesn't refetch them.
+  const [state, setState] = useState({ liked, count });
   const [pending, startTransition] = useTransition();
 
   const toggle = () =>
     startTransition(async () => {
-      const next = !state.liked;
-      apply(next);
-      await setTileLiked(tileId, next);
+      const before = state;
+      const next = !before.liked;
+      setState({ liked: next, count: before.count + (next ? 1 : -1) });
+      const result = await setTileLiked(tileId, next);
+      if (result.error) setState(before);
     });
 
   return (
