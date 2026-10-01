@@ -117,13 +117,17 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
   updatedAt: row.updated_at,
 });
 
+const DAY = 24 * 60 * 60 * 1000;
+
 /**
- * One page of everyone's published arts, newest first, and how many there
- * are in all. Row-level security leaves out those of private profiles.
+ * One page of everyone's arts published in the last `days` days, newest
+ * first, and how many there are in all. Row-level security leaves out those
+ * of private profiles.
  */
 export async function listPublicTiles(
   page: number,
   pageSize: number,
+  days: number,
 ): Promise<{ tiles: ProfileTile[]; count: number }> {
   const supabase = await createClient();
   const from = (page - 1) * pageSize;
@@ -134,6 +138,7 @@ export async function listPublicTiles(
       { count: "exact" },
     )
     .eq("visibility", "public")
+    .gte("published_at", new Date(Date.now() - days * DAY).toISOString())
     .order("published_at", { ascending: false })
     .range(from, from + pageSize - 1);
   if (error || !data) return { tiles: [], count: 0 };
