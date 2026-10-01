@@ -1,10 +1,29 @@
 "use server";
 
-import { refresh } from "next/cache";
-import { requireUser } from "@/lib/auth/session";
+import { getUser, requireUser } from "@/lib/auth/session";
+import type { PublicTile } from "@/lib/profile/profile";
+import { listPublicTiles } from "@/lib/profile/server";
 import { createClient } from "@/lib/supabase/server";
+import { PAGE_SIZE, PERIODS, type Period } from "./constants";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The next arts of the feed, after the `from` already shown. */
+export async function loadPopularTiles(
+  period: Period,
+  from: number,
+): Promise<PublicTile[]> {
+  const days = PERIODS.find((p) => p.value === period)?.days;
+  if (!days || !Number.isInteger(from) || from < 0) return [];
+  const user = await getUser();
+  const { tiles } = await listPublicTiles(
+    from,
+    PAGE_SIZE,
+    days,
+    user?.id ?? null,
+  );
+  return tiles;
+}
 
 /** Likes a published art, or takes the like back. */
 export async function setTileLiked(
@@ -31,6 +50,5 @@ export async function setTileLiked(
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }
-  refresh();
   return {};
 }
