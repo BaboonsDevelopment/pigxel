@@ -33,6 +33,8 @@ export type Profile = {
   username: string | null;
   /** A profile picture, e.g. from Google; null shows the initial instead. */
   avatarUrl: string | null;
+  /** Their plan's name, e.g. "Pro"; Free when absent. */
+  plan?: string;
 };
 
 /** What the app shows for a person: their Google name and picture, or their email. */

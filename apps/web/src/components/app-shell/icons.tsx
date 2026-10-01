@@ -94,6 +94,13 @@ export const SettingsIcon = () => (
   </Icon>
 );
 
+export const CrownIcon = () => (
+  <Icon className="size-4 shrink-0">
+    <path d="M4.5 17.5 3.5 8l5 4 3.5-6 3.5 6 5-4-1 9.5Z" />
+    <path d="M5 20.5h14" />
+  </Icon>
+);
+
 export const SignOutIcon = () => (
   <Icon className="size-4 shrink-0">
     <path d="M14 4.5H7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h7" />

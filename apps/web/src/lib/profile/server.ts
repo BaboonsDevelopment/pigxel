@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { profileOf, type Profile } from "@/lib/auth/session";
+import { getCurrentPlan } from "@/lib/billing/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
@@ -43,8 +44,11 @@ export const getOwnProfile = cache(
 
 /** What the sidebar shows: the profile, or the sign-in details before it exists. */
 export async function sidebarProfile(user: User): Promise<Profile> {
-  const own = await getOwnProfile(user.id);
-  const fallback = profileOf(user);
+  const [own, plan] = await Promise.all([
+    getOwnProfile(user.id),
+    getCurrentPlan(user.id),
+  ]);
+  const fallback = { ...profileOf(user), plan: plan.name };
   return own
     ? {
         ...fallback,

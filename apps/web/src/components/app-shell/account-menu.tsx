@@ -7,11 +7,17 @@ import { signOut } from "@/app/login/actions";
 import type { Profile } from "@/lib/auth/session";
 import type { AuthState } from "@/lib/auth/types";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
-import { ChevronRightIcon, SettingsIcon, SignOutIcon, UserIcon } from "./icons";
+import {
+  ChevronRightIcon,
+  CrownIcon,
+  SettingsIcon,
+  SignOutIcon,
+  UserIcon,
+} from "./icons";
 
 /**
  * The account at the bottom of the sidebar. A click opens a card with who
- * is signed in and Profile, Settings and Sign out: beside the sidebar on
+ * is signed in and Profile, Settings, Upgrade plan and Sign out: beside the sidebar on
  * wide screens, above the account in the phone menu.
  */
 export function AccountMenu({
@@ -95,6 +101,18 @@ export function AccountMenu({
               <SettingsIcon />
               Settings
             </Link>
+            <Link
+              role="menuitem"
+              href="/pricing"
+              onClick={follow}
+              className={cn(
+                item,
+                "font-medium text-primary hover:bg-primary/10 hover:text-primary",
+              )}
+            >
+              <CrownIcon />
+              Upgrade plan
+            </Link>
           </div>
           <form action={action} className="border-t p-1.5">
             <button
@@ -135,7 +153,9 @@ export function AccountMenu({
           <span className="block truncate text-sm font-semibold">
             {profile.name}
           </span>
-          <span className="block text-xs text-muted-foreground">Free plan</span>
+          <span className="block text-xs text-muted-foreground">
+            {profile.plan ?? "Free"} plan
+          </span>
         </span>
         <ChevronRightIcon />
       </button>

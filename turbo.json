@@ -11,6 +11,8 @@
     "AI_IMAGE_MODEL",
     "PADDLE_API_KEY",
     "PADDLE_ENVIRONMENT",
+    "PADDLE_CLIENT_TOKEN",
+    "PADDLE_WEBHOOK_SECRET",
     "APP_URL"
   ],
   "tasks": {
