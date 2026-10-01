@@ -25,12 +25,12 @@ export const FREE_PLAN = {
   name: "Free",
   description: "Everything you need to start making pixel art.",
   features: [
-    "Every drawing tool: pen, shapes, selections, shading, dither",
-    "Layers, frames and onion skin",
-    "Palettes, mirror drawing and tiled mode",
-    "Export to PNG, GIF and sprite sheets",
-    "Save to Pigxel cloud or Google Drive",
-    "A few AI generations to try it out",
+    "Every drawing tool",
+    "Layers, frames, onion skin",
+    "Palettes, mirror and tiled mode",
+    "PNG, GIF and sprite sheet export",
+    "Pigxel cloud or Google Drive",
+    "A few AI generations to try",
   ],
 };
 

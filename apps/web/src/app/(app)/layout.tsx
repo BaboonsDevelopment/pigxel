@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell/app-shell";
-import { PublicHeader } from "@/components/public-header";
+import { PublicHeader } from "@/components/public-header/public-header";
 import { getUser } from "@/lib/auth/session";
 import { countUnreadNotifications } from "@/lib/notifications/server";
 import { sidebarProfile } from "@/lib/profile/server";
 
 /**
  * Signed-in pages (Home, My projects, New tile, Settings) share the sidebar
- * and top bar. Explore is open to guests too; they get the public header
- * instead (the proxy keeps them out of the rest).
+ * and top bar. Explore, Pricing and Welcome are open to guests too; they get
+ * the public header instead (the proxy keeps them out of the rest). Keeping
+ * those pages here means signed-in people never leave the app for them.
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await getUser();

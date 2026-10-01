@@ -24,6 +24,7 @@ export function PasswordForm() {
           name="password"
           type="password"
           inputSize="lg"
+          className="h-12 rounded-xl"
           autoComplete="new-password"
           minLength={8}
           maxLength={128}
@@ -38,6 +39,7 @@ export function PasswordForm() {
           name="confirmPassword"
           type="password"
           inputSize="lg"
+          className="h-12 rounded-xl"
           autoComplete="new-password"
           minLength={8}
           maxLength={128}
@@ -46,7 +48,7 @@ export function PasswordForm() {
         />
       </Field>
       {state.error && <FormMessage tone="error">{state.error}</FormMessage>}
-      <Button size="lg" className="w-full" disabled={pending}>
+      <Button size="lg" className="h-12 w-full rounded-full" disabled={pending}>
         {pending ? "Saving…" : "Save password"}
       </Button>
     </form>

@@ -109,12 +109,6 @@
   transform: scale(0.97);
 }
 
-.buttonSmall {
-  height: 38px;
-  padding: 0 16px;
-  font-size: 14px;
-}
-
 .buttonDark {
   background: var(--ink);
   color: #fff;
@@ -155,72 +149,6 @@
 
 .buttonGhost:hover {
   background: rgb(255 255 255 / 0.14);
-}
-
-/* Header: clear over the hero, frosted once the page scrolls. */
-
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  padding: 0 var(--gutter);
-  background: rgb(255 255 255 / 0.85);
-  box-shadow: 0 1px 0 var(--line);
-  backdrop-filter: blur(14px) saturate(1.6);
-}
-
-@supports (animation-timeline: scroll()) {
-  .header {
-    animation: frost linear both;
-    animation-timeline: scroll(root);
-    animation-range: 0 120px;
-  }
-}
-
-@keyframes frost {
-  from {
-    background: rgb(255 255 255 / 0);
-    box-shadow: 0 1px 0 rgb(236 236 238 / 0);
-    backdrop-filter: blur(0) saturate(1);
-  }
-}
-
-.headerInner {
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  max-width: var(--max);
-  height: 68px;
-  margin: 0 auto;
-}
-
-.nav {
-  display: flex;
-  gap: 2px;
-}
-
-.nav a,
-.headerLogin {
-  padding: 9px 13px;
-  border-radius: 999px;
-  font: 500 14px/1 var(--sans);
-  color: var(--ink-2);
-  transition:
-    background-color 0.2s,
-    color 0.2s;
-}
-
-.nav a:hover,
-.headerLogin:hover {
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
 }
 
 /* Hero */
@@ -1156,10 +1084,6 @@
 /* Layout below desktop */
 
 @media (max-width: 960px) {
-  .nav {
-    display: none;
-  }
-
   .tabs {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1213,10 +1137,6 @@
 }
 
 @media (max-width: 480px) {
-  .headerLogin {
-    padding: 9px 10px;
-  }
-
   .stat {
     padding: 4px 16px;
   }
