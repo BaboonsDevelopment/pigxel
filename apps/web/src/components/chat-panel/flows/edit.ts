@@ -1,11 +1,13 @@
 import type { Area } from "@/components/pixel-canvas/constants";
-import { editTile, planEdit, redrawArea } from "@/lib/ai/actions";
+import { editTile, planEdit, redrawArea, redrawFrames } from "@/lib/ai/actions";
+import { sheetLayout } from "@/lib/ai/helpers";
 import type { EditPlan, TileAction } from "@/lib/ai/types";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
+import { sheetToFrames } from "@/lib/image/sheet";
 import {
   ASK_FRAME,
   ASK_SELECT,
@@ -21,7 +23,7 @@ import {
   replaceObject,
   samePixels,
 } from "../helpers";
-import { toArt } from "./pictures";
+import { framesSheet, toArt } from "./pictures";
 import { checkEdit } from "./review";
 
 /** New cels by frame id, written back as one undo step. */
@@ -163,7 +165,13 @@ export async function edit(chat: Chat, action: TileAction) {
     );
   };
 
-  if (plan.value.mode === "redraw" && steps.length > 1) {
+  // Frames redrawn one picture each (only when the drawing moves or
+  // resizes) cost one picture per frame, so that waits for a click.
+  if (
+    plan.value.mode === "redraw" &&
+    steps.length > 1 &&
+    !redrawnTogether(steps)
+  ) {
     chat.append({
       role: "assistant",
       content: `This changes ${steps.length} frames of the layer "${names.get(layerId)}", one picture each.`,
@@ -236,8 +244,17 @@ function move(chat: Chat, layerId: string, steps: Step[]): Cels {
 }
 
 /**
- * The image model redraws each frame's part (paid), all at once; the new
- * cels and the first picture, or null when one failed.
+ * Whether every frame is redrawn in one picture: when there are several and
+ * the drawing stays where it is in each.
+ */
+const redrawnTogether = (steps: Step[]) =>
+  steps.length > 1 && steps.every((s) => sameRect(s.source, s.target));
+
+/**
+ * The image model redraws the edited part (paid): every frame in one picture
+ * when it can (see redrawnTogether), so the change looks the same in all of
+ * them; else each frame's part, all at once. The new cels and the first
+ * picture, or null when it failed.
  */
 async function redraw(
   chat: Chat,
@@ -245,6 +262,8 @@ async function redraw(
   plan: EditPlan,
   steps: Step[],
 ): Promise<{ cels: Cels; image: string } | null> {
+  if (redrawnTogether(steps))
+    return redrawFramesTogether(chat, layerId, plan, steps);
   const { canvas } = chat;
   const size = canvas.size();
   const results = await Promise.all(
@@ -277,4 +296,56 @@ async function redraw(
     );
   }
   return { cels, image: pictures[0]! };
+}
+
+/**
+ * Every frame's part sent as one sprite sheet and redrawn as one picture
+ * (paid once), then cut back into frames: the changed thing looks the same
+ * in all of them. The new cels and the picture, or null when it failed.
+ */
+async function redrawFramesTogether(
+  chat: Chat,
+  layerId: string,
+  plan: EditPlan,
+  steps: Step[],
+): Promise<{ cels: Cels; image: string } | null> {
+  const { canvas } = chat;
+  const size = canvas.size();
+  // One box for all frames, so they share a cell size and stay in place.
+  const box = unionOf(steps.map((s) => s.source))!;
+  const before = steps.map((s) => canvas.readCel(layerId, s.frame));
+  const result = await redrawFrames({
+    instruction: plan.instruction,
+    sheet: framesSheet(
+      before,
+      size,
+      box,
+      sheetLayout(steps.length, box.w, box.h),
+    ),
+    count: steps.length,
+    cellW: box.w,
+    cellH: box.h,
+  }).catch(() => UNREACHABLE);
+  if (!result.ok) {
+    chat.setError(result.error);
+    return null;
+  }
+  const { image, layout } = result.value;
+  const frames = await sheetToFrames(
+    await (await fetch(image)).blob(),
+    layout,
+    steps.length,
+    box,
+  );
+  if (!frames.every(Boolean)) {
+    chat.setError("Couldn’t cut the redrawn frames apart. Try again.");
+    return null;
+  }
+  const cels: Cels = new Map();
+  for (const [i, step] of steps.entries())
+    cels.set(
+      step.frame,
+      applyRedraw(before[i]!, size, frames[i]!, box, step.keep),
+    );
+  return { cels, image };
 }

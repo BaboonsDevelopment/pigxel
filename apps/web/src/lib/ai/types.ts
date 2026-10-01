@@ -161,34 +161,6 @@ export type AnimationPlan = {
  */
 export type EditReview = { ok: boolean; problem: string; instruction: string };
 
-/**
- * What a look at an animation's frames found wrong, per track (by index):
- * `order` shows frame i the drawing of frame order[i] (poses out of order, or
- * a broken one replaced by a neighbour); `redraw` frames get drawn again in
- * `pose`; `path` is a prop's new path. Nothing to fix gives no tracks.
- */
-export type AnimationFixes = {
-  problem: string;
-  tracks: {
-    track: number;
-    order: number[] | null;
-    redraw: { frame: number; pose: string }[];
-    path: (Rect | null)[] | null;
-  }[];
-};
-
-/** The animation checker's raw answer; frames are counted from 1. */
-export type AnimationReviewReply = {
-  ok: boolean;
-  problem: string;
-  fixes: {
-    track: number;
-    order: number[];
-    redraw: { frame: number; pose: string }[];
-    path: (Rect & { visible: boolean })[];
-  }[];
-};
-
 /** The animation planner's raw answer: tracks in one flat shape. */
 export type AnimationReply = {
   name: string;
@@ -247,9 +219,4 @@ export interface AiProvider {
     before: GeneratedImage,
     after: GeneratedImage,
   ): Promise<EditReview>;
-  /** Looks at an animation's frames side by side. Text model. */
-  reviewAnimation(
-    prompt: string,
-    frames: GeneratedImage,
-  ): Promise<AnimationReviewReply>;
 }

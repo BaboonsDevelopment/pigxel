@@ -14,19 +14,32 @@ export const IMAGE_ATTEMPT_TIMEOUT_MS = 40_000;
 export const GEMINI_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta";
 /**
- * Free text models, tried in order after `AI_MODEL`. Google often answers 503
- * for one model while another is fine, so there are several.
+ * Text models (paid, see pricing.ts), tried in order after `AI_MODEL`. Google
+ * often answers 503 for one model while another is fine, so there are several.
  */
+/**
+ * How much text models think before answering, the least each allows. Thinking
+ * is billed as output and was most of what routing and placing cost; these
+ * answers are short classifications and boxes that need little of it.
+ */
+export const THINKING_LEVELS: Record<string, string> = {
+  "gemini-3.7-flash": "low",
+  "gemini-3.6-flash": "minimal",
+};
+
 export const TEXT_MODELS = [
   "gemini-3.6-flash",
   "gemini-3.7-flash",
   "gemini-3.1-flash-lite",
 ];
-/** Paid image models, tried in order after `AI_IMAGE_MODEL` (≈$0.03–0.05 each). */
+/**
+ * Paid image models, tried in order after `AI_IMAGE_MODEL`, cheapest first:
+ * a 1K picture is $0.034, $0.039 and $0.067 (see pricing.ts).
+ */
 export const IMAGE_MODELS = [
-  "gemini-3.1-flash-image",
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
+  "gemini-3.1-flash-image",
 ];
 /**
  * Image models that draw at a chosen size, and the size for a single picture:
@@ -287,11 +300,8 @@ summary: one or two short sentences for the user, in the language of the
 request, saying what the animation will show.`;
 
 // ── Checks ─────────────────────────────────────────────────────────────────
-// A finished edit or animation is looked at once (free text model) before it
-// is applied; what is found is fixed once, and the fix is not checked again.
-
-/** Most frames one check may have drawn again (paid, one picture each). */
-export const MAX_REDRAWN_FRAMES = 2;
+// A finished edit is looked at once (text model) before it is applied; what
+// is found is fixed once, and the fix is not checked again.
 
 export const EDIT_REVIEW_RULES = `Picture 1 is a pixel art layer before an edit,
 picture 2 the same area after it (enlarged; light grey means empty).
@@ -305,28 +315,3 @@ a clear, visible problem; then problem is one short sentence for the user in
 the language of REQUEST, and instruction is a better English instruction for
 one more attempt that avoids it (what to change, and what to leave exactly as
 it is). When ok, problem and instruction are "".`;
-
-export const ANIMATION_REVIEW_RULES = `The picture shows every frame of a pixel
-art animation side by side, frame 1 on the left, separated by dark lines
-(enlarged; light grey means empty). Only what moves is shown. TRACKS lists what
-was planned for each frame.
-Check: the frames come in the right order for the motion; each frame shows the
-thing once (never two of it, no missing or cut-off parts, no leftover
-scraps); poses match the plan and flow smoothly; a prop moves along a
-believable path (a throw is an arc, things fall down) and starts or stops at the
-right moment (leaves the hand when it is thrown).
-ok: true when it works, even if not perfect; then fixes is empty. Fix only
-clear, visible problems; never change what works.
-fixes: one per track that needs a fix; track is its number in TRACKS.
-- order: for a sheet whose drawings are right but in the wrong frames, or has a
-  broken frame that a neighbouring drawing can stand in for: one frame number
-  per frame (frameCount numbers, counted from 1), saying whose drawing that
-  frame shows. Frames where it is not seen keep their own number. Otherwise
-  empty.
-- redraw: for a sheet frame that is broken and no other drawing fits: the frame
-  number and a short description of the pose it must show; at most
-  ${MAX_REDRAWN_FRAMES} in all. Otherwise empty.
-- path: for a prop moving wrongly: exactly frameCount boxes in tile pixels,
-  visible false where it is not seen. Otherwise empty.
-problem: one short sentence for the user in the language of REQUEST saying what
-was fixed; "" when ok.`;

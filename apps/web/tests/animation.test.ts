@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { drawnBox, follow, frameStrip } from "@/components/chat-panel/helpers";
+import { drawnBox, follow } from "@/components/chat-panel/helpers";
 import { ASPECT_RATIOS, MAX_FRAMES, MAX_TRACKS } from "@/lib/ai/constants";
-import {
-  clampAnimationFixes,
-  clampAnimationPlan,
-  sheetLayout,
-} from "@/lib/ai/helpers";
-import type { AnimationPlan, AnimationReply } from "@/lib/ai/types";
+import { clampAnimationPlan, sheetLayout } from "@/lib/ai/helpers";
+import type { AnimationReply } from "@/lib/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { posesToFrames, splitSheet } from "@/lib/image/sheet";
 
@@ -257,111 +253,5 @@ describe("animating what is already drawn", () => {
       copy: null,
       grab: { layer: 1, area: { x: 28, y: 10, w: 4, h: 8 } },
     });
-  });
-});
-
-describe("checking an animation", () => {
-  const plan: AnimationPlan = {
-    name: "Beaver Hops",
-    frameCount: 4,
-    duration: 100,
-    summary: "",
-    tracks: [
-      {
-        kind: "sheet",
-        name: "Beaver",
-        subject: "a beaver",
-        reuse: null,
-        box: { x: 0, y: 0, w: 16, h: 16 },
-        poses: ["crouch", "jump", "land", ""],
-      },
-      {
-        kind: "prop",
-        name: "Carrot",
-        subject: "a carrot",
-        copy: null,
-        grab: null,
-        path: [null, { x: 2, y: 2, w: 4, h: 4 }, null, null],
-      },
-    ],
-  };
-  const fixes = (fix: object, ok = false) =>
-    clampAnimationFixes(
-      { ok, problem: "Frames were mixed up.", fixes: [fix as never] },
-      plan,
-      32,
-      32,
-    );
-
-  it("fixes nothing when all is fine", () => {
-    expect(fixes({ track: 0, order: [2, 1, 3, 4] }, true)).toEqual({
-      problem: "",
-      tracks: [],
-    });
-  });
-  it("puts a sheet's drawings in order, only among frames it is seen in", () => {
-    const [fix] = fixes({ track: 0, order: [2, 1, 3, 1], redraw: [] }).tracks;
-    expect(fix).toMatchObject({ track: 0, order: [1, 0, 2, 3], path: null });
-    // Unchanged order and nothing else to do: no fix.
-    expect(fixes({ track: 0, order: [1, 2, 3, 4] }).tracks).toEqual([]);
-  });
-  it("draws again only a few frames the sheet is seen in", () => {
-    const [fix] = fixes({
-      track: 0,
-      order: [],
-      redraw: [
-        { frame: 2, pose: "high jump" },
-        { frame: 2, pose: "again" },
-        { frame: 4, pose: "hidden frame" },
-        { frame: 1, pose: "" },
-        { frame: 3, pose: "one too many" },
-      ],
-    }).tracks;
-    expect(fix?.redraw).toEqual([
-      { frame: 1, pose: "high jump" },
-      { frame: 0, pose: "crouch" },
-    ]);
-  });
-  it("gives a prop a new path inside the tile, one box per frame", () => {
-    const box = { x: 30, y: 0, w: 8, h: 4, visible: true };
-    const hidden = { ...box, visible: false };
-    const [fix] = fixes({
-      track: 1,
-      path: [hidden, box, box, hidden],
-    }).tracks;
-    expect(fix?.path).toEqual([
-      null,
-      { x: 30, y: 0, w: 2, h: 4 },
-      { x: 30, y: 0, w: 2, h: 4 },
-      null,
-    ]);
-    expect(fixes({ track: 1, path: [box] }).tracks).toEqual([]);
-    expect(fixes({ track: 5, path: [box, box, box, box] }).tracks).toEqual([]);
-  });
-});
-
-describe("frames shown to the checker", () => {
-  it("lays frames side by side with a line between, layers stacked", () => {
-    const size = { w: 2, h: 1 };
-    const red = new Uint8ClampedArray([255, 0, 0, 255, 0, 0, 0, 0]);
-    const blue = new Uint8ClampedArray([0, 0, 0, 0, 0, 0, 255, 255]);
-    const strip = frameStrip(
-      [
-        [red, null],
-        [blue, blue],
-      ],
-      2,
-      size,
-      [9, 9, 9],
-    );
-    expect(strip.w).toBe(5);
-    const pixel = (x: number) => [...strip.rgba.subarray(x * 4, x * 4 + 4)];
-    expect([0, 1, 2, 3, 4].map(pixel)).toEqual([
-      [255, 0, 0, 255],
-      [0, 0, 255, 255],
-      [9, 9, 9, 255],
-      [0, 0, 0, 0],
-      [0, 0, 255, 255],
-    ]);
   });
 });

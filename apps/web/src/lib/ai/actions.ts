@@ -10,7 +10,6 @@ import {
 import { toUserMessage } from "@/lib/ai/errors";
 import {
   buildAnimationPrompt,
-  buildAnimationReviewPrompt,
   buildComposePrompt,
   buildEditReviewPrompt,
   buildEditSystemPrompt,
@@ -20,18 +19,16 @@ import {
   buildPlanPrompt,
   buildRedrawPrompt,
   buildSheetPrompt,
-  clampAnimationFixes,
+  buildSheetRedrawPrompt,
   clampAnimationPlan,
   clampRect,
   closestAspectRatio,
-  refitPlan,
   sheetLayout,
   type SheetLayout,
 } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
-  AnimationFixes,
   AnimationPlan,
   ChatMessage,
   EditPlan,
@@ -437,41 +434,45 @@ export async function reviewEdit(args: {
 }
 
 /**
- * Looks at an animation before it is applied: `frames` is a PNG data URL of
- * its frames side by side, `plan` what they were drawn from. Free (text model).
+ * Makes one change in every frame of an animation as one picture (paid
+ * once): `sheet` is a PNG data URL of the `count` frames, each `cellW ×
+ * cellH` tile pixels, laid out by sheetLayout. Returns the redrawn sheet and
+ * its grid.
  */
-export async function reviewAnimation(args: {
-  request: string;
-  plan: AnimationPlan;
-  frames: string;
-  width: number;
-  height: number;
-}): Promise<AiResult<AnimationFixes>> {
+export async function redrawFrames(args: {
+  instruction: string;
+  sheet: string;
+  count: number;
+  cellW: number;
+  cellH: number;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
-  const { width, height } = args;
-  const png = PNG_DATA_URL.exec(args.frames)?.[1];
+  const png = PNG_DATA_URL.exec(args.sheet)?.[1];
   const valid =
-    typeof args.request === "string" &&
+    typeof args.instruction === "string" &&
+    args.instruction.trim() &&
     png &&
-    validSize(width) &&
-    validSize(height) &&
-    Array.isArray(args.plan?.tracks);
-  if (!valid)
-    return { ok: false, error: "The animation could not be checked." };
-  return attempt("reviewAnimation", async () => {
-    // The plan comes back from the browser: it is fitted to the tile again
-    // before the checker hears of it, and the answer is fitted to it.
-    const plan = refitPlan(args.plan, width, height);
-    const reply = await getAiProvider().reviewAnimation(
-      buildAnimationReviewPrompt(
-        args.request.slice(0, 1000),
-        plan,
-        width,
-        height,
-      ),
+    Number.isInteger(args.count) &&
+    args.count >= 2 &&
+    args.count <= MAX_FRAMES &&
+    validSize(args.cellW) &&
+    validSize(args.cellH);
+  if (!valid) return { ok: false, error: "Those frames cannot be redrawn." };
+  return attempt("redrawFrames", async () => {
+    const layout = sheetLayout(args.count, args.cellW, args.cellH);
+    const { mimeType, base64 } = await getAiProvider().redraw(
+      buildSheetRedrawPrompt({
+        instruction: args.instruction.slice(0, 1000),
+        count: args.count,
+        cellW: args.cellW,
+        cellH: args.cellH,
+        layout,
+      }),
       { mimeType: "image/png", base64: png! },
+      layout.aspectRatio,
+      false,
     );
-    return clampAnimationFixes(reply, plan, width, height);
+    return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }
 

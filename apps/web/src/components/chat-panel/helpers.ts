@@ -169,37 +169,3 @@ export function grown(area: Area, margin: number, size: Size): Area {
     h: Math.min(size.h, area.y + area.h + margin) - y,
   };
 }
-
-/**
- * The frames of an animation side by side, one tile pixel of `divider`
- * between them. `layers` holds each layer's cels by frame, bottom layer
- * first; a frame shows them stacked.
- */
-export function frameStrip(
-  layers: (Uint8ClampedArray | null)[][],
-  frameCount: number,
-  size: Size,
-  divider: [number, number, number],
-): Bitmap {
-  const w = (size.w + 1) * frameCount - 1;
-  const strip = { rgba: new Uint8ClampedArray(w * size.h * 4), w, h: size.h };
-  for (let f = 0; f < frameCount; f++) {
-    const left = f * (size.w + 1);
-    for (let y = 0; y < size.h; y++) {
-      if (f) strip.rgba.set([...divider, 255], (y * strip.w + left - 1) * 4);
-      for (const cels of layers) {
-        const cel = cels[f];
-        if (!cel) continue;
-        for (let x = 0; x < size.w; x++) {
-          const i = (y * size.w + x) * 4;
-          if (cel[i + 3])
-            strip.rgba.set(
-              cel.subarray(i, i + 4),
-              (y * strip.w + left + x) * 4,
-            );
-        }
-      }
-    }
-  }
-  return strip;
-}

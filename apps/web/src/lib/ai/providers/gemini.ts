@@ -9,13 +9,13 @@ import {
   SMALL_IMAGE_SIZE,
   TEXT_ATTEMPT_TIMEOUT_MS,
   TEXT_RETRY_DELAYS_MS,
+  THINKING_LEVELS,
 } from "../constants";
 import { AiError, errorForStatus } from "../errors";
 import { fetchWithin, tryModels } from "../fallback";
 import {
   INTENTS,
   readAnimation,
-  readAnimationReview,
   readEdit,
   readEditReview,
   readPlacement,
@@ -69,7 +69,10 @@ export function createGeminiProvider(
               "x-goog-api-key": apiKey,
             },
             body: JSON.stringify(
-              typeof body === "function" ? body(model) : body,
+              withThinking(
+                model,
+                typeof body === "function" ? body(model) : body,
+              ),
             ),
           },
           timeoutMs,
@@ -280,34 +283,6 @@ export function createGeminiProvider(
       );
       return readEditReview(text);
     },
-
-    async reviewAnimation(prompt, frames) {
-      const text = await look(
-        "reviewAnimation",
-        prompt,
-        frames,
-        object({
-          ok: BOOLEAN,
-          problem: STRING,
-          fixes: {
-            type: "ARRAY",
-            items: object({
-              track: INTEGER,
-              order: { type: "ARRAY", items: INTEGER },
-              redraw: {
-                type: "ARRAY",
-                items: object({ frame: INTEGER, pose: STRING }),
-              },
-              path: {
-                type: "ARRAY",
-                items: object({ ...RECT.properties, visible: BOOLEAN }),
-              },
-            }),
-          },
-        }),
-      );
-      return readAnimationReview(text);
-    },
   };
 }
 
@@ -321,6 +296,19 @@ const object = <P extends Record<string, object>>(properties: P) => ({
   required: Object.keys(properties),
 });
 const RECT = object({ x: INTEGER, y: INTEGER, w: INTEGER, h: INTEGER });
+
+/** `body` with the model's thinking level from THINKING_LEVELS, if it has one. */
+function withThinking(model: string, body: { generationConfig?: object }) {
+  const thinkingLevel = THINKING_LEVELS[model];
+  if (!thinkingLevel) return body;
+  return {
+    ...body,
+    generationConfig: {
+      ...body.generationConfig,
+      thinkingConfig: { thinkingLevel },
+    },
+  };
+}
 
 const textOf = (parts: GeminiPart[]) => parts.map((p) => p.text ?? "").join("");
 
