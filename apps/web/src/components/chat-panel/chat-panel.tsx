@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { ResizeHandle } from "@/components/resize-handle";
 import { sendMessage } from "@/lib/ai/actions";
 import { REFERENCES_NOTE } from "@/lib/ai/constants";
-import { notifyAiSpent } from "@/lib/ai/spent-event";
 import { loadChat, saveChat } from "@/lib/chat/history";
 import { findPicture, keepPicture } from "@/lib/chat/pictures";
 import { ChatComposer } from "./components/chat-composer";
@@ -46,10 +45,6 @@ export function ChatPanel({
   // Nothing is saved before the stored chat is back, so it isn't overwritten.
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState(false);
-  // The token balance is read again each time the assistant is done.
-  useEffect(() => {
-    if (!pending) notifyAiSpent();
-  }, [pending]);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   // Pictures attached to the message being written, to draw from.

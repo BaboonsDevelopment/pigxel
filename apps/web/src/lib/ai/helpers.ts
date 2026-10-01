@@ -1,5 +1,6 @@
 import { GRID, OPS } from "@/lib/edit/constants";
 import {
+  ANIMATION_REVIEW_RULES,
   ANIMATION_RULES,
   ASPECT_RATIOS,
   EDIT_RESPONSE_RULES,
@@ -8,14 +9,17 @@ import {
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
   MAX_FRAMES,
+  MAX_REDRAWN_FRAMES,
   MAX_TRACKS,
   PLACEMENT_RULES,
   PLAN_RULES,
   REFERENCE_RULES,
 } from "./constants";
 import type {
+  AnimationFixes,
   AnimationPlan,
   AnimationReply,
+  AnimationReviewReply,
   AnimationTrack,
   ChatMessage,
   Rect,
@@ -30,9 +34,9 @@ export function buildImagePrompt(
   withReferences = false,
 ): string {
   return [
-    `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
+    subject,
     ...(withReferences ? [REFERENCE_RULES] : []),
-    `It is a ${width}x${height} pixel sprite drawn with small crisp pixels, centred on the picture with empty space around it.`,
+    `Pixel art sprite on a ${width}x${height} pixel grid, readable at that size,`,
     ...IMAGE_STYLE_RULES,
   ].join(" ");
 }
@@ -223,38 +227,6 @@ export function sheetLayout(
 }
 
 /**
- * Asks the image model to change every frame of an animation at once: the
- * picture sent along is the frames as a sprite sheet laid out by `layout`.
- * One picture keeps the changed subject the same in every frame, which
- * frames redrawn one by one never are. Frame 1 sets the look: the others
- * follow it, as the model otherwise keeps differences already there.
- */
-export function buildSheetRedrawPrompt(args: {
-  instruction: string;
-  count: number;
-  cellW: number;
-  cellH: number;
-  layout: SheetLayout;
-}): string {
-  const { cols, rows } = args.layout;
-  return [
-    `This picture is a pixel art sprite sheet: ${args.count} frames of one animation on a grid of exactly ${cols} columns and ${rows} rows of equal cells, in reading order, each cell a ${args.cellW}x${args.cellH} pixel sprite.`,
-    args.count < cols * rows
-      ? "The remaining cells at the end of the last row are empty and stay empty."
-      : "",
-    `Redraw the whole sheet with this change: ${args.instruction}.`,
-    "First make the change in frame 1 (top left). Frame 1 is then the model sheet for the whole animation: in every other frame, redraw the subject so it is the very same character as in frame 1 — the same design, face, head, hair, clothes, accessories, colours, outline, size, proportions and the same side it is seen from — even where the frames differ from each other now.",
-    "Only the movement may differ between frames: each frame keeps its own pose (limbs, small motions) and its place in its cell; everything else matches frame 1 exactly, as one character animated, not several look-alikes.",
-    "Keep the grid exactly: every frame stays in its cell. Change nothing else the instruction does not ask for.",
-    "No grid lines, no numbers, no labels.",
-    IMAGE_STYLE_RULES[0],
-    ...IMAGE_BACKGROUND_RULES,
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
-
-/**
  * Asks the image model for a sprite sheet: the same subject in every cell,
  * one pose per cell. With `fromReference`, the picture sent along shows the
  * subject, whose look must be kept.
@@ -332,6 +304,141 @@ export function buildEditReviewPrompt(request: string, instruction: string) {
     `INSTRUCTION GIVEN: ${instruction}`,
     EDIT_REVIEW_RULES,
   ].join("\n\n");
+}
+
+/** Asks the checker whether an animation works (see ANIMATION_REVIEW_RULES). */
+export function buildAnimationReviewPrompt(
+  request: string,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+) {
+  const tracks = plan.tracks
+    .map((t, i) => {
+      const frames =
+        t.kind === "sheet"
+          ? t.poses.map((p, f) => `  frame ${f + 1}: ${p || "(not seen)"}`)
+          : t.path.map(
+              (r, f) => `  frame ${f + 1}: ${r ? box(r) : "(not seen)"}`,
+            );
+      return [`${i}: ${t.kind} "${t.name}" — ${t.subject}`, ...frames].join(
+        "\n",
+      );
+    })
+    .join("\n");
+  return [
+    `Each frame is the ${width}x${height} pixel tile; frameCount ${plan.frameCount}.`,
+    `REQUEST: ${request}`,
+    `TRACKS:\n${tracks}`,
+    ANIMATION_REVIEW_RULES,
+  ].join("\n\n");
+}
+
+/**
+ * A plan sent back from the browser, fitted to the tile again with its tracks
+ * in the same places: what a check reads of it.
+ */
+export function refitPlan(
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationPlan {
+  const count = Math.round(Number(plan.frameCount));
+  const frameCount = Number.isFinite(count)
+    ? Math.max(2, Math.min(MAX_FRAMES, count))
+    : 2;
+  const perFrame = <T>(list: T[], fit: (item: T | undefined) => T) =>
+    Array.from({ length: frameCount }, (_, i) =>
+      fit(Array.isArray(list) ? list[i] : undefined),
+    );
+  const text = (value: unknown, max: number) =>
+    String(value ?? "").slice(0, max);
+  const tracks = plan.tracks.slice(0, MAX_TRACKS).map((t): AnimationTrack => {
+    const name = text(t.name, 40);
+    const subject = text(t.subject, 300);
+    return t.kind === "prop"
+      ? {
+          kind: "prop",
+          name,
+          subject,
+          copy: null,
+          grab: null,
+          path: perFrame(t.path, (r) =>
+            r ? clampRect(r, width, height) : null,
+          ),
+        }
+      : {
+          kind: "sheet",
+          name,
+          subject,
+          reuse: null,
+          box: clampRect(t.box, width, height),
+          poses: perFrame(t.poses, (p) => text(p, 200)),
+        };
+  });
+  return { name: "", frameCount, duration: 0, tracks, summary: "" };
+}
+
+/**
+ * The checker's answer as fixes that fit the plan: an order only for a sheet,
+ * as frame indexes where it is seen (identity dropped); redraws of frames it is
+ * seen in, at most MAX_REDRAWN_FRAMES in all; a path only for a prop, one box
+ * inside the tile per frame. An answer saying all is fine gives no fixes.
+ */
+export function clampAnimationFixes(
+  reply: AnimationReviewReply,
+  plan: AnimationPlan,
+  width: number,
+  height: number,
+): AnimationFixes {
+  if (reply.ok) return { problem: "", tracks: [] };
+  const n = plan.frameCount;
+  let redraws = MAX_REDRAWN_FRAMES;
+  const done = new Set<number>();
+  const tracks = reply.fixes.flatMap((fix): AnimationFixes["tracks"] => {
+    const track = plan.tracks[fix.track];
+    if (!track || done.has(fix.track)) return [];
+    done.add(fix.track);
+    if (track.kind === "prop") {
+      const path =
+        Array.isArray(fix.path) && fix.path.length === n
+          ? fix.path.map((r) =>
+              r && r.visible !== false && r.w > 0 && r.h > 0
+                ? clampRect(r, width, height)
+                : null,
+            )
+          : null;
+      return path?.some(Boolean)
+        ? [{ track: fix.track, order: null, redraw: [], path }]
+        : [];
+    }
+    const seen = (f: number) => Number.isInteger(f) && !!track.poses[f];
+    const asked = Array.isArray(fix.order) && fix.order.length === n;
+    const order = Array.from({ length: n }, (_, i) =>
+      asked && seen(i) && seen(fix.order[i]! - 1) ? fix.order[i]! - 1 : i,
+    );
+    const redraw = (Array.isArray(fix.redraw) ? fix.redraw : [])
+      .map((r) => ({
+        frame: r.frame - 1,
+        pose: String(r.pose ?? "").trim() || track.poses[r.frame - 1] || "",
+      }))
+      .filter((r, i, all) => {
+        const first = all.findIndex((o) => o.frame === r.frame) === i;
+        return seen(r.frame) && first && redraws-- > 0;
+      });
+    const reordered = order.some((f, i) => f !== i);
+    return reordered || redraw.length
+      ? [
+          {
+            track: fix.track,
+            order: reordered ? order : null,
+            redraw,
+            path: null,
+          },
+        ]
+      : [];
+  });
+  return { problem: tracks.length ? reply.problem : "", tracks };
 }
 
 /**
