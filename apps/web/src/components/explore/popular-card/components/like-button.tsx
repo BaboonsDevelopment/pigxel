@@ -38,7 +38,7 @@ export function LikeButton({
       disabled={pending}
       onClick={toggle}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium tabular-nums transition-colors hover:bg-muted",
+        "flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium tabular-nums transition-colors hover:bg-muted",
         state.liked
           ? "text-primary"
           : "text-muted-foreground hover:text-foreground",
