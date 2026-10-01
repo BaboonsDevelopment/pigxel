@@ -144,12 +144,11 @@ export const MAX_OVERLAP = 0.03;
 export const REFERENCE_SIDE = 512;
 export const REFERENCE_QUALITY = 0.9;
 
-/** How big each frame is shown to the AI that checks an animation, in screen pixels at most. */
-export const REVIEW_FRAME_SIDE = 128;
+/** The longest side of the frames sent to be redrawn together, in screen pixels at most. */
+export const FRAMES_SHEET_SIDE = 1024;
+
 /** Tile pixels shown around an edit to the AI that checks it, so it sees what the edit touches. */
 export const REVIEW_MARGIN = 4;
-/** The colour of the line between frames shown to the checker. */
-export const REVIEW_DIVIDER: [number, number, number] = [32, 32, 32];
 
 /** The panel's width in pixels, changed by dragging its left edge. */
 export const PANEL_WIDTH = { initial: 340, min: 260, max: 640 };
