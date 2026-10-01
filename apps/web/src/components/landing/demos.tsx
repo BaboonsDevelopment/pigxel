@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { FLOWER, PIG_FRAMES, PigFrame, PixelSprite } from "./pixel-art";
+import { FLOWER, HOP_FRAMES, MascotFrame, PixelSprite } from "./pixel-art";
 import styles from "./demos.module.css";
 
 const vars = (values: Record<string, string | number>) =>
@@ -20,7 +20,7 @@ function WindowBar({ title, meta }: { title: string; meta: string }) {
   );
 }
 
-/** Frames on a timeline: the pig hops, with the last frame as onion skin. */
+/** Frames on a timeline: the mascot hops, with the last frame as onion skin. */
 export function AnimateDemo() {
   return (
     <figure className={styles.window}>
@@ -29,10 +29,10 @@ export function AnimateDemo() {
         <div
           className={styles.preview}
           role="img"
-          aria-label="Pigxel’s pig hopping and blinking, four frames on loop, with the previous frame shown faintly as onion skin."
+          aria-label="Pigxel’s pig mascot hopping, four frames on loop, with the previous frame shown faintly as onion skin."
         >
-          {PIG_FRAMES.map((frame, index) => (
-            <PigFrame
+          {HOP_FRAMES.map((frame, index) => (
+            <MascotFrame
               key={index}
               {...frame}
               className={styles.frame}
@@ -50,13 +50,13 @@ export function AnimateDemo() {
             <path d="m8 5 11 7-11 7Z" fill="currentColor" />
           </svg>
         </span>
-        {PIG_FRAMES.map((frame, index) => (
+        {HOP_FRAMES.map((frame, index) => (
           <span
             key={index}
             className={styles.cell}
             style={vars({ "--i": index })}
           >
-            <PigFrame {...frame} />
+            <MascotFrame {...frame} />
             <small>{index + 1}</small>
           </span>
         ))}
@@ -150,10 +150,10 @@ export function ExportDemo() {
         <div
           className={styles.sheetFrames}
           role="img"
-          aria-label="A sprite sheet with the pig’s four hop frames in a row."
+          aria-label="A sprite sheet with the mascot’s four hop frames in a row."
         >
-          {PIG_FRAMES.map((frame, index) => (
-            <PigFrame key={index} {...frame} />
+          {HOP_FRAMES.map((frame, index) => (
+            <MascotFrame key={index} {...frame} />
           ))}
         </div>
         <span className={styles.sheetLabel}>hop-sheet.png · 4 × 1</span>

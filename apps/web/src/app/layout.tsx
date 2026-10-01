@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Mono, Fredoka, Poppins } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
+import "./transitions.css";
 
 export const metadata: Metadata = {
   title: "Pigxel",

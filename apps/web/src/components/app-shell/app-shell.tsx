@@ -40,7 +40,11 @@ export function AppShell({
 
   return (
     <div className="flex h-dvh bg-canvas">
-      <div className="hidden shrink-0 border-r border-border md:block">
+      {/* Named so page transitions leave the sidebar still. */}
+      <div
+        className="hidden shrink-0 border-r border-border md:block"
+        style={{ viewTransitionName: "app-sidebar" }}
+      >
         <Sidebar profile={profile} />
       </div>
 

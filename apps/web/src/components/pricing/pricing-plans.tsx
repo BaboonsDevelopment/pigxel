@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   initializePaddle,
@@ -12,14 +12,15 @@ import { Notice } from "@pigxel/ui/components/notice";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
 import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "@/lib/pricing";
+import { annualComparison, type PriceQuote } from "@/lib/pricing-comparison";
 
 const CYCLES: { id: BillingCycle; label: string }[] = [
   { id: "month", label: "Monthly" },
   { id: "year", label: "Yearly" },
 ];
 
-/** Paddle's formatted total for each price ID, as Paddle returned it. */
-type Prices = Partial<Record<string, string>>;
+/** Keep formatted checkout totals and raw minor units for honest comparisons. */
+type Prices = Partial<Record<string, PriceQuote>>;
 
 type Props = {
   environment: Environments;
@@ -29,14 +30,24 @@ type Props = {
   country?: string;
   /** The signed-in person, so checkout knows their email and account. */
   customer?: { id: string; email: string };
+  /** The page's title, set beside the billing toggle. */
+  heading: ReactNode;
 };
 
 /**
  * The billing toggle and the plan cards. Prices are Paddle's totals for the
  * visitor's country, shown exactly as Paddle formats them; Subscribe opens
- * Paddle Checkout for the price on the card.
+ * Paddle Checkout for the price on the card. It grows to fill the page, so
+ * on a desktop screen the plans sit in the middle of what's left; on short
+ * screens (under 820px tall) the cards tighten up to still fit.
  */
-export function PricingPlans({ environment, token, country, customer }: Props) {
+export function PricingPlans({
+  environment,
+  token,
+  country,
+  customer,
+  heading,
+}: Props) {
   const [cycle, setCycle] = useState<BillingCycle>("month");
   const [paddle, setPaddle] = useState<Paddle>();
   const [prices, setPrices] = useState<Prices>({});
@@ -67,7 +78,11 @@ export function PricingPlans({ environment, token, country, customer }: Props) {
             previews.flatMap((preview) =>
               preview.data.details.lineItems.map((item) => [
                 item.price.id,
-                item.formattedTotals.total,
+                {
+                  formattedTotal: item.formattedTotals.total,
+                  total: item.totals.total,
+                  currencyCode: preview.data.currencyCode,
+                },
               ]),
             ),
           ),
@@ -98,29 +113,37 @@ export function PricingPlans({ environment, token, country, customer }: Props) {
   }
 
   return (
-    <>
-      <div className="mt-8 flex justify-center">
-        <div
-          role="group"
-          aria-label="Billing period"
-          className="inline-flex rounded-full border bg-background p-1"
-        >
-          {CYCLES.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={cycle === id}
-              onClick={() => setCycle(id)}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                cycle === id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+        {heading}
+        <div className="flex flex-col items-start gap-1.5 md:ml-auto md:items-end">
+          <div
+            role="group"
+            aria-label="Billing period"
+            className="inline-flex rounded-full border bg-background p-1.5 shadow-sm"
+          >
+            {CYCLES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={cycle === id}
+                onClick={() => setCycle(id)}
+                className={cn(
+                  "rounded-full px-6 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
+                  cycle === id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground md:text-right">
+            {cycle === "year"
+              ? "One yearly payment. Compare it with 12 months of monthly billing."
+              : "Billed monthly. Choose yearly to see your annual savings."}
+          </p>
         </div>
       </div>
 
@@ -130,71 +153,132 @@ export function PricingPlans({ environment, token, country, customer }: Props) {
         </Notice>
       )}
 
-      <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        <li>
-          <PlanCard
-            name={FREE_PLAN.name}
-            description={FREE_PLAN.description}
-            features={FREE_PLAN.features}
-            price={<Price amount="Free" period="forever" />}
-            action={
-              <Link
-                href="/login?mode=signup"
-                className={buttonVariants({ className: "mt-6 w-full" })}
-              >
-                Start for free
-              </Link>
-            }
-          />
-        </li>
-        {TIERS.map((tier) => {
-          const amount = prices[tier.priceId[cycle]];
-          return (
-            <li key={tier.name}>
-              <PlanCard
-                name={tier.name}
-                description={tier.description}
-                features={tier.features}
-                highlighted={tier.highlighted}
-                price={
-                  amount ? (
-                    <Price amount={amount} period={`/ ${cycle}`} />
-                  ) : failed ? (
-                    <span className="text-sm text-muted-foreground">
-                      Price unavailable
-                    </span>
-                  ) : (
-                    <Skeleton
-                      aria-label="Loading price"
-                      className="h-10 w-32"
-                    />
+      <div className="flex flex-1 items-center pt-8 pb-2 lg:[@media(max-height:820px)]:pt-6 lg:[@media(max-height:740px)]:pt-4">
+        <ul className="grid w-full items-stretch gap-x-4 gap-y-9 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-5">
+          <li>
+            <PlanCard
+              name={FREE_PLAN.name}
+              description={FREE_PLAN.description}
+              features={FREE_PLAN.features}
+              price={
+                <Price
+                  amount="Free"
+                  period="forever"
+                  note="No subscription needed"
+                />
+              }
+              action={
+                <Link
+                  href="/login?mode=signup"
+                  className={buttonVariants({
+                    variant: "primary",
+                    size: "lg",
+                    className: "w-full",
+                  })}
+                >
+                  Start for free
+                </Link>
+              }
+            />
+          </li>
+          {TIERS.map((tier) => {
+            const quote = prices[tier.priceId[cycle]];
+            const comparison =
+              cycle === "year"
+                ? annualComparison(
+                    prices[tier.priceId.month],
+                    prices[tier.priceId.year],
                   )
-                }
-                action={
-                  <Button
-                    className="mt-6 w-full"
-                    variant={tier.highlighted ? undefined : "secondary"}
-                    disabled={!paddle || !amount}
-                    onClick={() => subscribe(tier)}
-                  >
-                    Subscribe
-                  </Button>
-                }
-              />
-            </li>
-          );
-        })}
-      </ul>
-    </>
+                : undefined;
+            return (
+              <li key={tier.name}>
+                <PlanCard
+                  name={tier.name}
+                  description={tier.description}
+                  features={tier.features}
+                  highlighted={tier.highlighted}
+                  price={
+                    quote ? (
+                      <Price
+                        amount={quote.formattedTotal}
+                        period={`/ ${cycle}`}
+                        comparison={comparison}
+                        note={
+                          cycle === "year"
+                            ? "Billed once per year"
+                            : "Billed monthly"
+                        }
+                      />
+                    ) : failed ? (
+                      <span className="text-sm text-muted-foreground">
+                        Price unavailable
+                      </span>
+                    ) : (
+                      <Skeleton
+                        aria-label="Loading price"
+                        className="h-10 w-32"
+                      />
+                    )
+                  }
+                  action={
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      variant="primary"
+                      disabled={!paddle || !quote}
+                      aria-label={`Subscribe to ${tier.name}, billed ${cycle === "year" ? "yearly" : "monthly"}`}
+                      onClick={() => subscribe(tier)}
+                    >
+                      Subscribe
+                    </Button>
+                  }
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
   );
 }
 
-function Price({ amount, period }: { amount: string; period: string }) {
+function Price({
+  amount,
+  period,
+  note,
+  comparison,
+}: {
+  amount: string;
+  period: string;
+  note: string;
+  comparison?: ReturnType<typeof annualComparison>;
+}) {
+  // The yearly comparison takes the note's line, so switching cycles never
+  // changes the card's height.
   return (
-    <>
-      <span className="font-display text-4xl tracking-tight">{amount}</span>
-      <span className="text-sm text-muted-foreground">{period}</span>
-    </>
+    <div>
+      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+        <span className="font-display text-4xl tracking-tight break-words">
+          {amount}
+        </span>
+        <span className="text-sm text-muted-foreground">{period}</span>
+      </div>
+      <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        {comparison ? (
+          <>
+            <span className="sr-only">Twelve months at the monthly rate: </span>
+            <s className="decoration-1">{comparison.regularPrice}</s>
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+              {comparison.savingsPercent > 0
+                ? `Save ${comparison.savingsPercent}%`
+                : "Annual savings"}
+            </span>
+          </>
+        ) : (
+          note
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -215,35 +299,51 @@ function PlanCard({
 }) {
   return (
     <article
+      aria-label={`${name} plan${highlighted ? ", recommended" : ""}`}
       className={cn(
-        "flex h-full flex-col rounded-2xl border bg-card p-6",
+        "relative flex h-full min-w-0 flex-col rounded-2xl border bg-card p-4 pt-7 xl:p-5 xl:pt-7 lg:[@media(max-height:820px)]:pt-6",
         highlighted &&
-          "border-primary shadow-[0_18px_40px_-24px_var(--color-primary)]",
+          "border-primary bg-primary/5 ring-2 ring-primary shadow-[0_18px_50px_-18px_var(--color-primary)] lg:-translate-y-2",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-xl">{name}</h2>
-        {highlighted && (
-          <span className="rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
-            Most popular
-          </span>
-        )}
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      <div className="mt-5 flex min-h-10 flex-wrap items-baseline gap-1">
+      {highlighted && (
+        <span className="absolute -top-3.5 left-1/2 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-primary px-4 py-1 text-xs font-semibold whitespace-nowrap text-primary-foreground">
+          <span aria-hidden="true">✦</span> Recommended
+        </span>
+      )}
+      <h2
+        className={cn("font-display text-2xl", highlighted && "text-primary")}
+      >
+        {name}
+      </h2>
+      <p className="mt-1.5 min-h-10 text-sm leading-snug text-muted-foreground lg:[@media(max-height:740px)]:min-h-9 lg:[@media(max-height:740px)]:leading-tight">
+        {description}
+      </p>
+      <div className="mt-3 min-h-16" aria-live="polite" aria-atomic="true">
         {price}
       </div>
-      <ul className="mt-6 flex-1 space-y-2 text-sm">
+      <div className="mt-3">{action}</div>
+      <ul className="mt-5 flex-1 space-y-2 border-t pt-5 text-[13px] lg:[@media(max-height:820px)]:mt-4 lg:[@media(max-height:820px)]:space-y-1.5 lg:[@media(max-height:740px)]:space-y-1 lg:[@media(max-height:820px)]:pt-4 lg:[@media(max-height:820px)]:text-xs">
         {features.map((feature) => (
-          <li key={feature} className="flex gap-2">
-            <span aria-hidden="true" className="text-primary">
-              ✦
-            </span>
+          <li key={feature} className="flex gap-2.5 leading-snug">
+            <svg
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              viewBox="0 0 20 20"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="m4 10 4 4 8-8"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
             {feature}
           </li>
         ))}
       </ul>
-      {action}
     </article>
   );
 }

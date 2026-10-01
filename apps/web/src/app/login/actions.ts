@@ -113,5 +113,6 @@ export async function signOut(): Promise<AuthState> {
     return { error: "Unable to sign out. Please try again." };
   }
   revalidatePath("/", "layout");
-  redirect("/login");
+  // Back to the landing page, the front door for signed-out visitors.
+  redirect("/");
 }

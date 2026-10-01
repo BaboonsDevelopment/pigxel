@@ -193,8 +193,8 @@ describe("email/password authentication", () => {
       "couldn’t connect",
     );
   });
-  it("signs out the current browser and redirects to login", async () => {
-    await expect(signOut()).rejects.toThrow("REDIRECT:/login");
+  it("signs out the current browser and returns to the landing page", async () => {
+    await expect(signOut()).rejects.toThrow(/^REDIRECT:\/$/);
     expect(mocks.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
   it("does not pretend signout worked when Supabase fails", async () => {

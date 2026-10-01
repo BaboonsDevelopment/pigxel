@@ -1,24 +1,38 @@
+import Image from "next/image";
 import Link from "next/link";
+import mascot from "../../public/art/pigxel-mascot-sitting.png";
 
+/** Pigxel's mascot: the sitting pig the app's sidebar shows. */
+export function BrandMascot({
+  className,
+  priority,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src={mascot}
+      alt=""
+      sizes="96px"
+      priority={priority}
+      draggable={false}
+      className={className}
+    />
+  );
+}
+
+/** The mascot and the name, linking home. */
 export function Brand() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center gap-2.5 rounded-sm text-xl font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-offset-4"
+      className="inline-flex items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4"
     >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="size-8"
-        shapeRendering="crispEdges"
-      >
-        <path fill="#d64a62" d="M3 3h6v3h6V3h6v15h-3v3H6v-3H3Z" />
-        <path fill="#ffa4b2" d="M5 5h3v4h8V5h3v12h-3v2H8v-2H5Z" />
-        <path fill="#542a35" d="M7 10h2v3H7zm8 0h2v3h-2Z" />
-        <path fill="#ef748d" d="M8 14h8v4H8Z" />
-        <path fill="#9e384e" d="M10 15h1v2h-1zm3 0h1v2h-1Z" />
-      </svg>
-      Pigxel
+      <BrandMascot className="h-auto w-10" />
+      <span className="font-display text-2xl leading-none font-semibold tracking-tight">
+        Pigxel
+      </span>
     </Link>
   );
 }
