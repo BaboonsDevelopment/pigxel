@@ -7,7 +7,7 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
 import type { PublicTile } from "@/lib/profile/profile";
-import { samePixels } from "../helpers";
+import { samePixels, zoomDialog } from "../helpers";
 
 type Picture = {
   width: number;
@@ -18,12 +18,18 @@ type Picture = {
   animated: boolean;
 };
 
-/** A published art large and crisp; an animation can be played. */
+/**
+ * A published art large and crisp; an animation can be played. It grows out
+ * of the card it opens from and shrinks back into it.
+ */
 export function PreviewDialog({
   tile,
+  origin,
   onClose,
 }: {
   tile: PublicTile;
+  /** Where the card is now, to open from and close into. */
+  origin: () => DOMRect | undefined;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -33,7 +39,24 @@ export function PreviewDialog({
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  useEffect(() => dialog.current?.showModal(), []);
+  const closing = useRef(false);
+
+  useEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    element.showModal();
+    void zoomDialog(element, origin(), "in");
+    // Opens once, from where the card was then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const dismiss = async () => {
+    const element = dialog.current;
+    if (!element || closing.current) return;
+    closing.current = true;
+    await zoomDialog(element, origin(), "out");
+    element.close();
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -93,12 +116,17 @@ export function PreviewDialog({
     <dialog
       ref={dialog}
       onClose={onClose}
+      onCancel={(e) => {
+        // Escape shrinks it back too.
+        e.preventDefault();
+        void dismiss();
+      }}
       onClick={(e) => {
         // A click on the dimmed backdrop closes it.
-        if (e.target === dialog.current) dialog.current.close();
+        if (e.target === dialog.current) void dismiss();
       }}
       aria-label={tile.name}
-      className="m-auto w-[min(48rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/50"
+      className="m-auto w-[min(48rem,calc(100vw-2rem))] overflow-hidden rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/50 backdrop:backdrop-blur-sm"
     >
       <div className="flex items-center justify-between gap-4 border-b py-2 pr-2 pl-5">
         <div className="min-w-0">
@@ -112,7 +140,7 @@ export function PreviewDialog({
           variant="ghost"
           size="icon"
           aria-label="Close"
-          onClick={() => dialog.current?.close()}
+          onClick={() => void dismiss()}
           className="text-lg leading-none"
         >
           ×
