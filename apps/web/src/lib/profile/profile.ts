@@ -55,6 +55,20 @@ export type ProfileTile = {
   updatedAt: string;
 };
 
+/** Who made a published art, as a card shows them. */
+export type TileAuthor = {
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+};
+
+/** A published art with its author, its likes and whether the viewer liked it. */
+export type PublicTile = ProfileTile & {
+  author: TileAuthor;
+  likes: number;
+  liked: boolean;
+};
+
 export const AVATAR_BUCKET = "avatars";
 
 /** The public address of an uploaded avatar. */
@@ -63,13 +77,19 @@ function uploadedAvatarUrl(path: string) {
   return `${base}/storage/v1/object/public/${AVATAR_BUCKET}/${path}`;
 }
 
+/** The picture a profile shows; null shows the initial instead. */
+export function avatarUrlOf(
+  row: Pick<ProfileRow, "avatar_kind" | "avatar_path" | "provider_avatar_url">,
+) {
+  return row.avatar_kind === "upload" && row.avatar_path
+    ? uploadedAvatarUrl(row.avatar_path)
+    : row.avatar_kind === "provider"
+      ? row.provider_avatar_url
+      : null;
+}
+
 export function toArtistProfile(row: ProfileRow): ArtistProfile {
-  const avatarUrl =
-    row.avatar_kind === "upload" && row.avatar_path
-      ? uploadedAvatarUrl(row.avatar_path)
-      : row.avatar_kind === "provider"
-        ? row.provider_avatar_url
-        : null;
+  const avatarUrl = avatarUrlOf(row);
   return {
     id: row.id,
     username: row.username,

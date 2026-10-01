@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   PROFILE_COLUMNS,
+  avatarUrlOf,
   toArtistProfile,
   type ArtistProfile,
   type ProfileRow,
   type ProfileTile,
+  type PublicTile,
   type Visibility,
 } from "./profile";
 
@@ -102,15 +104,75 @@ export async function listProfileTiles(
   if (error || !data) return { tiles: [], count: 0 };
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      width: row.width,
-      height: row.height,
-      thumbnail: row.thumbnail,
-      visibility: row.visibility,
-      pinOrder: row.pin_order,
-      updatedAt: row.updated_at,
+    tiles: (data as TileRow[]).map(toProfileTile),
+  };
+}
+
+const toProfileTile = (row: TileRow): ProfileTile => ({
+  id: row.id,
+  name: row.name,
+  width: row.width,
+  height: row.height,
+  thumbnail: row.thumbnail,
+  visibility: row.visibility,
+  pinOrder: row.pin_order,
+  updatedAt: row.updated_at,
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+
+type PublicTileRow = TileRow & {
+  author: Pick<
+    ProfileRow,
+    | "username"
+    | "display_name"
+    | "avatar_kind"
+    | "avatar_path"
+    | "provider_avatar_url"
+  >;
+  likes: { count: number }[];
+  mine: { user_id: string }[];
+};
+
+/**
+ * One page of everyone's arts published in the last `days` days, most liked
+ * in that time first, each with its author, its likes and whether `viewerId`
+ * liked it, and how many there are in all — in one request. Row-level security
+ * leaves out those of private profiles.
+ */
+export async function listPublicTiles(
+  page: number,
+  pageSize: number,
+  days: number,
+  viewerId: string,
+): Promise<{ tiles: PublicTile[]; count: number }> {
+  const supabase = await createClient();
+  const from = (page - 1) * pageSize;
+  const { data, count, error } = await supabase
+    .rpc(
+      "popular_tiles",
+      { since: new Date(Date.now() - days * DAY).toISOString() },
+      { count: "exact" },
+    )
+    .select(
+      "id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count), mine:tile_likes(user_id)",
+    )
+    .eq("mine.user_id", viewerId)
+    .range(from, from + pageSize - 1);
+  if (error) console.error("Couldn’t load public arts:", error.message);
+  if (error || !data) return { tiles: [], count: 0 };
+  const rows = data as unknown as PublicTileRow[];
+  return {
+    count: count ?? rows.length,
+    tiles: rows.map((row) => ({
+      ...toProfileTile(row),
+      author: {
+        username: row.author.username,
+        name: row.author.display_name,
+        avatarUrl: avatarUrlOf(row.author),
+      },
+      likes: row.likes[0]?.count ?? 0,
+      liked: row.mine.length > 0,
     })),
   };
 }
