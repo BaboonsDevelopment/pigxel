@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { buttonVariants } from "@pigxel/ui/components/button";
-import { cn } from "@pigxel/ui/lib/utils";
+import { headers } from "next/headers";
+import { PricingPlans } from "@/components/pricing/pricing-plans";
 import { LEGAL } from "@/lib/legal";
-import { PLANS, type Plan } from "@/lib/pricing";
+import { countryFromHeaders, paddleClientConfig } from "@/lib/paddle/config";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Pricing · Pigxel",
@@ -11,8 +13,24 @@ export const metadata: Metadata = {
     "Pigxel is free to use. Paid plans add more AI generations and cloud storage.",
 };
 
+/** The signed-in person, if any, so checkout can prefill their email. */
+async function signedInCustomer() {
+  if (!isSupabaseConfigured()) return undefined;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email ? { id: user.id, email: user.email } : undefined;
+}
+
 /** The plans side by side, then answers to common billing questions. */
-export default function Pricing() {
+export default async function Pricing() {
+  // Headers first: the page renders per request, so the config is checked
+  // when it's served rather than at build time.
+  const country = countryFromHeaders(await headers());
+  const { environment, token } = paddleClientConfig();
+  const customer = await signedInCustomer();
+
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-14">
       <div className="mx-auto max-w-2xl text-center">
@@ -25,13 +43,12 @@ export default function Pricing() {
         </p>
       </div>
 
-      <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {PLANS.map((plan) => (
-          <li key={plan.id}>
-            <PlanCard plan={plan} />
-          </li>
-        ))}
-      </ul>
+      <PricingPlans
+        environment={environment}
+        token={token}
+        country={country}
+        customer={customer}
+      />
 
       <section
         aria-labelledby="faq-heading"
@@ -65,73 +82,6 @@ export default function Pricing() {
         </dl>
       </section>
     </main>
-  );
-}
-
-function PlanCard({ plan }: { plan: Plan }) {
-  const free = plan.monthly === 0;
-  return (
-    <article
-      className={cn(
-        "flex h-full flex-col rounded-2xl border bg-card p-6",
-        plan.highlighted &&
-          "border-primary shadow-[0_18px_40px_-24px_var(--color-primary)]",
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-xl">{plan.name}</h2>
-        {plan.highlighted && (
-          <span className="rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
-            Most popular
-          </span>
-        )}
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
-      <p className="mt-5 flex items-baseline gap-1">
-        {plan.monthly === null ? (
-          <span className="font-display text-2xl text-muted-foreground">
-            Coming soon
-          </span>
-        ) : (
-          <>
-            <span className="font-display text-4xl tracking-tight">
-              ${plan.monthly}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {free ? "forever" : "/ month"}
-            </span>
-          </>
-        )}
-      </p>
-      <ul className="mt-6 flex-1 space-y-2 text-sm">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex gap-2">
-            <span aria-hidden="true" className="text-primary">
-              ✦
-            </span>
-            {feature}
-          </li>
-        ))}
-      </ul>
-      {free ? (
-        <Link
-          href="/login?mode=signup"
-          className={buttonVariants({ className: "mt-6 w-full" })}
-        >
-          Start for free
-        </Link>
-      ) : (
-        <span
-          aria-disabled="true"
-          className={buttonVariants({
-            variant: "secondary",
-            className: "mt-6 w-full",
-          })}
-        >
-          Coming soon
-        </span>
-      )}
-    </article>
   );
 }
 

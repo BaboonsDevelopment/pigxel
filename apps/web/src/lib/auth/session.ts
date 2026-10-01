@@ -6,17 +6,23 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
- * Returns the verified user, or sends signed-out visitors to the login page.
- * Cached per request, so a layout and its page share one check.
+ * The verified user, or null for a signed-out visitor. Cached per request,
+ * so a layout and its page share one check.
  */
-export const requireUser = cache(async () => {
-  if (!isSupabaseConfigured()) redirect("/login");
+export const getUser = cache(async (): Promise<User | null> => {
+  if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser();
-  if (error || !user) redirect("/login");
+  return error ? null : user;
+});
+
+/** Returns the verified user, or sends signed-out visitors to the login page. */
+export const requireUser = cache(async () => {
+  const user = await getUser();
+  if (!user) redirect("/login");
   return user;
 });
 
@@ -27,6 +33,8 @@ export type Profile = {
   username: string | null;
   /** A profile picture, e.g. from Google; null shows the initial instead. */
   avatarUrl: string | null;
+  /** Their plan's name, e.g. "Pro"; Free when absent. */
+  plan?: string;
 };
 
 /** What the app shows for a person: their Google name and picture, or their email. */

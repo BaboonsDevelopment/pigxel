@@ -39,7 +39,12 @@ const MAIN: NavItem[] = [
     href: "/tiles",
     match: (p) => p === "/tiles",
   },
-  { label: "Explore", icon: <TelescopeIcon /> },
+  {
+    label: "Explore",
+    icon: <TelescopeIcon />,
+    href: "/explore",
+    match: (p) => p.startsWith("/explore"),
+  },
   { label: "AI Studio", icon: <SparklesIcon /> },
   { label: "Tutorials", icon: <BookIcon /> },
 ];

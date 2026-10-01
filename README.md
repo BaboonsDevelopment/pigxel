@@ -23,7 +23,7 @@ apps/web/                    Next.js App Router + TypeScript
   src/lib/ai/                AI helper (Gemini)
   src/lib/profile/           Artist profiles: validation and queries
   src/lib/supabase/          Browser/server clients and configuration
-  src/lib/paddle/            Server-only Paddle client (billing comes next)
+  src/lib/paddle/            Paddle environment checks and the server-only client
   src/proxy.ts               Supabase session refresh when configured
 packages/ui/                 Tailwind theme, shadcn configuration, cn utility
 packages/typescript-config/  Shared TypeScript settings
@@ -50,7 +50,7 @@ Copy `apps/web/.env.example` to `apps/web/.env.local` when connecting services.
 
 - **Supabase:** set the public URL and publishable key. Local development requires Docker: `pnpm db:start` starts Supabase, and `pnpm db:stop` stops it. Apply the migrations in `supabase/migrations` (`pnpm exec supabase db push` for a linked project).
 - **Gemini:** set `GEMINI_API_KEY` for the AI helper in the editor.
-- **Paddle:** set the server API key and environment (defaults to `sandbox`). The server client is ready; add checkout, webhook verification, and subscription storage when implementing billing.
+- **Paddle:** set `PADDLE_ENVIRONMENT` (`sandbox` or `production`; there is no default, and the app refuses to start Paddle without it) and `PADDLE_CLIENT_TOKEN`, a client-side token for that environment (`test_…` or `live_…`). `PADDLE_API_KEY` is only needed by server code. `/pricing` shows Free and the Starter, Pro and Advanced tiers with Paddle's localized prices (monthly or yearly), and Subscribe opens Paddle Checkout as a one-page overlay that returns to `/welcome`. Edit the tiers and their Paddle price IDs in `apps/web/src/lib/pricing.ts`. In the Paddle dashboard, set **Checkout → Checkout settings → Default payment link** to the pricing page (localhost is fine on sandbox; live needs an approved domain). Signed-in buyers' checkouts carry their user ID, and `/api/paddle/webhook` stores their subscription events in the `subscriptions` table (`supabase/migrations/20261001200000_subscriptions.sql`), which sets the plan in the sidebar and Settings → Subscription. Create a notification destination in Paddle (**Developer tools → Notifications**) for the `subscription.*` events pointing at `<APP_URL>/api/paddle/webhook`, and set its secret key as `PADDLE_WEBHOOK_SECRET`; the webhook also needs `SUPABASE_SECRET_KEY`. Paddle can't reach localhost, so for local testing expose the dev server with a tunnel such as `ngrok http 3000` and use that HTTPS URL.
 
 ## Supabase Auth setup
 

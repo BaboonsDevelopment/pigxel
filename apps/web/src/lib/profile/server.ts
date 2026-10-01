@@ -2,14 +2,17 @@ import "server-only";
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { profileOf, type Profile } from "@/lib/auth/session";
+import { getCurrentPlan } from "@/lib/billing/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   PROFILE_COLUMNS,
+  avatarUrlOf,
   toArtistProfile,
   type ArtistProfile,
   type ProfileRow,
   type ProfileTile,
+  type PublicTile,
   type Visibility,
 } from "./profile";
 
@@ -41,8 +44,11 @@ export const getOwnProfile = cache(
 
 /** What the sidebar shows: the profile, or the sign-in details before it exists. */
 export async function sidebarProfile(user: User): Promise<Profile> {
-  const own = await getOwnProfile(user.id);
-  const fallback = profileOf(user);
+  const [own, plan] = await Promise.all([
+    getOwnProfile(user.id),
+    getCurrentPlan(user.id),
+  ]);
+  const fallback = { ...profileOf(user), plan: plan.name };
   return own
     ? {
         ...fallback,
@@ -102,15 +108,84 @@ export async function listProfileTiles(
   if (error || !data) return { tiles: [], count: 0 };
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map((row) => ({
-      id: row.id,
-      name: row.name,
-      width: row.width,
-      height: row.height,
-      thumbnail: row.thumbnail,
-      visibility: row.visibility,
-      pinOrder: row.pin_order,
-      updatedAt: row.updated_at,
+    tiles: (data as TileRow[]).map(toProfileTile),
+  };
+}
+
+const toProfileTile = (row: TileRow): ProfileTile => ({
+  id: row.id,
+  name: row.name,
+  width: row.width,
+  height: row.height,
+  thumbnail: row.thumbnail,
+  visibility: row.visibility,
+  pinOrder: row.pin_order,
+  updatedAt: row.updated_at,
+});
+
+const DAY = 24 * 60 * 60 * 1000;
+
+type PublicTileRow = TileRow & {
+  user_id: string;
+  author: Pick<
+    ProfileRow,
+    | "username"
+    | "display_name"
+    | "avatar_kind"
+    | "avatar_path"
+    | "provider_avatar_url"
+  >;
+  likes: { count: number }[];
+  /** Left out for guests. */
+  mine?: { user_id: string }[];
+};
+
+const PUBLIC_TILE_COLUMNS =
+  "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+
+/**
+ * Up to `limit` of everyone's arts published in the last `days` days,
+ * skipping the first `from`: most liked in that time first, each with its
+ * author, its likes and whether `viewerId` liked it (never, for a guest's
+ * null), and how many there are in all — in one request. Row-level security
+ * leaves out those of private profiles.
+ */
+export async function listPublicTiles(
+  from: number,
+  limit: number,
+  days: number,
+  viewerId: string | null,
+): Promise<{ tiles: PublicTile[]; count: number }> {
+  const supabase = await createClient();
+  const query = supabase
+    .rpc(
+      "popular_tiles",
+      { since: new Date(Date.now() - days * DAY).toISOString() },
+      { count: "exact" },
+    )
+    .select(
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    );
+  const { data, count, error } = await (
+    viewerId ? query.eq("mine.user_id", viewerId) : query
+  ).range(from, from + limit - 1);
+  if (error) console.error("Couldn’t load public arts:", error.message);
+  if (error || !data) return { tiles: [], count: 0 };
+  const rows = data as unknown as PublicTileRow[];
+  return {
+    count: count ?? rows.length,
+    tiles: rows.map((row) => ({
+      ...toProfileTile(row),
+      author: {
+        id: row.user_id,
+        username: row.author.username,
+        name: row.author.display_name,
+        avatarUrl: avatarUrlOf(row.author),
+      },
+      likes: row.likes[0]?.count ?? 0,
+      liked: Boolean(row.mine?.length),
     })),
   };
 }

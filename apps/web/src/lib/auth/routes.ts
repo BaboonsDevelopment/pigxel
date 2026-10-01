@@ -6,6 +6,7 @@ const protectedPaths = [
   "/tiles",
   "/settings",
   "/profile",
+  "/patch-notes",
   "/u",
   "/auth/update-password",
 ];

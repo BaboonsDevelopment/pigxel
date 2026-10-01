@@ -77,6 +77,18 @@ export async function readCloudTile(id: string): Promise<string> {
   return data.text();
 }
 
+/** The .pigxel file of anyone's published tile, e.g. to preview it on Explore. */
+export async function readPublishedTile(tile: {
+  id: string;
+  userId: string;
+}): Promise<string> {
+  const { data, error } = await createClient()
+    .storage.from(BUCKET)
+    .download(filePath({ id: tile.id, user_id: tile.userId }));
+  if (error || !data) throw new CloudError("Couldn’t load this art.");
+  return data.text();
+}
+
 /**
  * Creates a cloud tile, or updates `tile.id` when given, and returns it.
  * `image` fills in the size, background and thumbnail for the tile list.
