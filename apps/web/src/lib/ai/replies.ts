@@ -1,6 +1,7 @@
 import { AiError } from "./errors";
 import type {
   AnimationReply,
+  AnimationReviewReply,
   EditReply,
   EditReview,
   PlacementReply,
@@ -105,6 +106,16 @@ export function readEditReview(text: string): EditReview {
     ok: reply?.ok !== false || !instruction,
     problem: String(reply?.problem ?? ""),
     instruction,
+  };
+}
+
+/** Checked in detail by clampAnimationFixes (helpers.ts). */
+export function readAnimationReview(text: string): AnimationReviewReply {
+  const reply = parseJson<AnimationReviewReply>(text);
+  return {
+    ok: reply?.ok !== false,
+    problem: String(reply?.problem ?? ""),
+    fixes: Array.isArray(reply?.fixes) ? reply.fixes : [],
   };
 }
 

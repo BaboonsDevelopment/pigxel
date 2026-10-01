@@ -6,14 +6,12 @@ import {
   type ArtistProfile,
 } from "@/lib/profile/profile";
 import { linkTitle } from "@/lib/profile/validation";
-import { TokensButton } from "@/components/tokens-button/tokens-button";
 import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
 
 /**
  * The hero at the top of a profile: avatar, names, premium and joined
- * badges, bio and links, with Follow for visitors, or Edit and their AI
- * tokens for the owner.
+ * badges, bio and links, with Follow for visitors or Edit for the owner.
  */
 export function ProfileHeader({
   profile,
@@ -56,7 +54,6 @@ export function ProfileHeader({
                   </li>
                 )}
               </ul>
-              {isOwner && <TokensButton className="mt-3" />}
             </div>
             {isOwner ? (
               <div className="flex flex-col items-start gap-2 sm:items-end">

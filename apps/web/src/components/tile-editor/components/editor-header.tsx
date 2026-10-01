@@ -16,7 +16,6 @@ import type { OpenSource } from "../constants";
 import { useModifierLabel } from "../use-modifier-label";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "@/components/menu/menu";
-import { TokensButton } from "@/components/tokens-button/tokens-button";
 import type { MenuSections } from "@/components/menu/constants";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import { frameActions, layerActions } from "@/components/timeline/actions";
@@ -24,7 +23,8 @@ import type { Playback } from "@/components/timeline/use-playback";
 
 /**
  * The bar on top: back to the projects, the File, Edit, View, Layer and
- * Frame menus, the tile's name and where it is saved, and the AI tokens.
+ * Frame menus, the
+ * tile's name and where it is saved.
  */
 export function EditorHeader({
   file,
@@ -186,7 +186,6 @@ export function EditorHeader({
           Google Drive · {drive.email ?? "connected"}
         </p>
       )}
-      <TokensButton className={drive.connected ? undefined : "ml-auto"} />
     </header>
   );
 }
