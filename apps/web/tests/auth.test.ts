@@ -45,6 +45,11 @@ vi.mock("next/navigation", () => ({
   },
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
+// next/font is a compile-time transform; the landing page only needs its class names.
+vi.mock("next/font/google", () => ({
+  Geist: () => ({ variable: "" }),
+  Geist_Pixel: () => ({ variable: "" }),
+}));
 
 import { authenticate, signOut } from "@/app/login/actions";
 import { updatePassword } from "@/app/auth/update-password/actions";
