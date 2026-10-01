@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
-import { cn } from "@pigxel/ui/lib/utils";
+import { Pager } from "@/components/pager/pager";
 import { ArtCard } from "@/components/profile/art-card";
 import { requireUser } from "@/lib/auth/session";
 import { listPublicTiles } from "@/lib/profile/server";
-import { PERIODS, type Period } from "../constants";
+import { PERIODS } from "../constants";
 import { PeriodTabs } from "../period-tabs";
 
 export const metadata: Metadata = { title: "Popular · Explore · Pigxel" };
 export const dynamic = "force-dynamic";
 
-/** Arts on one page: fills whole rows of 2, 3, 4 and 6. */
-const PAGE_SIZE = 24;
+/** Arts on one page: fills whole rows of 2, 3 and 6. */
+const PAGE_SIZE = 18;
 
 type Props = { searchParams: Promise<{ page?: string; period?: string }> };
 
@@ -36,11 +36,12 @@ export default async function Popular({ searchParams }: Props) {
       <div className="pt-8">
         {tiles.length ? (
           <>
-            <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+            <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 xl:grid-cols-6">
               {tiles.map((tile) => (
                 <ArtCard
                   key={tile.id}
                   tile={tile}
+                  author={tile.author}
                   isOwner={false}
                   onTogglePublic={() => {}}
                   onTogglePin={() => {}}
@@ -48,7 +49,13 @@ export default async function Popular({ searchParams }: Props) {
               ))}
             </ul>
             {pages > 1 && (
-              <Pager page={page} pages={pages} period={period.value} />
+              <Pager
+                page={page}
+                pages={pages}
+                href={(to) =>
+                  `/explore/popular?period=${period.value}&page=${to}`
+                }
+              />
             )}
           </>
         ) : (
@@ -73,42 +80,5 @@ export default async function Popular({ searchParams }: Props) {
         )}
       </div>
     </>
-  );
-}
-
-/** Previous and next page, and where in the pages this is. */
-function Pager({
-  page,
-  pages,
-  period,
-}: {
-  page: number;
-  pages: number;
-  period: Period;
-}) {
-  const link = (to: number, label: string, enabled: boolean) => (
-    <Link
-      href={`/explore/popular?period=${period}&page=${to}`}
-      aria-disabled={!enabled}
-      tabIndex={enabled ? undefined : -1}
-      className={cn(
-        buttonVariants({ variant: "secondary" }),
-        !enabled && "pointer-events-none opacity-50",
-      )}
-    >
-      {label}
-    </Link>
-  );
-  return (
-    <nav
-      aria-label="Pages"
-      className="mt-10 flex items-center justify-center gap-4"
-    >
-      {link(page - 1, "Previous", page > 1)}
-      <span className="text-sm text-muted-foreground tabular-nums">
-        Page {page} of {pages}
-      </span>
-      {link(page + 1, "Next", page < pages)}
-    </nav>
   );
 }

@@ -6,10 +6,12 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   PROFILE_COLUMNS,
+  avatarUrlOf,
   toArtistProfile,
   type ArtistProfile,
   type ProfileRow,
   type ProfileTile,
+  type PublicTile,
   type Visibility,
 } from "./profile";
 
@@ -119,32 +121,51 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
 
 const DAY = 24 * 60 * 60 * 1000;
 
+type PublicTileRow = TileRow & {
+  author: Pick<
+    ProfileRow,
+    | "username"
+    | "display_name"
+    | "avatar_kind"
+    | "avatar_path"
+    | "provider_avatar_url"
+  >;
+};
+
 /**
  * One page of everyone's arts published in the last `days` days, newest
- * first, and how many there are in all. Row-level security leaves out those
- * of private profiles.
+ * first, each with its author, and how many there are in all — in one
+ * request. Row-level security leaves out those of private profiles.
  */
 export async function listPublicTiles(
   page: number,
   pageSize: number,
   days: number,
-): Promise<{ tiles: ProfileTile[]; count: number }> {
+): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
   const from = (page - 1) * pageSize;
   const { data, count, error } = await supabase
     .from("tiles")
     .select(
-      "id, name, width, height, thumbnail, visibility, pin_order, updated_at",
+      "id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url)",
       { count: "exact" },
     )
     .eq("visibility", "public")
     .gte("published_at", new Date(Date.now() - days * DAY).toISOString())
     .order("published_at", { ascending: false })
     .range(from, from + pageSize - 1);
+  if (error) console.error("Couldn’t load public arts:", error.message);
   if (error || !data) return { tiles: [], count: 0 };
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map(toProfileTile),
+    tiles: (data as unknown as PublicTileRow[]).map((row) => ({
+      ...toProfileTile(row),
+      author: {
+        username: row.author.username,
+        name: row.author.display_name,
+        avatarUrl: avatarUrlOf(row.author),
+      },
+    })),
   };
 }
 
