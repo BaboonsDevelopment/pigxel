@@ -4,12 +4,13 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { toSummary, type CloudTileSummary } from "./cloud";
 
 /**
- * The signed-in person's most recent cloud tiles (up to `limit`) for
- * server-rendered pages; empty if unavailable.
+ * The signed-in person's most recent cloud tiles (up to `limit`, skipping
+ * the first `from`) for server-rendered pages; empty if unavailable.
  */
 export async function listCloudTilesOnServer(
   userId: string,
   limit = 200,
+  from = 0,
 ): Promise<CloudTileSummary[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
@@ -19,7 +20,8 @@ export async function listCloudTilesOnServer(
     // Others' public tiles are readable too; this list is only your own.
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
-    .limit(limit);
+    .order("id")
+    .range(from, from + limit - 1);
   // Also covers the tiles table not being set up yet.
   if (error || !data) return [];
   return data.map(toSummary);

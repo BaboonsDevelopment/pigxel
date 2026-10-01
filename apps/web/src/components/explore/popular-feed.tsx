@@ -4,20 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { loadPopularTiles } from "@/app/(app)/explore/actions";
 import type { Period } from "@/app/(app)/explore/constants";
 import type { PublicTile } from "@/lib/profile/profile";
+import { scrollParent } from "@/lib/scroll-parent";
 import { PopularCard } from "./popular-card/popular-card";
 import { SignInBanner } from "./sign-in-banner";
 
 /** How far below the visible part the next arts start loading, so scrolling never waits. */
 const PRELOAD = "1500px";
-
-/** The nearest ancestor that scrolls, or null for the window. */
-function scrollParent(el: HTMLElement | null): HTMLElement | null {
-  for (let node = el?.parentElement; node; node = node.parentElement) {
-    const { overflowY } = getComputedStyle(node);
-    if (overflowY === "auto" || overflowY === "scroll") return node;
-  }
-  return null;
-}
 
 /** Popular arts that keep loading as you scroll, until there are no more. */
 export function PopularFeed({
