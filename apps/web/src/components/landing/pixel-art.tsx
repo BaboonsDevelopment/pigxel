@@ -1,4 +1,6 @@
-import type { SVGProps } from "react";
+import Image from "next/image";
+import type { CSSProperties, SVGProps } from "react";
+import mascot from "../../../public/art/pigxel-mascot-sitting.png";
 
 /**
  * A sprite drawn from rows of characters, one per pixel: `.` is empty and
@@ -192,40 +194,40 @@ export const FLOWER = [
 ] as const;
 
 /**
- * Pigxel's pig face (the brand mark) as an animation frame: `lift` raises
- * it for the hop, `blink` closes its eyes.
+ * The mascot as one frame of a hop: `lift` raises it (in steps of 6% of its
+ * height) and the landing frame squashes a little, like a real bounce.
  */
-export function PigFrame({
+export function MascotFrame({
   lift = 0,
-  blink = false,
-  ...props
-}: { lift?: number; blink?: boolean } & SVGProps<SVGSVGElement>) {
+  squash = false,
+  className,
+  style,
+}: {
+  lift?: number;
+  squash?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      shapeRendering="crispEdges"
-      aria-hidden="true"
-      {...props}
-    >
-      <path fill="#2d2a32" opacity="0.12" d="M7 22h10v1H7Z" />
-      <g transform={`translate(0 ${-lift})`}>
-        <path fill="#d64a62" d="M3 3h6v3h6V3h6v15h-3v3H6v-3H3Z" />
-        <path fill="#ffa4b2" d="M5 5h3v4h8V5h3v12h-3v2H8v-2H5Z" />
-        <path
-          fill="#542a35"
-          d={blink ? "M7 12h2v1H7zm8 0h2v1h-2Z" : "M7 10h2v3H7zm8 0h2v3h-2Z"}
-        />
-        <path fill="#ef748d" d="M8 14h8v4H8Z" />
-        <path fill="#9e384e" d="M10 15h1v2h-1zm3 0h1v2h-1Z" />
-      </g>
-    </svg>
+    <span className={className} style={style} aria-hidden="true">
+      <Image
+        src={mascot}
+        alt=""
+        sizes="180px"
+        draggable={false}
+        style={{
+          transform: `translateY(${-lift * 6}%)${squash ? " scale(1.05, 0.94)" : ""}`,
+          transformOrigin: "50% 100%",
+        }}
+      />
+    </span>
   );
 }
 
-/** The four frames of the pig's hop, as the demos play them. */
-export const PIG_FRAMES = [
-  { lift: 0, blink: false },
-  { lift: 1, blink: false },
-  { lift: 2, blink: true },
-  { lift: 1, blink: false },
+/** The four frames of the mascot's hop, as the demos play them. */
+export const HOP_FRAMES = [
+  { lift: 0, squash: true },
+  { lift: 1 },
+  { lift: 2 },
+  { lift: 1 },
 ] as const;

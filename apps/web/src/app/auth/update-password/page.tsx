@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
-import { AuthPage } from "@/components/auth-page";
+import { AuthPage } from "@/components/auth/auth-page";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { PasswordForm } from "./password-form";

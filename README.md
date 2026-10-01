@@ -66,7 +66,7 @@ The session is kept in cookies and refreshed by `src/proxy.ts` on every page, so
 
 Every account gets a profile (`supabase/migrations/20260929120000_profiles.sql`) with a username, display name, description (up to 200 characters), up to three links, an avatar and a public/private setting. `/u/<username>` shows the profile, its art count, pinned arts (up to six) and published arts; `/profile` goes to your own. Tiles in Pigxel cloud stay private until published from the profile. `/settings` has Profile, Account (email, password, connected Google/Apple sign-in, Google Drive, sign-out), Subscription and Privacy tabs.
 
-Apple sign-in is optional: it needs an Apple Developer account, the Apple provider enabled in Supabase, and `APPLE_CLIENT_ID` in `apps/web/.env.local`. Without it, the Apple buttons stay hidden.
+Apple sign-in is optional: it needs an Apple Developer account, the Apple provider enabled in Supabase, and `APPLE_CLIENT_ID` in `apps/web/.env.local`. The login page always shows the Google and Apple buttons; one whose client ID isn’t set shows as unavailable ("isn’t set up yet").
 
 Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs).
 

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { buttonVariants } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { AuthPage } from "@/components/auth-page";
+import Link from "next/link";
+import { AuthPage } from "@/components/auth/auth-page";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { HOME_PATH } from "@/lib/auth/routes";
@@ -14,11 +14,6 @@ import type { AuthMode } from "@/lib/auth/types";
 
 export const metadata: Metadata = { title: "Log in · Pigxel" };
 
-const providerButton = buttonVariants({
-  variant: "secondary",
-  size: "lg",
-  className: "w-full gap-3",
-});
 export const dynamic = "force-dynamic";
 
 export default async function Login({
@@ -38,10 +33,10 @@ export default async function Login({
   const authMode: AuthMode =
     mode === "signup" || mode === "forgot" ? mode : "login";
   const copy = {
-    login: ["Welcome back.", "Log in to your Pigxel account."],
+    login: ["Welcome back", undefined],
     signup: [
-      "Make yourself at home.",
-      "Create your Pigxel account with your email and password.",
+      "Create your free account",
+      "Draw, animate and keep your pixel art. No credit card needed.",
     ],
     forgot: [
       "Forgot your password?",
@@ -59,37 +54,98 @@ export default async function Login({
               : "This link is invalid or has expired. Request a new password reset link below."}
         </FormMessage>
       )}
-      {authMode !== "forgot" && (google || apple) && (
+      {authMode !== "forgot" && (
         <>
-          {google && (
-            <>
-              <a href={connectDriveUrl(HOME_PATH)} className={providerButton}>
-                <GoogleLogo />
-                Continue with Google
-              </a>
-              <FormMessage className="mt-2 text-center text-xs">
-                Also connects your Google Drive for saving tiles.
-              </FormMessage>
-            </>
-          )}
-          {apple && (
-            <a
-              href={`/auth/apple?next=${encodeURIComponent(HOME_PATH)}`}
-              className={`${providerButton} ${google ? "mt-4" : ""}`}
-            >
-              <AppleLogo />
-              Continue with Apple
-            </a>
-          )}
-          <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="grid grid-cols-2 gap-3">
+            <ProviderButton
+              href={google ? connectDriveUrl(HOME_PATH) : undefined}
+              logo={<GoogleLogo />}
+              name="Google"
+              hint="Also connects your Google Drive for saving tiles."
+            />
+            <ProviderButton
+              href={
+                apple
+                  ? `/auth/apple?next=${encodeURIComponent(HOME_PATH)}`
+                  : undefined
+              }
+              logo={<AppleLogo />}
+              name="Apple"
+            />
+          </div>
+          <div className="my-6 flex items-center gap-3 text-sm text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            or with email
+            or
             <span className="h-px flex-1 bg-border" />
           </div>
         </>
       )}
       <AuthForm key={authMode} mode={authMode} configured={configured} />
+      {authMode !== "forgot" && (
+        <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
+          By continuing, you agree to Pigxel’s{" "}
+          <Link
+            href="/terms"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/privacy"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      )}
     </AuthPage>
+  );
+}
+
+const providerClassName =
+  "inline-flex h-11 items-center justify-center gap-2.5 rounded-full bg-zinc-100 text-sm font-medium text-foreground transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * A quiet sign-in button: the provider's logo and name. Without an `href`
+ * the provider isn't set up (no client ID in the environment), so it shows
+ * dimmed and can't be pressed; hovering says why.
+ */
+function ProviderButton({
+  href,
+  logo,
+  name,
+  hint,
+}: {
+  href?: string;
+  logo: React.ReactNode;
+  name: string;
+  hint?: string;
+}) {
+  const label = `Continue with ${name}`;
+  return href ? (
+    <a
+      href={href}
+      className={providerClassName}
+      aria-label={label}
+      title={hint}
+    >
+      {logo}
+      {name}
+    </a>
+  ) : (
+    <span title={`${name} sign-in isn’t set up yet`} className="grid">
+      <button
+        type="button"
+        disabled
+        className={providerClassName}
+        aria-label={`${label} (not set up yet)`}
+      >
+        {logo}
+        {name}
+      </button>
+    </span>
   );
 }
 
@@ -98,7 +154,7 @@ function AppleLogo() {
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="size-5"
+      className="size-[18px]"
       fill="currentColor"
     >
       <path d="M16.4 12.7c0-2.6 2.1-3.8 2.2-3.9a4.8 4.8 0 0 0-3.8-2c-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9a5 5 0 0 0-4.2 2.6c-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.6-4.1ZM13.9 5.1a4.6 4.6 0 0 0 1.1-3.3 4.7 4.7 0 0 0-3.1 1.6 4.4 4.4 0 0 0-1.1 3.2c1.2.1 2.3-.6 3.1-1.5Z" />
@@ -108,7 +164,7 @@ function AppleLogo() {
 
 function GoogleLogo() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[18px]">
       <path
         fill="#4285F4"
         d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8Z"

@@ -36,6 +36,7 @@ export function AuthForm({
           name="email"
           type="email"
           inputSize="lg"
+          className="h-12 rounded-xl"
           defaultValue={state.email}
           placeholder="you@example.com"
           autoComplete="email"
@@ -55,6 +56,7 @@ export function AuthForm({
             name="password"
             type="password"
             inputSize="lg"
+            className="h-12 rounded-xl"
             autoComplete={signup ? "new-password" : "current-password"}
             aria-describedby={signup ? "password-hint" : undefined}
             minLength={signup ? 8 : 1}
@@ -79,7 +81,11 @@ export function AuthForm({
           Sign-in is not available yet. Please try again later.
         </FormMessage>
       )}
-      <Button size="lg" className="w-full" disabled={pending || !configured}>
+      <Button
+        size="lg"
+        className="h-12 w-full rounded-full"
+        disabled={pending || !configured}
+      >
         {pending ? "Please wait…" : labels[mode]}
       </Button>
       <p className="text-center text-sm text-muted-foreground">
@@ -88,6 +94,13 @@ export function AuthForm({
             New to Pigxel?{" "}
             <Link className={textLinkClassName} href="/login?mode=signup">
               Create an account
+            </Link>
+          </>
+        ) : signup ? (
+          <>
+            Already have an account?{" "}
+            <Link className={textLinkClassName} href="/login">
+              Log in
             </Link>
           </>
         ) : (

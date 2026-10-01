@@ -1,0 +1,72 @@
+/*
+ * Page transitions for <PageTransition> (components/page-transition.tsx).
+ * Global because view transition pseudo-elements live on the document.
+ */
+
+/* Clicks during a transition reach the page, not the overlay. */
+::view-transition {
+  pointer-events: none;
+}
+
+/* Everything that isn't a page or the chrome trades places quickly. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+}
+
+/* The public header and the app sidebar stay still while pages change. */
+::view-transition-group(site-header),
+::view-transition-group(app-sidebar) {
+  z-index: 100;
+  animation: none;
+}
+
+::view-transition-old(site-header),
+::view-transition-old(app-sidebar) {
+  display: none;
+}
+
+::view-transition-new(site-header),
+::view-transition-new(app-sidebar) {
+  animation: none;
+}
+
+/* The old page leaves fast; the new one rises in a moment later. */
+::view-transition-old(.page-exit) {
+  animation: 140ms ease-in both page-fade reverse;
+}
+
+::view-transition-new(.page-enter) {
+  animation:
+    260ms cubic-bezier(0.2, 0.7, 0.2, 1) 80ms both page-fade,
+    420ms cubic-bezier(0.2, 0.7, 0.2, 1) both page-rise;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes page-rise {
+  from {
+    translate: 0 14px;
+  }
+  to {
+    translate: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

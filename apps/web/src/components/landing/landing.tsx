@@ -2,13 +2,14 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/brand";
+import { PublicHeader } from "@/components/public-header/public-header";
 import { LEGAL_LINKS } from "@/lib/legal";
 import { ART, STRIP, type Art } from "./art";
 import { ArtWall } from "./art-wall";
 import { CountUp } from "./count-up";
 import { AiDemo, AnimateDemo, ExportDemo } from "./demos";
 import { FeatureTabs } from "./feature-tabs";
-import { geist, geistPixel } from "./fonts";
+import { geist, geistPixel } from "@/lib/fonts";
 import { ICONS, PixelSprite } from "./pixel-art";
 import { PixelPlayground } from "./pixel-playground";
 import styles from "./landing.module.css";
@@ -140,31 +141,14 @@ export function Landing() {
         Skip to content
       </a>
 
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <Brand />
-          <nav aria-label="Main" className={styles.nav}>
-            <Link href="/explore">Explore</Link>
-            <a href="#features">Features</a>
-            <Link href="/pricing">Pricing</Link>
-            <a href="#faq">FAQ</a>
-          </nav>
-          <div className={styles.headerActions}>
-            <Link href="/login" className={styles.headerLogin}>
-              Log in
-            </Link>
-            <Link
-              href="/login?mode=signup"
-              className={`${styles.button} ${styles.buttonDark} ${styles.buttonSmall}`}
-            >
-              Start for free
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main id="main">
-        <section className={styles.hero} aria-labelledby="hero-heading">
+        <section
+          className={styles.hero}
+          aria-labelledby="hero-heading"
+          data-header-reveal
+        >
           <a
             href="#features"
             className={`${styles.badge} ${styles.rise}`}
