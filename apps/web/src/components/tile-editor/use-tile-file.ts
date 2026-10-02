@@ -11,6 +11,7 @@ import {
 import {
   PigxelFileError,
   pigxelFileName,
+  safeFileBase,
   serializePigxel,
   type PigxelDocument,
 } from "@/lib/pigxel-file/format";
@@ -19,7 +20,13 @@ import {
   saveDriveFile,
   type DriveFile,
 } from "@/lib/pigxel-file/google-drive";
-import { downloadPigxel } from "@/lib/pigxel-file/local";
+import {
+  asepriteBaseName,
+  isAsepriteFile,
+  readAseprite,
+  writeAseprite,
+} from "@/lib/pigxel-file/aseprite";
+import { downloadAseprite, downloadPigxel } from "@/lib/pigxel-file/local";
 import {
   LOCATION_LABELS,
   type CloudTile,
@@ -202,19 +209,25 @@ export function useTileFile({
 
   const openFromComputer = () => fileInput.current?.click();
 
-  // A picture (PNG, GIF, JPEG, …) opens as a new tile; anything else is read
-  // as a .pigxel file.
+  // A picture (PNG, GIF, JPEG, …) or an Aseprite file opens as a new tile;
+  // anything else is read as a .pigxel file.
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
     void run(async () =>
       onOpen(
-        isImageFile(file)
+        isAsepriteFile(file.name)
           ? draftFromDocument(
               userId,
-              await documentFromImage(file),
-              imageBaseName(file.name),
+              readAseprite(new Uint8Array(await file.arrayBuffer())),
+              asepriteBaseName(file.name),
             )
-          : draftFromFile(userId, await file.text(), file.name, null),
+          : isImageFile(file)
+            ? draftFromDocument(
+                userId,
+                await documentFromImage(file),
+                imageBaseName(file.name),
+              )
+            : draftFromFile(userId, await file.text(), file.name, null),
       ),
     );
   };
@@ -224,6 +237,16 @@ export function useTileFile({
 
   const openCloudTile = (picked: CloudTile) =>
     void run(async () => onOpen(await draftForCloudTile(userId, picked)));
+
+  /** Downloads the tile as a .aseprite file, to open in Aseprite. */
+  const downloadAsAseprite = () =>
+    void run(async () => {
+      downloadAseprite(name, writeAseprite(currentImage()));
+      setStatus({
+        tone: "info",
+        text: `Downloaded ${safeFileBase(name)}.aseprite`,
+      });
+    });
 
   const download = () =>
     void run(async () => {
@@ -287,6 +310,7 @@ export function useTileFile({
     openDriveFile,
     openCloudTile,
     download,
+    downloadAsAseprite,
     saveToCloud: () => saveNow("cloud"),
     saveToDrive: () => saveNow("drive"),
     save,

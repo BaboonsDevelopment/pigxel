@@ -490,7 +490,7 @@ export function Editor({
       {dropping && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10 ring-4 ring-primary/40 ring-inset">
           <p className="rounded-xl bg-background px-5 py-3 text-sm font-medium shadow-lg">
-            Drop a picture or a .pigxel file
+            Drop a picture, a .pigxel or an .aseprite file
           </p>
         </div>
       )}

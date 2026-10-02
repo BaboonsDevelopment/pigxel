@@ -13,6 +13,7 @@ import { cn } from "@pigxel/ui/lib/utils";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
+import { ASEPRITE_EXTENSIONS } from "@/lib/pigxel-file/aseprite";
 import type { OpenSource } from "../constants";
 import { useModifierLabel } from "../use-modifier-label";
 import type { TileFile } from "../use-tile-file";
@@ -74,7 +75,7 @@ export function EditorHeader({
               onSelect: () => router.push("/tiles/new"),
             },
             {
-              // A .pigxel file, or a PNG, GIF or JPEG as a new tile.
+              // A .pigxel file, or a picture or .aseprite file as a new tile.
               label: "Open from your computer…",
               shortcut: `${mod}O`,
               onSelect: file.openFromComputer,
@@ -116,6 +117,10 @@ export function EditorHeader({
               shortcut: file.location ? undefined : `${mod}S`,
               onSelect: file.download,
             },
+            {
+              label: "Download .aseprite",
+              onSelect: file.downloadAsAseprite,
+            },
           ],
           [
             {
@@ -151,7 +156,7 @@ export function EditorHeader({
       <input
         ref={fileInput}
         type="file"
-        accept={`${PIGXEL_EXTENSION},application/json,${IMAGE_FILE_TYPES}`}
+        accept={`${PIGXEL_EXTENSION},application/json,${IMAGE_FILE_TYPES},${ASEPRITE_EXTENSIONS.join(",")}`}
         className="hidden"
         onChange={(e) => {
           file.onFileChosen(e.target.files?.[0]);
