@@ -50,7 +50,7 @@ export function pixelScale(anim: DecodedAnimation): number {
 }
 
 /** Every frame shrunk by a whole `k`, one pixel per k × k block. */
-function unscaled(anim: DecodedAnimation, k: number): DecodedAnimation {
+export function unscaled(anim: DecodedAnimation, k: number): DecodedAnimation {
   if (k === 1) return anim;
   const w = anim.w / k;
   const h = anim.h / k;
@@ -136,6 +136,55 @@ async function readStill(file: File): Promise<DecodedAnimation> {
  * enlarged comes back at its own size; anything still bigger than the
  * largest tile is shrunk to fit.
  */
+/** Files in the order their names count up: walk_2 before walk_10. */
+export function sequenceOrder<T extends { name: string }>(files: T[]): T[] {
+  return [...files].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
+  );
+}
+
+/**
+ * A name for a tile made of numbered files: what their names share, without
+ * the number and the separator before it ("walk_01.png" … "walk_08.png" make
+ * "walk"); the first file's name when they share nothing.
+ */
+export function sequenceName(names: string[]) {
+  const bases = names.map(imageBaseName);
+  let shared = bases[0] ?? "";
+  for (const base of bases.slice(1))
+    while (!base.startsWith(shared)) shared = shared.slice(0, -1);
+  return shared.replace(/[\s_\-.#]*\d*$/, "").trim() || bases[0] || "Untitled";
+}
+
+/**
+ * Several picture files as the frames of one new tile, in the order their
+ * names count up (every frame of a GIF in turn). Pictures of different sizes
+ * sit at the top-left of a frame as big as the largest; then, as for one
+ * picture, enlarged pixel art comes back to its own size and anything bigger
+ * than the largest tile is shrunk to fit.
+ */
+export async function documentFromSequence(
+  files: File[],
+): Promise<PigxelDocument> {
+  const read = await Promise.all(sequenceOrder(files).map(readImage));
+  const w = Math.max(...read.map((a) => a.w));
+  const h = Math.max(...read.map((a) => a.h));
+  const frames = read.flatMap((anim) =>
+    anim.frames.map(({ rgba, duration }) => {
+      if (anim.w === w && anim.h === h) return { rgba, duration };
+      const out = new Uint8ClampedArray(w * h * 4);
+      for (let y = 0; y < anim.h; y++)
+        out.set(rgba.subarray(y * anim.w * 4, (y + 1) * anim.w * 4), y * w * 4);
+      return { rgba: out, duration };
+    }),
+  );
+  const anim = { w, h, frames };
+  return documentFromFrames(fitted(unscaled(anim, pixelScale(anim))));
+}
+
 export async function documentFromImage(file: File): Promise<PigxelDocument> {
   const anim = await readImage(file);
   return documentFromFrames(fitted(unscaled(anim, pixelScale(anim))));
@@ -152,6 +201,14 @@ export async function pictureForTile(
   const full = await readImage(file);
   const first = { ...full, frames: full.frames.slice(0, 1) };
   const anim = fitted(unscaled(first, pixelScale(first)), size);
+  return { rgba: anim.frames[0]!.rgba, w: anim.w, h: anim.h };
+}
+
+/** A picture file's first frame at its full size, e.g. a sprite sheet to cut up. */
+export async function readPicture(
+  file: File,
+): Promise<{ rgba: Uint8ClampedArray; w: number; h: number }> {
+  const anim = await readImage(file);
   return { rgba: anim.frames[0]!.rgba, w: anim.w, h: anim.h };
 }
 

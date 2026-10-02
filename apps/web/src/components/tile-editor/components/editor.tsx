@@ -45,7 +45,16 @@ import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
-import { isImageFile, pictureForTile } from "@/lib/pigxel-file/import-image";
+import {
+  IMAGE_FILE_TYPES,
+  documentFromFrames,
+  imageBaseName,
+  isImageFile,
+  pictureForTile,
+  readPicture,
+  sequenceOrder,
+} from "@/lib/pigxel-file/import-image";
+import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
 import type { Slice } from "@/lib/slices/slices";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
@@ -69,6 +78,9 @@ const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
 });
 const ExportDialog = dynamic(() => import("./export-dialog"), { ssr: false });
+const ImportSheetDialog = dynamic(() => import("./import-sheet-dialog"), {
+  ssr: false,
+});
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -84,6 +96,13 @@ export function Editor({
   const router = useRouter();
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
+  // A sprite sheet picked to cut into a new tile's frames.
+  const sheetInput = useRef<HTMLInputElement>(null);
+  const [sheet, setSheet] = useState<{
+    name: string;
+    picture: Picture;
+    scale: number;
+  } | null>(null);
   // Kept while the tile is open, so Export comes back with the last choices.
   const [exportSettings, setExportSettings] =
     useState<ExportSettings>(DEFAULT_EXPORT);
@@ -380,7 +399,25 @@ export function Editor({
     e.preventDefault();
     dragDepth.current = 0;
     setDropping(false);
-    const dropped = e.dataTransfer.files[0];
+    const all = [...e.dataTransfer.files];
+    // Several pictures at once: the frames of an animation, as numbered.
+    if (all.length > 1 && all.every(isImageFile)) {
+      const open = await choiceDialog({
+        title: `Open ${all.length} pictures as frames?`,
+        message: `They become the frames of a new tile, in the order their names count up (${sequenceOrder(
+          all,
+        )
+          .slice(0, 3)
+          .map((f) => f.name)
+          .join(
+            ", ",
+          )}${all.length > 3 ? "…" : ""}). This tile stays saved in My projects.`,
+        choices: [{ value: "open", label: "Open as animation" }],
+      });
+      if (open) file.openFrames(all);
+      return;
+    }
+    const dropped = all[0];
     if (!dropped) return;
     const at = canvas.current?.tilePointAt(e.clientX, e.clientY) ?? null;
     if (!isImageFile(dropped)) {
@@ -503,6 +540,7 @@ export function Editor({
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
+        onImportSheet={() => sheetInput.current?.click()}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "View", sections: viewMenu },
@@ -590,6 +628,40 @@ export function Editor({
           draftId={draft.id}
           file={file}
           onClose={() => setOpening(null)}
+        />
+      )}
+      <input
+        ref={sheetInput}
+        type="file"
+        accept={IMAGE_FILE_TYPES}
+        className="hidden"
+        onChange={async (e) => {
+          const chosen = e.target.files?.[0];
+          // Lets the same file be chosen again later.
+          e.target.value = "";
+          if (!chosen) return;
+          try {
+            const native = nativeSheet(await readPicture(chosen));
+            setSheet({ name: imageBaseName(chosen.name), ...native });
+          } catch {
+            await choiceDialog({
+              title: "Couldn’t read the picture",
+              message: `“${chosen.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
+              choices: [],
+              cancelLabel: "OK",
+            });
+          }
+        }}
+      />
+      {sheet && (
+        <ImportSheetDialog
+          name={sheet.name}
+          picture={sheet.picture}
+          scale={sheet.scale}
+          onImport={(frames) =>
+            file.openDocument(documentFromFrames(frames), sheet.name)
+          }
+          onClose={() => setSheet(null)}
         />
       )}
       {exporting && (

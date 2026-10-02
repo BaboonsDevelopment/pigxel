@@ -40,8 +40,10 @@ import {
 } from "@/lib/pigxel-file/open-tile";
 import {
   documentFromImage,
+  documentFromSequence,
   imageBaseName,
   isImageFile,
+  sequenceName,
 } from "@/lib/pigxel-file/import-image";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 
@@ -232,6 +234,24 @@ export function useTileFile({
     );
   };
 
+  /** Opens numbered picture files (walk_01.png … walk_08.png) as the frames of a new tile. */
+  const openFrames = (files: File[]) => {
+    if (!files.length) return;
+    void run(async () =>
+      onOpen(
+        draftFromDocument(
+          userId,
+          await documentFromSequence(files),
+          sequenceName(files.map((f) => f.name)),
+        ),
+      ),
+    );
+  };
+
+  /** Opens a tile made here (e.g. from a sprite sheet) as a new tile called `tileName`. */
+  const openDocument = (doc: PigxelDocument, tileName: string) =>
+    void run(async () => onOpen(draftFromDocument(userId, doc, tileName)));
+
   const openDriveFile = (picked: DriveFile) =>
     void run(async () => onOpen(await draftForDriveFile(userId, picked)));
 
@@ -307,6 +327,8 @@ export function useTileFile({
         : status,
     onFileChosen,
     openFromComputer,
+    openDocument,
+    openFrames,
     openDriveFile,
     openCloudTile,
     download,

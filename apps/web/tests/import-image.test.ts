@@ -5,6 +5,8 @@ import {
   documentFromFrames,
   imageBaseName,
   pixelScale,
+  sequenceName,
+  sequenceOrder,
 } from "@/lib/pigxel-file/import-image";
 import { celOf } from "@/lib/sprite/frames";
 
@@ -84,5 +86,26 @@ describe("a picture as a tile", () => {
   it("names the tile after the file", () => {
     expect(imageBaseName("hero walk.GIF")).toBe("hero walk");
     expect(imageBaseName("tree.png")).toBe("tree");
+  });
+});
+
+describe("pictures as frames", () => {
+  it("puts numbered files in counting order", () => {
+    const files = ["walk_10.png", "walk_2.png", "Walk_1.png"].map((name) => ({
+      name,
+    }));
+    expect(sequenceOrder(files).map((f) => f.name)).toEqual([
+      "Walk_1.png",
+      "walk_2.png",
+      "walk_10.png",
+    ]);
+  });
+  it("names the tile after what the files share, without the number", () => {
+    expect(sequenceName(["walk_01.png", "walk_02.png", "walk_08.png"])).toBe(
+      "walk",
+    );
+    expect(sequenceName(["hero run 1.gif", "hero run 2.gif"])).toBe("hero run");
+    expect(sequenceName(["frame1.png", "frame2.png"])).toBe("frame");
+    expect(sequenceName(["cat.png", "dog.png"])).toBe("cat");
   });
 });

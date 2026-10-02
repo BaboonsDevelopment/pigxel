@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import {
   InputGroup,
@@ -37,6 +37,7 @@ export function EditorHeader({
   onOpenFrom,
   onConnectDrive,
   onExport,
+  onImportSheet,
   menus,
 }: {
   file: TileFile;
@@ -47,10 +48,13 @@ export function EditorHeader({
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
   onExport: () => void;
+  /** Picks a sprite sheet to cut into the frames of a new tile. */
+  onImportSheet: () => void;
   /** More menus after File, e.g. Edit and View. */
   menus: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
+  const framesInput = useRef<HTMLInputElement>(null);
   const mod = useModifierLabel();
 
   return (
@@ -79,6 +83,14 @@ export function EditorHeader({
               label: "Open from your computer…",
               shortcut: `${mod}O`,
               onSelect: file.openFromComputer,
+            },
+            {
+              label: "Open pictures as frames…",
+              onSelect: () => framesInput.current?.click(),
+            },
+            {
+              label: "Import sprite sheet…",
+              onSelect: onImportSheet,
             },
             {
               label: "Open from Pigxel cloud…",
@@ -161,6 +173,18 @@ export function EditorHeader({
         onChange={(e) => {
           file.onFileChosen(e.target.files?.[0]);
           // Lets the same file be chosen again later.
+          e.target.value = "";
+        }}
+      />
+      {/* Numbered pictures (walk_01.png …) opened as one animation. */}
+      <input
+        ref={framesInput}
+        type="file"
+        multiple
+        accept={IMAGE_FILE_TYPES}
+        className="hidden"
+        onChange={(e) => {
+          file.openFrames([...(e.target.files ?? [])]);
           e.target.value = "";
         }}
       />
