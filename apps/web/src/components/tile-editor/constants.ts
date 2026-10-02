@@ -9,6 +9,8 @@ export type EditorProps = {
   drive: DriveStatus;
   /** Connecting Google Drive was cancelled or failed on the way back. */
   driveError?: boolean;
+  /** The tutorial whose interactive guide is open, from the URL. */
+  guide?: string;
 };
 
 export type ToolId = PaintTool;

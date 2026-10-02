@@ -10,9 +10,9 @@ import pig from "../../../public/art/pigxel-mascot-sitting.png";
 import { AccountMenu } from "./account-menu";
 import {
   BookIcon,
+  CubeIcon,
   FolderIcon,
   HomeIcon,
-  SparklesIcon,
   TelescopeIcon,
 } from "./icons";
 import { PatchNotesCard } from "./patch-notes-card";
@@ -45,8 +45,18 @@ const MAIN: NavItem[] = [
     href: "/explore",
     match: (p) => p.startsWith("/explore"),
   },
-  { label: "AI Studio", icon: <SparklesIcon /> },
-  { label: "Tutorials", icon: <BookIcon /> },
+  {
+    label: "Assets",
+    icon: <CubeIcon />,
+    href: "/assets",
+    match: (p) => p === "/assets",
+  },
+  {
+    label: "Tutorials",
+    icon: <BookIcon />,
+    href: "/tutorials",
+    match: (p) => p.startsWith("/tutorials"),
+  },
 ];
 
 /**
