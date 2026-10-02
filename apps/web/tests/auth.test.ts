@@ -25,7 +25,9 @@ vi.mock("@/lib/supabase/server", () => ({
     from: () => ({
       select: () => ({
         eq: () => ({
-          order: () => ({ limit: async () => ({ data: [], error: null }) }),
+          order: () => ({
+            order: () => ({ range: async () => ({ data: [], error: null }) }),
+          }),
         }),
       }),
     }),

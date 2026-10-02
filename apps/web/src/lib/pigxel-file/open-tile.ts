@@ -9,6 +9,11 @@ export function editorUrl(draftId: string) {
   return `/tiles/edit?id=${encodeURIComponent(draftId)}`;
 }
 
+/** The editor for a draft with a tutorial's interactive guide open. */
+export function guideUrl(draftId: string, slug: string) {
+  return `${editorUrl(draftId)}&guide=${encodeURIComponent(slug)}`;
+}
+
 const FULL = new PigxelFileError(
   "This browser can’t keep more tiles. Remove some from My projects, or save them to Pigxel cloud.",
 );

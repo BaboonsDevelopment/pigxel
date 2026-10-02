@@ -1,4 +1,5 @@
 import type { Bitmap, Size } from "./bitmap";
+import { cropToContent } from "./steps/crop-to-content";
 import { cutOutBackground } from "./steps/cut-out-background";
 import { recoverPixelGrid } from "./steps/recover-pixel-grid";
 import { removeStrayPixels } from "./steps/remove-stray-pixels";
@@ -17,6 +18,10 @@ export const GENERATED_PICTURE_STEPS: Step[] = [
     apply: cutOutBackground,
   },
   {
+    rule: "Crop the empty space around the subject, so it fills the area",
+    apply: cropToContent,
+  },
+  {
     rule: "Recover the model's own pixel grid, one colour per cell",
     apply: recoverPixelGrid,
   },
@@ -29,6 +34,14 @@ export const GENERATED_PICTURE_STEPS: Step[] = [
     apply: removeStrayPixels,
   },
 ];
+
+/**
+ * How a redrawn picture becomes tile pixels: the same, but not cropped, as it
+ * keeps the framing of the part it replaces.
+ */
+export const REDRAWN_PICTURE_STEPS: Step[] = GENERATED_PICTURE_STEPS.filter(
+  (step) => step.apply !== cropToContent,
+);
 
 export const runSteps = (image: Bitmap, target: Size, steps: Step[]) =>
   steps.reduce((current, step) => step.apply(current, target), image);

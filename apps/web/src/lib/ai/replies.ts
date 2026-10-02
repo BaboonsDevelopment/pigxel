@@ -1,7 +1,7 @@
+import { MAX_SET_ITEMS } from "./constants";
 import { AiError } from "./errors";
 import type {
   AnimationReply,
-  AnimationReviewReply,
   EditReply,
   EditReview,
   PlacementReply,
@@ -45,6 +45,7 @@ export function readRoute(text: string, latest: string): Route {
       count: 1,
       name: "",
       frames: 0,
+      items: [],
     };
   const count = Math.round(Number(route?.count));
   const frames = Math.round(Number(route?.frames));
@@ -55,6 +56,17 @@ export function readRoute(text: string, latest: string): Route {
     count: count >= 1 ? Math.min(count, MAX_COUNT) : 1,
     name: (route?.name ?? "").trim().slice(0, 40),
     frames: frames >= 1 ? frames : 0,
+    items: (Array.isArray(route?.items) ? route.items : [])
+      .map((item) => ({
+        subject: String(item?.subject ?? "")
+          .trim()
+          .slice(0, 300),
+        name: String(item?.name ?? "")
+          .trim()
+          .slice(0, 40),
+      }))
+      .filter((item) => item.subject)
+      .slice(0, MAX_SET_ITEMS),
   };
 }
 
@@ -106,16 +118,6 @@ export function readEditReview(text: string): EditReview {
     ok: reply?.ok !== false || !instruction,
     problem: String(reply?.problem ?? ""),
     instruction,
-  };
-}
-
-/** Checked in detail by clampAnimationFixes (helpers.ts). */
-export function readAnimationReview(text: string): AnimationReviewReply {
-  const reply = parseJson<AnimationReviewReply>(text);
-  return {
-    ok: reply?.ok !== false,
-    problem: String(reply?.problem ?? ""),
-    fixes: Array.isArray(reply?.fixes) ? reply.fixes : [],
   };
 }
 

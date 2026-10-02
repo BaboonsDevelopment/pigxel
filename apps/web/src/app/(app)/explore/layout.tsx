@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
-import { ScaledPage } from "@/components/scaled-page";
+import { Page } from "@pigxel/ui/components/page";
 
 export default function ExploreLayout({ children }: { children: ReactNode }) {
-  return <ScaledPage>{children}</ScaledPage>;
+  return (
+    <div className="min-h-full bg-background">
+      <Page className="max-w-[100rem] px-5 pt-3 pb-12 md:px-8 md:pt-2 xl:px-10">
+        {children}
+      </Page>
+    </div>
+  );
 }

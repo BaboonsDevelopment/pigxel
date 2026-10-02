@@ -4,12 +4,14 @@ import {
   MAX_FRAMES,
   MAX_HISTORY,
   MAX_REFERENCES,
+  MAX_SET_ITEMS,
   PLACEMENT_HISTORY,
+  SMALL_IMAGE_MAX_SIDE,
 } from "@/lib/ai/constants";
-import { toUserMessage } from "@/lib/ai/errors";
+import { creditBalance, creditsOf } from "@/lib/ai/credits";
+import { AiError, toUserMessage } from "@/lib/ai/errors";
 import {
   buildAnimationPrompt,
-  buildAnimationReviewPrompt,
   buildComposePrompt,
   buildEditReviewPrompt,
   buildEditSystemPrompt,
@@ -18,19 +20,18 @@ import {
   buildPlacementPrompt,
   buildPlanPrompt,
   buildRedrawPrompt,
+  buildSetPrompt,
   buildSheetPrompt,
-  clampAnimationFixes,
+  buildSheetRedrawPrompt,
   clampAnimationPlan,
   clampRect,
   closestAspectRatio,
-  refitPlan,
   sheetLayout,
   type SheetLayout,
 } from "@/lib/ai/helpers";
 import { getAiProvider } from "@/lib/ai/provider";
 import type {
   AiResult,
-  AnimationFixes,
   AnimationPlan,
   ChatMessage,
   EditPlan,
@@ -42,6 +43,7 @@ import type {
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 
 const MAX_GRID = 256;
 /** A PNG data URL of at most ~1.5 MB, capturing its base64 payload. */
@@ -54,8 +56,14 @@ const MAX_GRID_TEXT = 100_000;
 
 const validSize = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
 
+/**
+ * Runs one AI action, if the person has tokens left; any failure becomes a
+ * message for them.
+ */
 async function attempt<T>(label: string, run: () => Promise<T>) {
   try {
+    if ((await creditBalance()).left <= 0)
+      throw new AiError("no_credits", "No AI tokens left.");
     return { ok: true, value: await run() } as const;
   } catch (e) {
     console.error(`[ai] ${label} failed:`, e);
@@ -90,6 +98,7 @@ export async function sendMessage(
         count: route.count,
         name: route.name,
         frames: route.frames,
+        items: route.items,
       },
     };
   });
@@ -120,7 +129,7 @@ export async function generateImage(
     const { mimeType, base64 } = await getAiProvider().generate(
       buildImagePrompt(subject, width, height, pictures.length > 0),
       closestAspectRatio(width, height),
-      true,
+      Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
       pictures.map((p) => ({ mimeType: p![1]!, base64: p![2]! })),
     );
     return `data:${mimeType};base64,${base64}`;
@@ -161,6 +170,7 @@ export async function redrawArea(
       buildRedrawPrompt(request, width, height),
       { mimeType: "image/png", base64: png },
       closestAspectRatio(width, height),
+      Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
     );
     return `data:${mimeType};base64,${base64}`;
   });
@@ -395,14 +405,7 @@ export async function planAnimation(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
-    return clampAnimationPlan(
-      reply,
-      width,
-      height,
-      layers.length,
-      args.frames,
-      objects.length,
-    );
+    return clampAnimationPlan(reply, width, height, layers.length, args.frames);
   });
 }
 
@@ -434,41 +437,80 @@ export async function reviewEdit(args: {
 }
 
 /**
- * Looks at an animation before it is applied: `frames` is a PNG data URL of
- * its frames side by side, `plan` what they were drawn from. Free (text model).
+ * Draws several different things in one picture (paid once), one per cell of
+ * a sheet, each cell sized for `cellW × cellH` tile pixels. Returns the
+ * picture and its grid.
  */
-export async function reviewAnimation(args: {
-  request: string;
-  plan: AnimationPlan;
-  frames: string;
-  width: number;
-  height: number;
-}): Promise<AiResult<AnimationFixes>> {
+export async function generateSet(args: {
+  subjects: string[];
+  cellW: number;
+  cellH: number;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
-  const { width, height } = args;
-  const png = PNG_DATA_URL.exec(args.frames)?.[1];
+  const subjects = Array.isArray(args.subjects) ? args.subjects : [];
   const valid =
-    typeof args.request === "string" &&
-    png &&
-    validSize(width) &&
-    validSize(height) &&
-    Array.isArray(args.plan?.tracks);
-  if (!valid)
-    return { ok: false, error: "The animation could not be checked." };
-  return attempt("reviewAnimation", async () => {
-    // The plan comes back from the browser: it is fitted to the tile again
-    // before the checker hears of it, and the answer is fitted to it.
-    const plan = refitPlan(args.plan, width, height);
-    const reply = await getAiProvider().reviewAnimation(
-      buildAnimationReviewPrompt(
-        args.request.slice(0, 1000),
-        plan,
-        width,
-        height,
-      ),
-      { mimeType: "image/png", base64: png! },
+    subjects.length >= 2 &&
+    subjects.length <= MAX_SET_ITEMS &&
+    subjects.every((s) => typeof s === "string" && s.trim()) &&
+    validSize(args.cellW) &&
+    validSize(args.cellH);
+  if (!valid) return { ok: false, error: "Those things cannot be drawn." };
+  return attempt("generateSet", async () => {
+    const layout = sheetLayout(subjects.length, args.cellW, args.cellH);
+    const { mimeType, base64 } = await getAiProvider().generate(
+      buildSetPrompt({
+        subjects: subjects.map((s) => s.slice(0, 300)),
+        cellW: args.cellW,
+        cellH: args.cellH,
+        layout,
+      }),
+      layout.aspectRatio,
+      false,
     );
-    return clampAnimationFixes(reply, plan, width, height);
+    return { image: `data:${mimeType};base64,${base64}`, layout };
+  });
+}
+
+/**
+ * Makes one change in every frame of an animation as one picture (paid
+ * once): `sheet` is a PNG data URL of the `count` frames, each `cellW ×
+ * cellH` tile pixels, laid out by sheetLayout. Returns the redrawn sheet and
+ * its grid.
+ */
+export async function redrawFrames(args: {
+  instruction: string;
+  sheet: string;
+  count: number;
+  cellW: number;
+  cellH: number;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
+  await requireUser();
+  const png = PNG_DATA_URL.exec(args.sheet)?.[1];
+  const valid =
+    typeof args.instruction === "string" &&
+    args.instruction.trim() &&
+    png &&
+    Number.isInteger(args.count) &&
+    args.count >= 2 &&
+    args.count <= MAX_FRAMES &&
+    validSize(args.cellW) &&
+    validSize(args.cellH);
+  if (!valid) return { ok: false, error: "Those frames cannot be redrawn." };
+  return attempt("redrawFrames", async () => {
+    const layout = sheetLayout(args.count, args.cellW, args.cellH);
+    const { mimeType, base64 } = await getAiProvider().redraw(
+      buildSheetRedrawPrompt({
+        instruction: args.instruction.slice(0, 1000),
+        count: args.count,
+        cellW: args.cellW,
+        cellH: args.cellH,
+        layout,
+      }),
+      { mimeType: "image/png", base64: png! },
+      layout.aspectRatio,
+      false,
+    );
+    return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }
 
@@ -516,4 +558,35 @@ export async function generateSheet(args: {
       : await ai.generate(prompt, layout.aspectRatio, false);
     return { image: `data:${mimeType};base64,${base64}`, layout };
   });
+}
+
+/** One recorded AI request, for the usage list: its step and what it took. */
+export type UsageRow = { step: string; credits: number; at: string };
+
+/** The signed-in person's most recent AI requests, newest first. */
+export async function listAiUsage(): Promise<UsageRow[]> {
+  await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ai_usage")
+    .select("step, cost_usd, created_at")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`Couldn’t load AI usage: ${error.message}`);
+  if (!data) return [];
+  return data.map((row) => ({
+    step: row.step,
+    credits: creditsOf(Number(row.cost_usd ?? 0)),
+    at: row.created_at,
+  }));
+}
+
+/** The signed-in person's AI tokens: their allowance and what is left. */
+export async function getAiBalance(): Promise<{
+  limit: number;
+  left: number;
+}> {
+  await requireUser();
+  const { limit, left } = await creditBalance();
+  return { limit, left: Math.floor(left) };
 }

@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@pigxel/ui/lib/utils";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "@/lib/auth/session";
 import pig from "../../../public/art/pigxel-mascot-sitting.png";
@@ -27,6 +29,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const isExplore = usePathname() === "/explore";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -39,9 +42,11 @@ export function AppShell({
 
   return (
     <div className="flex h-dvh bg-canvas">
-      {/* Named so page transitions leave the sidebar still. */}
+      {/* Named so page transitions leave the sidebar still. The name makes it
+          a stacking context, so it's raised for the account menu, which opens
+          beside it over the page. */}
       <div
-        className="hidden shrink-0 border-r border-border md:block"
+        className="relative z-30 hidden shrink-0 border-r border-border md:block"
         style={{ viewTransitionName: "app-sidebar" }}
       >
         <Sidebar profile={profile} />
@@ -69,8 +74,20 @@ export function AppShell({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:border-0 md:bg-transparent md:px-8">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          isExplore && "bg-background",
+        )}
+      >
+        <header
+          className={cn(
+            "flex shrink-0 items-center gap-3 px-4 md:px-8",
+            isExplore
+              ? "h-12 bg-background"
+              : "h-16 border-b border-border bg-sidebar md:border-0 md:bg-transparent",
+          )}
+        >
           <button
             type="button"
             aria-label="Open menu"
