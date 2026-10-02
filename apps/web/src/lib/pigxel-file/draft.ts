@@ -55,12 +55,52 @@ let loading: { userId: string; done: Promise<void> } | null = null;
 const listeners = new Set<() => void>();
 
 /**
+ * Other tabs of the site in this browser. Each keeps its own copy of the
+ * drafts, so every write and removal is told to the others: a tab opening a
+ * tile changed elsewhere shows the latest, instead of an old copy it would
+ * then save over the new one.
+ */
+type DraftMessage = { userId: string } & (
+  { draft: Draft } | { removed: string }
+);
+let otherTabs: BroadcastChannel | null = null;
+/** Messages that came while this tab was still reading its drafts. */
+let early: DraftMessage[] = [];
+
+function listenToOtherTabs() {
+  if (otherTabs || typeof BroadcastChannel === "undefined") return;
+  otherTabs = new BroadcastChannel("pigxel:drafts");
+  otherTabs.onmessage = ({ data }: MessageEvent<DraftMessage>) => {
+    if (loaded?.userId === data.userId) applyMessage(loaded.drafts, data);
+    else if (loading?.userId === data.userId) early.push(data);
+  };
+}
+
+function applyMessage(drafts: Map<string, Draft>, message: DraftMessage) {
+  if ("removed" in message) return void drafts.delete(message.removed);
+  const known = drafts.get(message.draft.id);
+  if (!known || known.savedAt <= message.draft.savedAt)
+    drafts.set(message.draft.id, message.draft);
+}
+
+function tellOtherTabs(message: DraftMessage) {
+  try {
+    otherTabs?.postMessage(message);
+  } catch {
+    // The other tabs read the drafts again when they reload.
+  }
+}
+
+/**
  * Reads this person's drafts from the browser, once per page. Drafts kept in
  * localStorage by earlier versions move to IndexedDB, freeing localStorage.
  */
 export function loadDrafts(userId: string): Promise<void> {
   if (loaded?.userId === userId) return Promise.resolve();
   if (loading?.userId === userId) return loading.done;
+  // Listening starts before reading, so no change from another tab is missed.
+  listenToOtherTabs();
+  early = [];
   const done = (async () => {
     const storage = browserStorage();
     const indexed = await indexedDbBackend();
@@ -86,11 +126,11 @@ export async function startDrafts(
   } catch {
     // Unreadable storage starts empty.
   }
-  loaded = {
-    userId,
-    drafts: new Map(drafts.map((draft) => [draft.id, draft])),
-    backend,
-  };
+  const byId = new Map(drafts.map((draft) => [draft.id, draft]));
+  for (const message of early)
+    if (message.userId === userId) applyMessage(byId, message);
+  early = [];
+  loaded = { userId, drafts: byId, backend };
   listeners.forEach((listener) => listener());
 }
 
@@ -148,6 +188,7 @@ export function writeDraft(userId: string, draft: DraftInput): boolean {
     return false;
   }
   store.drafts.set(draft.id, saved);
+  tellOtherTabs({ userId, draft: saved });
   return true;
 }
 
@@ -164,6 +205,7 @@ export function removeDraft(userId: string, id: string) {
   const store = draftsOf(userId);
   if (!store) return;
   store.drafts.delete(id);
+  tellOtherTabs({ userId, removed: id });
   try {
     void Promise.resolve(store.backend?.remove(userId, id)).catch(() => {});
   } catch {
