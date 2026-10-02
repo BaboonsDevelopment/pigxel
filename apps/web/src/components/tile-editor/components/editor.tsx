@@ -95,6 +95,9 @@ const ImportSheetDialog = dynamic(() => import("./import-sheet-dialog"), {
 const AssetPickerDialog = dynamic(() => import("./asset-picker-dialog"), {
   ssr: false,
 });
+const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
+  ssr: false,
+});
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -126,6 +129,7 @@ export function Editor({
     scale: number;
   } | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [resizing, setResizing] = useState(false);
   // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
@@ -340,6 +344,7 @@ export function Editor({
       { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
+    [{ label: "Canvas size…", onSelect: () => setResizing(true) }],
     [
       {
         label: "Select all",
@@ -607,7 +612,7 @@ export function Editor({
       {dropping && (
         <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10 ring-4 ring-primary/40 ring-inset">
           <p className="rounded-xl bg-background px-5 py-3 text-sm font-medium shadow-lg">
-            Drop a picture, a .pigxel or an .aseprite file
+            Drop a picture or a .pigxel file
           </p>
         </div>
       )}
@@ -759,6 +764,18 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {resizing && (
+        <CanvasSizeDialog
+          size={sprite.size}
+          picture={sprite.composite(["reference"])}
+          onApply={(next, offset) => {
+            // A selection made for the old size wouldn't line up any more.
+            selection.deselect();
+            sprite.resize(next, offset);
+          }}
+          onClose={() => setResizing(false)}
         />
       )}
       {inserting && (

@@ -88,8 +88,15 @@ export class CelCanvases {
     );
   }
 
-  /** Grows or shrinks every cel, keeping the top-left; `fillOf` paints the new space. */
-  resize(next: Size, fillOf: (layerId: string) => string | null) {
+  /**
+   * Grows or shrinks every cel, its old pixels placed at `offset` (the
+   * top-left by default); `fillOf` paints the new space.
+   */
+  resize(
+    next: Size,
+    fillOf: (layerId: string) => string | null,
+    offset = { x: 0, y: 0 },
+  ) {
     for (const { layerId, canvas } of this.list()) {
       const ctx = contextOf(canvas)!;
       const old = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -100,7 +107,7 @@ export class CelCanvases {
         ctx.fillStyle = fill;
         ctx.fillRect(0, 0, next.w, next.h);
       }
-      ctx.putImageData(old, 0, 0);
+      ctx.putImageData(old, offset.x, offset.y);
       this.cache.delete(canvas);
     }
   }

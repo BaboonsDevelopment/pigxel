@@ -6,6 +6,7 @@ import * as layerTree from "@/lib/layers/tree";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
+import { movedSlices } from "@/lib/sprite/canvas-size";
 import * as frameList from "@/lib/sprite/frames";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
@@ -563,12 +564,18 @@ export function useSprite(
     changeFrames(next);
   };
 
-  /** Grows or shrinks every cel, keeping the top-left; a Background fills new space. */
-  const resize = (next: Size) => {
-    cels.resize(next, fillOf);
+  /**
+   * Grows or shrinks every cel, the drawing moved by `offset` (kept at the
+   * top-left by default); a Background fills new space. Slices move along,
+   * cut to the new size. One undo step.
+   */
+  const resize = (next: Size, offset = { x: 0, y: 0 }) => {
+    cels.resize(next, fillOf, offset);
     for (const cel of cels.list()) changed.current.add(cel.canvas);
+    const nextSlices = movedSlices(slices, offset.x, offset.y, next.w, next.h);
     setSize(next);
-    finish({ size: next });
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
   };
 
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
