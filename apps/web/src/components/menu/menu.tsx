@@ -32,6 +32,7 @@ export function Menu({
   return (
     <details
       ref={ref}
+      data-menu={label}
       className="relative"
       onKeyDown={(e) => {
         if (e.key === "Escape" && ref.current) ref.current.open = false;
