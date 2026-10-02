@@ -61,6 +61,16 @@ type Snapshot = {
 };
 
 /**
+ * What a tile's editor keeps when it closes, to pick up where it left off:
+ * undo and redo, and the layer and frame being drawn on.
+ */
+export type KeptSprite = {
+  history: History<Snapshot>;
+  layerId: string;
+  frameId: string;
+};
+
+/**
  * The tile being edited, as Aseprite calls it a sprite: a layer tree, a list
  * of frames, and a cel (one layer's pixels in one frame) wherever something
  * is drawn. The tree and the frames are React state; the cels live in
@@ -69,9 +79,13 @@ type Snapshot = {
  * with every layer combined.
  *
  * Every finished change is a step Ctrl+Z can undo, and fires `onChange`, for
- * saving.
+ * saving. With `kept` (whose present is `initial`) undo goes on from there.
  */
-export function useSprite(initial: PigxelDocument, onChange: () => void) {
+export function useSprite(
+  initial: PigxelDocument,
+  onChange: () => void,
+  kept?: KeptSprite,
+) {
   const { background } = initial;
   const [size, setSize] = useState<Size>({
     w: initial.width,
@@ -81,11 +95,17 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   const [frames, setFrames] = useState(initial.frames);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
-  const [layerId, setLayerIdState] = useState(
-    () =>
-      layerTree.pixelLayerIds(initial.layers).at(-1) ?? initial.layers[0]!.id,
+  const [layerId, setLayerIdState] = useState(() =>
+    kept && layerTree.findLayer(initial.layers, kept.layerId)
+      ? kept.layerId
+      : (layerTree.pixelLayerIds(initial.layers).at(-1) ??
+        initial.layers[0]!.id),
   );
-  const [frameId, setFrameIdState] = useState(initial.frames[0]!.id);
+  const [frameId, setFrameIdState] = useState(() =>
+    kept && frameList.frameIndex(initial.frames, kept.frameId) >= 0
+      ? kept.frameId
+      : initial.frames[0]!.id,
+  );
   // Called before another cel becomes the active one, e.g. to put down a
   // floating selection on the cel it belongs to.
   const beforeLeave = useRef<(() => void) | null>(null);
@@ -103,14 +123,15 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   // Cels drawn on since the last finished change.
   const changed = useRef(new Set<HTMLCanvasElement>());
   const past = useRef<History<Snapshot>>(
-    history.startHistory({
-      tree: initial.layers,
-      frames: initial.frames,
-      size,
-      cels: initial.cels,
-      palette: initial.palette,
-      slices: initial.slices,
-    }),
+    kept?.history ??
+      history.startHistory({
+        tree: initial.layers,
+        frames: initial.frames,
+        size,
+        cels: initial.cels,
+        palette: initial.palette,
+        slices: initial.slices,
+      }),
   );
 
   const repaint = () => setVersion((v) => v + 1);
@@ -628,6 +649,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
           duration: frameList.clampDuration(ms),
         }),
       ),
+    /** Undo history and the active cel, to keep when the editor closes. */
+    keep: (): KeptSprite => ({ history: past.current, layerId, frameId }),
     /** The tile as a document, for saving. Its pixels are shared: never modify them. */
     document: (): PigxelDocument => ({
       id: initial.id,

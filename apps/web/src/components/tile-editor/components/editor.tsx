@@ -43,9 +43,15 @@ import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
-import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
+import {
+  readDraft,
+  readPen,
+  writePen,
+  type Draft,
+} from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import {
   IMAGE_FILE_TYPES,
   documentFromFrames,
@@ -60,6 +66,7 @@ import type { Slice } from "@/lib/slices/slices";
 import { findTutorial } from "@/lib/tutorials/tutorials";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
+import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
 import { useTileFile } from "../use-tile-file";
@@ -67,6 +74,7 @@ import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
+import { TileTabs } from "./tile-tabs";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
@@ -100,7 +108,13 @@ export function Editor({
   guide,
   draft,
   image,
-}: EditorProps & { draft: Draft; image: PigxelDocument }) {
+  kept,
+}: EditorProps & {
+  draft: Draft;
+  image: PigxelDocument;
+  /** Where this tile was left when switching tabs, to pick up from. */
+  kept: KeptTile | null;
+}) {
   const router = useRouter();
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -120,7 +134,7 @@ export function Editor({
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
-  const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [scale, setScale] = useState(kept?.scale ?? DEFAULT_SCALE);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   // A picture the pen and brush paint with, from Edit › Use as brush.
   const [stamp, setStamp] = useState<Stamp | null>(null);
@@ -137,7 +151,10 @@ export function Editor({
     userId,
     initial: draft,
     drive,
-    onOpen: (id) => router.push(editorUrl(id)),
+    onOpen: (id) => {
+      openTabAfter(userId, id, draft.id);
+      router.push(editorUrl(id));
+    },
     notice: driveError
       ? {
           tone: "error",
@@ -147,10 +164,39 @@ export function Editor({
   });
 
   // Every finished change to the sprite marks the tile for saving.
-  const sprite = useSprite(image, file.markDirty);
+  const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;
+    latestScale.current = scale;
   });
+  // Leaving for another tab keeps undo and the zoom, to pick up on return.
+  useEffect(
+    () => () => {
+      const left = tile.current;
+      const saved = readDraft(userId, draft.id);
+      if (!left || !saved || !readTabs(userId).includes(draft.id)) return;
+      const sprite = left.keep();
+      const now = sprite.history.present;
+      keepTile(draft.id, {
+        sprite,
+        image: {
+          id: image.id,
+          background: image.background,
+          width: now.size.w,
+          height: now.size.h,
+          layers: now.tree,
+          frames: now.frames,
+          cels: now.cels,
+          palette: now.palette,
+          slices: now.slices,
+        },
+        scale: latestScale.current,
+        savedAt: saved.savedAt,
+      });
+    },
+    [userId, draft.id, image],
+  );
   const playback = usePlayback(sprite);
   const selection = useSelection(sprite);
 
@@ -566,6 +612,7 @@ export function Editor({
         </div>
       )}
       <EditorHeader
+        draftId={draft.id}
         file={file}
         fileInput={fileInput}
         drive={drive}
@@ -608,6 +655,21 @@ export function Editor({
         />
       </aside>
       <div className="flex min-h-0 flex-col">
+        <TileTabs
+          userId={userId}
+          current={{
+            id: draft.id,
+            name: file.name,
+            dirty: file.dirty,
+            location: file.location,
+          }}
+          revision={file.revision}
+          picture={() => ({
+            rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
+            w: sprite.size.w,
+            h: sprite.size.h,
+          })}
+        />
         <main
           ref={workspace}
           data-guide="canvas"

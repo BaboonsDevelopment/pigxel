@@ -11,7 +11,6 @@ import {
 import {
   PigxelFileError,
   pigxelFileName,
-  safeFileBase,
   serializePigxel,
   type PigxelDocument,
 } from "@/lib/pigxel-file/format";
@@ -24,9 +23,8 @@ import {
   asepriteBaseName,
   isAsepriteFile,
   readAseprite,
-  writeAseprite,
 } from "@/lib/pigxel-file/aseprite";
-import { downloadAseprite, downloadPigxel } from "@/lib/pigxel-file/local";
+import { downloadPigxel } from "@/lib/pigxel-file/local";
 import {
   LOCATION_LABELS,
   type CloudTile,
@@ -277,16 +275,6 @@ export function useTileFile({
   const openCloudTile = (picked: CloudTile) =>
     void run(async () => onOpen(await draftForCloudTile(userId, picked)));
 
-  /** Downloads the tile as a .aseprite file, to open in Aseprite. */
-  const downloadAsAseprite = () =>
-    void run(async () => {
-      downloadAseprite(name, writeAseprite(currentImage()));
-      setStatus({
-        tone: "info",
-        text: `Downloaded ${safeFileBase(name)}.aseprite`,
-      });
-    });
-
   const download = () =>
     void run(async () => {
       downloadPigxel(name, serializePigxel(currentImage()));
@@ -332,6 +320,8 @@ export function useTileFile({
 
   return {
     name,
+    /** Bumped by every change to the tile. */
+    revision,
     rename: (next: string) => {
       setName(next);
       changed();
@@ -351,7 +341,6 @@ export function useTileFile({
     openDriveFile,
     openCloudTile,
     download,
-    downloadAsAseprite,
     saveToCloud: () => saveNow("cloud"),
     saveToDrive: () => saveNow("drive"),
     save,

@@ -14,6 +14,7 @@ import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
 import { ASEPRITE_EXTENSIONS } from "@/lib/pigxel-file/aseprite";
+import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
 import { useModifierLabel } from "../use-modifier-label";
 import type { TileFile } from "../use-tile-file";
@@ -29,6 +30,7 @@ import type { Playback } from "@/components/timeline/use-playback";
  * Frame menus, the tile's name and where it is saved, and the AI tokens.
  */
 export function EditorHeader({
+  draftId,
   file,
   fileInput,
   drive,
@@ -40,6 +42,8 @@ export function EditorHeader({
   onImportSheet,
   menus,
 }: {
+  /** The tile's draft, for New tile to come back to on Cancel. */
+  draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
   drive: DriveStatus;
@@ -76,7 +80,7 @@ export function EditorHeader({
           [
             {
               label: "New tile…",
-              onSelect: () => router.push("/tiles/new"),
+              onSelect: () => router.push(newTileUrl(draftId)),
             },
             {
               // A .pigxel file, or a picture or .aseprite file as a new tile.
@@ -128,10 +132,6 @@ export function EditorHeader({
               label: "Download .pigxel",
               shortcut: file.location ? undefined : `${mod}S`,
               onSelect: file.download,
-            },
-            {
-              label: "Download .aseprite",
-              onSelect: file.downloadAsAseprite,
             },
           ],
           [

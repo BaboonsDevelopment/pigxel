@@ -34,7 +34,11 @@ export default function RootLayout({
       lang="en"
       className={`${poppins.variable} ${fredoka.variable} ${dmMono.variable}`}
     >
-      <body className="min-h-screen">{children}</body>
+      {/* Browser extensions (Grammarly, Bitdefender, …) add attributes to
+          <body> before React loads; that alone isn't a hydration problem. */}
+      <body className="min-h-screen" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }

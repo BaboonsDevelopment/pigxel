@@ -24,6 +24,7 @@ import {
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { openTabAfter } from "@/lib/pigxel-file/tabs";
 import {
   MAX_PIGXEL_SIZE,
   PIGXEL_EXTENSION,
@@ -64,6 +65,8 @@ type FormProps = {
   assetId?: string;
   /** A palette to paint from instead of the default one. */
   paletteId?: string;
+  /** The draft whose editor sent here (its + tab): Cancel goes back to it, and the new tile opens next to it. */
+  from?: string;
 };
 
 /**
@@ -87,6 +90,7 @@ function Form({
   userId,
   drive,
   driveError,
+  from,
   asset,
   palette,
 }: Omit<FormProps, "assetId" | "paletteId"> & {
@@ -162,6 +166,7 @@ function Form({
       setBusy(false);
       return;
     }
+    if (from) openTabAfter(userId, draft.id, from);
     router.push(editorUrl(draft.id));
   };
 
@@ -362,7 +367,7 @@ function Form({
             : "Create tile"}
         </Button>
         <Link
-          href="/tiles"
+          href={from ? editorUrl(from) : "/tiles"}
           className={buttonVariants({ variant: "ghost", size: "lg" })}
         >
           Cancel

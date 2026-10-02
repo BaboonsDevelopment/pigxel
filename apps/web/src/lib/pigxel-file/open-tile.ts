@@ -15,6 +15,11 @@ export function editorUrl(draftId: string) {
   return `/tiles/edit?id=${encodeURIComponent(draftId)}`;
 }
 
+/** The new-tile page, opened from a tile's editor: Cancel goes back to it. */
+export function newTileUrl(fromDraftId: string) {
+  return `/tiles/new?from=${encodeURIComponent(fromDraftId)}`;
+}
+
 /** The editor for a draft with a tutorial's interactive guide open. */
 export function guideUrl(draftId: string, slug: string) {
   return `${editorUrl(draftId)}&guide=${encodeURIComponent(slug)}`;
