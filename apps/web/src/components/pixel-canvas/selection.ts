@@ -1,4 +1,4 @@
-import { linePoints } from "@/lib/edit/raster";
+import { ellipsePoints, linePoints } from "@/lib/edit/raster";
 import type { Area, Size } from "./constants";
 import type { Rgba } from "./paint";
 import { fillPoints, type Point } from "./pen";
@@ -29,6 +29,14 @@ export function rectMask(size: Size, area: Area): Mask {
       y * size.w + Math.max(0, area.x),
       y * size.w + Math.min(size.w, area.x + area.w),
     );
+  return mask;
+}
+
+/** The pixels of the filled ellipse that fits `area`; parts off the tile are left out. */
+export function ellipseMask(size: Size, area: Area): Mask {
+  const mask = new Uint8Array(size.w * size.h);
+  for (const { x, y } of ellipsePoints(area, true))
+    if (x >= 0 && y >= 0 && x < size.w && y < size.h) mask[y * size.w + x] = 1;
   return mask;
 }
 
@@ -65,18 +73,19 @@ export function polygonMask(size: Size, points: Point[]): Mask {
   return mask;
 }
 
-/** The pixels of `pixels` (RGBA of the tile) the magic wand picks with a click at `start`. */
+/** The pixels of `pixels` (RGBA of the tile) the magic wand picks with a click at `start`; see fillPoints. */
 export function wandMask(
   pixels: Uint8ClampedArray,
   size: Size,
   start: Point,
   contiguous: boolean,
+  tolerance = 0,
 ): Mask {
   const mask = new Uint8Array(size.w * size.h);
   if (start.x < 0 || start.y < 0 || start.x >= size.w || start.y >= size.h)
     return mask;
   const image = { width: size.w, height: size.h, data: pixels };
-  for (const i of fillPoints(image as ImageData, start, contiguous))
+  for (const i of fillPoints(image as ImageData, start, contiguous, tolerance))
     mask[i] = 1;
   return mask;
 }

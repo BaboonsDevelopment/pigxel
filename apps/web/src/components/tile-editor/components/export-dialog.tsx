@@ -59,8 +59,9 @@ export default function ExportDialog({
 
   const { size, frames } = source;
   const animated = settings.format === "gif" || settings.format === "sheet";
-  const output = exportSize(settings, size, frames.length);
+  const output = exportSize(settings, size, frames.length, source.slices);
   const fits = fitsCanvas(output);
+  const noSlices = settings.format === "slices" && !output.w;
 
   const run = async () => {
     setBusy(true);
@@ -126,6 +127,12 @@ export default function ExportDialog({
               </ChoiceCard>
             ))}
           </div>
+          {noSlices && (
+            <FormMessage tone="error" className="text-xs">
+              This tile has no slices yet. Mark parts of it with the Slice tool
+              (C) first.
+            </FormMessage>
+          )}
           {!animated && frames.length > 1 && (
             <FormMessage className="text-xs">
               Exports frame {frameIndex(frames, source.frameId) + 1} of{" "}
@@ -189,6 +196,7 @@ export default function ExportDialog({
               tone={fits ? "muted" : "error"}
               className="tabular-nums"
             >
+              {settings.format === "slices" && "Largest "}
               {output.w} × {output.h} px
               {!fits &&
                 ` — too big; each side can be at most ${MAX_EXPORT_SIDE} px`}
@@ -206,7 +214,7 @@ export default function ExportDialog({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={busy || !fits}>
+          <Button type="submit" disabled={busy || !fits || noSlices}>
             {busy ? "Exporting…" : "Export"}
           </Button>
         </div>

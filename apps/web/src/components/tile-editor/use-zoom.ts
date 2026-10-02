@@ -38,11 +38,14 @@ type GestureEvent = UIEvent & {
 export function useZoom({
   workspace,
   tileRect,
+  initial = DEFAULT_SCALE,
 }: {
   workspace: RefObject<HTMLElement | null>;
   tileRect: () => DOMRect | null;
+  /** The zoom to start at. */
+  initial?: number;
 }) {
-  const [scale, setScale] = useState(DEFAULT_SCALE);
+  const [scale, setScale] = useState(() => clampScale(initial));
   const anchor = useRef<ZoomAnchor>(null);
   const [isTouchpad] = useState(wheelSource);
   // The zoom when a Safari pinch began; its scale is relative to that.

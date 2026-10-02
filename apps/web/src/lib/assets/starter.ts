@@ -864,5 +864,6 @@ export function starterDocument(asset: StarterAsset): PigxelDocument {
       ]),
     ),
     palette: [...new Set(Object.values(asset.colors))],
+    slices: [],
   };
 }

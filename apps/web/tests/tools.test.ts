@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import {
+  blendInk,
+  blurInk,
+  jumbleInk,
+  gradientAt,
   inPattern,
+  paintGradient,
   paintPoints,
   paintStamp,
   shadingInk,
   type PaintOptions,
 } from "@/components/pixel-canvas/paint";
-import { brushTip } from "@/components/pixel-canvas/pen";
+import {
+  brushTip,
+  sprayDotCount,
+  sprayDots,
+  curvePoints,
+} from "@/components/pixel-canvas/pen";
 import { onionFrames } from "@/components/pixel-canvas/view";
 import { parsePaletteFile, toGpl } from "@/lib/palette/files";
 
@@ -97,6 +107,163 @@ describe("picture brush", () => {
     const data = blank();
     paintStamp(data, [{ x: 0, y: 0 }], stamp, BLACK, options);
     expect([...data.slice(0, 4)]).toEqual([...BLACK]);
+  });
+});
+
+describe("curve", () => {
+  it("runs from end to end without gaps or doubled pixels", () => {
+    const start = { x: 0, y: 10 };
+    const end = { x: 12, y: 10 };
+    const points = curvePoints(start, { x: 2, y: 0 }, { x: 10, y: 0 }, end);
+    expect(points[0]).toEqual(start);
+    expect(points.at(-1)).toEqual(end);
+    for (let i = 1; i < points.length; i++) {
+      const step = Math.max(
+        Math.abs(points[i]!.x - points[i - 1]!.x),
+        Math.abs(points[i]!.y - points[i - 1]!.y),
+      );
+      expect(step).toBe(1);
+    }
+    // Bent towards the controls, above the straight line between the ends.
+    expect(Math.min(...points.map((p) => p.y))).toBeLessThan(6);
+  });
+  it("is a straight line while the controls sit on the ends", () => {
+    const start = { x: 0, y: 0 };
+    const end = { x: 5, y: 0 };
+    expect(curvePoints(start, start, end, end)).toEqual(
+      [0, 1, 2, 3, 4, 5].map((x) => ({ x, y: 0 })),
+    );
+  });
+});
+
+describe("inks", () => {
+  // A drawn red pixel, then an empty one.
+  const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
+  const halfBlack = [0, 0, 0, 128] as const;
+  const at = (ink: unknown, i: number) => (ink as (i: number) => unknown)(i);
+
+  it("simple lays a see-through colour over drawn pixels, as it is on empty ones", () => {
+    const ink = blendInk(before, halfBlack, "simple");
+    expect(at(ink, 0)).toEqual([127, 0, 0, 255]);
+    expect(at(ink, 1)).toEqual(halfBlack);
+    expect(blendInk(before, BLACK, "simple")).toEqual(BLACK);
+  });
+  it("alpha compositing lays it over empty pixels too", () => {
+    expect(at(blendInk(before, halfBlack, "alpha"), 1)).toEqual(halfBlack);
+    expect(at(blendInk(before, halfBlack, "alpha"), 0)).toEqual([
+      127, 0, 0, 255,
+    ]);
+  });
+  it("copy colour puts the colour exactly, see-through included", () => {
+    expect(blendInk(before, halfBlack, "copy")).toEqual(halfBlack);
+  });
+  it("lock alpha colours only drawn pixels and keeps their opacity", () => {
+    const faint = new Uint8ClampedArray([255, 0, 0, 100, 0, 0, 0, 0]);
+    const ink = blendInk(faint, BLACK, "lockAlpha");
+    expect(at(ink, 0)).toEqual([0, 0, 0, 100]);
+    expect(at(ink, 1)).toBeNull();
+  });
+});
+
+describe("blur", () => {
+  it("averages each pixel with its neighbours, from before the stroke", () => {
+    const wide = { w: 3, h: 1 };
+    const before = new Uint8ClampedArray([...BLACK, ...BLACK, ...RED]);
+    const ink = blurInk(before, wide) as (i: number) => readonly number[];
+    expect(ink(0)).toEqual([0, 0, 0, 255]);
+    expect(ink(1)).toEqual([85, 0, 0, 255]);
+    expect(ink(2)).toEqual([128, 0, 0, 255]);
+  });
+  it("fades an edge into transparency without darkening it", () => {
+    const wide = { w: 2, h: 1 };
+    const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
+    const ink = blurInk(before, wide) as (i: number) => readonly number[];
+    expect(ink(1)).toEqual([255, 0, 0, 128]);
+    // Nothing to blur where everything around is transparent.
+    expect(blurInk(new Uint8ClampedArray(8), wide)).toBeTypeOf("function");
+    expect(
+      (blurInk(new Uint8ClampedArray(8), wide) as (i: number) => unknown)(0),
+    ).toBeNull();
+  });
+});
+
+describe("jumble", () => {
+  it("moves colours around without making new ones, the same on every redraw", () => {
+    const tile = { w: 6, h: 6 };
+    const before = new Uint8ClampedArray(tile.w * tile.h * 4);
+    for (let i = 0; i < tile.w * tile.h; i++)
+      before.set(i % tile.w < 3 ? RED : BLACK, i * 4);
+    const ink = jumbleInk(before, tile, 7) as (i: number) => number[] | null;
+    const picked = Array.from({ length: tile.w * tile.h }, (_, i) => ink(i));
+    for (const rgba of picked)
+      if (rgba) expect([RED.join(), BLACK.join()]).toContain(rgba.join());
+    // Some pixels on the edge between the two colours swapped sides.
+    expect(picked.some((rgba, i) => rgba && rgba[0] !== before[i * 4])).toBe(
+      true,
+    );
+    const again = jumbleInk(before, tile, 7) as (i: number) => unknown;
+    expect(picked.map((_, i) => again(i))).toEqual(picked);
+  });
+});
+
+describe("spray", () => {
+  it("scatters dots inside the circle around the pointer", () => {
+    let seed = 1;
+    const random = () =>
+      ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const dots = sprayDots({ x: 10, y: 10 }, 3, 500, random);
+    expect(dots).toHaveLength(500);
+    for (const { x, y } of dots)
+      expect(Math.hypot(x - 10, y - 10)).toBeLessThanOrEqual(
+        3.5 + Math.SQRT1_2,
+      );
+    // Spread over the circle, not stuck in one spot.
+    expect(new Set(dots.map((d) => `${d.x},${d.y}`)).size).toBeGreaterThan(20);
+  });
+  it("lays dots in proportion to speed and time held", () => {
+    expect(sprayDotCount(100, 1)).toBe(2 * sprayDotCount(50, 1));
+    expect(sprayDotCount(40, 0.5)).toBe(sprayDotCount(40, 1) / 2);
+  });
+});
+
+describe("gradient", () => {
+  const wide = { w: 4, h: 1 };
+  const row = (data: Uint8ClampedArray) =>
+    Array.from({ length: data.length / 4 }, (_, i) => data[i * 4]!);
+  const from = { x: 0, y: 0 };
+  const to = { x: 3, y: 0 };
+
+  it("measures how far along the line, or from the centre, a pixel is", () => {
+    expect(
+      [0, 1, 2, 3].map((x) => gradientAt(x, 0, from, to, "linear")),
+    ).toEqual([0, 1 / 3, 2 / 3, 1]);
+    // Pixels before the start and past the end keep the end colours.
+    expect(gradientAt(-2, 0, from, to, "linear")).toBe(0);
+    expect(gradientAt(5, 0, from, to, "linear")).toBe(1);
+    expect(gradientAt(0, 3, from, to, "radial")).toBe(1);
+  });
+  it("mixes the colours smoothly without a dither", () => {
+    const data = new Uint8ClampedArray(wide.w * 4);
+    paintGradient(data, from, to, BLACK, RED, "linear", "none", {
+      size: wide,
+      mask: null,
+    });
+    expect(row(data)).toEqual([0, 85, 170, 255]);
+  });
+  it("keeps to the two colours with a dither, and stays in the selection", () => {
+    const data = new Uint8ClampedArray(wide.w * 4);
+    const mask = new Uint8Array([1, 1, 1, 0]);
+    paintGradient(data, from, to, BLACK, RED, "linear", "bayer4", {
+      size: wide,
+      mask,
+    });
+    expect(
+      row(data)
+        .slice(0, 3)
+        .every((v) => v === 0 || v === 255),
+    ).toBe(true);
+    expect(row(data)[0]).toBe(0);
+    expect(data[3 * 4 + 3]).toBe(0);
   });
 });
 

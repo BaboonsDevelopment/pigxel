@@ -13,11 +13,14 @@ export function isTyping(target: EventTarget | null) {
 /** The setting `[` and `]` change for a tool, if it has a size. */
 export function sizeKey(
   tool: ToolId,
-): "size" | "brushSize" | "eraserSize" | null {
-  if (tool === "brush") return "brushSize";
+): "size" | "brushSize" | "eraserSize" | "sprayWidth" | null {
+  if (tool === "brush" || tool === "blur" || tool === "jumble")
+    return "brushSize";
   if (tool === "eraser") return "eraserSize";
+  if (tool === "spray") return "sprayWidth";
   return tool === "pen" ||
     tool === "line" ||
+    tool === "curve" ||
     tool === "rect" ||
     tool === "ellipse"
     ? "size"
@@ -91,7 +94,6 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
     if (code === "KeyN") return command("newLayer");
     if (code === "KeyH") return command("flipHorizontal");
     if (code === "KeyV") return command("flipVertical");
-    if (code === "KeyR") return command("rotateRight");
     return toolKey(code, true);
   }
   if (zoomIn) return command("zoomIn");
