@@ -216,6 +216,66 @@ export function paintStamp(
 }
 
 /**
+ * Blur ink: each pixel becomes the average of itself and its neighbours
+ * (3×3, inside the tile) in `before`, so a stroke blurs each pixel once.
+ * Colours are weighted by alpha, so transparent pixels soften an edge's
+ * opacity without darkening its colour. Fully transparent areas stay as they are.
+ */
+export function blurInk(before: Uint8ClampedArray, size: Size): Ink {
+  return (i) => {
+    const x = i % size.w;
+    const y = Math.floor(i / size.w);
+    let count = 0;
+    let alpha = 0;
+    const rgb = [0, 0, 0];
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= size.w || ny >= size.h) continue;
+        const at = (ny * size.w + nx) * 4;
+        const a = before[at + 3]!;
+        for (let c = 0; c < 3; c++) rgb[c]! += before[at + c]! * a;
+        alpha += a;
+        count++;
+      }
+    if (!alpha) return null;
+    return [
+      Math.round(rgb[0]! / alpha),
+      Math.round(rgb[1]! / alpha),
+      Math.round(rgb[2]! / alpha),
+      Math.round(alpha / count),
+    ];
+  };
+}
+
+/**
+ * Jumble ink: each pixel takes the colour `before` had at a random spot up
+ * to 2 pixels away (inside the tile), so edges get ragged without any new
+ * colours. The spot is fixed by `seed` and the pixel, so redrawing the stroke
+ * picks the same one; a new stroke with a new seed jumbles further.
+ */
+export function jumbleInk(
+  before: Uint8ClampedArray,
+  size: Size,
+  seed: number,
+): Ink {
+  return (i) => {
+    let h = Math.imul(i ^ seed, 0x45d9f3b);
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+    h ^= h >>> 16;
+    const dx = ((h >>> 0) % 5) - 2;
+    const dy = ((h >>> 8) % 5) - 2;
+    const x = (i % size.w) + dx;
+    const y = Math.floor(i / size.w) + dy;
+    if ((!dx && !dy) || x < 0 || y < 0 || x >= size.w || y >= size.h)
+      return null;
+    const at = (y * size.w + x) * 4;
+    return [before[at]!, before[at + 1]!, before[at + 2]!, before[at + 3]!];
+  };
+}
+
+/**
  * Shading ink (as in Aseprite): each pixel whose colour is in the palette
  * moves one step along it (`step` +1 towards the end, −1 towards the start);
  * other pixels stay as they are. Reads `before`, so a pixel shades once per

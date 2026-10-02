@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import {
+  blurInk,
+  jumbleInk,
   gradientAt,
   inPattern,
   paintGradient,
@@ -130,6 +132,47 @@ describe("curve", () => {
     expect(curvePoints(start, start, end, end)).toEqual(
       [0, 1, 2, 3, 4, 5].map((x) => ({ x, y: 0 })),
     );
+  });
+});
+
+describe("blur", () => {
+  it("averages each pixel with its neighbours, from before the stroke", () => {
+    const wide = { w: 3, h: 1 };
+    const before = new Uint8ClampedArray([...BLACK, ...BLACK, ...RED]);
+    const ink = blurInk(before, wide) as (i: number) => readonly number[];
+    expect(ink(0)).toEqual([0, 0, 0, 255]);
+    expect(ink(1)).toEqual([85, 0, 0, 255]);
+    expect(ink(2)).toEqual([128, 0, 0, 255]);
+  });
+  it("fades an edge into transparency without darkening it", () => {
+    const wide = { w: 2, h: 1 };
+    const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
+    const ink = blurInk(before, wide) as (i: number) => readonly number[];
+    expect(ink(1)).toEqual([255, 0, 0, 128]);
+    // Nothing to blur where everything around is transparent.
+    expect(blurInk(new Uint8ClampedArray(8), wide)).toBeTypeOf("function");
+    expect(
+      (blurInk(new Uint8ClampedArray(8), wide) as (i: number) => unknown)(0),
+    ).toBeNull();
+  });
+});
+
+describe("jumble", () => {
+  it("moves colours around without making new ones, the same on every redraw", () => {
+    const tile = { w: 6, h: 6 };
+    const before = new Uint8ClampedArray(tile.w * tile.h * 4);
+    for (let i = 0; i < tile.w * tile.h; i++)
+      before.set(i % tile.w < 3 ? RED : BLACK, i * 4);
+    const ink = jumbleInk(before, tile, 7) as (i: number) => number[] | null;
+    const picked = Array.from({ length: tile.w * tile.h }, (_, i) => ink(i));
+    for (const rgba of picked)
+      if (rgba) expect([RED.join(), BLACK.join()]).toContain(rgba.join());
+    // Some pixels on the edge between the two colours swapped sides.
+    expect(picked.some((rgba, i) => rgba && rgba[0] !== before[i * 4])).toBe(
+      true,
+    );
+    const again = jumbleInk(before, tile, 7) as (i: number) => unknown;
+    expect(picked.map((_, i) => again(i))).toEqual(picked);
   });
 });
 

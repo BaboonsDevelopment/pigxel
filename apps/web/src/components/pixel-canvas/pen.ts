@@ -9,6 +9,8 @@ export type PaintTool =
   | "pen"
   | "brush"
   | "spray"
+  | "blur"
+  | "jumble"
   | "eraser"
   | "line"
   | "curve"

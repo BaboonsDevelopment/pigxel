@@ -38,6 +38,8 @@ import {
 } from "./helpers";
 import {
   inPattern,
+  blurInk,
+  jumbleInk,
   mirrored,
   paintGradient,
   paintPoints,
@@ -97,6 +99,8 @@ type Stroke = {
   color: string | null;
   /** The cel before the stroke, so each redraw starts from it. */
   before: Uint8ClampedArray;
+  /** Picks where the jumble takes each pixel from, new for every stroke. */
+  seed?: number;
   /** The curve's bend, set by the drags after the first. */
   curve?: CurveBend;
 };
@@ -388,10 +392,13 @@ export function PixelCanvas({
   }, [frame, finishFrame]);
 
   const isSelectionTool = SELECTION_TOOLS.includes(tool);
-  // The brush is round; the pen, eraser, line and shapes have a square tip.
-  // The spray's "tip" is the circle it scatters dots in.
+  // The brush and blur are round (and share a size); the pen, eraser, line
+  // and shapes have a square tip. The spray's "tip" is the circle it
+  // scatters dots in.
+  const roundTip = (t: PaintTool) =>
+    t === "brush" || t === "blur" || t === "jumble";
   const tipSize = (t: PaintTool) =>
-    t === "brush"
+    roundTip(t)
       ? pen.brushSize
       : t === "eraser"
         ? pen.eraserSize
@@ -406,10 +413,14 @@ export function PixelCanvas({
     tool === "pipette"
       ? 1
       : tipSize(tool);
-  const hoverTip = brushTip(hoverSize, tool === "brush" || tool === "spray");
+  const hoverTip = brushTip(hoverSize, roundTip(tool) || tool === "spray");
   // Tools that don't lay down the pen colour show only the outline of their tip.
   const hoverOutline =
-    tool === "pipette" || tool === "eraser" || tool === "spray";
+    tool === "pipette" ||
+    tool === "eraser" ||
+    tool === "spray" ||
+    tool === "blur" ||
+    tool === "jumble";
   // Selecting works on any layer; painting and moving need one that can change.
   const blocked =
     !sprite.canPaint &&
@@ -427,19 +438,27 @@ export function PixelCanvas({
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     const data = new Uint8ClampedArray(current.before);
     const tipPixels = tipSize(current.tool);
-    const tip = brushTip(tipPixels, current.tool === "brush");
+    const tip = brushTip(tipPixels, roundTip(current.tool));
     const origin = (p: Point) => brushOrigin(p, tipPixels);
     const start = current.points[0]!;
     const inkTool = current.tool === "pen" || current.tool === "brush";
     // Shading moves pixels along the palette: forwards with the left button.
     const ink: Ink =
-      (inkTool ||
-        current.tool === "spray" ||
-        current.tool === "contour" ||
-        current.tool === "polygon") &&
-      pen.ink === "shading"
-        ? shadingInk(current.before, sprite.palette, current.secondary ? -1 : 1)
-        : current.rgba;
+      current.tool === "blur"
+        ? blurInk(current.before, size)
+        : current.tool === "jumble"
+          ? jumbleInk(current.before, size, current.seed ?? 0)
+          : (inkTool ||
+                current.tool === "spray" ||
+                current.tool === "contour" ||
+                current.tool === "polygon") &&
+              pen.ink === "shading"
+            ? shadingInk(
+                current.before,
+                sprite.palette,
+                current.secondary ? -1 : 1,
+              )
+            : current.rgba;
     const paint = (points: Point[], thin = false) =>
       paintPoints(
         data,
@@ -733,7 +752,12 @@ export function PixelCanvas({
         : [0, 0, 0, 0];
     if (tool === "bucket") return fillAt(ctx, point, rgba, color);
     e.currentTarget.setPointerCapture(e.pointerId);
-    const freehand = tool === "pen" || tool === "brush" || erase;
+    const freehand =
+      tool === "pen" ||
+      tool === "brush" ||
+      tool === "blur" ||
+      tool === "jumble" ||
+      erase;
     const shading =
       pen.ink === "shading" &&
       (((tool === "pen" || tool === "brush") && !stamp) ||
@@ -753,12 +777,17 @@ export function PixelCanvas({
       secondary: slot === "secondary",
       // Shading and picture brushes don't lay down one colour.
       color:
-        shading || (stamp && freehand && !erase) || tool === "gradient"
+        shading ||
+        (stamp && freehand && !erase) ||
+        tool === "gradient" ||
+        tool === "blur" ||
+        tool === "jumble"
           ? null
           : color,
       before: new Uint8ClampedArray(
         ctx.getImageData(0, 0, size.w, size.h).data,
       ),
+      seed: tool === "jumble" ? (Math.random() * 2 ** 31) | 0 : undefined,
       // Straight until it is bent: the controls sit on the ends.
       curve:
         tool === "curve"

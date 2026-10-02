@@ -58,6 +58,8 @@ export function ToolOptions({
       "spray",
       "contour",
       "polygon",
+      "blur",
+      "jumble",
       "eraser",
       "line",
       "curve",
@@ -331,7 +333,7 @@ const TRANSFORMS: {
   {
     kind: "rotateRight",
     label: "Rotate right",
-    title: "Rotate 90° to the right (Shift+R)",
+    title: "Rotate 90° to the right",
     icon: "↻",
   },
 ];
@@ -377,6 +379,9 @@ const HINTS: Record<ToolId, string> = {
     "Draw around a shape; it closes and fills as you go · Right button fills with the secondary colour · Alt+click picks a colour",
   polygon:
     "Click to place corners · Click the first one, double-click or Enter fills it · Shift snaps to 45° · Esc cancels · Right button uses the secondary colour",
+  blur: "Drag over an edge to soften it; it adds in-between colours · Each stroke blurs once more",
+  jumble:
+    "Drag over an edge to make it ragged; no new colours · Each stroke jumbles more",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",

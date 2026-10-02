@@ -253,7 +253,6 @@ export function Editor({
       },
       {
         label: "Rotate 90° right",
-        shortcut: "Shift+R",
         onSelect: commands.rotateRight,
       },
       {
