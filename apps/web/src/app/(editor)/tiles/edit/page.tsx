@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { TileEditor } from "@/components/tile-editor/tile-editor";
-import { requireUser } from "@/lib/auth/session";
+import { isAdmin, requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
 
 export const metadata: Metadata = { title: "Edit tile · Pigxel" };
@@ -23,6 +23,7 @@ export default async function EditTile({
       drive={drive}
       driveError={driveResult === "error"}
       guide={guide}
+      canPublish={isAdmin(user)}
     />
   );
 }

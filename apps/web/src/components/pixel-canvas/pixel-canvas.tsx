@@ -31,6 +31,7 @@ import {
   isBlank,
   largestEmptyArea,
   pixelAt,
+  pixelsPassed,
   resizeTo,
   sameSize,
   tileSnapshot,
@@ -119,6 +120,8 @@ export type PixelCanvasHandle = {
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
+  /** Where the tile is on screen, e.g. to zoom around a point on it. */
+  tileRect: () => DOMRect | null;
 };
 
 /** Where copies of the tile sit around it in tiled mode, in rows. */
@@ -312,6 +315,7 @@ export function PixelCanvas({
           resolveFrame.current = resolve;
         });
       },
+      tileRect: () => screenRef.current?.getBoundingClientRect() ?? null,
     };
   }, [sprite, size]);
 
@@ -473,15 +477,17 @@ export function PixelCanvas({
     );
   };
 
-  const moveSelect = (p: Point) => {
-    if (!selectDrag) return;
+  /** Follows the pointer through `passed` pixels, the last being where it is now. */
+  const moveSelect = (passed: Point[]) => {
+    const p = passed.at(-1);
+    if (!selectDrag || !p) return;
     if (selectDrag.kind === "move")
       selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
     else if (selectDrag.kind === "marquee") {
       if (p.x !== selectDrag.to.x || p.y !== selectDrag.to.y)
         setSelectDrag({ ...selectDrag, to: p });
     } else {
-      const points = extendStroke(selectDrag.points, p);
+      const points = passed.reduce(extendStroke, selectDrag.points);
       if (points !== selectDrag.points)
         setSelectDrag({ ...selectDrag, points });
     }
@@ -554,10 +560,13 @@ export function PixelCanvas({
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const point = pixelAt(e);
+    // Every pixel passed since the last event, so fast curves stay round.
+    const passed = pixelsPassed(e.nativeEvent, e.currentTarget);
+    const point = passed.at(-1);
+    if (!point) return;
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
-    if (selectDrag) return moveSelect(point);
+    if (selectDrag) return moveSelect(passed);
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
@@ -578,7 +587,7 @@ export function PixelCanvas({
       if (end.x === current.end.x && end.y === current.end.y) return;
       current.end = end;
     } else {
-      const points = extendStroke(current.points, point);
+      const points = passed.reduce(extendStroke, current.points);
       if (points === current.points) return;
       current.points = points;
     }

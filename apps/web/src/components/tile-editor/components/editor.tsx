@@ -10,8 +10,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
-import { zoom } from "@/components/pixel-canvas/helpers";
+import type { Area } from "@/components/pixel-canvas/constants";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import { rgbaOf, type Stamp } from "@/components/pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
@@ -36,7 +35,7 @@ import {
 } from "@/components/pixel-canvas/use-sprite";
 import { Timeline } from "@/components/timeline/timeline";
 import { usePlayback } from "@/components/timeline/use-playback";
-import { assetPixels, assetSize, type Asset } from "@/lib/assets/assets";
+import { loadAssetFrame, type Asset } from "@/lib/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
@@ -51,6 +50,7 @@ import { isTyping, shortcutFor, sizeKey } from "../helpers";
 import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
 import { useTileFile } from "../use-tile-file";
+import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
@@ -72,6 +72,9 @@ const ExportDialog = dynamic(() => import("./export-dialog"), { ssr: false });
 const AssetPickerDialog = dynamic(() => import("./asset-picker-dialog"), {
   ssr: false,
 });
+const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
+  ssr: false,
+});
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -83,6 +86,7 @@ export function Editor({
   drive,
   driveError,
   guide,
+  canPublish,
   draft,
   image,
 }: EditorProps & { draft: Draft; image: PigxelDocument }) {
@@ -90,6 +94,7 @@ export function Editor({
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
   const [inserting, setInserting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
@@ -98,7 +103,6 @@ export function Editor({
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
-  const [scale, setScale] = useState(DEFAULT_SCALE);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   // A picture the pen and brush paint with, from Edit › Use as brush.
   const [stamp, setStamp] = useState<Stamp | null>(null);
@@ -107,6 +111,10 @@ export function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
+  const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
+    workspace,
+    tileRect: () => canvas.current?.tileRect() ?? null,
+  });
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<SpriteApi>(null);
   const file = useTileFile({
@@ -163,9 +171,9 @@ export function Editor({
     redo: () => {
       if (!selection.floating) sprite.redo();
     },
-    zoomIn: () => setScale((s) => zoom(s, -1)),
-    zoomOut: () => setScale((s) => zoom(s, 1)),
-    zoomReset: () => setScale(DEFAULT_SCALE),
+    zoomIn,
+    zoomOut,
+    zoomReset,
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
@@ -222,10 +230,18 @@ export function Editor({
     setTool("pen");
   };
 
-  /** Puts an asset's first frame in the middle of the active cel, floating, to be moved into place. */
-  const insertAsset = (asset: Asset) => {
-    const { w, h } = assetSize(asset);
-    const pixels = assetPixels(asset);
+  /**
+   * Puts an asset's first frame in the middle of the active cel, floating,
+   * to be moved into place; says why not when it can't.
+   */
+  const insertAsset = async (asset: Asset): Promise<string | null> => {
+    let frame;
+    try {
+      frame = await loadAssetFrame(asset);
+    } catch {
+      return "Couldn’t load this asset. Try again.";
+    }
+    const { pixels, w, h } = frame;
     const mask = new Uint8Array(w * h);
     for (let i = 0; i < mask.length; i++) mask[i] = pixels[i * 4 + 3] ? 1 : 0;
     const placed = selection.paste({
@@ -236,11 +252,11 @@ export function Editor({
       pixels,
       mask,
     });
-    if (placed) {
-      setTool("move");
-      setInserted((n) => n + 1);
-    }
-    return placed;
+    if (!placed)
+      return "This layer can’t be drawn on. Pick an unlocked, visible layer first.";
+    setTool("move");
+    setInserted((n) => n + 1);
+    return null;
   };
 
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
@@ -405,18 +421,6 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // The wheel zooms the tile instead of scrolling the page.
-  useEffect(() => {
-    const area = workspace.current;
-    if (!area) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      setScale((s) => zoom(s, e.deltaY));
-    };
-    area.addEventListener("wheel", onWheel, { passive: false });
-    return () => area.removeEventListener("wheel", onWheel);
-  }, []);
-
   return (
     <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]">
       <EditorHeader
@@ -428,6 +432,7 @@ export function Editor({
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
+        onPublish={canPublish ? () => setPublishing(true) : undefined}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "View", sections: viewMenu },
@@ -510,6 +515,13 @@ export function Editor({
           draftId={draft.id}
           file={file}
           onClose={() => setOpening(null)}
+        />
+      )}
+      {publishing && (
+        <PublishAssetDialog
+          name={file.name}
+          document={sprite.document}
+          onClose={() => setPublishing(false)}
         />
       )}
       {inserting && (

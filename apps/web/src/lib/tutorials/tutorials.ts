@@ -81,7 +81,7 @@ export const TUTORIALS: Tutorial[] = [
     steps: [
       {
         title: "Your canvas",
-        body: "This is a 16 × 16 tile: every square is one pixel. Scroll to zoom, and hold Space and drag to move around.",
+        body: "This is a 16 × 16 tile: every square is one pixel. Pinch or turn the mouse wheel to zoom; drag with two fingers or the middle button, or hold Space and drag, to move around.",
         keys: ["Space"],
         target: CANVAS,
       },
