@@ -37,6 +37,7 @@ import {
 } from "@/components/pixel-canvas/use-sprite";
 import { Timeline } from "@/components/timeline/timeline";
 import { usePlayback } from "@/components/timeline/use-playback";
+import { assetPixels, assetSize, type Asset } from "@/lib/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
@@ -56,6 +57,7 @@ import {
 } from "@/lib/pigxel-file/import-image";
 import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
 import type { Slice } from "@/lib/slices/slices";
+import { findTutorial } from "@/lib/tutorials/tutorials";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
 import { useModifierLabel } from "../use-modifier-label";
@@ -64,6 +66,7 @@ import { useTileFile } from "../use-tile-file";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
+import { GuideCoach } from "./guide-coach";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
@@ -81,15 +84,20 @@ const ExportDialog = dynamic(() => import("./export-dialog"), { ssr: false });
 const ImportSheetDialog = dynamic(() => import("./import-sheet-dialog"), {
   ssr: false,
 });
+const AssetPickerDialog = dynamic(() => import("./asset-picker-dialog"), {
+  ssr: false,
+});
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
- * left, canvas and timeline in the middle, AI chat on the right.
+ * left, canvas and timeline in the middle, AI chat on the right; with a
+ * tutorial's guide over it when one is open.
  */
 export function Editor({
   userId,
   drive,
   driveError,
+  guide,
   draft,
   image,
 }: EditorProps & { draft: Draft; image: PigxelDocument }) {
@@ -103,6 +111,10 @@ export function Editor({
     picture: Picture;
     scale: number;
   } | null>(null);
+  const [inserting, setInserting] = useState(false);
+  // Counted for the guides, which wait for an asset to be put in.
+  const [inserted, setInserted] = useState(0);
+  const tutorial = findTutorial(guide);
   // Kept while the tile is open, so Export comes back with the last choices.
   const [exportSettings, setExportSettings] =
     useState<ExportSettings>(DEFAULT_EXPORT);
@@ -248,6 +260,27 @@ export function Editor({
     setTool("pen");
   };
 
+  /** Puts an asset's first frame in the middle of the active cel, floating, to be moved into place. */
+  const insertAsset = (asset: Asset) => {
+    const { w, h } = assetSize(asset);
+    const pixels = assetPixels(asset);
+    const mask = new Uint8Array(w * h);
+    for (let i = 0; i < mask.length; i++) mask[i] = pixels[i * 4 + 3] ? 1 : 0;
+    const placed = selection.paste({
+      x: Math.floor((sprite.size.w - w) / 2),
+      y: Math.floor((sprite.size.h - h) / 2),
+      w,
+      h,
+      pixels,
+      mask,
+    });
+    if (placed) {
+      setTool("move");
+      setInserted((n) => n + 1);
+    }
+    return placed;
+  };
+
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
   const editMenu: MenuSections = [
     [
@@ -260,6 +293,7 @@ export function Editor({
       { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
       { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
     ],
+    [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
       {
         label: "Select all",
@@ -576,6 +610,7 @@ export function Editor({
       <div className="flex min-h-0 flex-col">
         <main
           ref={workspace}
+          data-guide="canvas"
           {...pan.handlers}
           className={cn(
             "flex min-h-0 flex-1 overflow-auto bg-muted p-12",
@@ -662,6 +697,31 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {inserting && (
+        <AssetPickerDialog
+          onPick={insertAsset}
+          onClose={() => setInserting(false)}
+        />
+      )}
+      {tutorial && (
+        <GuideCoach
+          key={tutorial.slug}
+          tutorial={tutorial}
+          sprite={sprite}
+          editor={{
+            tool,
+            color: pen.color,
+            frames: sprite.frames.length,
+            onion: view.onion,
+            grid: view.gridSize,
+            playing: playback.playing,
+            exporting,
+            floating: selection.floating,
+            inserted,
+          }}
+          onExit={() => router.replace(editorUrl(draft.id))}
         />
       )}
       {exporting && (

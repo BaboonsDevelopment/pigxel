@@ -47,6 +47,13 @@ export const SparklesIcon = () => (
   </Icon>
 );
 
+export const CubeIcon = () => (
+  <Icon>
+    <path d="M12 3.5 19.5 7.7v8.6L12 20.5l-7.5-4.2V7.7Z" />
+    <path d="M4.5 7.7 12 12l7.5-4.3M12 12v8.5" />
+  </Icon>
+);
+
 export const BookIcon = () => (
   <Icon>
     <path d="M12 6.5c-1.8-1.3-4.3-2-7.5-2v13c3.2 0 5.7.7 7.5 2 1.8-1.3 4.3-2 7.5-2v-13c-3.2 0-5.7.7-7.5 2Z" />

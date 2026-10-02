@@ -23,7 +23,10 @@ export function FrameDuration({
   };
 
   return (
-    <label className="flex items-center gap-1 text-sm">
+    <label
+      data-guide="frame-duration"
+      className="flex items-center gap-1 text-sm"
+    >
       <span className="text-muted-foreground">Duration</span>
       <input
         type="number"

@@ -15,6 +15,11 @@ export function editorUrl(draftId: string) {
   return `/tiles/edit?id=${encodeURIComponent(draftId)}`;
 }
 
+/** The editor for a draft with a tutorial's interactive guide open. */
+export function guideUrl(draftId: string, slug: string) {
+  return `${editorUrl(draftId)}&guide=${encodeURIComponent(slug)}`;
+}
+
 const REFUSED = new PigxelFileError(
   "This browser won’t keep tiles. Allow site data for Pigxel, or remove some tiles from My projects.",
 );

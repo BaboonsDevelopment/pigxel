@@ -42,9 +42,11 @@ export function AppShell({
 
   return (
     <div className="flex h-dvh bg-canvas">
-      {/* Named so page transitions leave the sidebar still. */}
+      {/* Named so page transitions leave the sidebar still. The name makes it
+          a stacking context, so it's raised for the account menu, which opens
+          beside it over the page. */}
       <div
-        className="hidden shrink-0 border-r border-border md:block"
+        className="relative z-30 hidden shrink-0 border-r border-border md:block"
         style={{ viewTransitionName: "app-sidebar" }}
       >
         <Sidebar profile={profile} />

@@ -14,6 +14,14 @@ import {
 } from "@pigxel/ui/components/input";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { AssetSprite } from "@/components/assets/asset-sprite";
+import {
+  assetDocument,
+  assetSize,
+  findAsset,
+  type Asset,
+} from "@/lib/assets/assets";
+import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
@@ -52,17 +60,41 @@ type FormProps = {
   drive: DriveStatus;
   /** Connecting Google Drive was cancelled or failed on the way back. */
   driveError?: boolean;
+  /** An asset to start from, from the Assets page; it sets the size. */
+  assetId?: string;
+  /** A palette to paint from instead of the default one. */
+  paletteId?: string;
 };
 
-/** The new-tile setup: name, size, background, and where the tile is stored. */
-export function NewTileForm(props: FormProps) {
+/**
+ * The new-tile setup: name, size, background, and where the tile is stored;
+ * or, starting from an asset, only the name and where.
+ */
+export function NewTileForm({ assetId, paletteId, ...props }: FormProps) {
   if (!useIsClient()) return <div className="min-h-96" />;
-  return <Form {...props} />;
+  // A different asset or palette starts the form afresh.
+  return (
+    <Form
+      key={`${assetId}:${paletteId}`}
+      {...props}
+      asset={findAsset(assetId)}
+      palette={PALETTE_PRESETS.find((p) => p.id === paletteId) ?? null}
+    />
+  );
 }
 
-function Form({ userId, drive, driveError }: FormProps) {
+function Form({
+  userId,
+  drive,
+  driveError,
+  asset,
+  palette,
+}: Omit<FormProps, "assetId" | "paletteId"> & {
+  asset: Asset | null;
+  palette: PalettePreset | null;
+}) {
   const router = useRouter();
-  const [name, setName] = useState("Untitled");
+  const [name, setName] = useState(asset?.name ?? "Untitled");
   const [width, setWidth] = useState("32");
   const [height, setHeight] = useState("32");
   const [background, setBackground] = useState<Background>("transparent");
@@ -80,7 +112,10 @@ function Form({ userId, drive, driveError }: FormProps) {
   };
 
   const create = async (w: number, h: number) => {
-    const image = blankDocument(w, h, background);
+    const image = asset
+      ? assetDocument(asset)
+      : blankDocument(w, h, background);
+    if (palette && !asset) image.palette = [...palette.colors];
     const file = serializePigxel(image);
     let location: TileLocation | null = null;
     setBusy(true);
@@ -135,6 +170,11 @@ function Form({ userId, drive, driveError }: FormProps) {
       className="space-y-8"
       onSubmit={(e) => {
         e.preventDefault();
+        if (asset) {
+          const { w, h } = assetSize(asset);
+          void create(w, h);
+          return;
+        }
         const w = size(width);
         const h = size(height);
         if (!w || !h) {
@@ -157,69 +197,98 @@ function Form({ userId, drive, driveError }: FormProps) {
         </InputGroup>
       </Field>
 
-      <Field label="Size" hint={`In pixels, up to ${MAX_PIGXEL_SIZE}.`}>
-        <div className="flex flex-wrap items-center gap-2">
-          {PRESETS.map((n) => (
-            <Button
-              key={n}
-              type="button"
-              variant="secondary"
-              aria-pressed={width === String(n) && height === String(n)}
-              onClick={() => {
-                setWidth(String(n));
-                setHeight(String(n));
-              }}
-              className="tabular-nums"
-            >
-              {n}×{n}
-            </Button>
-          ))}
-          <span className="mx-2 h-6 w-px bg-border" aria-hidden="true" />
-          <Input
-            aria-label="Width"
-            type="number"
-            min={1}
-            max={MAX_PIGXEL_SIZE}
-            required
-            value={width}
-            onChange={(e) => setWidth(e.target.value)}
-            className="h-9 w-16 px-1 text-center tabular-nums"
-          />
-          <span className="text-muted-foreground">×</span>
-          <Input
-            aria-label="Height"
-            type="number"
-            min={1}
-            max={MAX_PIGXEL_SIZE}
-            required
-            value={height}
-            onChange={(e) => setHeight(e.target.value)}
-            className="h-9 w-16 px-1 text-center tabular-nums"
-          />
-        </div>
-      </Field>
+      {asset ? (
+        <StartingAsset asset={asset} />
+      ) : (
+        <>
+          <Field label="Size" hint={`In pixels, up to ${MAX_PIGXEL_SIZE}.`}>
+            <div className="flex flex-wrap items-center gap-2">
+              {PRESETS.map((n) => (
+                <Button
+                  key={n}
+                  type="button"
+                  variant="secondary"
+                  aria-pressed={width === String(n) && height === String(n)}
+                  onClick={() => {
+                    setWidth(String(n));
+                    setHeight(String(n));
+                  }}
+                  className="tabular-nums"
+                >
+                  {n}×{n}
+                </Button>
+              ))}
+              <span className="mx-2 h-6 w-px bg-border" aria-hidden="true" />
+              <Input
+                aria-label="Width"
+                type="number"
+                min={1}
+                max={MAX_PIGXEL_SIZE}
+                required
+                value={width}
+                onChange={(e) => setWidth(e.target.value)}
+                className="h-9 w-16 px-1 text-center tabular-nums"
+              />
+              <span className="text-muted-foreground">×</span>
+              <Input
+                aria-label="Height"
+                type="number"
+                min={1}
+                max={MAX_PIGXEL_SIZE}
+                required
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+                className="h-9 w-16 px-1 text-center tabular-nums"
+              />
+            </div>
+          </Field>
 
-      <fieldset>
-        <legend className="mb-3 text-sm font-medium">Background</legend>
-        <div className="grid max-w-lg grid-cols-3 gap-3">
-          {BACKGROUND_OPTIONS.map((option) => (
-            <ChoiceCard key={option.value} className="items-center">
-              <Radio
-                name="background"
-                value={option.value}
-                checked={background === option.value}
-                onChange={() => setBackground(option.value)}
-                className="sr-only"
-              />
-              <span
-                aria-hidden="true"
-                className={cn("size-6 shrink-0 rounded border", option.swatch)}
-              />
-              <span className="text-sm">{option.label}</span>
-            </ChoiceCard>
-          ))}
-        </div>
-      </fieldset>
+          <fieldset>
+            <legend className="mb-3 text-sm font-medium">Background</legend>
+            <div className="grid max-w-lg grid-cols-3 gap-3">
+              {BACKGROUND_OPTIONS.map((option) => (
+                <ChoiceCard key={option.value} className="items-center">
+                  <Radio
+                    name="background"
+                    value={option.value}
+                    checked={background === option.value}
+                    onChange={() => setBackground(option.value)}
+                    className="sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "size-6 shrink-0 rounded border",
+                      option.swatch,
+                    )}
+                  />
+                  <span className="text-sm">{option.label}</span>
+                </ChoiceCard>
+              ))}
+            </div>
+          </fieldset>
+        </>
+      )}
+
+      {palette && !asset && (
+        <Field label="Palette">
+          <div className="flex max-w-lg items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-6 flex-1 overflow-hidden rounded ring-1 ring-black/10"
+            >
+              {palette.colors.map((color) => (
+                <span
+                  key={color}
+                  className="flex-1"
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </span>
+            <span className="shrink-0 text-sm">{palette.name}</span>
+          </div>
+        </Field>
+      )}
 
       <fieldset>
         <legend className="mb-3 text-sm font-medium">Where to keep it</legend>
@@ -300,5 +369,32 @@ function Form({ userId, drive, driveError }: FormProps) {
         </Link>
       </div>
     </form>
+  );
+}
+
+/** The asset a tile starts from: what it looks like, and its size. */
+function StartingAsset({ asset }: { asset: Asset }) {
+  const { w, h } = assetSize(asset);
+  const frames = asset.frames.length;
+  return (
+    <Field label="Starts from">
+      <div className="flex max-w-sm items-center gap-4 rounded-xl border p-3">
+        <span className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-checker">
+          <AssetSprite asset={asset} className="size-12" />
+        </span>
+        <span className="min-w-0 text-sm">
+          <span className="block font-semibold">{asset.name}</span>
+          <span className="block text-muted-foreground tabular-nums">
+            {w} × {h} pixels{frames > 1 && `, ${frames} frames`}
+          </span>
+          <Link
+            href="/tiles/new"
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Start blank instead
+          </Link>
+        </span>
+      </div>
+    </Field>
   );
 }
