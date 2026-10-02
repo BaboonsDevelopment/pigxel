@@ -73,9 +73,12 @@ function unscaled(anim: DecodedAnimation, k: number): DecodedAnimation {
   };
 }
 
-/** Every frame shrunk smoothly to fit within the largest tile, keeping its shape. */
-function fitted(anim: DecodedAnimation): DecodedAnimation {
-  const scale = MAX_PIGXEL_SIZE / Math.max(anim.w, anim.h);
+/** Every frame shrunk smoothly to fit within `box`, keeping its shape. */
+function fitted(
+  anim: DecodedAnimation,
+  box = { w: MAX_PIGXEL_SIZE, h: MAX_PIGXEL_SIZE },
+): DecodedAnimation {
+  const scale = Math.min(box.w / anim.w, box.h / anim.h);
   if (scale >= 1) return anim;
   const w = Math.max(1, Math.round(anim.w * scale));
   const h = Math.max(1, Math.round(anim.h * scale));
@@ -134,19 +137,35 @@ async function readStill(file: File): Promise<DecodedAnimation> {
  * largest tile is shrunk to fit.
  */
 export async function documentFromImage(file: File): Promise<PigxelDocument> {
-  let anim: DecodedAnimation;
+  const anim = await readImage(file);
+  return documentFromFrames(fitted(unscaled(anim, pixelScale(anim))));
+}
+
+/**
+ * A picture file to put on a tile of `size`: its first frame, enlarged pixel
+ * art at its own size, and shrunk to fit the tile when bigger.
+ */
+export async function pictureForTile(
+  file: File,
+  size: { w: number; h: number },
+): Promise<{ rgba: Uint8ClampedArray; w: number; h: number }> {
+  const full = await readImage(file);
+  const first = { ...full, frames: full.frames.slice(0, 1) };
+  const anim = fitted(unscaled(first, pixelScale(first)), size);
+  return { rgba: anim.frames[0]!.rgba, w: anim.w, h: anim.h };
+}
+
+/** Every frame of a picture file at its full size. */
+async function readImage(file: File): Promise<DecodedAnimation> {
   try {
-    anim =
-      /\.gif$/i.test(file.name) || file.type === "image/gif"
-        ? decodeGif(new Uint8Array(await file.arrayBuffer()))
-        : await readStill(file);
+    return /\.gif$/i.test(file.name) || file.type === "image/gif"
+      ? decodeGif(new Uint8Array(await file.arrayBuffer()))
+      : await readStill(file);
   } catch (error) {
     throw error instanceof PigxelFileError
       ? error
       : new PigxelFileError("This picture can’t be opened. Try a PNG or GIF.");
   }
-  anim = fitted(unscaled(anim, pixelScale(anim)));
-  return documentFromFrames(anim);
 }
 
 /** Decoded frames as a tile with one layer, transparent where they are. */

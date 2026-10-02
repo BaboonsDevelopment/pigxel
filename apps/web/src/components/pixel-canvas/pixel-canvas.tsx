@@ -177,6 +177,8 @@ export type PixelCanvasHandle = {
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
+  /** The tile pixel under a point on the screen, or null when it is off the tile. */
+  tilePointAt: (clientX: number, clientY: number) => Point | null;
 };
 
 /** Why typed text draws nothing: the font has none of its letters. */
@@ -402,6 +404,13 @@ export function PixelCanvas({
         return new Promise<Area | null>((resolve) => {
           resolveAiArea.current = resolve;
         });
+      },
+      tilePointAt(clientX, clientY) {
+        const box = screenRef.current?.getBoundingClientRect();
+        if (!box?.width || !box.height) return null;
+        const x = Math.floor(((clientX - box.left) / box.width) * size.w);
+        const y = Math.floor(((clientY - box.top) / box.height) * size.h);
+        return x >= 0 && y >= 0 && x < size.w && y < size.h ? { x, y } : null;
       },
       adjustArea(area) {
         resolveFrame.current?.(null);

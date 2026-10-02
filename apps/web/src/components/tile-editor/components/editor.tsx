@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { choiceDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
@@ -44,6 +45,7 @@ import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { isImageFile, pictureForTile } from "@/lib/pigxel-file/import-image";
 import type { Slice } from "@/lib/slices/slices";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
@@ -368,6 +370,65 @@ export function Editor({
     if (selection.paste(pasteSource(image))) setTool("move");
   });
 
+  // Dropping a file: a picture goes on this tile where it lands (or opens as
+  // a new tile), a .pigxel file opens as a new tile; a dialog asks first.
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
+  const hasFiles = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes("Files");
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDropping(false);
+    const dropped = e.dataTransfer.files[0];
+    if (!dropped) return;
+    const at = canvas.current?.tilePointAt(e.clientX, e.clientY) ?? null;
+    if (!isImageFile(dropped)) {
+      const open = await choiceDialog({
+        title: "Open this tile?",
+        message: `“${dropped.name}” opens in the editor in place of this tile, which stays saved in My projects.`,
+        choices: [{ value: "open", label: "Open" }],
+      });
+      if (open) file.onFileChosen(dropped);
+      return;
+    }
+    const choice = await choiceDialog({
+      title: `Add “${dropped.name}”?`,
+      message: sprite.canPaint
+        ? "Put the picture on this tile where you dropped it, to move into place, or open it as a new tile (this one stays saved in My projects)."
+        : "The active layer is hidden or locked, so the picture can only open as a new tile.",
+      choices: [
+        { value: "new", label: "Open as new tile", variant: "secondary" },
+        ...(sprite.canPaint
+          ? [{ value: "place" as const, label: "Put on this tile" }]
+          : []),
+      ],
+    });
+    if (choice === "new") return file.onFileChosen(dropped);
+    if (choice !== "place") return;
+    try {
+      const { rgba, w, h } = await pictureForTile(dropped, sprite.size);
+      // Centred where it was dropped; the paste keeps it on the tile.
+      const centre = at ?? { x: sprite.size.w / 2, y: sprite.size.h / 2 };
+      const placed = selection.paste({
+        x: Math.round(centre.x - w / 2),
+        y: Math.round(centre.y - h / 2),
+        w,
+        h,
+        pixels: rgba,
+        mask: new Uint8Array(w * h).fill(1),
+      });
+      if (placed) setTool("move");
+    } catch {
+      await choiceDialog({
+        title: "Couldn’t read the picture",
+        message: `“${dropped.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
+        choices: [],
+        cancelLabel: "OK",
+      });
+    }
+  };
+
   useEffect(() => {
     const listener = (e: ClipboardEvent) => void onPaste(e);
     window.addEventListener("paste", listener);
@@ -400,7 +461,39 @@ export function Editor({
   }, []);
 
   return (
-    <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]">
+    <div
+      className="relative grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current++;
+        setDropping(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDropping(false);
+      }}
+      onDrop={(e) => {
+        // The chat box takes pictures dropped on it as attachments.
+        if (e.defaultPrevented) {
+          dragDepth.current = 0;
+          setDropping(false);
+        } else if (hasFiles(e)) void onDrop(e);
+      }}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10 ring-4 ring-primary/40 ring-inset">
+          <p className="rounded-xl bg-background px-5 py-3 text-sm font-medium shadow-lg">
+            Drop a picture or a .pigxel file
+          </p>
+        </div>
+      )}
       <EditorHeader
         file={file}
         fileInput={fileInput}
