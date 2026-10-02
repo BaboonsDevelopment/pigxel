@@ -215,6 +215,50 @@ export function paintStamp(
       }
 }
 
+/** How a colour meets the pixel under it (Aseprite's inks, shading aside). */
+export type BlendMode = "simple" | "alpha" | "copy" | "lockAlpha";
+
+/** `top` laid over `under` as glass: the usual "source over" blend. */
+function over(top: Rgba, under: Rgba): Rgba {
+  const a = top[3] / 255;
+  const b = (under[3] / 255) * (1 - a);
+  const out = a + b;
+  if (!out) return [0, 0, 0, 0];
+  const mix = (c: number) => Math.round((top[c]! * a + under[c]! * b) / out);
+  return [mix(0), mix(1), mix(2), Math.round(out * 255)];
+}
+
+/**
+ * Paints `rgba` (alpha is the stroke's opacity) by `mode`, reading each pixel
+ * from `before`, so a stroke changes a pixel once however often it passes:
+ * "simple" lays a see-through colour over drawn pixels but puts it as it is
+ * on empty ones; "alpha" always lays it over; "copy" puts it as it is,
+ * transparency included; "lockAlpha" colours only drawn pixels, keeping how
+ * opaque each is.
+ */
+export function blendInk(
+  before: Uint8ClampedArray,
+  rgba: Rgba,
+  mode: BlendMode,
+): Ink {
+  if (mode === "copy" || (mode === "simple" && rgba[3] === 255)) return rgba;
+  return (i) => {
+    const under: Rgba = [
+      before[i * 4]!,
+      before[i * 4 + 1]!,
+      before[i * 4 + 2]!,
+      before[i * 4 + 3]!,
+    ];
+    if (mode === "lockAlpha") {
+      if (!under[3]) return null;
+      const [r, g, b] = over(rgba, [under[0], under[1], under[2], 255]);
+      return [r, g, b, under[3]];
+    }
+    if (mode === "simple" && !under[3]) return rgba;
+    return over(rgba, under);
+  };
+}
+
 /**
  * Blur ink: each pixel becomes the average of itself and its neighbours
  * (3×3, inside the tile) in `before`, so a stroke blurs each pixel once.

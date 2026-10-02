@@ -7,7 +7,9 @@ import {
   MAX_SPRAY_SPEED,
   MIN_PEN_SIZE,
   MIN_SPRAY_SPEED,
+  clampOpacity,
   clampPenSize,
+  clampTolerance,
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
 import type {
@@ -109,6 +111,48 @@ export function ToolOptions({
         />
       )}
 
+      {tool === "brush" && !stamp && (
+        <>
+          <OptionSelect
+            label="Shape"
+            title="Line: a calligraphy pen, wide when drawn across its slant and thin along it"
+            value={pen.brushShape}
+            options={[
+              ["round", "Round"],
+              ["line", "Line"],
+            ]}
+            onChange={(brushShape) => onChange({ ...pen, brushShape })}
+          />
+          {pen.brushShape === "line" && (
+            <label
+              className="flex items-center gap-2"
+              title="The line's slant in degrees: 0 lies flat, 45 leans right, 90 stands up, 135 leans left"
+            >
+              <span className="text-muted-foreground">Angle</span>
+              <Input
+                type="number"
+                inputSize="sm"
+                min={0}
+                max={180}
+                step={15}
+                value={pen.brushAngle}
+                onChange={(e) =>
+                  onChange({
+                    ...pen,
+                    brushAngle: Math.max(
+                      0,
+                      Math.min(180, Math.round(Number(e.target.value)) || 0),
+                    ),
+                  })
+                }
+                className="w-14 px-1 text-center tabular-nums"
+              />
+              °
+            </label>
+          )}
+        </>
+      )}
+
       {tool === "spray" && (
         <label
           className="flex items-center gap-2"
@@ -162,16 +206,43 @@ export function ToolOptions({
         tool === "spray" ||
         tool === "contour" ||
         tool === "polygon") && (
-        <OptionSelect
-          label="Ink"
-          title="Shading moves each pixel one step along the palette: left button forwards, right button back"
-          value={pen.ink}
-          options={[
-            ["simple", "Simple"],
-            ["shading", "Shading"],
-          ]}
-          onChange={(ink) => onChange({ ...pen, ink })}
-        />
+        <>
+          <OptionSelect
+            label="Ink"
+            title={INK_TITLES[pen.ink] ?? ""}
+            value={pen.ink}
+            options={[
+              ["simple", "Simple"],
+              ["alpha", "Alpha compositing"],
+              ["copy", "Copy color"],
+              ["lockAlpha", "Lock alpha"],
+              ["shading", "Shading"],
+            ]}
+            onChange={(ink) => onChange({ ...pen, ink })}
+          />
+          {pen.ink !== "shading" && (
+            <label
+              className="flex items-center gap-2"
+              title="How opaque the colour goes on, 0 (clear) to 255 (solid)"
+            >
+              <span className="text-muted-foreground">Opacity</span>
+              <Input
+                type="number"
+                inputSize="sm"
+                min={0}
+                max={255}
+                value={pen.opacity}
+                onChange={(e) =>
+                  onChange({
+                    ...pen,
+                    opacity: clampOpacity(Number(e.target.value)),
+                  })
+                }
+                className="w-14 px-1 text-center tabular-nums"
+              />
+            </label>
+          )}
+        </>
       )}
 
       {paints && (
@@ -264,6 +335,40 @@ export function ToolOptions({
           Contiguous
         </label>
       )}
+      {tool === "bucket" && (
+        <OptionSelect
+          label="Edges from"
+          title="All layers: lines on other layers stop the fill too, while it still paints only the active layer. For colouring under an outline layer"
+          value={pen.fillFrom}
+          options={[
+            ["layer", "This layer"],
+            ["all", "All layers"],
+          ]}
+          onChange={(fillFrom) => onChange({ ...pen, fillFrom })}
+        />
+      )}
+      {(tool === "bucket" || tool === "wand") && (
+        <label
+          className="flex items-center gap-2"
+          title="0 takes only the exact colour; higher also takes shades close to it (each of red, green, blue and alpha at most this far off). Try 20–40 on pictures from the AI"
+        >
+          <span className="text-muted-foreground">Tolerance</span>
+          <Input
+            type="number"
+            inputSize="sm"
+            min={0}
+            max={255}
+            value={pen.tolerance}
+            onChange={(e) =>
+              onChange({
+                ...pen,
+                tolerance: clampTolerance(Number(e.target.value)),
+              })
+            }
+            className="w-14 px-1 text-center tabular-nums"
+          />
+        </label>
+      )}
 
       {(selectionTool || selection.mask) && transforms && (
         <div
@@ -342,6 +447,19 @@ export function ToolOptions({
     </div>
   );
 }
+
+/** What each ink does, for its tooltip. */
+const INK_TITLES: Record<string, string> = {
+  simple:
+    "Paints the colour; a see-through colour lies over drawn pixels and goes on as it is where nothing is drawn",
+  alpha:
+    "Lays the colour over what is there, like glass: a second stroke makes it denser",
+  copy: "Puts the colour exactly, see-through included: a low opacity cuts a see-through hole",
+  lockAlpha:
+    "Colours only what is drawn and keeps how opaque it is: recolour outlines without going outside them",
+  shading:
+    "Moves each pixel one step along the palette: left button forwards, right button back",
+};
 
 const TRANSFORMS: {
   kind: Transform;

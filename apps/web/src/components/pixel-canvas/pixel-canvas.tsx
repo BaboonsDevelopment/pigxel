@@ -44,6 +44,7 @@ import {
 } from "./helpers";
 import {
   inPattern,
+  blendInk,
   blurInk,
   jumbleInk,
   mirrored,
@@ -63,10 +64,14 @@ import {
   SELECTION_TOOLS,
   brushOrigin,
   brushTip,
+  clampOpacity,
+  clampTolerance,
   curvePoints,
   extendStroke,
+  fourConnected,
   fillPoints,
   linePoints,
+  lineTip,
   pixelColor,
   snapLine,
   sprayDotCount,
@@ -449,7 +454,14 @@ export function PixelCanvas({
     tool === "pipette"
       ? 1
       : tipSize(tool);
-  const hoverTip = brushTip(hoverSize, roundTip(tool) || tool === "spray");
+  // The brush can be a calligraphy line instead of round.
+  const lineBrush = (t: PaintTool) =>
+    t === "brush" && pen.brushShape === "line";
+  const tipOf = (t: PaintTool, size: number) =>
+    lineBrush(t)
+      ? lineTip(size, pen.brushAngle)
+      : brushTip(size, roundTip(t) || t === "spray");
+  const hoverTip = tipOf(tool, hoverSize);
   // Tools that don't lay down the pen colour show only the outline of their tip.
   const hoverOutline =
     tool === "pipette" ||
@@ -475,27 +487,40 @@ export function PixelCanvas({
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     const data = new Uint8ClampedArray(current.before);
     const tipPixels = tipSize(current.tool);
-    const tip = brushTip(tipPixels, roundTip(current.tool));
+    const tip = tipOf(current.tool, tipPixels);
     const origin = (p: Point) => brushOrigin(p, tipPixels);
     const start = current.points[0]!;
     const inkTool = current.tool === "pen" || current.tool === "brush";
-    // Shading moves pixels along the palette: forwards with the left button.
+    // The tools with an Ink setting; the rest paint the plain colour.
+    const inked =
+      inkTool ||
+      current.tool === "spray" ||
+      current.tool === "contour" ||
+      current.tool === "polygon";
     const ink: Ink =
       current.tool === "blur"
         ? blurInk(current.before, size)
         : current.tool === "jumble"
           ? jumbleInk(current.before, size, current.seed ?? 0)
-          : (inkTool ||
-                current.tool === "spray" ||
-                current.tool === "contour" ||
-                current.tool === "polygon") &&
-              pen.ink === "shading"
-            ? shadingInk(
-                current.before,
-                sprite.palette,
-                current.secondary ? -1 : 1,
-              )
-            : current.rgba;
+          : !inked
+            ? current.rgba
+            : pen.ink === "shading"
+              ? // Moves pixels along the palette: forwards with the left button.
+                shadingInk(
+                  current.before,
+                  sprite.palette,
+                  current.secondary ? -1 : 1,
+                )
+              : blendInk(
+                  current.before,
+                  [
+                    current.rgba[0],
+                    current.rgba[1],
+                    current.rgba[2],
+                    clampOpacity(pen.opacity),
+                  ],
+                  pen.ink,
+                );
     const paint = (points: Point[], thin = false) =>
       paintPoints(
         data,
@@ -565,7 +590,9 @@ export function PixelCanvas({
       paint(
         current.tool === "pen"
           ? strokePixels(current.points, pen)
-          : current.points,
+          : lineBrush(current.tool)
+            ? fourConnected(current.points)
+            : current.points,
       );
     }
     ctx.putImageData(
@@ -617,19 +644,35 @@ export function PixelCanvas({
     color: string | null,
   ) => {
     const image = ctx.getImageData(0, 0, size.w, size.h);
+    // With "All layers", what is seen (references aside) sets where the fill
+    // stops, e.g. outlines on a layer above; it still paints this layer.
+    const allLayers = pen.fillFrom === "all";
+    const bounds = allLayers
+      ? new ImageData(
+          sprite.composite(["reference"]) as Uint8ClampedArray<ArrayBuffer>,
+          size.w,
+          size.h,
+        )
+      : image;
     let changed = false;
     for (const copy of mirrored(point, size, symmetry)) {
       const at = wrapPixel(copy.x, copy.y, size, tiled);
       // Inside a selection, only a click on it fills.
       if (!at || (mask && !isSelected(mask, size, at))) continue;
       const start = (at.y * size.w + at.x) * 4;
-      if (rgba.every((v, c) => image.data[start + c] === v)) continue;
-      for (const i of fillPoints(image, at, pen.contiguous)) {
+      if (!allLayers && rgba.every((v, c) => image.data[start + c] === v))
+        continue;
+      for (const i of fillPoints(
+        bounds,
+        at,
+        pen.contiguous,
+        clampTolerance(pen.tolerance),
+      )) {
         if (mask && !mask[i]) continue;
         if (!inPattern(i % size.w, Math.floor(i / size.w), pen.density))
           continue;
+        if (rgba.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
         image.data.set(rgba, i * 4);
-        changed = true;
       }
     }
     if (!changed) return;
@@ -652,7 +695,10 @@ export function PixelCanvas({
     }
     if (tool === "wand") {
       const cel = sprite.readCel(sprite.layerId, sprite.frameId);
-      selection.select(wandMask(cel, size, p, pen.contiguous), mode);
+      selection.select(
+        wandMask(cel, size, p, pen.contiguous, clampTolerance(pen.tolerance)),
+        mode,
+      );
       return;
     }
     if (tool === "polygonLasso")

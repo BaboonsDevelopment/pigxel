@@ -73,18 +73,19 @@ export function polygonMask(size: Size, points: Point[]): Mask {
   return mask;
 }
 
-/** The pixels of `pixels` (RGBA of the tile) the magic wand picks with a click at `start`. */
+/** The pixels of `pixels` (RGBA of the tile) the magic wand picks with a click at `start`; see fillPoints. */
 export function wandMask(
   pixels: Uint8ClampedArray,
   size: Size,
   start: Point,
   contiguous: boolean,
+  tolerance = 0,
 ): Mask {
   const mask = new Uint8Array(size.w * size.h);
   if (start.x < 0 || start.y < 0 || start.x >= size.w || start.y >= size.h)
     return mask;
   const image = { width: size.w, height: size.h, data: pixels };
-  for (const i of fillPoints(image as ImageData, start, contiguous))
+  for (const i of fillPoints(image as ImageData, start, contiguous, tolerance))
     mask[i] = 1;
   return mask;
 }

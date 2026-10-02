@@ -1,5 +1,5 @@
 import { linePoints, type Point } from "@/lib/edit/raster";
-import type { GradientDither, GradientShape } from "./paint";
+import type { BlendMode, GradientDither, GradientShape } from "./paint";
 import type { TextFont } from "./text";
 
 // The tools draw with the same pixel lines as AI edits.
@@ -55,7 +55,9 @@ export type PenSettings = {
    * How the pen and brush change pixels: "simple" paints the colour,
    * "shading" moves each pixel one step along the palette (Aseprite's shading ink).
    */
-  ink: "simple" | "shading";
+  ink: BlendMode | "shading";
+  /** How opaque the colour the pen, brush, spray and fills paint is, 0–255. */
+  opacity: number;
   /** How much of what the tools cover gets painted, in %: under 100 dithers. */
   density: number;
   /** Width and height of the square pen and line, in tile pixels. */
@@ -64,6 +66,10 @@ export type PenSettings = {
   pixelPerfect: boolean;
   /** Diameter of the round brush, in tile pixels. */
   brushSize: number;
+  /** The brush's tip: round, or a line at `brushAngle` like a calligraphy pen. */
+  brushShape: "round" | "line";
+  /** The line tip's angle in degrees, 0–180: 0 lies flat, 90 stands up. */
+  brushAngle: number;
   /** Width and height of the square eraser, in tile pixels. */
   eraserSize: number;
   /** Radius of the circle the spray scatters dots in, in tile pixels. */
@@ -72,6 +78,10 @@ export type PenSettings = {
   spraySpeed: number;
   /** The bucket and magic wand take only the connected area, not every pixel of that colour. */
   contiguous: boolean;
+  /** Where the bucket finds the edges of what it fills: the active layer, or all visible layers. */
+  fillFrom: "layer" | "all";
+  /** How far (0–255, per channel) a colour may be from the clicked one for the bucket and wand to take it. */
+  tolerance: number;
   /** The gradient runs along the dragged line, or out from its start. */
   gradientShape: GradientShape;
   /** The gradient keeps to its two colours in an ordered dither, or mixes them. */
@@ -90,14 +100,19 @@ export const DEFAULT_PEN: PenSettings = {
   recent: [],
   fillShapes: false,
   ink: "simple",
+  opacity: 255,
   density: 100,
   size: 1,
   pixelPerfect: true,
   brushSize: 3,
   eraserSize: 1,
+  brushShape: "round",
+  brushAngle: 45,
   sprayWidth: 4,
   spraySpeed: 40,
   contiguous: true,
+  tolerance: 0,
+  fillFrom: "layer",
   gradientShape: "linear",
   gradientDither: "bayer4",
   textFont: "tiny5",
@@ -131,6 +146,20 @@ export function sprayDots(
       y: Math.round(center.y + Math.sin(angle) * distance),
     };
   });
+}
+
+/** An opacity of 0–255; anything unusable is fully opaque. */
+export function clampOpacity(value: number) {
+  return Number.isFinite(value)
+    ? Math.max(0, Math.min(255, Math.round(value)))
+    : 255;
+}
+
+/** A tolerance of 0–255; anything unusable is 0, the exact colour only. */
+export function clampTolerance(value: number) {
+  return Number.isFinite(value)
+    ? Math.max(0, Math.min(255, Math.round(value)))
+    : 0;
 }
 
 export function clampPenSize(size: number) {
@@ -238,6 +267,36 @@ export function brushTip(size: number, round: boolean): TipRect[] {
   return rows;
 }
 
+/**
+ * A calligraphy tip: a line `size` pixels long at `angle` degrees (0 lies
+ * flat, 90 stands up, counter-clockwise), centred like the other tips.
+ * Strokes across it come out wide and strokes along it thin.
+ */
+export function lineTip(size: number, angle: number): TipRect[] {
+  const centre = (size - 1) / 2;
+  // Settings saved before there was an angle have none: 45° stands in.
+  const rad = ((Number.isFinite(angle) ? angle : 45) * Math.PI) / 180;
+  const dx = Math.cos(rad) * centre;
+  const dy = -Math.sin(rad) * centre;
+  return linePoints(
+    { x: Math.round(centre - dx), y: Math.round(centre - dy) },
+    { x: Math.round(centre + dx), y: Math.round(centre + dy) },
+  ).map((p) => ({ dx: p.x, dy: p.y, w: 1, h: 1 }));
+}
+
+/**
+ * The stroke with a sideways step added at every diagonal one, so a line tip
+ * dragged across its own slant leaves no holes.
+ */
+export function fourConnected(stroke: Point[]): Point[] {
+  return stroke.flatMap((p, i) => {
+    const prev = stroke[i - 1];
+    return prev && prev.x !== p.x && prev.y !== p.y
+      ? [{ x: p.x, y: prev.y }, p]
+      : [p];
+  });
+}
+
 /** The end of a shape dragged from `from` to `to`, made a square when `square`. */
 export function squareFrom(from: Point, to: Point, square: boolean): Point {
   if (!square) return to;
@@ -265,30 +324,35 @@ export function snapLine(from: Point, to: Point): Point {
   };
 }
 
-/** The pixels of `image` a bucket click at `start` repaints. */
+/**
+ * The pixels of `image` a bucket click at `start` repaints: those of the
+ * clicked colour, or with `tolerance` (0–255) also those whose every channel
+ * (red, green, blue, alpha) is at most that far from it, as in Aseprite.
+ */
 export function fillPoints(
   image: ImageData,
   start: Point,
   contiguous: boolean,
+  tolerance = 0,
 ): number[] {
   const { width, height, data } = image;
-  const at = (i: number) =>
-    data[i * 4]! |
-    (data[i * 4 + 1]! << 8) |
-    (data[i * 4 + 2]! << 16) |
-    (data[i * 4 + 3]! << 24);
   const first = start.y * width + start.x;
-  const target = at(first);
+  const target = [0, 1, 2, 3].map((c) => data[first * 4 + c]!);
+  const like = (i: number) => {
+    for (let c = 0; c < 4; c++)
+      if (Math.abs(data[i * 4 + c]! - target[c]!) > tolerance) return false;
+    return true;
+  };
   const out: number[] = [];
   if (!contiguous) {
-    for (let i = 0; i < width * height; i++) if (at(i) === target) out.push(i);
+    for (let i = 0; i < width * height; i++) if (like(i)) out.push(i);
     return out;
   }
   const seen = new Uint8Array(width * height);
   const stack = [first];
   seen[first] = 1;
   for (let i = stack.pop(); i !== undefined; i = stack.pop()) {
-    if (at(i) !== target) continue;
+    if (!like(i)) continue;
     out.push(i);
     const x = i % width;
     const next = [

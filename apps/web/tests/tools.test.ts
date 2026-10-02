@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import {
+  blendInk,
   blurInk,
   jumbleInk,
   gradientAt,
@@ -132,6 +133,35 @@ describe("curve", () => {
     expect(curvePoints(start, start, end, end)).toEqual(
       [0, 1, 2, 3, 4, 5].map((x) => ({ x, y: 0 })),
     );
+  });
+});
+
+describe("inks", () => {
+  // A drawn red pixel, then an empty one.
+  const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
+  const halfBlack = [0, 0, 0, 128] as const;
+  const at = (ink: unknown, i: number) => (ink as (i: number) => unknown)(i);
+
+  it("simple lays a see-through colour over drawn pixels, as it is on empty ones", () => {
+    const ink = blendInk(before, halfBlack, "simple");
+    expect(at(ink, 0)).toEqual([127, 0, 0, 255]);
+    expect(at(ink, 1)).toEqual(halfBlack);
+    expect(blendInk(before, BLACK, "simple")).toEqual(BLACK);
+  });
+  it("alpha compositing lays it over empty pixels too", () => {
+    expect(at(blendInk(before, halfBlack, "alpha"), 1)).toEqual(halfBlack);
+    expect(at(blendInk(before, halfBlack, "alpha"), 0)).toEqual([
+      127, 0, 0, 255,
+    ]);
+  });
+  it("copy colour puts the colour exactly, see-through included", () => {
+    expect(blendInk(before, halfBlack, "copy")).toEqual(halfBlack);
+  });
+  it("lock alpha colours only drawn pixels and keeps their opacity", () => {
+    const faint = new Uint8ClampedArray([255, 0, 0, 100, 0, 0, 0, 0]);
+    const ink = blendInk(faint, BLACK, "lockAlpha");
+    expect(at(ink, 0)).toEqual([0, 0, 0, 100]);
+    expect(at(ink, 1)).toBeNull();
   });
 });
 
