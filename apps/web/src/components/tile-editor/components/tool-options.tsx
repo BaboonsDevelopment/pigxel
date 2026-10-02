@@ -4,8 +4,12 @@ import { Input } from "@pigxel/ui/components/input";
 import type { Stamp } from "@/components/pixel-canvas/paint";
 import {
   MAX_PEN_SIZE,
+  MAX_SPRAY_SPEED,
   MIN_PEN_SIZE,
+  MIN_SPRAY_SPEED,
+  clampOpacity,
   clampPenSize,
+  clampTolerance,
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
 import type {
@@ -13,8 +17,11 @@ import type {
   Transform,
 } from "@/components/pixel-canvas/use-selection";
 import type { CanvasView } from "@/components/pixel-canvas/view";
+import { TEXT_FONTS, TEXT_SCALES } from "@/components/pixel-canvas/text";
+import type { Slice } from "@/lib/slices/slices";
 import type { ToolId } from "../constants";
 import { sizeKey } from "../helpers";
+import { SliceOptions } from "./slice-options";
 
 /** The settings of the selected tool, shown above the canvas, and the canvas-wide modes. */
 export function ToolOptions({
@@ -27,6 +34,9 @@ export function ToolOptions({
   stamp,
   onClearStamp,
   onUseAsBrush,
+  slice,
+  onSliceChange,
+  onSliceDelete,
 }: {
   tool: ToolId;
   pen: PenSettings;
@@ -38,18 +48,37 @@ export function ToolOptions({
   stamp: Stamp | null;
   onClearStamp: () => void;
   onUseAsBrush: () => void;
+  /** The slice picked with the Slice tool, if any. */
+  slice: Slice | null;
+  onSliceChange: (slice: Slice) => void;
+  onSliceDelete: () => void;
 }) {
   const key = sizeKey(tool);
   const selectionTool =
     tool === "marquee" ||
+    tool === "ellipseMarquee" ||
     tool === "lasso" ||
+    tool === "polygonLasso" ||
     tool === "wand" ||
     tool === "move";
   // The Move tool flips and turns the whole layer when nothing is selected.
   const transforms = selection.mask !== null || tool === "move";
   const inkTool = tool === "pen" || tool === "brush";
   const paints =
-    inkTool || ["eraser", "line", "rect", "ellipse", "bucket"].includes(tool);
+    inkTool ||
+    [
+      "spray",
+      "contour",
+      "polygon",
+      "blur",
+      "jumble",
+      "eraser",
+      "line",
+      "curve",
+      "rect",
+      "ellipse",
+      "bucket",
+    ].includes(tool);
   return (
     <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       {inkTool && stamp && (
@@ -70,13 +99,90 @@ export function ToolOptions({
 
       {key && !(inkTool && stamp) && (
         <SizeField
-          label={tool === "brush" ? "Brush size" : "Size"}
+          label={
+            tool === "brush"
+              ? "Brush size"
+              : tool === "spray"
+                ? "Width"
+                : "Size"
+          }
           value={pen[key]}
           onChange={(size) => onChange({ ...pen, [key]: clampPenSize(size) })}
         />
       )}
 
-      {tool === "pen" && (
+      {tool === "brush" && !stamp && (
+        <>
+          <OptionSelect
+            label="Shape"
+            title="Line: a calligraphy pen, wide when drawn across its slant and thin along it"
+            value={pen.brushShape}
+            options={[
+              ["round", "Round"],
+              ["line", "Line"],
+            ]}
+            onChange={(brushShape) => onChange({ ...pen, brushShape })}
+          />
+          {pen.brushShape === "line" && (
+            <label
+              className="flex items-center gap-2"
+              title="The line's slant in degrees: 0 lies flat, 45 leans right, 90 stands up, 135 leans left"
+            >
+              <span className="text-muted-foreground">Angle</span>
+              <Input
+                type="number"
+                inputSize="sm"
+                min={0}
+                max={180}
+                step={15}
+                value={pen.brushAngle}
+                onChange={(e) =>
+                  onChange({
+                    ...pen,
+                    brushAngle: Math.max(
+                      0,
+                      Math.min(180, Math.round(Number(e.target.value)) || 0),
+                    ),
+                  })
+                }
+                className="w-14 px-1 text-center tabular-nums"
+              />
+              °
+            </label>
+          )}
+        </>
+      )}
+
+      {tool === "spray" && (
+        <label
+          className="flex items-center gap-2"
+          title="How fast dots appear while you hold the button"
+        >
+          <span className="text-muted-foreground">Speed</span>
+          <Input
+            type="number"
+            inputSize="sm"
+            min={MIN_SPRAY_SPEED}
+            max={MAX_SPRAY_SPEED}
+            value={pen.spraySpeed}
+            onChange={(e) =>
+              onChange({
+                ...pen,
+                spraySpeed: Math.max(
+                  MIN_SPRAY_SPEED,
+                  Math.min(
+                    MAX_SPRAY_SPEED,
+                    Math.round(Number(e.target.value) || MIN_SPRAY_SPEED),
+                  ),
+                ),
+              })
+            }
+            className="w-14 px-1 text-center tabular-nums"
+          />
+        </label>
+      )}
+
+      {(tool === "pen" || tool === "curve") && (
         <label
           className="flex items-center gap-2 has-disabled:opacity-50"
           title={
@@ -96,17 +202,47 @@ export function ToolOptions({
         </label>
       )}
 
-      {inkTool && !stamp && (
-        <OptionSelect
-          label="Ink"
-          title="Shading moves each pixel one step along the palette: left button forwards, right button back"
-          value={pen.ink}
-          options={[
-            ["simple", "Simple"],
-            ["shading", "Shading"],
-          ]}
-          onChange={(ink) => onChange({ ...pen, ink })}
-        />
+      {((inkTool && !stamp) ||
+        tool === "spray" ||
+        tool === "contour" ||
+        tool === "polygon") && (
+        <>
+          <OptionSelect
+            label="Ink"
+            title={INK_TITLES[pen.ink] ?? ""}
+            value={pen.ink}
+            options={[
+              ["simple", "Simple"],
+              ["alpha", "Alpha compositing"],
+              ["copy", "Copy color"],
+              ["lockAlpha", "Lock alpha"],
+              ["shading", "Shading"],
+            ]}
+            onChange={(ink) => onChange({ ...pen, ink })}
+          />
+          {pen.ink !== "shading" && (
+            <label
+              className="flex items-center gap-2"
+              title="How opaque the colour goes on, 0 (clear) to 255 (solid)"
+            >
+              <span className="text-muted-foreground">Opacity</span>
+              <Input
+                type="number"
+                inputSize="sm"
+                min={0}
+                max={255}
+                value={pen.opacity}
+                onChange={(e) =>
+                  onChange({
+                    ...pen,
+                    opacity: clampOpacity(Number(e.target.value)),
+                  })
+                }
+                className="w-14 px-1 text-center tabular-nums"
+              />
+            </label>
+          )}
+        </>
       )}
 
       {paints && (
@@ -134,6 +270,59 @@ export function ToolOptions({
         </label>
       )}
 
+      {tool === "slice" && slice && (
+        <SliceOptions
+          slice={slice}
+          onChange={onSliceChange}
+          onDelete={onSliceDelete}
+        />
+      )}
+
+      {tool === "text" && (
+        <>
+          <OptionSelect
+            label="Font"
+            title={TEXT_FONTS.find((f) => f.id === pen.textFont)?.title ?? ""}
+            value={pen.textFont}
+            options={TEXT_FONTS.map((f) => [f.id, f.label])}
+            onChange={(textFont) => onChange({ ...pen, textFont })}
+          />
+          <OptionSelect
+            label="Size"
+            title="How many times bigger than the font's own pixels"
+            value={String(pen.textScale)}
+            options={TEXT_SCALES.map((n) => [String(n), `${n}×`])}
+            onChange={(scale) => onChange({ ...pen, textScale: Number(scale) })}
+          />
+        </>
+      )}
+
+      {tool === "gradient" && (
+        <>
+          <OptionSelect
+            label="Shape"
+            title="Linear runs along the line; radial spreads out from where you start"
+            value={pen.gradientShape}
+            options={[
+              ["linear", "Linear"],
+              ["radial", "Radial"],
+            ]}
+            onChange={(gradientShape) => onChange({ ...pen, gradientShape })}
+          />
+          <OptionSelect
+            label="Dither"
+            title="A dither keeps to the two colours; Smooth mixes them into new shades"
+            value={pen.gradientDither}
+            options={[
+              ["bayer4", "Ordered 4×4"],
+              ["bayer8", "Ordered 8×8"],
+              ["none", "Smooth"],
+            ]}
+            onChange={(gradientDither) => onChange({ ...pen, gradientDither })}
+          />
+        </>
+      )}
+
       {(tool === "bucket" || tool === "wand") && (
         <label
           className="flex items-center gap-2"
@@ -144,6 +333,40 @@ export function ToolOptions({
             onChange={(e) => onChange({ ...pen, contiguous: e.target.checked })}
           />
           Contiguous
+        </label>
+      )}
+      {tool === "bucket" && (
+        <OptionSelect
+          label="Edges from"
+          title="All layers: lines on other layers stop the fill too, while it still paints only the active layer. For colouring under an outline layer"
+          value={pen.fillFrom}
+          options={[
+            ["layer", "This layer"],
+            ["all", "All layers"],
+          ]}
+          onChange={(fillFrom) => onChange({ ...pen, fillFrom })}
+        />
+      )}
+      {(tool === "bucket" || tool === "wand") && (
+        <label
+          className="flex items-center gap-2"
+          title="0 takes only the exact colour; higher also takes shades close to it (each of red, green, blue and alpha at most this far off). Try 20–40 on pictures from the AI"
+        >
+          <span className="text-muted-foreground">Tolerance</span>
+          <Input
+            type="number"
+            inputSize="sm"
+            min={0}
+            max={255}
+            value={pen.tolerance}
+            onChange={(e) =>
+              onChange({
+                ...pen,
+                tolerance: clampTolerance(Number(e.target.value)),
+              })
+            }
+            className="w-14 px-1 text-center tabular-nums"
+          />
         </label>
       )}
 
@@ -225,6 +448,19 @@ export function ToolOptions({
   );
 }
 
+/** What each ink does, for its tooltip. */
+const INK_TITLES: Record<string, string> = {
+  simple:
+    "Paints the colour; a see-through colour lies over drawn pixels and goes on as it is where nothing is drawn",
+  alpha:
+    "Lays the colour over what is there, like glass: a second stroke makes it denser",
+  copy: "Puts the colour exactly, see-through included: a low opacity cuts a see-through hole",
+  lockAlpha:
+    "Colours only what is drawn and keeps how opaque it is: recolour outlines without going outside them",
+  shading:
+    "Moves each pixel one step along the palette: left button forwards, right button back",
+};
+
 const TRANSFORMS: {
   kind: Transform;
   label: string;
@@ -252,7 +488,7 @@ const TRANSFORMS: {
   {
     kind: "rotateRight",
     label: "Rotate right",
-    title: "Rotate 90° to the right (Shift+R)",
+    title: "Rotate 90° to the right",
     icon: "↻",
   },
 ];
@@ -292,16 +528,35 @@ const SELECT_HINT =
 const HINTS: Record<ToolId, string> = {
   pen: PAINT_HINT,
   brush: PAINT_HINT,
+  spray:
+    "Hold to scatter dots; the longer you hold, the denser · Right button sprays the secondary colour · Alt+click picks a colour",
+  contour:
+    "Draw around a shape; it closes and fills as you go · Right button fills with the secondary colour · Alt+click picks a colour",
+  polygon:
+    "Click to place corners · Click the first one, double-click or Enter fills it · Shift snaps to 45° · Esc cancels · Right button uses the secondary colour",
+  blur: "Drag over an edge to soften it; it adds in-between colours · Each stroke blurs once more",
+  jumble:
+    "Drag over an edge to make it ragged; no new colours · Each stroke jumbles more",
+  text: "Click where the text goes and type · Enter puts it on the tile to move into place · Esc cancels · Right-click uses the secondary colour",
+  slice:
+    "Drag to mark a part of the tile · Click a slice to pick it, drag to move it · Del removes it · Export saves each slice as its own PNG",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",
+  curve:
+    "Drag the ends, then drag to bend it, then drag again to bend its far end · Enter keeps it as it is · Esc cancels",
   rect: "Drag to draw · Shift makes a square · Right button uses the secondary colour",
   ellipse:
     "Drag to draw · Shift makes a circle · Right button uses the secondary colour",
   bucket: "Click fills · Right-click fills with the secondary colour",
+  gradient:
+    "Drag from the primary colour to the secondary · Fills the selection, or the whole layer · Shift snaps to 45° · Right button swaps the colours",
   pipette: "Click picks the primary colour · Right-click the secondary",
   marquee: SELECT_HINT,
+  ellipseMarquee: `Shift while dragging makes a circle · ${SELECT_HINT}`,
   lasso: `Draw around the pixels · ${SELECT_HINT}`,
+  polygonLasso:
+    "Click to place corners · Click the first one, double-click or Enter closes · Esc cancels · Shift adds · Alt takes away",
   wand: "Click selects a colour area · Shift adds · Alt takes away",
   move: "Drag moves the selection, or the whole layer · Arrow keys nudge · Enter drops",
 };

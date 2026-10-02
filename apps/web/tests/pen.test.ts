@@ -5,7 +5,9 @@ import {
   clampPenSize,
   extendStroke,
   fillPoints,
+  fourConnected,
   linePoints,
+  lineTip,
   pixelColor,
   pixelPerfect,
   snapLine,
@@ -132,6 +134,28 @@ describe("brushTip", () => {
   });
 });
 
+describe("lineTip", () => {
+  const cells = (size: number, angle: number) =>
+    lineTip(size, angle).map((r) => [r.dx, r.dy]);
+  it("lies flat, stands up or leans, centred in the tip", () => {
+    expect(cells(5, 0)).toEqual([0, 1, 2, 3, 4].map((x) => [x, 2]));
+    expect(cells(5, 90)).toEqual([4, 3, 2, 1, 0].map((y) => [2, y]));
+    expect(cells(3, 45)).toEqual([
+      [0, 2],
+      [1, 1],
+      [2, 0],
+    ]);
+  });
+  it("adds a sideways step at each diagonal one, so strokes leave no holes", () => {
+    expect(fourConnected([p(0, 0), p(1, 1), p(2, 1)])).toEqual([
+      p(0, 0),
+      p(1, 0),
+      p(1, 1),
+      p(2, 1),
+    ]);
+  });
+});
+
 describe("snapLine", () => {
   it("snaps to horizontal, vertical and diagonal lines", () => {
     expect(snapLine(p(0, 0), p(10, 2))).toEqual(p(10, 0));
@@ -151,6 +175,24 @@ describe("fillPoints", () => {
   });
   it("does not wrap around the image edges", () => {
     expect(fillPoints(image(["r.", ".r"]), p(1, 1), true)).toEqual([3]);
+  });
+  it("takes close shades too, up to the tolerance on every channel", () => {
+    // A sky of three blues a few steps apart, and a white cloud.
+    const sky = {
+      width: 4,
+      height: 1,
+      data: new Uint8ClampedArray([
+        ...[40, 90, 200, 255],
+        ...[44, 95, 210, 255],
+        ...[50, 100, 230, 255],
+        ...[255, 255, 255, 255],
+      ]),
+    } as ImageData;
+    expect(fillPoints(sky, p(0, 0), true)).toEqual([0]);
+    expect(fillPoints(sky, p(0, 0), true, 10).sort()).toEqual([0, 1]);
+    expect(fillPoints(sky, p(0, 0), true, 30).sort()).toEqual([0, 1, 2]);
+    // Measured from the clicked colour, not from step to step.
+    expect(fillPoints(sky, p(0, 0), false, 20).sort()).toEqual([0, 1]);
   });
 });
 

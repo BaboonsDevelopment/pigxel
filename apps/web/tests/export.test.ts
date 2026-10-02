@@ -270,6 +270,7 @@ describe("exporting a tile", () => {
     frameId: "f2",
     background: "transparent",
     picture: (id) => solid(2, 2, id === "f1" ? red : halfBlue),
+    slices: [],
   };
   const settings = (patch: Partial<ExportSettings>): ExportSettings => ({
     ...DEFAULT_EXPORT,
@@ -309,6 +310,83 @@ describe("exporting a tile", () => {
     expect([gif.width, gif.height]).toEqual([4, 4]);
     expect(gif.frames.map((f) => f.delay)).toEqual([10, 20]);
     expect(framePixels(gif, 0)).toEqual(solid(4, 4, red));
+  });
+
+  it("saves each slice of the frame on screen, named after it", () => {
+    const wide: ExportSource = {
+      ...source,
+      size: { w: 4, h: 2 },
+      picture: () => {
+        const rgba = solid(4, 2, red);
+        rgba.set(halfBlue, 3 * 4);
+        return rgba;
+      },
+      slices: [
+        {
+          id: "a",
+          name: "door",
+          bounds: { x: 2, y: 0, w: 2, h: 2 },
+          center: null,
+          pivot: null,
+        },
+        {
+          id: "b",
+          name: "door",
+          bounds: { x: 3, y: 1, w: 5, h: 5 },
+          center: null,
+          pivot: null,
+        },
+        {
+          id: "c",
+          name: "gone",
+          bounds: { x: 9, y: 9, w: 2, h: 2 },
+          center: null,
+          pivot: null,
+        },
+      ],
+    };
+    const files = exportFiles(wide, settings({ format: "slices", scale: 2 }));
+    expect(files.map((f) => f.name)).toEqual(["door.png", "door 2.png"]);
+    const [door, cut] = files;
+    if (!("image" in door!) || !("image" in cut!))
+      throw new Error("expected pictures");
+    expect([door.image.w, door.image.h]).toEqual([4, 4]);
+    expect(pixel(door.image.rgba, 4, 2, 0)).toEqual(halfBlue);
+    // Only the part on the tile is saved.
+    expect([cut.image.w, cut.image.h]).toEqual([2, 2]);
+  });
+
+  it("lists slices in sheet data, scaled, as Aseprite does", () => {
+    const [, json] = exportFiles(
+      {
+        ...source,
+        slices: [
+          {
+            id: "a",
+            name: "frame",
+            bounds: { x: 0, y: 0, w: 2, h: 2 },
+            center: { x: 1, y: 1, w: 0, h: 0 },
+            pivot: null,
+          },
+        ],
+      },
+      settings({ format: "sheet", sheetData: true, scale: 3 }),
+    );
+    if (!("data" in json!) || typeof json.data !== "string")
+      throw new Error("expected text");
+    expect(JSON.parse(json.data).meta.slices).toEqual([
+      {
+        name: "frame",
+        color: "#0000ffff",
+        keys: [
+          {
+            frame: 0,
+            bounds: { x: 0, y: 0, w: 6, h: 6 },
+            center: { x: 3, y: 3, w: 0, h: 0 },
+          },
+        ],
+      },
+    ]);
   });
 
   it("saves a sheet and, when asked, its JSON", () => {

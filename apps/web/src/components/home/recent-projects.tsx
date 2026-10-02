@@ -7,7 +7,7 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
-import { useIsClient } from "@/lib/use-is-client";
+import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import {
   confirmRemoveLocalTile,
   useCloudTileActions,
@@ -70,7 +70,7 @@ export function RecentProjects(props: {
   limit: number;
 }) {
   // Local tiles live in this browser's storage, so the row waits for the client.
-  if (!useIsClient()) return <div className="min-h-44" />;
+  if (!useDraftsLoaded(props.userId)) return <div className="min-h-44" />;
   return <Row {...props} />;
 }
 

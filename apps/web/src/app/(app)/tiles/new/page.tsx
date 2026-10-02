@@ -11,7 +11,12 @@ export const dynamic = "force-dynamic";
 export default async function NewTile({
   searchParams,
 }: {
-  searchParams: Promise<{ drive?: string; asset?: string; palette?: string }>;
+  searchParams: Promise<{
+    drive?: string;
+    asset?: string;
+    palette?: string;
+    from?: string;
+  }>;
 }) {
   const user = await requireUser();
   const [params, drive] = await Promise.all([
@@ -27,6 +32,7 @@ export default async function NewTile({
         driveError={params.drive === "error"}
         assetId={params.asset}
         paletteId={params.palette}
+        from={params.from}
       />
     </Page>
   );

@@ -39,6 +39,76 @@ export function inPattern(x: number, y: number, density = 100) {
   return density >= 100 || BAYER[y & 3]![x & 3]! < (density / 100) * 16;
 }
 
+/** How the gradient tool spreads its colours: along the line, or out from its start. */
+export type GradientShape = "linear" | "radial";
+
+/** How the gradient tool blends: mixed colours, or an ordered dither of the two. */
+export type GradientDither = "none" | "bayer4" | "bayer8";
+
+/** The 8×8 Bayer matrix, built from the 4×4 one: values 0–63. */
+function bayer8(x: number, y: number) {
+  const corner = [
+    [0, 2],
+    [3, 1],
+  ][(y >> 2) & 1]![(x >> 2) & 1]!;
+  return 4 * BAYER[y & 3]![x & 3]! + corner;
+}
+
+/** How far (0–1) the pixel (x, y) is along a gradient dragged from `from` to `to`. */
+export function gradientAt(
+  x: number,
+  y: number,
+  from: Point,
+  to: Point,
+  shape: GradientShape,
+): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const clamp = (t: number) => Math.max(0, Math.min(1, t));
+  if (shape === "radial") {
+    const radius = Math.hypot(dx, dy);
+    return radius ? clamp(Math.hypot(x - from.x, y - from.y) / radius) : 0;
+  }
+  const length = dx * dx + dy * dy;
+  return length ? clamp(((x - from.x) * dx + (y - from.y) * dy) / length) : 0;
+}
+
+/**
+ * Fills `data` (RGBA of the whole tile), or the masked part of it, with a
+ * gradient from `start` at `from` to `end` at `to`. A dither keeps to the
+ * two colours; without one they are mixed, which makes new shades.
+ */
+export function paintGradient(
+  data: Uint8ClampedArray,
+  from: Point,
+  to: Point,
+  start: Rgba,
+  end: Rgba,
+  shape: GradientShape,
+  dither: GradientDither,
+  options: Pick<PaintOptions, "size" | "mask">,
+) {
+  const { size, mask } = options;
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const i = y * size.w + x;
+      if (mask && !mask[i]) continue;
+      const t = gradientAt(x, y, from, to, shape);
+      if (dither === "none") {
+        data.set(
+          start.map((v, c) => Math.round(v + (end[c]! - v) * t)),
+          i * 4,
+        );
+        continue;
+      }
+      const threshold =
+        dither === "bayer8"
+          ? (bayer8(x, y) + 0.5) / 64
+          : (BAYER[y & 3]![x & 3]! + 0.5) / 16;
+      data.set(t > threshold ? end : start, i * 4);
+    }
+}
+
 const mod = (value: number, n: number) => ((value % n) + n) % n;
 
 /**
@@ -143,6 +213,110 @@ export function paintStamp(
           options,
         );
       }
+}
+
+/** How a colour meets the pixel under it (Aseprite's inks, shading aside). */
+export type BlendMode = "simple" | "alpha" | "copy" | "lockAlpha";
+
+/** `top` laid over `under` as glass: the usual "source over" blend. */
+function over(top: Rgba, under: Rgba): Rgba {
+  const a = top[3] / 255;
+  const b = (under[3] / 255) * (1 - a);
+  const out = a + b;
+  if (!out) return [0, 0, 0, 0];
+  const mix = (c: number) => Math.round((top[c]! * a + under[c]! * b) / out);
+  return [mix(0), mix(1), mix(2), Math.round(out * 255)];
+}
+
+/**
+ * Paints `rgba` (alpha is the stroke's opacity) by `mode`, reading each pixel
+ * from `before`, so a stroke changes a pixel once however often it passes:
+ * "simple" lays a see-through colour over drawn pixels but puts it as it is
+ * on empty ones; "alpha" always lays it over; "copy" puts it as it is,
+ * transparency included; "lockAlpha" colours only drawn pixels, keeping how
+ * opaque each is.
+ */
+export function blendInk(
+  before: Uint8ClampedArray,
+  rgba: Rgba,
+  mode: BlendMode,
+): Ink {
+  if (mode === "copy" || (mode === "simple" && rgba[3] === 255)) return rgba;
+  return (i) => {
+    const under: Rgba = [
+      before[i * 4]!,
+      before[i * 4 + 1]!,
+      before[i * 4 + 2]!,
+      before[i * 4 + 3]!,
+    ];
+    if (mode === "lockAlpha") {
+      if (!under[3]) return null;
+      const [r, g, b] = over(rgba, [under[0], under[1], under[2], 255]);
+      return [r, g, b, under[3]];
+    }
+    if (mode === "simple" && !under[3]) return rgba;
+    return over(rgba, under);
+  };
+}
+
+/**
+ * Blur ink: each pixel becomes the average of itself and its neighbours
+ * (3×3, inside the tile) in `before`, so a stroke blurs each pixel once.
+ * Colours are weighted by alpha, so transparent pixels soften an edge's
+ * opacity without darkening its colour. Fully transparent areas stay as they are.
+ */
+export function blurInk(before: Uint8ClampedArray, size: Size): Ink {
+  return (i) => {
+    const x = i % size.w;
+    const y = Math.floor(i / size.w);
+    let count = 0;
+    let alpha = 0;
+    const rgb = [0, 0, 0];
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= size.w || ny >= size.h) continue;
+        const at = (ny * size.w + nx) * 4;
+        const a = before[at + 3]!;
+        for (let c = 0; c < 3; c++) rgb[c]! += before[at + c]! * a;
+        alpha += a;
+        count++;
+      }
+    if (!alpha) return null;
+    return [
+      Math.round(rgb[0]! / alpha),
+      Math.round(rgb[1]! / alpha),
+      Math.round(rgb[2]! / alpha),
+      Math.round(alpha / count),
+    ];
+  };
+}
+
+/**
+ * Jumble ink: each pixel takes the colour `before` had at a random spot up
+ * to 2 pixels away (inside the tile), so edges get ragged without any new
+ * colours. The spot is fixed by `seed` and the pixel, so redrawing the stroke
+ * picks the same one; a new stroke with a new seed jumbles further.
+ */
+export function jumbleInk(
+  before: Uint8ClampedArray,
+  size: Size,
+  seed: number,
+): Ink {
+  return (i) => {
+    let h = Math.imul(i ^ seed, 0x45d9f3b);
+    h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+    h ^= h >>> 16;
+    const dx = ((h >>> 0) % 5) - 2;
+    const dy = ((h >>> 8) % 5) - 2;
+    const x = (i % size.w) + dx;
+    const y = Math.floor(i / size.w) + dy;
+    if ((!dx && !dy) || x < 0 || y < 0 || x >= size.w || y >= size.h)
+      return null;
+    const at = (y * size.w + x) * 4;
+    return [before[at]!, before[at + 1]!, before[at + 2]!, before[at + 3]!];
+  };
 }
 
 /**

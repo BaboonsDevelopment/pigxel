@@ -5,7 +5,7 @@ import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
-import { useIsClient } from "@/lib/use-is-client";
+import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { ProjectCard } from "./project-card/project-card";
 import { confirmRemoveLocalTile } from "./tile-actions";
 import { TileThumbnail } from "./tile-thumbnail";
@@ -17,7 +17,7 @@ type LocalTile = Draft & { image: PigxelDocument };
  * else, and Google Drive files opened here. Cloud tiles are listed separately.
  */
 export function LocalTiles(props: { userId: string; hasCloudTiles: boolean }) {
-  if (!useIsClient()) return <div className="mt-6 min-h-48" />;
+  if (!useDraftsLoaded(props.userId)) return <div className="mt-6 min-h-48" />;
   return <List {...props} />;
 }
 

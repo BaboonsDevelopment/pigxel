@@ -86,6 +86,7 @@ export function assetDocument(
       ]),
     ),
     palette: assetPalette(asset),
+    slices: [],
   };
 }
 

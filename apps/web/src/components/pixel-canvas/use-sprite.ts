@@ -5,6 +5,7 @@ import { flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import type { Slice } from "@/lib/slices/slices";
 import * as frameList from "@/lib/sprite/frames";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
@@ -56,6 +57,17 @@ type Snapshot = {
   size: Size;
   cels: Cels;
   palette: string[];
+  slices: Slice[];
+};
+
+/**
+ * What a tile's editor keeps when it closes, to pick up where it left off:
+ * undo and redo, and the layer and frame being drawn on.
+ */
+export type KeptSprite = {
+  history: History<Snapshot>;
+  layerId: string;
+  frameId: string;
 };
 
 /**
@@ -67,9 +79,13 @@ type Snapshot = {
  * with every layer combined.
  *
  * Every finished change is a step Ctrl+Z can undo, and fires `onChange`, for
- * saving.
+ * saving. With `kept` (whose present is `initial`) undo goes on from there.
  */
-export function useSprite(initial: PigxelDocument, onChange: () => void) {
+export function useSprite(
+  initial: PigxelDocument,
+  onChange: () => void,
+  kept?: KeptSprite,
+) {
   const { background } = initial;
   const [size, setSize] = useState<Size>({
     w: initial.width,
@@ -78,11 +94,18 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   const [tree, setTree] = useState(initial.layers);
   const [frames, setFrames] = useState(initial.frames);
   const [palette, setPaletteState] = useState(initial.palette);
-  const [layerId, setLayerIdState] = useState(
-    () =>
-      layerTree.pixelLayerIds(initial.layers).at(-1) ?? initial.layers[0]!.id,
+  const [slices, setSlicesState] = useState(initial.slices);
+  const [layerId, setLayerIdState] = useState(() =>
+    kept && layerTree.findLayer(initial.layers, kept.layerId)
+      ? kept.layerId
+      : (layerTree.pixelLayerIds(initial.layers).at(-1) ??
+        initial.layers[0]!.id),
   );
-  const [frameId, setFrameIdState] = useState(initial.frames[0]!.id);
+  const [frameId, setFrameIdState] = useState(() =>
+    kept && frameList.frameIndex(initial.frames, kept.frameId) >= 0
+      ? kept.frameId
+      : initial.frames[0]!.id,
+  );
   // Called before another cel becomes the active one, e.g. to put down a
   // floating selection on the cel it belongs to.
   const beforeLeave = useRef<(() => void) | null>(null);
@@ -100,13 +123,15 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   // Cels drawn on since the last finished change.
   const changed = useRef(new Set<HTMLCanvasElement>());
   const past = useRef<History<Snapshot>>(
-    history.startHistory({
-      tree: initial.layers,
-      frames: initial.frames,
-      size,
-      cels: initial.cels,
-      palette: initial.palette,
-    }),
+    kept?.history ??
+      history.startHistory({
+        tree: initial.layers,
+        frames: initial.frames,
+        size,
+        cels: initial.cels,
+        palette: initial.palette,
+        slices: initial.slices,
+      }),
   );
 
   const repaint = () => setVersion((v) => v + 1);
@@ -167,6 +192,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       frames?: Frame[];
       size?: Size;
       palette?: string[];
+      slices?: Slice[];
     } = {},
   ) => {
     const snapshot: Snapshot = {
@@ -175,6 +201,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       size: next.size ?? size,
       cels: new Map(),
       palette: next.palette ?? palette,
+      slices: next.slices ?? slices,
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
@@ -288,6 +315,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     setFrames(snapshot.frames);
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
+    setSlicesState(snapshot.slices);
     if (!layerTree.findLayer(snapshot.tree, layerId))
       setLayerIdState(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
     if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
@@ -331,36 +359,60 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
   };
 
   /** Adds a layer above the active one, in one undo step; returns its id. */
-  const addLayer = (
+  const addLayer = (kind: Exclude<LayerKind, "background">, layer?: NewLayer) =>
+    addLayers(kind, [layer ?? {}])[0]!;
+
+  /**
+   * Adds layers above the active one, each above the one before, in one undo
+   * step; returns their ids. Calling addLayer once for each would not do:
+   * every call starts from the same layer tree until the next render.
+   */
+  const addLayers = (
     kind: Exclude<LayerKind, "background">,
-    {
-      name,
-      cels: pixels = new Map(),
-      reuseEmpty = false,
-      hideOthers = false,
-    }: NewLayer = {},
+    layers: NewLayer[],
   ) => {
-    const active = layerTree.findLayer(tree, layerId)?.layer;
-    const empty =
-      reuseEmpty && active?.kind === "normal" && isEmptyLayer(active.id)
-        ? active
-        : null;
-    const layer =
-      empty ??
-      layerTree.createLayer(kind, name ?? layerTree.nextName(tree, kind));
-    let next = empty
-      ? name
-        ? layerTree.updateLayer(tree, empty.id, { name })
-        : tree
-      : layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId));
-    if (hideOthers)
-      for (const other of layerTree.allLayers(next))
-        if (other.kind === "normal" && other.id !== layer.id && other.visible)
-          next = layerTree.updateLayer(next, other.id, { visible: false });
-    putCels(layer.id, pixels);
-    setLayerId(layer.id);
+    let next = tree;
+    let above = layerId;
+    const ids = layers.map(
+      ({
+        name,
+        cels: pixels = new Map(),
+        reuseEmpty = false,
+        hideOthers = false,
+      }) => {
+        const active = layerTree.findLayer(next, above)?.layer;
+        const empty =
+          reuseEmpty && active?.kind === "normal" && isEmptyLayer(active.id)
+            ? active
+            : null;
+        const layer =
+          empty ??
+          layerTree.createLayer(kind, name ?? layerTree.nextName(next, kind));
+        next = empty
+          ? name
+            ? layerTree.updateLayer(next, empty.id, { name })
+            : next
+          : layerTree.insertLayer(
+              next,
+              layer,
+              layerTree.placeAbove(next, above),
+            );
+        if (hideOthers)
+          for (const other of layerTree.allLayers(next))
+            if (
+              other.kind === "normal" &&
+              other.id !== layer.id &&
+              other.visible
+            )
+              next = layerTree.updateLayer(next, other.id, { visible: false });
+        putCels(layer.id, pixels);
+        above = layer.id;
+        return layer.id;
+      },
+    );
+    setLayerId(above);
     changeTree(next);
-    return layer.id;
+    return ids;
   };
 
   /**
@@ -521,6 +573,12 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
 
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
 
+  /** Changes the tile's slices, as one undo step. */
+  const setSlices = (next: Slice[]) => {
+    setSlicesState(next);
+    finish({ slices: next });
+  };
+
   /** Changes the tile's palette, as one undo step. */
   const setPalette = (next: string[]) => {
     setPaletteState(next);
@@ -536,6 +594,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
     background,
     palette,
     setPalette,
+    slices,
+    setSlices,
     layerId,
     activeLayer,
     /** What erasing the active layer leaves: the Background's colour, or null for transparency. */
@@ -568,6 +628,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       beforeLeave.current = callback;
     },
     addLayer,
+    addLayers,
     canRemoveLayer,
     removeLayer,
     updateLayer: (id: string, patch: LayerPatch) =>
@@ -588,6 +649,8 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
           duration: frameList.clampDuration(ms),
         }),
       ),
+    /** Undo history and the active cel, to keep when the editor closes. */
+    keep: (): KeptSprite => ({ history: past.current, layerId, frameId }),
     /** The tile as a document, for saving. Its pixels are shared: never modify them. */
     document: (): PigxelDocument => ({
       id: initial.id,
@@ -595,6 +658,7 @@ export function useSprite(initial: PigxelDocument, onChange: () => void) {
       height: size.h,
       background,
       palette,
+      slices,
       layers: tree,
       frames,
       cels: new Map(

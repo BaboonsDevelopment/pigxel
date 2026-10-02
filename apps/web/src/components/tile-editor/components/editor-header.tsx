@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import {
   InputGroup,
@@ -12,6 +12,9 @@ import {
 import { cn } from "@pigxel/ui/lib/utils";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
+import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
+import { ASEPRITE_EXTENSIONS } from "@/lib/pigxel-file/aseprite";
+import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
 import { useModifierLabel } from "../use-modifier-label";
 import type { TileFile } from "../use-tile-file";
@@ -27,6 +30,7 @@ import type { Playback } from "@/components/timeline/use-playback";
  * Frame menus, the tile's name and where it is saved, and the AI tokens.
  */
 export function EditorHeader({
+  draftId,
   file,
   fileInput,
   drive,
@@ -35,8 +39,11 @@ export function EditorHeader({
   onOpenFrom,
   onConnectDrive,
   onExport,
+  onImportSheet,
   menus,
 }: {
+  /** The tile's draft, for New tile to come back to on Cancel. */
+  draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
   drive: DriveStatus;
@@ -45,10 +52,13 @@ export function EditorHeader({
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
   onExport: () => void;
+  /** Picks a sprite sheet to cut into the frames of a new tile. */
+  onImportSheet: () => void;
   /** More menus after File, e.g. Edit and View. */
   menus: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
+  const framesInput = useRef<HTMLInputElement>(null);
   const mod = useModifierLabel();
 
   return (
@@ -70,12 +80,21 @@ export function EditorHeader({
           [
             {
               label: "New tile…",
-              onSelect: () => router.push("/tiles/new"),
+              onSelect: () => router.push(newTileUrl(draftId)),
             },
             {
+              // A .pigxel file, or a picture or .aseprite file as a new tile.
               label: "Open from your computer…",
               shortcut: `${mod}O`,
               onSelect: file.openFromComputer,
+            },
+            {
+              label: "Open pictures as frames…",
+              onSelect: () => framesInput.current?.click(),
+            },
+            {
+              label: "Import sprite sheet…",
+              onSelect: onImportSheet,
             },
             {
               label: "Open from Pigxel cloud…",
@@ -149,11 +168,23 @@ export function EditorHeader({
       <input
         ref={fileInput}
         type="file"
-        accept={`${PIGXEL_EXTENSION},application/json`}
+        accept={`${PIGXEL_EXTENSION},application/json,${IMAGE_FILE_TYPES},${ASEPRITE_EXTENSIONS.join(",")}`}
         className="hidden"
         onChange={(e) => {
           file.onFileChosen(e.target.files?.[0]);
           // Lets the same file be chosen again later.
+          e.target.value = "";
+        }}
+      />
+      {/* Numbered pictures (walk_01.png …) opened as one animation. */}
+      <input
+        ref={framesInput}
+        type="file"
+        multiple
+        accept={IMAGE_FILE_TYPES}
+        className="hidden"
+        onChange={(e) => {
+          file.openFrames([...(e.target.files ?? [])]);
           e.target.value = "";
         }}
       />

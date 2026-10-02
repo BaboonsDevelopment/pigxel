@@ -68,6 +68,16 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/** The box with corners `a` and `b`, not clamped to the tile. */
+export function boxBetween(a: Point, b: Point): Area {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x) + 1,
+    h: Math.abs(b.y - a.y) + 1,
+  };
+}
+
 /** True when every pixel is transparent. */
 export function isBlank(image: ImageData): boolean {
   for (let i = 3; i < image.data.length; i += 4) {
@@ -182,7 +192,7 @@ export function atLeastPlacementSize(area: Area, tile: Size): Area {
 
 /**
  * `start` with the dragged `edges` moved by `dx × dy` tile pixels, kept inside
- * the tile and no smaller than `MIN_PLACEMENT_SIDE` (or the tile).
+ * the tile and no smaller than `minSide` (or the tile).
  */
 export function adjustFrame(
   start: Area,
@@ -190,6 +200,7 @@ export function adjustFrame(
   dx: number,
   dy: number,
   tile: Size,
+  minSide = MIN_PLACEMENT_SIDE,
 ): Area {
   const axis = (
     pos: number,
@@ -199,7 +210,7 @@ export function adjustFrame(
     high: boolean,
     max: number,
   ) => {
-    const min = Math.min(MIN_PLACEMENT_SIDE, max);
+    const min = Math.min(minSide, max);
     if (low && high) {
       return [Math.max(0, Math.min(max - len, pos + delta)), len] as const;
     }

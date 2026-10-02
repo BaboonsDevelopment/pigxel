@@ -8,6 +8,7 @@ import {
 } from "@/components/pixel-canvas/paint";
 import {
   combineMasks,
+  ellipseMask,
   flipFloating,
   floatingMask,
   invertMask,
@@ -144,6 +145,23 @@ describe("selections", () => {
       "###..",
       "##...",
       "#....",
+    ]);
+  });
+  it("selects the ellipse that fits a box, cut off at the tile edge", () => {
+    const big = { w: 5, h: 5 };
+    expect(rows(ellipseMask(big, { x: 0, y: 0, w: 5, h: 5 }), 5)).toEqual([
+      ".###.",
+      "#####",
+      "#####",
+      "#####",
+      ".###.",
+    ]);
+    expect(rows(ellipseMask(big, { x: -2, y: 0, w: 5, h: 5 }), 5)).toEqual([
+      "##...",
+      "###..",
+      "###..",
+      "###..",
+      "##...",
     ]);
   });
   it("picks a colour area with the magic wand", () => {

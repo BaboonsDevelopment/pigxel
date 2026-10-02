@@ -9,6 +9,7 @@ import {
 } from "@/lib/pigxel-file/cloud";
 import {
   findDraftFor,
+  loadDrafts,
   removeDraft,
   writeDraft,
   type Draft,
@@ -57,6 +58,7 @@ export function useCloudTileActions(userId: string) {
     try {
       await deleteCloudTile(tile.id);
       // A copy open in this browser stays, as a tile kept only here.
+      await loadDrafts(userId);
       const open = findDraftFor(userId, {
         kind: "cloud",
         tile: { id: tile.id, name: tile.name },

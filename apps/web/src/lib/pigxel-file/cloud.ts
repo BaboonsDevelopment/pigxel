@@ -135,7 +135,13 @@ export async function saveCloudTile(
   if (upload.error) {
     // A new tile without its file would be empty: take the row back out.
     if (!tile.id) await supabase.from("tiles").delete().eq("id", data.id);
-    throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
+    const tooBig =
+      "statusCode" in upload.error && upload.error.statusCode === "413";
+    throw new CloudError(
+      tooBig
+        ? "This tile is too big for Pigxel cloud. Remove some frames or layers, or download it."
+        : "Couldn’t save to Pigxel cloud. Try again.",
+    );
   }
   return { id: data.id, name: data.name };
 }
