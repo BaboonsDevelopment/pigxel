@@ -29,6 +29,14 @@ export const EXPORT_FORMATS = [
     mime: "image/png",
     description: "Every frame side by side in one PNG, for game engines.",
   },
+  {
+    id: "slices",
+    label: "Slices",
+    extension: ".png",
+    mime: "image/png",
+    description:
+      "Each slice of the frame on screen as its own PNG, named after it.",
+  },
 ] as const;
 
 export type ExportFormat = (typeof EXPORT_FORMATS)[number]["id"];

@@ -14,16 +14,12 @@ import {
 } from "@pigxel/ui/components/input";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { AssetSprite } from "@/components/assets/asset-sprite";
-import {
-  assetDocument,
-  assetSize,
-  findAsset,
-  type Asset,
-} from "@/lib/assets/assets";
+import { AssetImage } from "@/components/assets/asset-image";
+import { loadAssetDocument, type Asset } from "@/lib/assets/assets";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
-import { createDraft } from "@/lib/pigxel-file/draft";
+import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { openTabAfter } from "@/lib/pigxel-file/tabs";
 import {
   MAX_PIGXEL_SIZE,
   PIGXEL_EXTENSION,
@@ -61,23 +57,25 @@ type FormProps = {
   /** Connecting Google Drive was cancelled or failed on the way back. */
   driveError?: boolean;
   /** An asset to start from, from the Assets page; it sets the size. */
-  assetId?: string;
+  asset?: Asset | null;
   /** A palette to paint from instead of the default one. */
   paletteId?: string;
+  /** The draft whose editor sent here (its + tab): Cancel goes back to it, and the new tile opens next to it. */
+  from?: string;
 };
 
 /**
  * The new-tile setup: name, size, background, and where the tile is stored;
  * or, starting from an asset, only the name and where.
  */
-export function NewTileForm({ assetId, paletteId, ...props }: FormProps) {
+export function NewTileForm({ asset, paletteId, ...props }: FormProps) {
   if (!useIsClient()) return <div className="min-h-96" />;
   // A different asset or palette starts the form afresh.
   return (
     <Form
-      key={`${assetId}:${paletteId}`}
+      key={`${asset?.id}:${paletteId}`}
       {...props}
-      asset={findAsset(assetId)}
+      asset={asset ?? null}
       palette={PALETTE_PRESETS.find((p) => p.id === paletteId) ?? null}
     />
   );
@@ -87,9 +85,10 @@ function Form({
   userId,
   drive,
   driveError,
+  from,
   asset,
   palette,
-}: Omit<FormProps, "assetId" | "paletteId"> & {
+}: Omit<FormProps, "asset" | "paletteId"> & {
   asset: Asset | null;
   palette: PalettePreset | null;
 }) {
@@ -112,14 +111,22 @@ function Form({
   };
 
   const create = async (w: number, h: number) => {
-    const image = asset
-      ? assetDocument(asset)
-      : blankDocument(w, h, background);
+    setBusy(true);
+    setError(null);
+    let image;
+    try {
+      // An asset's file loads only now, when a tile is made from it.
+      image = asset
+        ? await loadAssetDocument(asset)
+        : blankDocument(w, h, background);
+    } catch {
+      setError("Couldn’t load the asset. Try again.");
+      setBusy(false);
+      return;
+    }
     if (palette && !asset) image.palette = [...palette.colors];
     const file = serializePigxel(image);
     let location: TileLocation | null = null;
-    setBusy(true);
-    setError(null);
     try {
       if (storage === "cloud")
         location = {
@@ -146,6 +153,7 @@ function Form({
       return;
     }
     // Every new tile gets its own draft; other tiles are left as they are.
+    await loadDrafts(userId);
     const draft = createDraft(userId, {
       name,
       file,
@@ -161,6 +169,7 @@ function Form({
       setBusy(false);
       return;
     }
+    if (from) openTabAfter(userId, draft.id, from);
     router.push(editorUrl(draft.id));
   };
 
@@ -170,8 +179,7 @@ function Form({
       onSubmit={(e) => {
         e.preventDefault();
         if (asset) {
-          const { w, h } = assetSize(asset);
-          void create(w, h);
+          void create(asset.width, asset.height);
           return;
         }
         const w = size(width);
@@ -361,7 +369,7 @@ function Form({
             : "Create tile"}
         </Button>
         <Link
-          href="/tiles"
+          href={from ? editorUrl(from) : "/tiles"}
           className={buttonVariants({ variant: "ghost", size: "lg" })}
         >
           Cancel
@@ -373,13 +381,12 @@ function Form({
 
 /** The asset a tile starts from: what it looks like, and its size. */
 function StartingAsset({ asset }: { asset: Asset }) {
-  const { w, h } = assetSize(asset);
-  const frames = asset.frames.length;
+  const { width: w, height: h, frames } = asset;
   return (
     <Field label="Starts from">
       <div className="flex max-w-sm items-center gap-4 rounded-xl border p-3">
         <span className="flex size-16 shrink-0 items-center justify-center rounded-lg bg-checker">
-          <AssetSprite asset={asset} className="size-12" />
+          <AssetImage asset={asset} className="w-12" />
         </span>
         <span className="min-w-0 text-sm">
           <span className="block font-semibold">{asset.name}</span>

@@ -1,13 +1,10 @@
 import type { PointerEvent } from "react";
 import {
-  MAX_SCALE,
   MAX_SIZE,
   MIN_PLACEMENT_SIDE,
-  MIN_SCALE,
   MIN_SIZE,
   SNAPSHOT_BACKGROUND,
   SNAPSHOT_SIDE,
-  ZOOM_FACTOR,
   type Area,
   type FrameEdges,
   type ResizeDrag,
@@ -25,12 +22,35 @@ export function sameSize(a: Size, b: Size) {
 
 /** The tile pixel under the pointer, whatever the zoom. */
 export function pixelAt(e: PointerEvent<HTMLCanvasElement>): Point {
-  const canvas = e.currentTarget;
+  return pixelUnder(e.currentTarget, e.clientX, e.clientY);
+}
+
+/** The pixel of `canvas` at a point on screen; outside it, past its edges. */
+export function pixelUnder(
+  canvas: HTMLCanvasElement,
+  clientX: number,
+  clientY: number,
+): Point {
   const rect = canvas.getBoundingClientRect();
   return {
-    x: Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width),
-    y: Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height),
+    x: Math.floor(((clientX - rect.left) / rect.width) * canvas.width),
+    y: Math.floor(((clientY - rect.top) / rect.height) * canvas.height),
   };
+}
+
+/**
+ * The pixels a pointer passed through since its last event, oldest first:
+ * the browser batches fast movements into one event, and a curve drawn
+ * through all of them stays round instead of turning into straight cuts.
+ */
+export function pixelsPassed(
+  e: globalThis.PointerEvent,
+  canvas: HTMLCanvasElement,
+): Point[] {
+  const samples = e.getCoalescedEvents?.() ?? [];
+  return (samples.length ? samples : [e]).map((sample) =>
+    pixelUnder(canvas, sample.clientX, sample.clientY),
+  );
 }
 
 /** The tile size a resize handle points at after moving to the pointer. */
@@ -51,12 +71,6 @@ export function resizeTo(
   };
 }
 
-/** The next zoom level for a wheel step; scrolling up zooms in. */
-export function zoom(scale: number, deltaY: number): number {
-  const next = deltaY < 0 ? scale * ZOOM_FACTOR : scale / ZOOM_FACTOR;
-  return Math.max(MIN_SCALE, Math.min(MAX_SCALE, next));
-}
-
 /** The rectangle spanned by two corner pixels, clipped to the tile. */
 export function areaBetween(a: Point, b: Point, size: Size): Area {
   const clampX = (v: number) => Math.max(0, Math.min(size.w - 1, v));
@@ -66,6 +80,16 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   const x1 = clampX(Math.max(a.x, b.x));
   const y1 = clampY(Math.max(a.y, b.y));
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/** The box with corners `a` and `b`, not clamped to the tile. */
+export function boxBetween(a: Point, b: Point): Area {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x) + 1,
+    h: Math.abs(b.y - a.y) + 1,
+  };
 }
 
 /** True when every pixel is transparent. */
@@ -182,7 +206,7 @@ export function atLeastPlacementSize(area: Area, tile: Size): Area {
 
 /**
  * `start` with the dragged `edges` moved by `dx × dy` tile pixels, kept inside
- * the tile and no smaller than `MIN_PLACEMENT_SIDE` (or the tile).
+ * the tile and no smaller than `minSide` (or the tile).
  */
 export function adjustFrame(
   start: Area,
@@ -190,6 +214,7 @@ export function adjustFrame(
   dx: number,
   dy: number,
   tile: Size,
+  minSide = MIN_PLACEMENT_SIDE,
 ): Area {
   const axis = (
     pos: number,
@@ -199,7 +224,7 @@ export function adjustFrame(
     high: boolean,
     max: number,
   ) => {
-    const min = Math.min(MIN_PLACEMENT_SIDE, max);
+    const min = Math.min(minSide, max);
     if (low && high) {
       return [Math.max(0, Math.min(max - len, pos + delta)), len] as const;
     }

@@ -109,6 +109,16 @@
   }
 }
 
+/*
+ * Plays a sprite sheet: the frames sit side by side in a picture as wide as
+ * all of them, which steps left a frame at a time, as steps(frame count).
+ */
+@keyframes sprite-sheet {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
 /* The dashes around a selection on the canvas crawl, as in Aseprite. */
 @keyframes marching-ants {
   to {

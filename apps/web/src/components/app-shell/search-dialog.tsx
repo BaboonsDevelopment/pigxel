@@ -14,6 +14,7 @@ import { searchAll } from "@/app/(app)/topbar-actions";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { useCloudTileActions } from "@/components/tiles/tile-actions";
 import { listDrafts } from "@/lib/pigxel-file/draft";
+import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import type { SearchResults } from "@/lib/search/server";
 import { SearchIcon } from "./icons";
@@ -94,6 +95,8 @@ function SearchPanel({ userId, close }: { userId: string; close: () => void }) {
   });
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
+  // Tiles kept in this browser are listed once they are read.
+  useDraftsLoaded(userId);
 
   // Asks the server once typing pauses; answers for older text are ignored below.
   useEffect(() => {

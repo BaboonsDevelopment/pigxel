@@ -10,8 +10,8 @@ import {
   useState,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
-import { zoom } from "@/components/pixel-canvas/helpers";
+import { choiceDialog } from "@/components/confirm-dialog/confirm-dialog";
+import type { Area } from "@/components/pixel-canvas/constants";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import { rgbaOf, type Stamp } from "@/components/pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
@@ -36,25 +36,45 @@ import {
 } from "@/components/pixel-canvas/use-sprite";
 import { Timeline } from "@/components/timeline/timeline";
 import { usePlayback } from "@/components/timeline/use-playback";
-import { assetPixels, assetSize, type Asset } from "@/lib/assets/assets";
+import { loadAssetFrame, type Asset } from "@/lib/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
-import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
+import {
+  readDraft,
+  readPen,
+  writePen,
+  type Draft,
+} from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
+import {
+  IMAGE_FILE_TYPES,
+  documentFromFrames,
+  imageBaseName,
+  isImageFile,
+  pictureForTile,
+  readPicture,
+  sequenceOrder,
+} from "@/lib/pigxel-file/import-image";
+import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
+import type { Slice } from "@/lib/slices/slices";
 import { findTutorial } from "@/lib/tutorials/tutorials";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
+import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
 import { useTileFile } from "../use-tile-file";
+import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
+import { TileTabs } from "./tile-tabs";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
@@ -69,7 +89,13 @@ const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
 });
 const ExportDialog = dynamic(() => import("./export-dialog"), { ssr: false });
+const ImportSheetDialog = dynamic(() => import("./import-sheet-dialog"), {
+  ssr: false,
+});
 const AssetPickerDialog = dynamic(() => import("./asset-picker-dialog"), {
+  ssr: false,
+});
+const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
 
@@ -83,13 +109,28 @@ export function Editor({
   drive,
   driveError,
   guide,
+  canPublish,
   draft,
   image,
-}: EditorProps & { draft: Draft; image: PigxelDocument }) {
+  kept,
+}: EditorProps & {
+  draft: Draft;
+  image: PigxelDocument;
+  /** Where this tile was left when switching tabs, to pick up from. */
+  kept: KeptTile | null;
+}) {
   const router = useRouter();
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
+  // A sprite sheet picked to cut into a new tile's frames.
+  const sheetInput = useRef<HTMLInputElement>(null);
+  const [sheet, setSheet] = useState<{
+    name: string;
+    picture: Picture;
+    scale: number;
+  } | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
@@ -98,7 +139,6 @@ export function Editor({
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
-  const [scale, setScale] = useState(DEFAULT_SCALE);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   // A picture the pen and brush paint with, from Edit › Use as brush.
   const [stamp, setStamp] = useState<Stamp | null>(null);
@@ -107,6 +147,12 @@ export function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
+  const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
+    workspace,
+    tileRect: () => canvas.current?.tileRect() ?? null,
+    // Back on a tab, the tile comes back at the zoom it was left at.
+    initial: kept?.scale,
+  });
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<SpriteApi>(null);
   const file = useTileFile({
@@ -115,7 +161,10 @@ export function Editor({
     userId,
     initial: draft,
     drive,
-    onOpen: (id) => router.push(editorUrl(id)),
+    onOpen: (id) => {
+      openTabAfter(userId, id, draft.id);
+      router.push(editorUrl(id));
+    },
     notice: driveError
       ? {
           tone: "error",
@@ -125,12 +174,51 @@ export function Editor({
   });
 
   // Every finished change to the sprite marks the tile for saving.
-  const sprite = useSprite(image, file.markDirty);
+  const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;
+    latestScale.current = scale;
   });
+  // Leaving for another tab keeps undo and the zoom, to pick up on return.
+  useEffect(
+    () => () => {
+      const left = tile.current;
+      const saved = readDraft(userId, draft.id);
+      if (!left || !saved || !readTabs(userId).includes(draft.id)) return;
+      const sprite = left.keep();
+      const now = sprite.history.present;
+      keepTile(draft.id, {
+        sprite,
+        image: {
+          id: image.id,
+          background: image.background,
+          width: now.size.w,
+          height: now.size.h,
+          layers: now.tree,
+          frames: now.frames,
+          cels: now.cels,
+          palette: now.palette,
+          slices: now.slices,
+        },
+        scale: latestScale.current,
+        savedAt: saved.savedAt,
+      });
+    },
+    [userId, draft.id, image],
+  );
   const playback = usePlayback(sprite);
   const selection = useSelection(sprite);
+
+  // The slice picked with the Slice tool; gone when undo takes it away.
+  const [sliceId, setSliceId] = useState<string | null>(null);
+  const slice = sprite.slices.find((s) => s.id === sliceId) ?? null;
+  const changeSlice = (next: Slice) =>
+    sprite.setSlices(sprite.slices.map((s) => (s.id === next.id ? next : s)));
+  const deleteSlice = () => {
+    if (slice) sprite.setSlices(sprite.slices.filter((s) => s !== slice));
+    setSliceId(null);
+  };
 
   // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
@@ -163,13 +251,19 @@ export function Editor({
     redo: () => {
       if (!selection.floating) sprite.redo();
     },
-    zoomIn: () => setScale((s) => zoom(s, -1)),
-    zoomOut: () => setScale((s) => zoom(s, 1)),
-    zoomReset: () => setScale(DEFAULT_SCALE),
+    zoomIn,
+    zoomOut,
+    zoomReset,
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
-    clearLayer: () => (selection.mask ? selection.clear() : sprite.clearCel()),
+    // With the Slice tool, Delete removes the picked slice instead.
+    clearLayer: () =>
+      tool === "slice" && slice
+        ? deleteSlice()
+        : selection.mask
+          ? selection.clear()
+          : sprite.clearCel(),
     newFrame: () => sprite.addFrame(true),
     previousFrame: () => sprite.stepFrame(-1),
     nextFrame: () => sprite.stepFrame(1),
@@ -222,10 +316,18 @@ export function Editor({
     setTool("pen");
   };
 
-  /** Puts an asset's first frame in the middle of the active cel, floating, to be moved into place. */
-  const insertAsset = (asset: Asset) => {
-    const { w, h } = assetSize(asset);
-    const pixels = assetPixels(asset);
+  /**
+   * Puts an asset's first frame in the middle of the active cel, floating,
+   * to be moved into place; says why not when it can't.
+   */
+  const insertAsset = async (asset: Asset): Promise<string | null> => {
+    let frame;
+    try {
+      frame = await loadAssetFrame(asset);
+    } catch {
+      return "Couldn’t load this asset. Try again.";
+    }
+    const { pixels, w, h } = frame;
     const mask = new Uint8Array(w * h);
     for (let i = 0; i < mask.length; i++) mask[i] = pixels[i * 4 + 3] ? 1 : 0;
     const placed = selection.paste({
@@ -236,11 +338,11 @@ export function Editor({
       pixels,
       mask,
     });
-    if (placed) {
-      setTool("move");
-      setInserted((n) => n + 1);
-    }
-    return placed;
+    if (!placed)
+      return "This layer can’t be drawn on. Pick an unlocked, visible layer first.";
+    setTool("move");
+    setInserted((n) => n + 1);
+    return null;
   };
 
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
@@ -287,7 +389,6 @@ export function Editor({
       },
       {
         label: "Rotate 90° right",
-        shortcut: "Shift+R",
         onSelect: commands.rotateRight,
       },
       {
@@ -386,6 +487,83 @@ export function Editor({
     if (selection.paste(pasteSource(image))) setTool("move");
   });
 
+  // Dropping a file: a picture goes on this tile where it lands (or opens as
+  // a new tile), a .pigxel file opens as a new tile; a dialog asks first.
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
+  const hasFiles = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes("Files");
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDropping(false);
+    const all = [...e.dataTransfer.files];
+    // Several pictures at once: the frames of an animation, as numbered.
+    if (all.length > 1 && all.every(isImageFile)) {
+      const open = await choiceDialog({
+        title: `Open ${all.length} pictures as frames?`,
+        message: `They become the frames of a new tile, in the order their names count up (${sequenceOrder(
+          all,
+        )
+          .slice(0, 3)
+          .map((f) => f.name)
+          .join(
+            ", ",
+          )}${all.length > 3 ? "…" : ""}). This tile stays saved in My projects.`,
+        choices: [{ value: "open", label: "Open as animation" }],
+      });
+      if (open) file.openFrames(all);
+      return;
+    }
+    const dropped = all[0];
+    if (!dropped) return;
+    const at = canvas.current?.tilePointAt(e.clientX, e.clientY) ?? null;
+    if (!isImageFile(dropped)) {
+      const open = await choiceDialog({
+        title: "Open this tile?",
+        message: `“${dropped.name}” opens in the editor in place of this tile, which stays saved in My projects.`,
+        choices: [{ value: "open", label: "Open" }],
+      });
+      if (open) file.onFileChosen(dropped);
+      return;
+    }
+    const choice = await choiceDialog({
+      title: `Add “${dropped.name}”?`,
+      message: sprite.canPaint
+        ? "Put the picture on this tile where you dropped it, to move into place, or open it as a new tile (this one stays saved in My projects)."
+        : "The active layer is hidden or locked, so the picture can only open as a new tile.",
+      choices: [
+        { value: "new", label: "Open as new tile", variant: "secondary" },
+        ...(sprite.canPaint
+          ? [{ value: "place" as const, label: "Put on this tile" }]
+          : []),
+      ],
+    });
+    if (choice === "new") return file.onFileChosen(dropped);
+    if (choice !== "place") return;
+    try {
+      const { rgba, w, h } = await pictureForTile(dropped, sprite.size);
+      // Centred where it was dropped; the paste keeps it on the tile.
+      const centre = at ?? { x: sprite.size.w / 2, y: sprite.size.h / 2 };
+      const placed = selection.paste({
+        x: Math.round(centre.x - w / 2),
+        y: Math.round(centre.y - h / 2),
+        w,
+        h,
+        pixels: rgba,
+        mask: new Uint8Array(w * h).fill(1),
+      });
+      if (placed) setTool("move");
+    } catch {
+      await choiceDialog({
+        title: "Couldn’t read the picture",
+        message: `“${dropped.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
+        choices: [],
+        cancelLabel: "OK",
+      });
+    }
+  };
+
   useEffect(() => {
     const listener = (e: ClipboardEvent) => void onPaste(e);
     window.addEventListener("paste", listener);
@@ -405,21 +583,42 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // The wheel zooms the tile instead of scrolling the page.
-  useEffect(() => {
-    const area = workspace.current;
-    if (!area) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      setScale((s) => zoom(s, e.deltaY));
-    };
-    area.addEventListener("wheel", onWheel, { passive: false });
-    return () => area.removeEventListener("wheel", onWheel);
-  }, []);
-
   return (
-    <div className="grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]">
+    <div
+      className="relative grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]"
+      onDragEnter={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        dragDepth.current++;
+        setDropping(true);
+      }}
+      onDragOver={(e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDragLeave={(e) => {
+        if (!hasFiles(e)) return;
+        dragDepth.current = Math.max(0, dragDepth.current - 1);
+        if (!dragDepth.current) setDropping(false);
+      }}
+      onDrop={(e) => {
+        // The chat box takes pictures dropped on it as attachments.
+        if (e.defaultPrevented) {
+          dragDepth.current = 0;
+          setDropping(false);
+        } else if (hasFiles(e)) void onDrop(e);
+      }}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-primary/10 ring-4 ring-primary/40 ring-inset">
+          <p className="rounded-xl bg-background px-5 py-3 text-sm font-medium shadow-lg">
+            Drop a picture, a .pigxel or an .aseprite file
+          </p>
+        </div>
+      )}
       <EditorHeader
+        draftId={draft.id}
         file={file}
         fileInput={fileInput}
         drive={drive}
@@ -428,6 +627,8 @@ export function Editor({
         onOpenFrom={setOpening}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
+        onPublish={canPublish ? () => setPublishing(true) : undefined}
+        onImportSheet={() => sheetInput.current?.click()}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "View", sections: viewMenu },
@@ -444,6 +645,9 @@ export function Editor({
           stamp={stamp}
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
+          slice={slice}
+          onSliceChange={changeSlice}
+          onSliceDelete={deleteSlice}
         />
       </div>
       <aside className="flex min-h-0 w-[6.5rem] flex-col border-r bg-background">
@@ -458,6 +662,21 @@ export function Editor({
         />
       </aside>
       <div className="flex min-h-0 flex-col">
+        <TileTabs
+          userId={userId}
+          current={{
+            id: draft.id,
+            name: file.name,
+            dirty: file.dirty,
+            location: file.location,
+          }}
+          revision={file.revision}
+          picture={() => ({
+            rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
+            w: sprite.size.w,
+            h: sprite.size.h,
+          })}
+        />
         <main
           ref={workspace}
           data-guide="canvas"
@@ -478,6 +697,9 @@ export function Editor({
               view={view}
               stamp={stamp}
               highlight={highlight}
+              onTextPlaced={() => setTool("move")}
+              sliceId={sliceId}
+              onSelectSlice={setSliceId}
               onPickColor={(color, slot) =>
                 setPen((p) =>
                   slot === "primary"
@@ -510,6 +732,47 @@ export function Editor({
           draftId={draft.id}
           file={file}
           onClose={() => setOpening(null)}
+        />
+      )}
+      {publishing && (
+        <PublishAssetDialog
+          name={file.name}
+          document={sprite.document}
+          onClose={() => setPublishing(false)}
+        />
+      )}
+      <input
+        ref={sheetInput}
+        type="file"
+        accept={IMAGE_FILE_TYPES}
+        className="hidden"
+        onChange={async (e) => {
+          const chosen = e.target.files?.[0];
+          // Lets the same file be chosen again later.
+          e.target.value = "";
+          if (!chosen) return;
+          try {
+            const native = nativeSheet(await readPicture(chosen));
+            setSheet({ name: imageBaseName(chosen.name), ...native });
+          } catch {
+            await choiceDialog({
+              title: "Couldn’t read the picture",
+              message: `“${chosen.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
+              choices: [],
+              cancelLabel: "OK",
+            });
+          }
+        }}
+      />
+      {sheet && (
+        <ImportSheetDialog
+          name={sheet.name}
+          picture={sheet.picture}
+          scale={sheet.scale}
+          onImport={(frames) =>
+            file.openDocument(documentFromFrames(frames), sheet.name)
+          }
+          onClose={() => setSheet(null)}
         />
       )}
       {inserting && (
@@ -546,6 +809,7 @@ export function Editor({
             frameId: sprite.frameId,
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),
+            slices: sprite.slices,
           }}
           settings={exportSettings}
           onChange={setExportSettings}

@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { isTyping } from "./helpers";
 
 /**
- * Holding Space and dragging scrolls the workspace, as in every drawing app.
- * While Space is held, clicks go to panning instead of the tools.
+ * Holding Space and dragging scrolls the workspace, as in every drawing app,
+ * and so does dragging with the middle mouse button; two fingers on a
+ * touchpad scroll it as any page. While Space is held, clicks go to panning
+ * instead of the tools.
  */
 export function usePan() {
   const [held, setHeld] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const from = useRef<{ x: number; y: number; left: number; top: number }>(
     null,
   );
@@ -30,12 +33,17 @@ export function usePan() {
     };
   }, []);
 
+  const stop = () => {
+    from.current = null;
+    setDragging(false);
+  };
+
   return {
-    panning: held,
+    panning: held || dragging,
     /** Handlers for the scrolling workspace element. */
     handlers: {
       onPointerDownCapture: (e: React.PointerEvent<HTMLElement>) => {
-        if (!held) return;
+        if (!held && e.button !== 1) return;
         const area = e.currentTarget;
         // Keep the tools from drawing under the pan.
         e.stopPropagation();
@@ -47,6 +55,11 @@ export function usePan() {
           left: area.scrollLeft,
           top: area.scrollTop,
         };
+        setDragging(true);
+      },
+      // The middle button would otherwise start the browser's autoscroll.
+      onMouseDown: (e: React.MouseEvent<HTMLElement>) => {
+        if (e.button === 1) e.preventDefault();
       },
       onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
         if (!from.current) return;
@@ -55,9 +68,8 @@ export function usePan() {
           from.current.top - (e.clientY - from.current.y),
         );
       },
-      onPointerUp: () => {
-        from.current = null;
-      },
+      onPointerUp: stop,
+      onPointerCancel: stop,
     },
   };
 }

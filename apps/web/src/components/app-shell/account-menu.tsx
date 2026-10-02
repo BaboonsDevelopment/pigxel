@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { signOut } from "@/app/login/actions";
@@ -8,6 +9,7 @@ import type { Profile } from "@/lib/auth/session";
 import type { AuthState } from "@/lib/auth/types";
 import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import {
+  BugIcon,
   ChevronRightIcon,
   CrownIcon,
   SettingsIcon,
@@ -17,8 +19,9 @@ import {
 
 /**
  * The account at the bottom of the sidebar. A click opens a card with who
- * is signed in and Profile, Settings, Upgrade plan and Sign out: beside the sidebar on
- * wide screens, above the account in the phone menu.
+ * is signed in and Profile, Settings, Upgrade plan, Bugs & feature requests
+ * and Sign out: beside the sidebar on wide screens, above the account in the
+ * phone menu.
  */
 export function AccountMenu({
   profile,
@@ -31,6 +34,7 @@ export function AccountMenu({
   const [state, action, pending] = useActionState(signOut, {} as AuthState);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
+  const path = usePathname();
   const profileHref = profile.username
     ? `/u/${profile.username}`
     : "/settings/profile";
@@ -112,6 +116,15 @@ export function AccountMenu({
             >
               <CrownIcon />
               Upgrade plan
+            </Link>
+            <Link
+              role="menuitem"
+              href={`/feedback?from=${encodeURIComponent(path)}`}
+              onClick={follow}
+              className={item}
+            >
+              <BugIcon />
+              Bugs &amp; feature requests
             </Link>
           </div>
           <form action={action} className="border-t p-1.5">

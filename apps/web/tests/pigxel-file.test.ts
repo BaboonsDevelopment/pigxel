@@ -32,6 +32,7 @@ function document(width: number, height: number): PigxelDocument {
     frames: [frame],
     cels: new Map([[frame.id, new Map([[layer.id, pixels(width, height)]])]]),
     palette: ["#000000", "#ff004d"],
+    slices: [],
   };
 }
 
@@ -58,7 +59,7 @@ describe(".pigxel format", () => {
   it("writes a versioned document with frames, layer settings and cels", () => {
     expect(valid).toMatchObject({
       format: "pigxel",
-      version: 5,
+      version: 6,
       width: 2,
       height: 2,
       frames: [{ duration: 100 }],
@@ -102,6 +103,7 @@ describe(".pigxel format", () => {
       layers,
       frames: [frame],
       palette: [],
+      slices: [],
       cels: new Map([
         [
           frame.id,
@@ -143,7 +145,7 @@ describe(".pigxel format", () => {
     }
   });
   it("rejects files from a newer version", () => {
-    expect(() => parsePigxel(file({ ...valid, version: 6 }))).toThrow(
+    expect(() => parsePigxel(file({ ...valid, version: 7 }))).toThrow(
       "newer version",
     );
   });
@@ -153,6 +155,35 @@ describe(".pigxel format", () => {
     const v4 = { ...valid, version: 4 };
     delete v4.palette;
     expect(parsePigxel(file(v4)).palette).toEqual(DEFAULT_PALETTE);
+  });
+  it("round-trips slices, and gives older files none", () => {
+    const door = {
+      id: "door",
+      name: "door",
+      bounds: { x: 1, y: 0, w: 8, h: 8 },
+      center: { x: 2, y: 2, w: 4, h: 4 },
+      pivot: { x: 4, y: 7 },
+    };
+    const withSlices = { ...valid, slices: [door] };
+    expect(parsePigxel(file(withSlices)).slices).toEqual([door]);
+    const v5 = { ...valid, version: 5 };
+    delete v5.slices;
+    expect(parsePigxel(file(v5)).slices).toEqual([]);
+  });
+  it("leaves out broken slices and a centre that doesn't fit", () => {
+    const slices = [
+      { name: "", bounds: { x: 0, y: 0, w: 2, h: 2 } },
+      { name: "no size", bounds: { x: 0, y: 0, w: 0, h: 2 } },
+      {
+        name: "kept",
+        bounds: { x: 0, y: 0, w: 4, h: 4 },
+        center: { x: 2, y: 2, w: 4, h: 4 },
+        pivot: { x: "a", y: 1 },
+      },
+    ];
+    const read = parsePigxel(file({ ...valid, slices })).slices;
+    expect(read).toHaveLength(1);
+    expect(read[0]).toMatchObject({ name: "kept", center: null, pivot: null });
   });
   it("keeps only valid palette colours, lowercase and once each", () => {
     const messy = {

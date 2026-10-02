@@ -12,6 +12,12 @@ import {
   type Ref,
 } from "react";
 import { ellipsePoints, rectPoints } from "@/lib/edit/raster";
+import {
+  nextSliceName,
+  resizedSlice,
+  sliceAt,
+  type Slice,
+} from "@/lib/slices/slices";
 import { frameIndex } from "@/lib/sprite/frames";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
@@ -27,17 +33,23 @@ import {
 } from "./constants";
 import {
   areaBetween,
+  boxBetween,
   canvasOf,
   isBlank,
   largestEmptyArea,
   pixelAt,
+  pixelsPassed,
   resizeTo,
   sameSize,
   tileSnapshot,
 } from "./helpers";
 import {
   inPattern,
+  blendInk,
+  blurInk,
+  jumbleInk,
   mirrored,
+  paintGradient,
   paintPoints,
   paintStamp,
   rgbaOf,
@@ -53,11 +65,18 @@ import {
   SELECTION_TOOLS,
   brushOrigin,
   brushTip,
+  clampOpacity,
+  clampTolerance,
+  curvePoints,
   extendStroke,
+  fourConnected,
   fillPoints,
   linePoints,
+  lineTip,
   pixelColor,
   snapLine,
+  sprayDotCount,
+  sprayDots,
   squareFrom,
   strokePixels,
   type PaintTool,
@@ -65,14 +84,18 @@ import {
   type Point,
 } from "./pen";
 import {
+  ellipseMask,
   isSelected,
   maskOutline,
   polygonMask,
   rectMask,
   selectModeOf,
   wandMask,
+  type Floating,
   type SelectMode,
 } from "./selection";
+import { SliceOverlay } from "./components/slice-overlay";
+import { textPiece } from "./text";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
 import { onionFrames, type CanvasView } from "./view";
@@ -91,13 +114,49 @@ type Stroke = {
   color: string | null;
   /** The cel before the stroke, so each redraw starts from it. */
   before: Uint8ClampedArray;
+  /** Picks where the jumble takes each pixel from, new for every stroke. */
+  seed?: number;
+  /** The curve's bend, set by the drags after the first. */
+  curve?: CurveBend;
+};
+
+/**
+ * A curve takes three drags: the first places its ends, the second bends it
+ * (`c1` and `c2` together), the third moves `c2` alone. `held` is true while
+ * one of them is being dragged.
+ */
+type CurveBend = { c1: Point; c2: Point; stage: 0 | 1 | 2; held: boolean };
+
+/** What the canvas shows over an unfinished curve: its ends and bend handles. */
+type CurveGuide = {
+  start: Point;
+  end: Point;
+  c1: Point;
+  c2: Point;
+  stage: number;
 };
 
 /** A selection being dragged out, or selected pixels being moved. */
 type SelectDrag =
-  | { kind: "marquee"; from: Point; to: Point; mode: SelectMode }
+  | {
+      kind: "marquee";
+      from: Point;
+      to: Point;
+      mode: SelectMode;
+      /** The elliptical marquee: the ellipse that fits the dragged box. */
+      ellipse: boolean;
+    }
   | { kind: "lasso"; points: Point[]; mode: SelectMode }
+  | PolygonDrag
   | { kind: "move"; from: Point };
+
+/** The polygonal lasso: corners placed click by click, and where the pointer is. */
+type PolygonDrag = {
+  kind: "polygon";
+  points: Point[];
+  pointer: Point;
+  mode: SelectMode;
+};
 
 export type ColorSlot = "primary" | "secondary";
 
@@ -119,7 +178,15 @@ export type PixelCanvasHandle = {
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
+  /** Where the tile is on screen, e.g. to zoom around a point on it. */
+  tileRect: () => DOMRect | null;
+  /** The tile pixel under a point on the screen, or null when it is off the tile. */
+  tilePointAt: (clientX: number, clientY: number) => Point | null;
 };
+
+/** Why typed text draws nothing: the font has none of its letters. */
+const NO_GLYPHS =
+  "This font has none of these letters. For Cyrillic, pick Tiny5, DotGothic16 or Press Start 2P.";
 
 /** Where copies of the tile sit around it in tiled mode, in rows. */
 function tiledCells(tiled: TiledMode): Point[] {
@@ -139,6 +206,9 @@ export function PixelCanvas({
   highlight,
   onPickColor,
   onUseColor,
+  onTextPlaced,
+  sliceId = null,
+  onSelectSlice,
   ref,
 }: {
   tool: PaintTool;
@@ -156,6 +226,11 @@ export function PixelCanvas({
   onPickColor?: (color: string, slot: ColorSlot) => void;
   /** Called with the colour of each finished stroke or fill. */
   onUseColor?: (color: string) => void;
+  /** Called when typed text is put on the tile as a floating piece, to move it. */
+  onTextPlaced?: () => void;
+  /** The slice picked with the Slice tool, and picking another (null for none). */
+  sliceId?: string | null;
+  onSelectSlice?: (id: string | null) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
@@ -165,6 +240,34 @@ export function PixelCanvas({
   const [selecting, setSelecting] = useState(false);
   const [aiArea, setAiArea] = useState<Area | null>(null);
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
+  const [spraying, setSpraying] = useState(false);
+  const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
+  // A slice being drawn, or the picked one being dragged by (dx, dy).
+  const [sliceDrag, setSliceDrag] = useState<
+    | { kind: "new"; from: Point; to: Point }
+    | { kind: "move"; id: string; from: Point; dx: number; dy: number }
+    | null
+  >(null);
+  // The text tool's box: where its text goes, in which colour, and what is typed.
+  const [textBox, setTextBox] = useState<{
+    at: Point;
+    rgba: Rgba;
+    text: string;
+  } | null>(null);
+  const [textPreview, setTextPreview] = useState<Floating | null>(null);
+  const textInput = useRef<HTMLInputElement>(null);
+  const [textError, setTextError] = useState<string | null>(null);
+  // The corners of an unfinished polygon and where the pointer is, for the guides.
+  const [paintPolygon, setPaintPolygon] = useState<{
+    points: Point[];
+    pointer: Point;
+  } | null>(null);
+  // Picking another tool drops a polygon that isn't closed yet.
+  const [polygonTool, setPolygonTool] = useState(tool);
+  if (polygonTool !== tool) {
+    setPolygonTool(tool);
+    if (selectDrag?.kind === "polygon") setSelectDrag(null);
+  }
   const screenRef = useRef<HTMLCanvasElement>(null);
   const onionRef = useRef<HTMLCanvasElement>(null);
   const copies = useRef(new Set<HTMLCanvasElement>());
@@ -305,6 +408,13 @@ export function PixelCanvas({
           resolveAiArea.current = resolve;
         });
       },
+      tilePointAt(clientX, clientY) {
+        const box = screenRef.current?.getBoundingClientRect();
+        if (!box?.width || !box.height) return null;
+        const x = Math.floor(((clientX - box.left) / box.width) * size.w);
+        const y = Math.floor(((clientY - box.top) / box.height) * size.h);
+        return x >= 0 && y >= 0 && x < size.w && y < size.h ? { x, y } : null;
+      },
       adjustArea(area) {
         resolveFrame.current?.(null);
         setFrame(area);
@@ -312,6 +422,7 @@ export function PixelCanvas({
           resolveFrame.current = resolve;
         });
       },
+      tileRect: () => screenRef.current?.getBoundingClientRect() ?? null,
     };
   }, [sprite, size]);
 
@@ -335,19 +446,51 @@ export function PixelCanvas({
   }, [frame, finishFrame]);
 
   const isSelectionTool = SELECTION_TOOLS.includes(tool);
-  // The brush is round; the pen, eraser, line and shapes have a square tip.
+  // The brush and blur are round (and share a size); the pen, eraser, line
+  // and shapes have a square tip. The spray's "tip" is the circle it
+  // scatters dots in.
+  const roundTip = (t: PaintTool) =>
+    t === "brush" || t === "blur" || t === "jumble";
   const tipSize = (t: PaintTool) =>
-    t === "brush" ? pen.brushSize : t === "eraser" ? pen.eraserSize : pen.size;
-  const hoverSize = tool === "bucket" || tool === "pipette" ? 1 : tipSize(tool);
-  const hoverTip = brushTip(hoverSize, tool === "brush");
+    roundTip(t)
+      ? pen.brushSize
+      : t === "eraser"
+        ? pen.eraserSize
+        : t === "spray"
+          ? pen.sprayWidth * 2 + 1
+          : pen.size;
+  const hoverSize =
+    tool === "bucket" ||
+    tool === "gradient" ||
+    tool === "contour" ||
+    tool === "polygon" ||
+    tool === "pipette"
+      ? 1
+      : tipSize(tool);
+  // The brush can be a calligraphy line instead of round.
+  const lineBrush = (t: PaintTool) =>
+    t === "brush" && pen.brushShape === "line";
+  const tipOf = (t: PaintTool, size: number) =>
+    lineBrush(t)
+      ? lineTip(size, pen.brushAngle)
+      : brushTip(size, roundTip(t) || t === "spray");
+  const hoverTip = tipOf(tool, hoverSize);
   // Tools that don't lay down the pen colour show only the outline of their tip.
-  const hoverOutline = tool === "pipette" || tool === "eraser";
+  const hoverOutline =
+    tool === "pipette" ||
+    tool === "eraser" ||
+    tool === "spray" ||
+    tool === "blur" ||
+    tool === "jumble";
   // Selecting works on any layer; painting and moving need one that can change.
   const blocked =
     !sprite.canPaint &&
     tool !== "pipette" &&
     tool !== "marquee" &&
+    tool !== "ellipseMarquee" &&
     tool !== "lasso" &&
+    tool !== "polygonLasso" &&
+    tool !== "slice" &&
     tool !== "wand";
   const overSelection =
     !!hover && isSelected(mask, size, hover) && tool !== "wand";
@@ -357,15 +500,40 @@ export function PixelCanvas({
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     const data = new Uint8ClampedArray(current.before);
     const tipPixels = tipSize(current.tool);
-    const tip = brushTip(tipPixels, current.tool === "brush");
+    const tip = tipOf(current.tool, tipPixels);
     const origin = (p: Point) => brushOrigin(p, tipPixels);
     const start = current.points[0]!;
     const inkTool = current.tool === "pen" || current.tool === "brush";
-    // Shading moves pixels along the palette: forwards with the left button.
+    // The tools with an Ink setting; the rest paint the plain colour.
+    const inked =
+      inkTool ||
+      current.tool === "spray" ||
+      current.tool === "contour" ||
+      current.tool === "polygon";
     const ink: Ink =
-      inkTool && pen.ink === "shading"
-        ? shadingInk(current.before, sprite.palette, current.secondary ? -1 : 1)
-        : current.rgba;
+      current.tool === "blur"
+        ? blurInk(current.before, size)
+        : current.tool === "jumble"
+          ? jumbleInk(current.before, size, current.seed ?? 0)
+          : !inked
+            ? current.rgba
+            : pen.ink === "shading"
+              ? // Moves pixels along the palette: forwards with the left button.
+                shadingInk(
+                  current.before,
+                  sprite.palette,
+                  current.secondary ? -1 : 1,
+                )
+              : blendInk(
+                  current.before,
+                  [
+                    current.rgba[0],
+                    current.rgba[1],
+                    current.rgba[2],
+                    clampOpacity(pen.opacity),
+                  ],
+                  pen.ink,
+                );
     const paint = (points: Point[], thin = false) =>
       paintPoints(
         data,
@@ -387,6 +555,41 @@ export function PixelCanvas({
       paint(shape(box, false));
     } else if (current.tool === "line") {
       paint(linePoints(start, current.end));
+    } else if (current.curve) {
+      const { c1, c2 } = current.curve;
+      paint(strokePixels(curvePoints(start, c1, c2, current.end), pen));
+    } else if (current.tool === "spray") {
+      paint(current.points, true);
+    } else if (current.tool === "contour" || current.tool === "polygon") {
+      // The outline drawn so far, closed back to its start and filled; an
+      // unfinished polygon reaches to the pointer.
+      const inside = polygonMask(
+        size,
+        current.tool === "polygon"
+          ? [...current.points, current.end]
+          : current.points,
+      );
+      const points: Point[] = [];
+      inside.forEach((on, i) => {
+        if (on) points.push({ x: i % size.w, y: Math.floor(i / size.w) });
+      });
+      paint(points, true);
+    } else if (current.tool === "gradient") {
+      // Until the line has a length there is no direction, so nothing changes.
+      // The right button runs the gradient the other way round.
+      const primary = rgbaOf(pen.color);
+      const secondary = rgbaOf(pen.secondary);
+      if (start.x !== current.end.x || start.y !== current.end.y)
+        paintGradient(
+          data,
+          start,
+          current.end,
+          current.secondary ? secondary : primary,
+          current.secondary ? primary : secondary,
+          pen.gradientShape,
+          pen.gradientDither,
+          paintOptions,
+        );
     } else if (inkTool && stamp) {
       // A picture brush: its own colours, or a silhouette with the right button.
       paintStamp(
@@ -400,7 +603,9 @@ export function PixelCanvas({
       paint(
         current.tool === "pen"
           ? strokePixels(current.points, pen)
-          : current.points,
+          : lineBrush(current.tool)
+            ? fourConnected(current.points)
+            : current.points,
       );
     }
     ctx.putImageData(
@@ -410,6 +615,30 @@ export function PixelCanvas({
     );
     sprite.touched();
   };
+
+  // While the spray is held it keeps laying dots, even with the pointer still:
+  // `seconds` since the last frame decides how many.
+  const sprayTick = useEffectEvent((seconds: number) => {
+    const current = stroke.current;
+    const ctx = sprite.context();
+    if (current?.tool !== "spray" || !ctx) return;
+    const count = sprayDotCount(pen.spraySpeed, seconds);
+    // The fraction left over becomes a dot now and then, so slow speeds still spray.
+    const dots = Math.floor(count) + (Math.random() < count % 1 ? 1 : 0);
+    if (!dots) return;
+    current.points.push(...sprayDots(current.end, pen.sprayWidth, dots));
+    drawStroke(ctx, current);
+  });
+  useEffect(() => {
+    if (!spraying) return;
+    let last = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      sprayTick((now - last) / 1000);
+      last = now;
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [spraying]);
 
   // The pipette picks what is seen, all layers combined.
   const pickColor = (point: Point, slot: ColorSlot) => {
@@ -428,19 +657,35 @@ export function PixelCanvas({
     color: string | null,
   ) => {
     const image = ctx.getImageData(0, 0, size.w, size.h);
+    // With "All layers", what is seen (references aside) sets where the fill
+    // stops, e.g. outlines on a layer above; it still paints this layer.
+    const allLayers = pen.fillFrom === "all";
+    const bounds = allLayers
+      ? new ImageData(
+          sprite.composite(["reference"]) as Uint8ClampedArray<ArrayBuffer>,
+          size.w,
+          size.h,
+        )
+      : image;
     let changed = false;
     for (const copy of mirrored(point, size, symmetry)) {
       const at = wrapPixel(copy.x, copy.y, size, tiled);
       // Inside a selection, only a click on it fills.
       if (!at || (mask && !isSelected(mask, size, at))) continue;
       const start = (at.y * size.w + at.x) * 4;
-      if (rgba.every((v, c) => image.data[start + c] === v)) continue;
-      for (const i of fillPoints(image, at, pen.contiguous)) {
+      if (!allLayers && rgba.every((v, c) => image.data[start + c] === v))
+        continue;
+      for (const i of fillPoints(
+        bounds,
+        at,
+        pen.contiguous,
+        clampTolerance(pen.tolerance),
+      )) {
         if (mask && !mask[i]) continue;
         if (!inPattern(i % size.w, Math.floor(i / size.w), pen.density))
           continue;
+        if (rgba.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
         image.data.set(rgba, i * 4);
-        changed = true;
       }
     }
     if (!changed) return;
@@ -451,6 +696,7 @@ export function PixelCanvas({
 
   const startSelect = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
     if (e.button !== 0) return;
+    if (selectDrag?.kind === "polygon") return addCorner(selectDrag, p);
     const mode = selectModeOf(e);
     const inside = isSelected(mask, size, p);
     if (tool === "move" || (mode === "replace" && inside && tool !== "wand")) {
@@ -462,43 +708,102 @@ export function PixelCanvas({
     }
     if (tool === "wand") {
       const cel = sprite.readCel(sprite.layerId, sprite.frameId);
-      selection.select(wandMask(cel, size, p, pen.contiguous), mode);
+      selection.select(
+        wandMask(cel, size, p, pen.contiguous, clampTolerance(pen.tolerance)),
+        mode,
+      );
       return;
     }
+    if (tool === "polygonLasso")
+      return setSelectDrag({ kind: "polygon", points: [p], pointer: p, mode });
     e.currentTarget.setPointerCapture(e.pointerId);
     setSelectDrag(
       tool === "lasso"
         ? { kind: "lasso", points: [p], mode }
-        : { kind: "marquee", from: p, to: p, mode },
+        : {
+            kind: "marquee",
+            from: p,
+            to: p,
+            mode,
+            ellipse: tool === "ellipseMarquee",
+          },
     );
   };
 
-  const moveSelect = (p: Point) => {
-    if (!selectDrag) return;
+  /**
+   * Follows the pointer through `passed` pixels, the last being where it is
+   * now. Shift while dragging the elliptical marquee makes a circle.
+   */
+  const moveSelect = (passed: Point[], shift: boolean) => {
+    const p = passed.at(-1);
+    if (!selectDrag || !p) return;
     if (selectDrag.kind === "move")
       selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
     else if (selectDrag.kind === "marquee") {
-      if (p.x !== selectDrag.to.x || p.y !== selectDrag.to.y)
-        setSelectDrag({ ...selectDrag, to: p });
+      const to = selectDrag.ellipse ? squareFrom(selectDrag.from, p, shift) : p;
+      if (to.x !== selectDrag.to.x || to.y !== selectDrag.to.y)
+        setSelectDrag({ ...selectDrag, to });
+    } else if (selectDrag.kind === "polygon") {
+      if (p.x !== selectDrag.pointer.x || p.y !== selectDrag.pointer.y)
+        setSelectDrag({ ...selectDrag, pointer: p });
     } else {
-      const points = extendStroke(selectDrag.points, p);
+      const points = passed.reduce(extendStroke, selectDrag.points);
       if (points !== selectDrag.points)
         setSelectDrag({ ...selectDrag, points });
     }
   };
 
+  // The polygon is closed by a click on its first corner, a double click or Enter.
+  const addCorner = (current: PolygonDrag, p: Point) => {
+    const [first] = current.points;
+    const last = current.points.at(-1)!;
+    if (current.points.length >= 3 && p.x === first!.x && p.y === first!.y)
+      return closePolygon(current);
+    if (p.x !== last.x || p.y !== last.y)
+      setSelectDrag({ ...current, points: [...current.points, p] });
+  };
+
+  const closePolygon = (current: PolygonDrag) => {
+    setSelectDrag(null);
+    // Fewer than three corners make no area: the polygon is just dropped.
+    if (current.points.length >= 3)
+      selection.select(polygonMask(size, current.points), current.mode);
+  };
+
+  // Enter closes the polygon and Esc drops it, before the editor's own
+  // Enter (drop the selection) and Esc (deselect) see the key.
+  const polygon = selectDrag?.kind === "polygon" ? selectDrag : null;
+  const onPolygonKey = useEffectEvent((e: KeyboardEvent) => {
+    if (!polygon || (e.key !== "Enter" && e.key !== "Escape")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === "Enter") closePolygon(polygon);
+    else setSelectDrag(null);
+  });
+  const polygonOpen = polygon !== null;
+  useEffect(() => {
+    if (!polygonOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => onPolygonKey(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [polygonOpen]);
+
   const endSelect = () => {
     const current = selectDrag;
+    // The polygon stays open between clicks.
+    if (current?.kind === "polygon") return;
     setSelectDrag(null);
     if (!current) return;
     if (current.kind === "move") return selection.endMove();
     if (current.kind === "marquee") {
-      const { from, to, mode } = current;
+      const { from, to, mode, ellipse } = current;
       // A click without a drag clears the selection, as in Aseprite.
       if (from.x === to.x && from.y === to.y && mode === "replace")
         return selection.deselect();
       return selection.select(
-        rectMask(size, areaBetween(from, to, size)),
+        ellipse
+          ? ellipseMask(size, boxBetween(from, to))
+          : rectMask(size, areaBetween(from, to, size)),
         mode,
       );
     }
@@ -512,12 +817,36 @@ export function PixelCanvas({
     if (frame || (e.button !== 0 && e.button !== 2)) return;
     const point = pixelAt(e);
     const slot: ColorSlot = e.button === 2 ? "secondary" : "primary";
+    // The second and third drags of a curve bend it.
+    const unfinished = stroke.current;
+    if (unfinished?.curve && !unfinished.curve.held) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      unfinished.curve.held = true;
+      return bendCurve(unfinished, point);
+    }
+    // Each further click on an unfinished polygon places a corner.
+    if (unfinished?.tool === "polygon") {
+      const last = unfinished.points.at(-1)!;
+      return addShapeCorner(
+        unfinished,
+        e.shiftKey ? snapLine(last, point) : point,
+      );
+    }
     // Alt+click picks a colour with the drawing tools, as in Aseprite
     // (selection tools use Alt to take away from the selection).
     if (tool === "pipette" || (e.altKey && !isSelectionTool))
       return pickColor(point, slot);
     if (isSelectionTool) return startSelect(e, point);
+    if (tool === "slice") return startSlice(e, point);
     if (blocked) return;
+    // A click opens the text box there, or moves it, keeping what is typed.
+    // Keeping the default stops the click taking focus from the box.
+    if (tool === "text") {
+      e.preventDefault();
+      const rgba = rgbaOf(slot === "primary" ? pen.color : pen.secondary);
+      setTextError(null);
+      return setTextBox((box) => ({ at: point, rgba, text: box?.text ?? "" }));
+    }
     // Drawing puts lifted pixels down first.
     selection.drop();
     // A layer with nothing in this frame yet gets its cel now.
@@ -532,53 +861,334 @@ export function PixelCanvas({
         : [0, 0, 0, 0];
     if (tool === "bucket") return fillAt(ctx, point, rgba, color);
     e.currentTarget.setPointerCapture(e.pointerId);
-    const freehand = tool === "pen" || tool === "brush" || erase;
+    const freehand =
+      tool === "pen" ||
+      tool === "brush" ||
+      tool === "blur" ||
+      tool === "jumble" ||
+      erase;
     const shading =
-      pen.ink === "shading" && (tool === "pen" || tool === "brush") && !stamp;
+      pen.ink === "shading" &&
+      (((tool === "pen" || tool === "brush") && !stamp) ||
+        tool === "spray" ||
+        tool === "contour" ||
+        tool === "polygon");
     stroke.current = {
       tool,
       points:
-        freehand && e.shiftKey && lastPoint.current
-          ? linePoints(lastPoint.current, point)
-          : [point],
+        tool === "spray"
+          ? sprayDots(point, pen.sprayWidth, 1)
+          : freehand && e.shiftKey && lastPoint.current
+            ? linePoints(lastPoint.current, point)
+            : [point],
       end: point,
       rgba,
       secondary: slot === "secondary",
       // Shading and picture brushes don't lay down one colour.
-      color: shading || (stamp && freehand && !erase) ? null : color,
+      color:
+        shading ||
+        (stamp && freehand && !erase) ||
+        tool === "gradient" ||
+        tool === "blur" ||
+        tool === "jumble"
+          ? null
+          : color,
       before: new Uint8ClampedArray(
         ctx.getImageData(0, 0, size.w, size.h).data,
       ),
+      seed: tool === "jumble" ? (Math.random() * 2 ** 31) | 0 : undefined,
+      // Straight until it is bent: the controls sit on the ends.
+      curve:
+        tool === "curve"
+          ? { c1: point, c2: point, stage: 0, held: true }
+          : undefined,
     };
     drawStroke(ctx, stroke.current);
+    if (tool === "spray") setSpraying(true);
+    if (tool === "curve") showCurve(stroke.current);
+    if (tool === "polygon") showPolygon(stroke.current);
+  };
+
+  const showPolygon = (current: Stroke) =>
+    setPaintPolygon({ points: [...current.points], pointer: current.end });
+
+  // A click on the first corner closes the polygon; others add a corner.
+  const addShapeCorner = (current: Stroke, point: Point) => {
+    const first = current.points[0]!;
+    const last = current.points.at(-1)!;
+    if (
+      current.points.length >= 3 &&
+      point.x === first.x &&
+      point.y === first.y
+    )
+      return closeShape(current);
+    if (point.x === last.x && point.y === last.y) return;
+    current.points.push(point);
+    current.end = point;
+    const ctx = sprite.context();
+    if (ctx) drawStroke(ctx, current);
+    showPolygon(current);
+  };
+
+  // Fills the polygon without the stretch to the pointer; with fewer than
+  // three corners there is no area, so it is dropped.
+  const closeShape = (current: Stroke) => {
+    if (current.points.length < 3) return cancelStroke(current);
+    current.end = current.points.at(-1)!;
+    const ctx = sprite.context();
+    if (ctx) drawStroke(ctx, current);
+    finishStroke(current);
+  };
+
+  const showCurve = (current: Stroke) =>
+    setCurveGuide(
+      current.curve
+        ? {
+            start: current.points[0]!,
+            end: current.end,
+            c1: current.curve.c1,
+            c2: current.curve.c2,
+            stage: current.curve.stage,
+          }
+        : null,
+    );
+
+  // The second drag bends the curve with both controls, the third with the second alone.
+  const bendCurve = (current: Stroke, point: Point) => {
+    const ctx = sprite.context();
+    if (!current.curve || !ctx) return;
+    if (current.curve.stage === 1) {
+      current.curve.c1 = point;
+      current.curve.c2 = point;
+    } else current.curve.c2 = point;
+    drawStroke(ctx, current);
+    showCurve(current);
+  };
+
+  const finishStroke = (current: Stroke) => {
+    lastPoint.current =
+      current.tool === "line" || current.curve
+        ? current.end
+        : (current.points.at(-1) ?? null);
+    stroke.current = null;
+    setSpraying(false);
+    setCurveGuide(null);
+    setPaintPolygon(null);
+    sprite.commit();
+    if (current.color) onUseColor?.(current.color);
+  };
+
+  // Esc puts the cel back as it was before the curve or polygon.
+  const cancelStroke = (current: Stroke) => {
+    stroke.current = null;
+    setCurveGuide(null);
+    setPaintPolygon(null);
+    const ctx = sprite.context();
+    if (!ctx) return;
+    ctx.putImageData(
+      new ImageData(current.before as Uint8ClampedArray<ArrayBuffer>, size.w),
+      0,
+      0,
+    );
+    sprite.touched();
+  };
+
+  // Enter finishes an unfinished curve or polygon as it is, Esc drops it,
+  // before the editor's own Enter and Esc see the key.
+  const onShapeKey = useEffectEvent((e: KeyboardEvent) => {
+    const current = stroke.current;
+    const open = current?.curve || current?.tool === "polygon";
+    if (!current || !open || (e.key !== "Enter" && e.key !== "Escape")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === "Escape") cancelStroke(current);
+    else if (current.curve) finishStroke(current);
+    else closeShape(current);
+  });
+  const shapeOpen = curveGuide !== null || paintPolygon !== null;
+  useEffect(() => {
+    if (!shapeOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => onShapeKey(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [shapeOpen]);
+
+  // Picking another tool, layer or frame keeps an unfinished curve or
+  // polygon as it is, so its next clicks can't land on another cel.
+  const keepShape = useEffectEvent(() => {
+    const current = stroke.current;
+    if (current?.curve) finishStroke(current);
+    else if (current?.tool === "polygon") closeShape(current);
+  });
+  useEffect(() => keepShape(), [tool, sprite.layerId, sprite.frameId]);
+
+  // The text box shows only with the text tool; switching away drops it.
+  const openText = tool === "text" ? textBox : null;
+
+  // The typed text, drawn as it will land on the tile.
+  useEffect(() => {
+    if (!openText) return;
+    let live = true;
+    void textPiece(
+      openText.text,
+      pen.textFont,
+      pen.textScale,
+      openText.rgba,
+      openText.at.x,
+      openText.at.y,
+    ).then((piece) => {
+      if (live) setTextPreview(piece);
+    });
+    return () => {
+      live = false;
+    };
+  }, [openText, pen.textFont, pen.textScale]);
+
+  // Typing goes to the box wherever it was opened or moved to.
+  const textAt = openText?.at;
+  useEffect(() => textInput.current?.focus(), [textAt]);
+
+  // Enter puts the text on the tile as a floating piece, to move and drop
+  // like a paste; it stays inside the tile.
+  const placeText = async () => {
+    if (!openText) return;
+    const piece = await textPiece(
+      openText.text,
+      pen.textFont,
+      pen.textScale,
+      openText.rgba,
+      openText.at.x,
+      openText.at.y,
+    );
+    // The box stays open, saying why, when there is nothing to put down.
+    if (!piece) return setTextError(NO_GLYPHS);
+    if (!selection.paste(piece))
+      return setTextError("Pick a visible, unlocked layer to put the text on.");
+    setTextBox(null);
+    setTextPreview(null);
+    onTextPlaced?.();
+  };
+
+  // A press on a slice picks it and drags it; elsewhere it draws a new one.
+  const startSlice = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const picked = sprite.slices.find((s) => s.id === sliceId);
+    const hit =
+      picked && sliceAt([picked], p.x, p.y)
+        ? picked
+        : sliceAt(sprite.slices, p.x, p.y);
+    if (hit) {
+      onSelectSlice?.(hit.id);
+      setSliceDrag({ kind: "move", id: hit.id, from: p, dx: 0, dy: 0 });
+    } else setSliceDrag({ kind: "new", from: p, to: p });
+  };
+
+  const moveSlice = (p: Point) => {
+    if (!sliceDrag) return;
+    if (sliceDrag.kind === "new") {
+      if (p.x !== sliceDrag.to.x || p.y !== sliceDrag.to.y)
+        setSliceDrag({ ...sliceDrag, to: p });
+      return;
+    }
+    const dx = p.x - sliceDrag.from.x;
+    const dy = p.y - sliceDrag.from.y;
+    if (dx !== sliceDrag.dx || dy !== sliceDrag.dy)
+      setSliceDrag({ ...sliceDrag, dx, dy });
+  };
+
+  // A click on an empty spot leaves no slice picked.
+  const endSlice = () => {
+    const drag = sliceDrag;
+    setSliceDrag(null);
+    if (!drag) return;
+    if (drag.kind === "move") {
+      if (!drag.dx && !drag.dy) return;
+      return sprite.setSlices(
+        sprite.slices.map((s) =>
+          s.id === drag.id
+            ? {
+                ...s,
+                bounds: {
+                  ...s.bounds,
+                  x: s.bounds.x + drag.dx,
+                  y: s.bounds.y + drag.dy,
+                },
+              }
+            : s,
+        ),
+      );
+    }
+    if (drag.from.x === drag.to.x && drag.from.y === drag.to.y)
+      return onSelectSlice?.(null);
+    const slice: Slice = {
+      id: crypto.randomUUID(),
+      name: nextSliceName(sprite.slices),
+      bounds: areaBetween(drag.from, drag.to, size),
+      center: null,
+      pivot: null,
+    };
+    sprite.setSlices([...sprite.slices, slice]);
+    onSelectSlice?.(slice.id);
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const point = pixelAt(e);
+    // Every pixel passed since the last event, so fast curves stay round.
+    const passed = pixelsPassed(e.nativeEvent, e.currentTarget);
+    const point = passed.at(-1);
+    if (!point) return;
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
-    if (selectDrag) return moveSelect(point);
+    if (selectDrag) return moveSelect(passed, e.shiftKey);
+    if (sliceDrag) return moveSlice(point);
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
+    // The spray lays its dots on a timer, around wherever the pointer is.
+    if (current.tool === "spray") {
+      current.end = point;
+      return;
+    }
+    // An unfinished polygon stretches from its last corner to the pointer.
+    if (current.tool === "polygon") {
+      const last = current.points.at(-1)!;
+      const end = e.shiftKey ? snapLine(last, point) : point;
+      if (end.x === current.end.x && end.y === current.end.y) return;
+      current.end = end;
+      drawStroke(ctx, current);
+      return showPolygon(current);
+    }
+    // A curve bends only while its second or third drag is held.
+    if (current.curve && current.curve.stage > 0) {
+      if (current.curve.held) bendCurve(current, point);
+      return;
+    }
     if (
+      current.curve ||
       current.tool === "line" ||
+      current.tool === "gradient" ||
       current.tool === "rect" ||
       current.tool === "ellipse"
     ) {
-      // Lines and shapes are redrawn from their start; Shift keeps a line to
-      // 45° steps and makes a shape a square or circle.
+      // Lines, gradients and shapes are redrawn from their start; Shift keeps
+      // a line to 45° steps and makes a shape a square or circle.
       const from = current.points[0]!;
       const end =
-        current.tool === "line"
+        current.curve || current.tool === "line" || current.tool === "gradient"
           ? e.shiftKey
             ? snapLine(from, point)
             : point
           : squareFrom(from, point, e.shiftKey);
       if (end.x === current.end.x && end.y === current.end.y) return;
       current.end = end;
+      // The first drag of a curve draws it straight, its controls on the ends.
+      if (current.curve) {
+        current.curve.c1 = from;
+        current.curve.c2 = end;
+        showCurve(current);
+      }
     } else {
-      const points = extendStroke(current.points, point);
+      const points = passed.reduce(extendStroke, current.points);
       if (points === current.points) return;
       current.points = points;
     }
@@ -587,13 +1197,22 @@ export function PixelCanvas({
 
   const endPointer = () => {
     if (selectDrag) return endSelect();
+    if (sliceDrag) return endSlice();
     const current = stroke.current;
-    if (!current) return;
-    lastPoint.current =
-      current.tool === "line" ? current.end : (current.points.at(-1) ?? null);
-    stroke.current = null;
-    sprite.commit();
-    if (current.color) onUseColor?.(current.color);
+    // A polygon stays open between clicks.
+    if (!current || current.tool === "polygon") return;
+    const curve = current.curve;
+    if (curve) {
+      curve.held = false;
+      const start = current.points[0]!;
+      const dot = start.x === current.end.x && start.y === current.end.y;
+      // A curve waits for its bending drags; a click without a drag is a dot.
+      if (curve.stage < 2 && !(curve.stage === 0 && dot)) {
+        curve.stage = curve.stage === 0 ? 1 : 2;
+        return showCurve(current);
+      }
+    }
+    finishStroke(current);
   };
 
   const startAiArea = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -636,14 +1255,20 @@ export function PixelCanvas({
     onPointerUp: selecting ? endAiArea : endPointer,
     onPointerCancel: selecting ? endAiArea : endPointer,
     onPointerLeave: () => setHover(null),
+    onDoubleClick: () => {
+      if (polygon) closePolygon(polygon);
+      if (stroke.current?.tool === "polygon") closeShape(stroke.current);
+    },
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
   const cursor =
     blocked && !selecting
       ? "cursor-not-allowed"
-      : tool === "move" || (overSelection && isSelectionTool)
+      : tool === "move" || (overSelection && isSelectionTool && !polygon)
         ? "cursor-move"
-        : "cursor-crosshair";
+        : tool === "text"
+          ? "cursor-text"
+          : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
   const showTip =
     hover &&
@@ -652,13 +1277,24 @@ export function PixelCanvas({
     !frame &&
     !blocked &&
     !isSelectionTool &&
+    tool !== "text" &&
+    tool !== "slice" &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
-  const lasso = selectDrag?.kind === "lasso" ? selectDrag.points : null;
+  // The corners of a polygonal lasso or of a polygon being drawn.
+  const corners = polygon ?? paintPolygon;
+  const lasso =
+    selectDrag?.kind === "lasso"
+      ? selectDrag.points
+      : polygon && [...polygon.points, polygon.pointer];
+  // The ellipse may run off the tile, so its box isn't clamped to it.
   const marquee =
     selectDrag?.kind === "marquee"
-      ? areaBetween(selectDrag.from, selectDrag.to, size)
+      ? selectDrag.ellipse
+        ? boxBetween(selectDrag.from, selectDrag.to)
+        : areaBetween(selectDrag.from, selectDrag.to, size)
       : null;
+  const ellipseMarquee = selectDrag?.kind === "marquee" && selectDrag.ellipse;
 
   const tile = (
     <div
@@ -759,7 +1395,7 @@ export function PixelCanvas({
         />
       )}
 
-      {(outline || marquee || lasso) && (
+      {(outline || marquee || lasso || corners || curveGuide) && (
         <svg
           aria-hidden="true"
           viewBox={`0 0 ${size.w} ${size.h}`}
@@ -786,7 +1422,19 @@ export function PixelCanvas({
               />
             </>
           )}
-          {marquee && (
+          {marquee && ellipseMarquee && (
+            <ellipse
+              cx={marquee.x + marquee.w / 2}
+              cy={marquee.y + marquee.h / 2}
+              rx={marquee.w / 2}
+              ry={marquee.h / 2}
+              fill="rgb(59 130 246 / 0.12)"
+              stroke="rgb(59 130 246)"
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {marquee && !ellipseMarquee && (
             <rect
               x={marquee.x}
               y={marquee.y}
@@ -807,6 +1455,54 @@ export function PixelCanvas({
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {/* Once the ends are placed, the bend handles and the lines tying
+              them to the ends show where the next drag pulls. */}
+          {curveGuide &&
+            curveGuide.stage > 0 &&
+            [
+              { from: curveGuide.start, handle: curveGuide.c1 },
+              { from: curveGuide.end, handle: curveGuide.c2 },
+            ].map(({ from, handle }, i) => (
+              <g key={i}>
+                <line
+                  x1={from.x + 0.5}
+                  y1={from.y + 0.5}
+                  x2={handle.x + 0.5}
+                  y2={handle.y + 0.5}
+                  stroke="rgb(59 130 246)"
+                  strokeDasharray="4 3"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle
+                  cx={handle.x + 0.5}
+                  cy={handle.y + 0.5}
+                  r={0.5}
+                  fill="white"
+                  stroke="rgb(59 130 246)"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            ))}
+          {corners?.points.map((p, i) => {
+            // The first corner fills in when a click on it would close the shape.
+            const closes =
+              i === 0 &&
+              corners.points.length >= 3 &&
+              p.x === corners.pointer.x &&
+              p.y === corners.pointer.y;
+            return (
+              <rect
+                key={i}
+                x={p.x}
+                y={p.y}
+                width={1}
+                height={1}
+                fill={closes ? "rgb(59 130 246)" : "white"}
+                stroke="rgb(59 130 246)"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
         </svg>
       )}
 
@@ -821,6 +1517,90 @@ export function PixelCanvas({
           {marquee.w} × {marquee.h}
         </span>
       )}
+
+      {tool === "slice" && (
+        <SliceOverlay
+          slices={sprite.slices}
+          size={size}
+          scale={scale}
+          pickedId={sliceId}
+          drag={sliceDrag}
+          onResize={(bounds) =>
+            sprite.setSlices(
+              sprite.slices.map((s) =>
+                s.id === sliceId ? resizedSlice(s, bounds) : s,
+              ),
+            )
+          }
+        />
+      )}
+
+      {openText && textPreview && (
+        <canvas
+          aria-hidden="true"
+          width={textPreview.w}
+          height={textPreview.h}
+          className="pointer-events-none absolute outline-1 outline-blue-500 outline-dashed [image-rendering:pixelated]"
+          style={{
+            left: openText.at.x * scale,
+            top: openText.at.y * scale,
+            width: textPreview.w * scale,
+            height: textPreview.h * scale,
+          }}
+          ref={(canvas) =>
+            canvas
+              ?.getContext("2d")
+              ?.putImageData(
+                new ImageData(
+                  textPreview.pixels as Uint8ClampedArray<ArrayBuffer>,
+                  textPreview.w,
+                  textPreview.h,
+                ),
+                0,
+                0,
+              )
+          }
+        />
+      )}
+      {openText && (
+        <input
+          ref={textInput}
+          aria-label="Text"
+          placeholder="Type, then Enter"
+          value={openText.text}
+          onChange={(e) => {
+            setTextBox({ ...openText, text: e.target.value });
+            setTextError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void placeText();
+            if (e.key === "Escape") {
+              setTextBox(null);
+              setTextPreview(null);
+              setTextError(null);
+            }
+          }}
+          className="absolute z-10 h-7 w-44 rounded-md border bg-background px-2 text-sm text-foreground shadow-md"
+          style={{
+            left: openText.at.x * scale,
+            top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 6,
+          }}
+        />
+      )}
+      {openText &&
+        (textError ??
+          (openText.text.trim() && !textPreview ? NO_GLYPHS : null)) && (
+          <p
+            role="status"
+            className="absolute z-10 w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md"
+            style={{
+              left: openText.at.x * scale,
+              top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 40,
+            }}
+          >
+            {textError ?? NO_GLYPHS}
+          </p>
+        )}
 
       {aiArea && (
         <div

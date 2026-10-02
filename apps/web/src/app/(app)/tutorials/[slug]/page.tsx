@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ScaledPage } from "@/components/scaled-page";
 import { StartGuideButton } from "@/components/tutorials/start-guide-button";
 import { TutorialVideo } from "@/components/tutorials/tutorial-video";
+import { findAsset } from "@/lib/assets/server";
 import { requireUser } from "@/lib/auth/session";
 import { findTutorial } from "@/lib/tutorials/tutorials";
 
@@ -23,8 +24,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TutorialPage({ params }: Props) {
   const tutorial = findTutorial((await params).slug);
   if (!tutorial) notFound();
-  const user = await requireUser();
   const { practice } = tutorial;
+  const [user, asset] = await Promise.all([
+    requireUser(),
+    practice.asset ? findAsset(practice.asset) : null,
+  ]);
 
   return (
     <ScaledPage>
@@ -66,7 +70,11 @@ export default async function TutorialPage({ params }: Props) {
             tool, and steps tick off by themselves as you do them.
           </p>
           <div className="mt-4">
-            <StartGuideButton userId={user.id} slug={tutorial.slug} />
+            <StartGuideButton
+              userId={user.id}
+              slug={tutorial.slug}
+              asset={asset}
+            />
           </div>
           <ol className="mt-5 space-y-2.5">
             {tutorial.steps.map((step, i) => (

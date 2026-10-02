@@ -54,6 +54,13 @@ export const CubeIcon = () => (
   </Icon>
 );
 
+export const BugIcon = () => (
+  <Icon>
+    <path d="M8.5 9.5a3.5 3.5 0 0 1 7 0v4.5a3.5 3.5 0 0 1-7 0Z" />
+    <path d="M10 6.5 8.5 4.5M14 6.5l1.5-2M8.5 11.5H5M8.5 15l-3 1.5M15.5 11.5H19M15.5 15l3 1.5M12 10v7.5" />
+  </Icon>
+);
+
 export const BookIcon = () => (
   <Icon>
     <path d="M12 6.5c-1.8-1.3-4.3-2-7.5-2v13c3.2 0 5.7.7 7.5 2 1.8-1.3 4.3-2 7.5-2v-13c-3.2 0-5.7.7-7.5 2Z" />

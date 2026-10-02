@@ -212,7 +212,7 @@ async function drawSet(chat: Chat, items: SetItem[]) {
     items.length,
     cell,
   );
-  const added = items.flatMap((item, i) => {
+  const layers = items.flatMap((item, i) => {
     const art = pictures[i];
     if (!art) return [];
     const area = {
@@ -221,9 +221,11 @@ async function drawSet(chat: Chat, items: SetItem[]) {
       ...cell,
     };
     const name = item.name || item.subject.split(/[,.]/)[0]!.slice(0, 30);
-    canvas.addLayer(name, paint(emptyCel(size), size, art.rgba, area), false);
-    return [name];
+    return [{ name, pixels: paint(emptyCel(size), size, art.rgba, area) }];
   });
+  // All at once: added one by one, each would replace the one before.
+  if (layers.length) canvas.addLayers(layers);
+  const added = layers.map((l) => l.name);
   chat.setPending(false);
   if (!added.length) {
     chat.setError("Couldn’t cut the picture into its parts. Try again.");
