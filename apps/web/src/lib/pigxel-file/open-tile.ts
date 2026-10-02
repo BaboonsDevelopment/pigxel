@@ -1,6 +1,12 @@
 import { readCloudTile } from "./cloud";
 import { createDraft, findDraftFor } from "./draft";
-import { PigxelFileError, parsePigxel, stripPigxelExtension } from "./format";
+import {
+  PigxelFileError,
+  parsePigxel,
+  serializePigxel,
+  stripPigxelExtension,
+  type PigxelDocument,
+} from "./format";
 import { readDriveFile, type DriveFile } from "./google-drive";
 import type { CloudTile, TileLocation } from "./location";
 
@@ -26,6 +32,25 @@ export function draftFromFile(
     file: contents,
     location,
     dirty: false,
+  });
+  if (!draft) throw FULL;
+  return draft.id;
+}
+
+/**
+ * Starts a draft for a tile made from a picture; it is saved nowhere yet, so
+ * it starts with unsaved changes.
+ */
+export function draftFromDocument(
+  userId: string,
+  doc: PigxelDocument,
+  name: string,
+): string {
+  const draft = createDraft(userId, {
+    name,
+    file: serializePigxel(doc),
+    location: null,
+    dirty: true,
   });
   if (!draft) throw FULL;
   return draft.id;

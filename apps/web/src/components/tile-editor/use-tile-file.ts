@@ -28,8 +28,14 @@ import {
 import {
   draftForCloudTile,
   draftForDriveFile,
+  draftFromDocument,
   draftFromFile,
 } from "@/lib/pigxel-file/open-tile";
+import {
+  documentFromImage,
+  imageBaseName,
+  isImageFile,
+} from "@/lib/pigxel-file/import-image";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 
 export type FileStatus = {
@@ -196,11 +202,21 @@ export function useTileFile({
 
   const openFromComputer = () => fileInput.current?.click();
 
+  // A picture (PNG, GIF, JPEG, …) opens as a new tile; anything else is read
+  // as a .pigxel file.
   const onFileChosen = (file: File | undefined) => {
-    if (file)
-      void run(async () =>
-        onOpen(draftFromFile(userId, await file.text(), file.name, null)),
-      );
+    if (!file) return;
+    void run(async () =>
+      onOpen(
+        isImageFile(file)
+          ? draftFromDocument(
+              userId,
+              await documentFromImage(file),
+              imageBaseName(file.name),
+            )
+          : draftFromFile(userId, await file.text(), file.name, null),
+      ),
+    );
   };
 
   const openDriveFile = (picked: DriveFile) =>
