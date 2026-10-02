@@ -112,8 +112,8 @@ function Row({
                       ? "Remove from this browser"
                       : "Delete",
                   destructive: true,
-                  onSelect: () => {
-                    if (confirmRemoveLocalTile(userId, project.draft))
+                  onSelect: async () => {
+                    if (await confirmRemoveLocalTile(userId, project.draft))
                       refresh();
                   },
                 },

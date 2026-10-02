@@ -14,7 +14,15 @@ export type TileAction = {
   name?: string;
   /** For animate: how many frames were asked for; 0 lets the planner choose. */
   frames?: number;
+  /**
+   * For generate: several different things asked for at once, each drawn on
+   * a layer of its own from one picture; empty for one thing.
+   */
+  items?: SetItem[];
 };
+
+/** One of several different things asked for at once. */
+export type SetItem = { subject: string; name: string };
 
 export type ChatMessage = {
   role: "user" | "assistant";
@@ -39,6 +47,7 @@ export type Route = {
   count: number;
   name: string;
   frames: number;
+  items: SetItem[];
 };
 
 export type GeneratedImage = { mimeType: string; base64: string };
@@ -103,12 +112,11 @@ export type PlacementReply = {
 };
 
 /**
- * Something that changes shape from frame to frame (a character's pose, an
- * explosion): the image model draws all its poses at once, as a sprite sheet.
- * `poses` has one entry per frame, "" where it is not seen.
+ * What an animation shows, drawn frame by frame as one sprite sheet: the
+ * whole scene in `box` (a character and everything it throws, casts or
+ * makes move), one entry of `poses` per frame, "" where nothing is seen.
  */
 export type SheetTrack = {
-  kind: "sheet";
   name: string;
   subject: string;
   /** The index of an existing layer it animates (its look is kept), or null. */
@@ -118,39 +126,15 @@ export type SheetTrack = {
   poses: string[];
 };
 
-/**
- * Something that keeps its shape and only moves (a thrown grenade): drawn
- * once, then placed at `path[frame]`, or hidden where that is null.
- */
-export type PropTrack = {
-  kind: "prop";
-  name: string;
-  subject: string;
-  /**
-   * The number of an object already drawn on the tile (from the objects the
-   * planner was shown) whose own pixels fly; nothing new is drawn.
-   */
-  copy: number | null;
-  /**
-   * A thing drawn as part of a layer (a skull held in a hand): the box
-   * around it and the layer's number (null when the planner didn't say; the
-   * layer drawn there is used). It is cut out into a layer of its own first,
-   * and its pixels fly.
-   */
-  grab: { layer: number | null; area: Rect } | null;
-  path: (Rect | null)[];
-};
-
-export type AnimationTrack = SheetTrack | PropTrack;
-
-/** How an animation is made: its frames and one layer per track, bottom to top. */
+/** How an animation is made: its frames, and the one layer drawn for them. */
 export type AnimationPlan = {
   /** A short name for the group of new layers, e.g. "Monkey throws grenade". */
   name: string;
   frameCount: number;
   /** How long each frame shows, in milliseconds. */
   duration: number;
-  tracks: AnimationTrack[];
+  /** One track: the whole animation is one layer. */
+  tracks: SheetTrack[];
   /** One or two sentences for the user, in their language. */
   summary: string;
 };
@@ -168,15 +152,11 @@ export type AnimationReply = {
   duration: number;
   summary: string;
   tracks: {
-    kind: string;
     name: string;
     subject: string;
     reuse: number;
     box: Rect;
-    copy: number;
-    grab: Rect;
     poses: string[];
-    path: (Rect & { visible: boolean })[];
   }[];
 };
 

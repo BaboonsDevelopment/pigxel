@@ -1,5 +1,11 @@
 import { components, type Component } from "@/lib/edit/objects";
-import { cropBitmap, type Bitmap, type Box, type Size } from "./bitmap";
+import {
+  cropBitmap,
+  opaqueBox,
+  type Bitmap,
+  type Box,
+  type Size,
+} from "./bitmap";
 import { decodeImage } from "./decode";
 import { imageToSprite } from "./quantize";
 import { cutOutBackground } from "./steps/cut-out-background";
@@ -210,18 +216,48 @@ export function posesToFrames(
 }
 
 /**
+ * The first `count` cells of `grid` cut out as they are, all one size: for
+ * frames of one scene seen by a fixed camera, where what is drawn moves
+ * within the frame and must keep its place. Empty cells give null.
+ */
+export function sheetCells(
+  image: Bitmap,
+  grid: Grid,
+  count: number,
+): (Bitmap | null)[] {
+  const w = Math.floor(image.w / grid.cols);
+  const h = Math.floor(image.h / grid.rows);
+  return Array.from({ length: count }, (_, i) => {
+    const cell = cropBitmap(image, {
+      x: (i % grid.cols) * w,
+      y: Math.floor(i / grid.cols) * h,
+      w,
+      h,
+    });
+    return opaqueBox(cell) ? cell : null;
+  });
+}
+
+/**
  * A sprite sheet from the image model turned into `count` pixel art frames
- * of `box` size (null where a cell is empty). Browser-only: decoding needs a
- * canvas.
+ * of `box` size (null where a cell is empty). By "poses" (separate things,
+ * each found as drawn and stood on the bottom of its frame) or by "cells"
+ * (whole frames of one scene, kept as framed). Browser-only: decoding needs
+ * a canvas.
  */
 export async function sheetToFrames(
   source: Blob,
   grid: Grid,
   count: number,
   box: Size,
+  by: "poses" | "cells" = "poses",
 ): Promise<(Bitmap | null)[]> {
   const target = Math.max(box.w * grid.cols, box.h * grid.rows);
   const decoded = await decodeImage(source, target);
   const sheet = recoverPixelGrid(cutOutBackground(decoded));
-  return posesToFrames(splitSheet(sheet, grid, count), box);
+  const parts =
+    by === "cells"
+      ? sheetCells(sheet, grid, count)
+      : splitSheet(sheet, grid, count);
+  return posesToFrames(parts, box);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { drawnBox, follow } from "@/components/chat-panel/helpers";
-import { ASPECT_RATIOS, MAX_FRAMES, MAX_TRACKS } from "@/lib/ai/constants";
+import { ASPECT_RATIOS, MAX_FRAMES } from "@/lib/ai/constants";
 import { clampAnimationPlan, sheetLayout } from "@/lib/ai/helpers";
 import type { AnimationReply } from "@/lib/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
@@ -34,84 +34,61 @@ describe("sprite sheet layout", () => {
 
 describe("animation plan", () => {
   const sheet = {
-    kind: "sheet",
-    name: "Monkey",
-    subject: "a brown monkey holding a grenade",
+    name: "Frost Mage",
+    subject: "a mage in blue robes and a frost bolt",
     reuse: -1,
     box: { x: 2, y: 4, w: 40, h: 40 },
-    copy: -1,
-    grab: { x: 0, y: 0, w: 0, h: 0 },
-    poses: ["wind up", "throw", "follow through"],
-    path: [],
-  };
-  const prop = {
-    kind: "prop",
-    name: "Grenade",
-    subject: "a small green grenade",
-    reuse: -1,
-    box: { x: 0, y: 0, w: 6, h: 6 },
-    copy: -1,
-    grab: { x: 0, y: 0, w: 0, h: 0 },
-    poses: [],
-    path: [
-      { x: 0, y: 0, w: 6, h: 6, visible: false },
-      { x: 30, y: 10, w: 6, h: 6, visible: true },
-      { x: 60, y: 90, w: 6, h: 6, visible: true },
-    ],
+    poses: ["raises the staff", "the bolt flies", "the bolt hits"],
   };
   const reply = (
     patch: Partial<AnimationReply> = {},
   ): Partial<AnimationReply> => ({
-    name: "Monkey Throws Grenade",
+    name: "Mage Casts Frost Bolt",
     frameCount: 3,
     duration: 90,
-    summary: "The monkey throws the grenade.",
-    tracks: [sheet, prop],
+    summary: "The mage casts a frost bolt.",
+    tracks: [sheet],
     ...patch,
   });
 
-  it("keeps boxes in the tile and gives one pose and place per frame", () => {
-    const plan = clampAnimationPlan(reply(), 32, 32, 0, 0, 0);
+  it("keeps the box in the tile and gives one pose per frame", () => {
+    const plan = clampAnimationPlan(reply(), 32, 32, 0, 0);
     expect(plan.frameCount).toBe(3);
-    const [monkey, grenade] = plan.tracks;
-    expect(monkey).toMatchObject({ kind: "sheet", reuse: null });
-    if (monkey?.kind !== "sheet") throw new Error("expected a sheet");
-    expect(monkey.box.x + monkey.box.w).toBeLessThanOrEqual(32);
-    expect(monkey.poses).toHaveLength(3);
-    if (grenade?.kind !== "prop") throw new Error("expected a prop");
-    expect(grenade.path[0]).toBeNull();
-    expect(grenade.path[2]!.x + grenade.path[2]!.w).toBeLessThanOrEqual(32);
+    const [mage] = plan.tracks;
+    expect(mage).toMatchObject({ reuse: null });
+    expect(mage!.box.x + mage!.box.w).toBeLessThanOrEqual(32);
+    expect(mage!.poses).toHaveLength(3);
   });
   it("follows the frame count asked for and stays within limits", () => {
-    const plan = clampAnimationPlan(reply(), 64, 64, 0, 5, 0);
+    const plan = clampAnimationPlan(reply(), 64, 64, 0, 5);
     expect(plan.frameCount).toBe(5);
     expect(plan.tracks[0]).toMatchObject({ poses: [...sheet.poses, "", ""] });
     expect(
-      clampAnimationPlan(reply({ frameCount: 99 }), 64, 64, 0, 0, 0).frameCount,
+      clampAnimationPlan(reply({ frameCount: 99 }), 64, 64, 0, 0).frameCount,
     ).toBe(MAX_FRAMES);
-    const many = clampAnimationPlan(
-      reply({ tracks: [sheet, sheet, sheet, sheet, prop] }),
+  });
+  it("makes the whole animation one layer", () => {
+    const plan = clampAnimationPlan(
+      reply({ tracks: [sheet, { ...sheet, name: "Bolt" }] }),
       64,
       64,
-      0,
       0,
       0,
     );
-    expect(many.tracks).toHaveLength(MAX_TRACKS);
+    expect(plan.tracks).toHaveLength(1);
+    expect(plan.tracks[0]).toMatchObject({ name: "Frost Mage" });
   });
-  it("drops tracks with nothing to show and reuses only existing layers", () => {
-    const hidden = {
-      ...prop,
-      path: prop.path.map((r) => ({ ...r, visible: false })),
-    };
+  it("drops a track with nothing to show and reuses only existing layers", () => {
     const plan = clampAnimationPlan(
       reply({
-        tracks: [{ ...sheet, reuse: 1 }, hidden, { ...sheet, subject: "" }],
+        tracks: [
+          { ...sheet, subject: "" },
+          { ...sheet, reuse: 1 },
+        ],
       }),
       64,
       64,
       2,
-      0,
       0,
     );
     expect(plan.tracks).toHaveLength(1);
@@ -122,7 +99,6 @@ describe("animation plan", () => {
         64,
         64,
         2,
-        0,
         0,
       ).tracks[0],
     ).toMatchObject({ reuse: null });
@@ -193,65 +169,6 @@ describe("edits across frames", () => {
       y: 44,
       w: 20,
       h: 20,
-    });
-  });
-});
-
-describe("animating what is already drawn", () => {
-  const prop = {
-    kind: "prop",
-    name: "Skull",
-    subject: "the skull in his hand",
-    reuse: -1,
-    box: { x: 0, y: 0, w: 0, h: 0 },
-    grab: { x: 0, y: 0, w: 0, h: 0 },
-    poses: [],
-    path: [
-      { x: 20, y: 10, w: 6, h: 6, visible: false },
-      { x: 30, y: 8, w: 6, h: 6, visible: true },
-    ],
-  };
-  it("flies the pixels of a drawn object it copies", () => {
-    const plan = clampAnimationPlan(
-      { tracks: [{ ...prop, copy: 2 }] },
-      32,
-      32,
-      0,
-      2,
-      3,
-    );
-    expect(plan.tracks[0]).toMatchObject({ kind: "prop", copy: 2 });
-  });
-  it("draws a new prop when it copies no known object", () => {
-    for (const copy of [-1, 3, 1.5]) {
-      const plan = clampAnimationPlan(
-        { tracks: [{ ...prop, copy }] },
-        32,
-        32,
-        0,
-        2,
-        3,
-      );
-      expect(plan.tracks[0]).toMatchObject({ kind: "prop", copy: null });
-    }
-  });
-  it("cuts a held thing out of its layer, given a box and the layer", () => {
-    const plan = clampAnimationPlan(
-      {
-        tracks: [
-          { ...prop, reuse: 1, copy: 0, grab: { x: 28, y: 10, w: 8, h: 8 } },
-        ],
-      },
-      32,
-      32,
-      2,
-      2,
-      3,
-    );
-    expect(plan.tracks[0]).toMatchObject({
-      kind: "prop",
-      copy: null,
-      grab: { layer: 1, area: { x: 28, y: 10, w: 4, h: 8 } },
     });
   });
 });
