@@ -48,6 +48,7 @@ export function PeriodTabs({ active }: { active: Period }) {
             tabs.current[i] = el;
           }}
           href={`/explore?period=${period.value}`}
+          scroll={false}
           aria-current={i === index ? "page" : undefined}
           className={cn(
             "relative px-4 py-1 font-display text-base tracking-tight whitespace-nowrap transition-colors duration-300",

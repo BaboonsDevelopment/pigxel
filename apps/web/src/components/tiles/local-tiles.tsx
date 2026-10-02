@@ -72,8 +72,8 @@ function List({
                     ? "Remove from this browser"
                     : "Delete",
                 destructive: true,
-                onSelect: () => {
-                  if (confirmRemoveLocalTile(userId, tile))
+                onSelect: async () => {
+                  if (await confirmRemoveLocalTile(userId, tile))
                     setTiles(readTiles(userId));
                 },
               },

@@ -1,3 +1,4 @@
+import { MAX_SET_ITEMS } from "./constants";
 import { AiError } from "./errors";
 import type {
   AnimationReply,
@@ -44,6 +45,7 @@ export function readRoute(text: string, latest: string): Route {
       count: 1,
       name: "",
       frames: 0,
+      items: [],
     };
   const count = Math.round(Number(route?.count));
   const frames = Math.round(Number(route?.frames));
@@ -54,6 +56,17 @@ export function readRoute(text: string, latest: string): Route {
     count: count >= 1 ? Math.min(count, MAX_COUNT) : 1,
     name: (route?.name ?? "").trim().slice(0, 40),
     frames: frames >= 1 ? frames : 0,
+    items: (Array.isArray(route?.items) ? route.items : [])
+      .map((item) => ({
+        subject: String(item?.subject ?? "")
+          .trim()
+          .slice(0, 300),
+        name: String(item?.name ?? "")
+          .trim()
+          .slice(0, 40),
+      }))
+      .filter((item) => item.subject)
+      .slice(0, MAX_SET_ITEMS),
   };
 }
 

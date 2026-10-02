@@ -4,6 +4,7 @@ import {
   MAX_FRAMES,
   MAX_HISTORY,
   MAX_REFERENCES,
+  MAX_SET_ITEMS,
   PLACEMENT_HISTORY,
   SMALL_IMAGE_MAX_SIDE,
 } from "@/lib/ai/constants";
@@ -19,6 +20,7 @@ import {
   buildPlacementPrompt,
   buildPlanPrompt,
   buildRedrawPrompt,
+  buildSetPrompt,
   buildSheetPrompt,
   buildSheetRedrawPrompt,
   clampAnimationPlan,
@@ -96,6 +98,7 @@ export async function sendMessage(
         count: route.count,
         name: route.name,
         frames: route.frames,
+        items: route.items,
       },
     };
   });
@@ -402,14 +405,7 @@ export async function planAnimation(args: {
       }),
       { mimeType: "image/png", base64: png! },
     );
-    return clampAnimationPlan(
-      reply,
-      width,
-      height,
-      layers.length,
-      args.frames,
-      objects.length,
-    );
+    return clampAnimationPlan(reply, width, height, layers.length, args.frames);
   });
 }
 
@@ -438,6 +434,41 @@ export async function reviewEdit(args: {
       { mimeType: "image/png", base64: after },
     ),
   );
+}
+
+/**
+ * Draws several different things in one picture (paid once), one per cell of
+ * a sheet, each cell sized for `cellW × cellH` tile pixels. Returns the
+ * picture and its grid.
+ */
+export async function generateSet(args: {
+  subjects: string[];
+  cellW: number;
+  cellH: number;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
+  await requireUser();
+  const subjects = Array.isArray(args.subjects) ? args.subjects : [];
+  const valid =
+    subjects.length >= 2 &&
+    subjects.length <= MAX_SET_ITEMS &&
+    subjects.every((s) => typeof s === "string" && s.trim()) &&
+    validSize(args.cellW) &&
+    validSize(args.cellH);
+  if (!valid) return { ok: false, error: "Those things cannot be drawn." };
+  return attempt("generateSet", async () => {
+    const layout = sheetLayout(subjects.length, args.cellW, args.cellH);
+    const { mimeType, base64 } = await getAiProvider().generate(
+      buildSetPrompt({
+        subjects: subjects.map((s) => s.slice(0, 300)),
+        cellW: args.cellW,
+        cellH: args.cellH,
+        layout,
+      }),
+      layout.aspectRatio,
+      false,
+    );
+    return { image: `data:${mimeType};base64,${base64}`, layout };
+  });
 }
 
 /**

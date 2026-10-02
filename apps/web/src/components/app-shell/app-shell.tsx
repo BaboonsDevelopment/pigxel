@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@pigxel/ui/lib/utils";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "@/lib/auth/session";
 import pig from "../../../public/art/pigxel-mascot-sitting.png";
 import { CloseIcon, MenuIcon } from "./icons";
 import { NotificationBell } from "./notification-bell";
 import { SearchButton } from "./search-dialog";
-import { TokensButton } from "@/components/tokens-button/tokens-button";
 import { Sidebar } from "./sidebar";
 
 /**
@@ -28,6 +29,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const isExplore = usePathname() === "/explore";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -70,8 +72,20 @@ export function AppShell({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 md:border-0 md:bg-transparent md:px-8">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          isExplore && "bg-background",
+        )}
+      >
+        <header
+          className={cn(
+            "flex shrink-0 items-center gap-3 px-4 md:px-8",
+            isExplore
+              ? "h-12 bg-background"
+              : "h-16 border-b border-border bg-sidebar md:border-0 md:bg-transparent",
+          )}
+        >
           <button
             type="button"
             aria-label="Open menu"
@@ -88,7 +102,6 @@ export function AppShell({
             </span>
           </Link>
           <div className="ml-auto flex items-center gap-2.5">
-            <TokensButton />
             <SearchButton userId={userId} />
             <NotificationBell unread={unreadNotifications} />
           </div>

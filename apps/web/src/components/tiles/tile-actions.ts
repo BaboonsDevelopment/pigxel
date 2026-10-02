@@ -14,6 +14,7 @@ import {
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { PigxelFileError } from "@/lib/pigxel-file/format";
+import { confirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { draftForCloudTile, editorUrl } from "@/lib/pigxel-file/open-tile";
 
 /** Opening and deleting Pigxel cloud tiles, shared by Home and My projects. */
@@ -45,7 +46,12 @@ export function useCloudTileActions(userId: string) {
   };
 
   const remove = async (tile: CloudTileSummary) => {
-    if (!window.confirm(`Delete “${tile.name}” from Pigxel cloud?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Delete tile?",
+      message: `“${tile.name}” will be deleted from Pigxel cloud.`,
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
     setError(null);
     setRemoved((ids) => new Set(ids).add(tile.id));
     try {
@@ -80,12 +86,24 @@ export function useCloudTileActions(userId: string) {
 }
 
 /** Asks, then removes a tile kept in this browser; returns whether it was removed. */
-export function confirmRemoveLocalTile(userId: string, tile: Draft): boolean {
-  const question =
+export async function confirmRemoveLocalTile(
+  userId: string,
+  tile: Draft,
+): Promise<boolean> {
+  const confirmed = await confirmDialog(
     tile.location?.kind === "drive"
-      ? `Remove “${tile.name}” from this browser? It stays in Google Drive${tile.dirty ? ", without the changes not yet saved there" : ""}.`
-      : `“${tile.name}” is only kept in this browser. Remove it for good?`;
-  if (!window.confirm(question)) return false;
+      ? {
+          title: "Remove from this browser?",
+          message: `“${tile.name}” stays in Google Drive${tile.dirty ? ", without the changes not yet saved there" : ""}.`,
+          confirmLabel: "Remove",
+        }
+      : {
+          title: "Delete tile?",
+          message: `“${tile.name}” is only kept in this browser, so it will be gone for good.`,
+          confirmLabel: "Delete",
+        },
+  );
+  if (!confirmed) return false;
   removeDraft(userId, tile.id);
   return true;
 }

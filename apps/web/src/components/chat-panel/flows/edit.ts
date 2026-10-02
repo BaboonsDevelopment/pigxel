@@ -336,6 +336,8 @@ async function redrawFramesTogether(
     layout,
     steps.length,
     box,
+    // Whole frames, so the redrawn parts stay where they were.
+    "cells",
   );
   if (!frames.every(Boolean)) {
     chat.setError("Couldn’t cut the redrawn frames apart. Try again.");

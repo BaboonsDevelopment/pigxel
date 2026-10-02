@@ -2,11 +2,13 @@ import type { Area } from "@/components/pixel-canvas/constants";
 import { atLeastPlacementSize } from "@/components/pixel-canvas/helpers";
 import {
   generateImage,
+  generateSet,
   planPlacement,
   suggestComposition,
 } from "@/lib/ai/actions";
-import type { TileAction } from "@/lib/ai/types";
+import type { SetItem, TileAction } from "@/lib/ai/types";
 import { resizeNearest } from "@/lib/image/bitmap";
+import { sheetToFrames } from "@/lib/image/sheet";
 import {
   ASK_SELECT,
   UNREACHABLE,
@@ -118,6 +120,8 @@ export async function generate(chat: Chat, action: TileAction) {
   const { request: subject, where = "", count = 1 } = action;
   const name = layerName(action);
   const size = canvas.size();
+  if (action.items && action.items.length > 1)
+    return drawSet(chat, action.items);
   if (chat.selectArea) {
     chat.say(ASK_SELECT);
     const area = await canvas.selectArea();
@@ -164,4 +168,71 @@ export async function generate(chat: Chat, action: TileAction) {
   } else {
     await drawOnNewLayer(chat, subject, name, plan.value.areas);
   }
+}
+
+/**
+ * Several different things asked for at once: drawn in one picture (paid
+ * once, one style and scale), then each on a layer of its own, spread over
+ * the free part of the tile (the whole tile when it is empty), one cell of
+ * a grid each. False when it failed.
+ */
+async function drawSet(chat: Chat, items: SetItem[]) {
+  const { canvas } = chat;
+  const size = canvas.size();
+  const region = (!canvas.isEmpty() && canvas.freeArea()) || {
+    x: 0,
+    y: 0,
+    ...size,
+  };
+  const cols = Math.min(
+    items.length,
+    Math.max(1, Math.round(Math.sqrt((items.length * region.w) / region.h))),
+  );
+  const rows = Math.ceil(items.length / cols);
+  const cell = {
+    w: Math.max(1, Math.floor(region.w / cols)),
+    h: Math.max(1, Math.floor(region.h / rows)),
+  };
+  chat.setPending(true);
+  const result = await generateSet({
+    subjects: items.map((item) => item.subject),
+    cellW: cell.w,
+    cellH: cell.h,
+  }).catch(() => UNREACHABLE);
+  if (!result.ok) {
+    chat.setError(result.error);
+    chat.setPending(false);
+    return false;
+  }
+  const { image, layout } = result.value;
+  // By pose: each thing as drawn, all shrunk alike, so their sizes compare.
+  const pictures = await sheetToFrames(
+    await (await fetch(image)).blob(),
+    layout,
+    items.length,
+    cell,
+  );
+  const added = items.flatMap((item, i) => {
+    const art = pictures[i];
+    if (!art) return [];
+    const area = {
+      x: region.x + (i % cols) * cell.w,
+      y: region.y + Math.floor(i / cols) * cell.h,
+      ...cell,
+    };
+    const name = item.name || item.subject.split(/[,.]/)[0]!.slice(0, 30);
+    canvas.addLayer(name, paint(emptyCel(size), size, art.rgba, area), false);
+    return [name];
+  });
+  chat.setPending(false);
+  if (!added.length) {
+    chat.setError("Couldn’t cut the picture into its parts. Try again.");
+    return false;
+  }
+  chat.append({
+    role: "assistant",
+    content: `Here they are, each on a layer of its own: ${added.map((n) => `"${n}"`).join(", ")}.`,
+    image,
+  });
+  return true;
 }

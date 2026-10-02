@@ -8,7 +8,6 @@ import {
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
   MAX_FRAMES,
-  MAX_TRACKS,
   PLACEMENT_RULES,
   PLAN_RULES,
   REFERENCE_RULES,
@@ -16,7 +15,7 @@ import {
 import type {
   AnimationPlan,
   AnimationReply,
-  AnimationTrack,
+  SheetTrack,
   ChatMessage,
   Rect,
 } from "./types";
@@ -255,6 +254,40 @@ export function buildSheetRedrawPrompt(args: {
 }
 
 /**
+ * Asks the image model for several different things in one picture, one per
+ * cell of a sheet, so they come out in one style and to one scale; each is
+ * cut out into a layer of its own.
+ */
+export function buildSetPrompt(args: {
+  subjects: string[];
+  cellW: number;
+  cellH: number;
+  layout: SheetLayout;
+}): string {
+  const { cols, rows } = args.layout;
+  const cells = args.subjects
+    .map(
+      (subject, i) =>
+        `Cell ${i + 1} in row ${Math.floor(i / cols) + 1}, column ${(i % cols) + 1}: ${subject}.`,
+    )
+    .join(" ");
+  return [
+    `A pixel art sprite sheet of ${args.subjects.length} different game sprites on a grid of exactly ${cols} columns and ${rows} rows of equal cells, one sprite per cell, in reading order: the top row from left to right, then the next row.`,
+    cells,
+    `Each cell is a ${args.cellW}x${args.cellH} pixel sprite. Each sprite is whole, centred in its cell with empty space around it, and never touches or crosses into another cell.`,
+    "All sprites share one style, palette, outline and light, as art of one game, and keep their real sizes relative to each other (a dog is bigger than an apple).",
+    args.subjects.length < cols * rows
+      ? "Leave the remaining cells at the end of the last row empty."
+      : "",
+    "No grid lines, no numbers, no labels.",
+    ...IMAGE_STYLE_RULES.slice(0, 4),
+    ...IMAGE_BACKGROUND_RULES,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
  * Asks the image model for a sprite sheet: the same subject in every cell,
  * one pose per cell. With `fromReference`, the picture sent along shows the
  * subject, whose look must be kept.
@@ -282,7 +315,7 @@ export function buildSheetPrompt(args: {
     args.fromReference
       ? `Every frame shows the subject of the attached picture (${args.subject}) with exactly its design, colours, outline and proportions.`
       : `Every frame shows the same subject: ${args.subject}.`,
-    `Each cell is a ${args.cellW}x${args.cellH} pixel sprite. The subject has the same size, colours and design in every frame, seen from the same camera, on the same baseline, centred in its cell with empty space around it; only the pose changes.`,
+    `Each cell is the same ${args.cellW}x${args.cellH} pixel scene seen by one fixed camera: the subject keeps its size, colours, design and place in every frame, and only what moves changes. Everything a frame shows stays inside its cell, never crossing into another cell, with a little empty space at the cell edges.`,
     frames,
     args.poses.length < cols * rows
       ? "Leave the remaining cells at the end of the last row empty."
@@ -336,8 +369,8 @@ export function buildEditReviewPrompt(request: string, instruction: string) {
 
 /**
  * Turns the planner's answer into a plan that fits the tile: frame count and
- * duration in range, every box inside the tile, one pose and one path entry
- * per frame, and at most MAX_TRACKS tracks, none without anything to show.
+ * duration in range, the box inside the tile, one pose per frame, and one
+ * track (the whole animation is one layer) with something to show.
  * `asked` is the frame count the user asked for (0 when they did not).
  */
 export function clampAnimationPlan(
@@ -346,7 +379,6 @@ export function clampAnimationPlan(
   height: number,
   layerCount: number,
   asked: number,
-  objectCount: number,
 ): AnimationPlan {
   const count = Math.round(Number(asked || reply.frameCount));
   const frameCount = Number.isFinite(count)
@@ -354,48 +386,33 @@ export function clampAnimationPlan(
     : 6;
   const ms = Math.round(Number(reply.duration));
   const duration = Number.isFinite(ms) ? Math.max(20, Math.min(1000, ms)) : 100;
-  const perFrame = <T>(list: T[] | undefined, empty: T) =>
-    Array.from({ length: frameCount }, (_, i) => list?.[i] ?? empty);
 
-  const tracks = (reply.tracks ?? []).flatMap((t): AnimationTrack[] => {
-    const name = String(t.name || "Layer").slice(0, 40);
+  const tracks = (reply.tracks ?? []).flatMap((t): SheetTrack[] => {
     const subject = String(t.subject ?? "").trim();
-    if (!subject) return [];
-    if (t.kind === "prop") {
-      const path = perFrame(t.path, null).map((r) =>
-        r && r.visible !== false ? clampRect(r, width, height) : null,
-      );
-      const layer =
-        Number.isInteger(t.reuse) && t.reuse >= 0 && t.reuse < layerCount
-          ? t.reuse
-          : null;
-      const grab =
-        t.grab?.w > 0 && t.grab.h > 0
-          ? { layer, area: clampRect(t.grab, width, height) }
-          : null;
-      const copy =
-        !grab && Number.isInteger(t.copy) && t.copy >= 0 && t.copy < objectCount
-          ? t.copy
-          : null;
-      return path.some(Boolean)
-        ? [{ kind: "prop", name, subject, copy, grab, path }]
-        : [];
-    }
-    const poses = perFrame(t.poses, "").map((p) => String(p).trim());
-    if (!poses.some(Boolean) || !t.box) return [];
+    const poses = Array.from({ length: frameCount }, (_, i) =>
+      String(t.poses?.[i] ?? "").trim(),
+    );
+    if (!subject || !poses.some(Boolean) || !t.box) return [];
     const reuse =
       Number.isInteger(t.reuse) && t.reuse >= 0 && t.reuse < layerCount
         ? t.reuse
         : null;
-    const area = clampRect(t.box, width, height);
-    return [{ kind: "sheet", name, subject, reuse, box: area, poses }];
+    return [
+      {
+        name: String(t.name || "Animation").slice(0, 40),
+        subject,
+        reuse,
+        box: clampRect(t.box, width, height),
+        poses,
+      },
+    ];
   });
 
   return {
     name: String(reply.name || "Animation").slice(0, 60),
     frameCount,
     duration,
-    tracks: tracks.slice(0, MAX_TRACKS),
+    tracks: tracks.slice(0, 1),
     summary: String(reply.summary ?? ""),
   };
 }

@@ -150,6 +150,10 @@ export function createGeminiProvider(
             count: INTEGER,
             name: STRING,
             frames: INTEGER,
+            items: {
+              type: "ARRAY",
+              items: object({ subject: STRING, name: STRING }),
+            },
           }),
         },
       });
@@ -255,18 +259,11 @@ export function createGeminiProvider(
           tracks: {
             type: "ARRAY",
             items: object({
-              kind: { type: "STRING", enum: ["sheet", "prop"] },
               name: STRING,
               subject: STRING,
               reuse: INTEGER,
               box: RECT,
-              copy: INTEGER,
-              grab: RECT,
               poses: { type: "ARRAY", items: STRING },
-              path: {
-                type: "ARRAY",
-                items: object({ ...RECT.properties, visible: BOOLEAN }),
-              },
             }),
           },
         }),

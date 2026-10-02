@@ -98,9 +98,15 @@ For generate also set:
 - count: how many to add (1 unless they asked for more, e.g. "5 more apples" is 5).
 - name: a short Title Case name for its layer, one or two English words
   ("Monkey", "Red Apple").
+- items: when they ask for several DIFFERENT things at once ("a dog, an
+  apple and a pitchfork"), one entry per thing, in their order: subject (a
+  short plain English description of that one thing, as above) and name (its
+  layer name, as above). Then subject lists them all briefly, count is 1 and
+  where is empty. For one thing, or several of the same thing (that is
+  count), items is empty.
 For animate also set frames: the number of frames they asked for, 0 when
 they did not say.
-Otherwise leave where and name empty, count 1 and frames 0.
+Otherwise leave where and name empty, items empty, count 1 and frames 0.
 A message ending in ${REFERENCES_NOTE} came with pictures to draw from
 ("draw this", "in this style", "make him like this"): drawing something from
 them is generate, and subject says what to take from them ("the fox from the
@@ -232,10 +238,11 @@ asking how to add it; otherwise empty.`;
 
 // ── Animations ──────────────────────────────────────────────────────────────
 
+/** Most different things one message may ask to draw at once (one picture). */
+export const MAX_SET_ITEMS = 6;
+
 /** Most frames an animation may have. */
 export const MAX_FRAMES = 12;
-/** Most pictures (paid) one animation may need: one per track. */
-export const MAX_TRACKS = 3;
 
 export const ANIMATION_RULES = `Plan a short pixel art animation for the request.
 
@@ -245,52 +252,32 @@ duration: how long each frame shows, in milliseconds: about 100 for most
 actions, 60-80 for fast ones, 150-250 for slow ones.
 name: a short Title Case name for the animation ("Monkey Throws Grenade").
 
-tracks: one per thing that moves, bottom to top in drawing order, at most
-${MAX_TRACKS} (each costs one picture). Things that do not move are not tracks.
-- kind "sheet": something whose shape changes between frames — a character's
-  pose, a flag, fire, an explosion. An image model draws all its poses at
-  once as a sprite sheet.
-  subject: a full visual description of it that is the same in every frame
-  (what it is, colours, clothes, what it holds at the start). Do not describe
-  the motion here.
-  poses: exactly frameCount short descriptions, one per frame, of its pose
-  in that frame, forming smooth motion; "" for frames where it is not seen
-  (an explosion before it happens).
-  box: one rectangle in tile pixels where it is drawn in every frame, large
-  enough for all its poses (arms raised, legs apart), inside the tile.
-  path: empty.
-- kind "prop": something that keeps its shape and only moves — a thrown ball
-  or grenade, a flying arrow, a falling leaf. It is drawn once and placed.
-  subject: what it looks like.
-  path: exactly frameCount boxes in tile pixels, one per frame, where it is
-  in that frame; visible false where it is not seen (still held in a hand,
-  already exploded). Follow a believable path (a throw is an arc) with even
-  spacing, and keep its size unless it comes closer or goes away.
-  box: its size in the first frame it is seen; poses: empty.
-  copy: when it is already drawn as a separate object in OBJECTS, that
-  object's number: its own pixels fly, nothing new is drawn. Otherwise -1.
-  grab: when it is already drawn but not as a separate object (a skull held
-  in a hand, touching it), the box in tile pixels around just that thing,
-  tight, and reuse = the number of its layer in LAYERS: it is cut out into a
-  layer of its own and its own pixels fly. Otherwise all zeros.
-When a character holds something that flies off, that thing is always a
-prop of its own (copy or grab), never part of the character's poses. Its
-path gives its place in every frame: in the hand, moving with it, until it
-is thrown, then along its flight. The character's poses show the hand
-without it (holding nothing), as the thing is drawn by the prop.
-Something never appears twice in a frame: in a sheet's pose and as a prop.
-Example: "the necromancer throws the skull in his hand", with the skull drawn
-in his hand on layer 0 "Necromancer" → two tracks: a sheet "Necromancer"
-(reuse 0; poses: wind-up holding nothing, throw, follow-through) and a prop
-"Skull" (grab: the tight box around the skull in his hand, reuse 0, copy -1;
-path: in the hand for the wind-up, then forward along an arc).
-reuse: when the request animates something already drawn (from LAYERS), that
-layer's number, so its look is kept; otherwise -1. A sheet reuses the layer
-it animates; a prop with grab names the layer the thing is cut from.
+tracks: exactly one track: the whole animation is ONE layer, drawn frame by
+frame as one sprite sheet (one picture). It shows everything that moves in
+the request together — the character and whatever it throws, shoots, casts or
+makes happen (a frost bolt, a thrown grenade, sparks, an explosion) — drawn
+in the frames where they are, never as separate things.
+- name: a short Title Case name for the layer.
+- subject: a full visual description of everything the animation shows that
+  stays the same in every frame (the character: what it is, colours, clothes,
+  what it holds; and what its spell or projectile looks like). Do not
+  describe the motion here.
+- poses: exactly frameCount short descriptions, one per frame, of the whole
+  scene in that frame: the character's pose and where everything else is
+  ("the mage raises the staff, a small frost bolt forms at its tip"; "the
+  bolt halfway to the right edge, the mage lowering the staff"). Moving
+  things follow a believable path with even spacing.
+- box: one rectangle in tile pixels that holds the whole action in every
+  frame (the character and the full path of what it throws or casts), inside
+  the tile. Every frame is drawn into this same box, as by a fixed camera.
+- reuse: when the request animates something already drawn (from LAYERS),
+  that layer's number, so its look is kept and it is replaced by the
+  animation; otherwise -1. A thing already drawn on that layer that moves (a
+  skull in his hand that he throws) is part of the frames too.
 
-Never add a new thing for something already drawn: animate it (reuse) or
-move its own pixels (copy or grab). Add tracks only for what the request asks to
-move; no extra effects, trails or objects unless asked.
+Never add a new thing for something already drawn: animate it (reuse). Show
+only what the request asks for; no extra effects, trails or objects unless
+asked.
 
 Keep everything inside the tile, where it fits the scene. Motion is smooth:
 neighbouring frames differ a little. A looping action (walk, idle, waving)
