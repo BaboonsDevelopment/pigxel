@@ -44,6 +44,7 @@ import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import { readPen, writePen, type Draft } from "@/lib/pigxel-file/draft";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import type { Slice } from "@/lib/slices/slices";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
 import { useModifierLabel } from "../use-modifier-label";
@@ -120,6 +121,16 @@ export function Editor({
   const playback = usePlayback(sprite);
   const selection = useSelection(sprite);
 
+  // The slice picked with the Slice tool; gone when undo takes it away.
+  const [sliceId, setSliceId] = useState<string | null>(null);
+  const slice = sprite.slices.find((s) => s.id === sliceId) ?? null;
+  const changeSlice = (next: Slice) =>
+    sprite.setSlices(sprite.slices.map((s) => (s.id === next.id ? next : s)));
+  const deleteSlice = () => {
+    if (slice) sprite.setSlices(sprite.slices.filter((s) => s !== slice));
+    setSliceId(null);
+  };
+
   // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
 
@@ -157,7 +168,13 @@ export function Editor({
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
-    clearLayer: () => (selection.mask ? selection.clear() : sprite.clearCel()),
+    // With the Slice tool, Delete removes the picked slice instead.
+    clearLayer: () =>
+      tool === "slice" && slice
+        ? deleteSlice()
+        : selection.mask
+          ? selection.clear()
+          : sprite.clearCel(),
     newFrame: () => sprite.addFrame(true),
     previousFrame: () => sprite.stepFrame(-1),
     nextFrame: () => sprite.stepFrame(1),
@@ -409,6 +426,9 @@ export function Editor({
           stamp={stamp}
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
+          slice={slice}
+          onSliceChange={changeSlice}
+          onSliceDelete={deleteSlice}
         />
       </div>
       <aside className="flex min-h-0 w-[6.5rem] flex-col border-r bg-background">
@@ -443,6 +463,8 @@ export function Editor({
               stamp={stamp}
               highlight={highlight}
               onTextPlaced={() => setTool("move")}
+              sliceId={sliceId}
+              onSelectSlice={setSliceId}
               onPickColor={(color, slot) =>
                 setPen((p) =>
                   slot === "primary"
@@ -486,6 +508,7 @@ export function Editor({
             frameId: sprite.frameId,
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),
+            slices: sprite.slices,
           }}
           settings={exportSettings}
           onChange={setExportSettings}

@@ -68,6 +68,10 @@ export type CanvasBridge = {
     pixels: Uint8ClampedArray,
     replace: boolean,
   ) => string;
+  /** Adds a layer for each of `layers`, one above the other, as one undo step. */
+  addLayers: (
+    layers: { name: string; pixels: Uint8ClampedArray }[],
+  ) => string[];
   /**
    * Moves what a layer shows inside `area` to a new layer called `name`
    * above it, as one undo step; returns the new layer's id.

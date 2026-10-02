@@ -126,6 +126,18 @@ function createBridge(
         hideOthers: replace,
       });
     },
+    addLayers(layers) {
+      const { frames } = sprite();
+      return sprite().addLayers(
+        "normal",
+        layers.map(({ name, pixels }, i) => ({
+          name,
+          cels: new Map(frames.map((f) => [f.id, pixels])),
+          // A new tile's empty "Layer 1" takes the first picture.
+          reuseEmpty: i === 0,
+        })),
+      );
+    },
     cutToLayer: (layerId, area, name) =>
       sprite().cutToLayer(layerId, area, name),
     addAnimation: (spec) => sprite().addAnimation(spec),

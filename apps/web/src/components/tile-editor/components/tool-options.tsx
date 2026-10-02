@@ -16,8 +16,10 @@ import type {
 } from "@/components/pixel-canvas/use-selection";
 import type { CanvasView } from "@/components/pixel-canvas/view";
 import { TEXT_FONTS, TEXT_SCALES } from "@/components/pixel-canvas/text";
+import type { Slice } from "@/lib/slices/slices";
 import type { ToolId } from "../constants";
 import { sizeKey } from "../helpers";
+import { SliceOptions } from "./slice-options";
 
 /** The settings of the selected tool, shown above the canvas, and the canvas-wide modes. */
 export function ToolOptions({
@@ -30,6 +32,9 @@ export function ToolOptions({
   stamp,
   onClearStamp,
   onUseAsBrush,
+  slice,
+  onSliceChange,
+  onSliceDelete,
 }: {
   tool: ToolId;
   pen: PenSettings;
@@ -41,6 +46,10 @@ export function ToolOptions({
   stamp: Stamp | null;
   onClearStamp: () => void;
   onUseAsBrush: () => void;
+  /** The slice picked with the Slice tool, if any. */
+  slice: Slice | null;
+  onSliceChange: (slice: Slice) => void;
+  onSliceDelete: () => void;
 }) {
   const key = sizeKey(tool);
   const selectionTool =
@@ -188,6 +197,14 @@ export function ToolOptions({
           />
           Filled
         </label>
+      )}
+
+      {tool === "slice" && slice && (
+        <SliceOptions
+          slice={slice}
+          onChange={onSliceChange}
+          onDelete={onSliceDelete}
+        />
       )}
 
       {tool === "text" && (
@@ -403,6 +420,8 @@ const HINTS: Record<ToolId, string> = {
   jumble:
     "Drag over an edge to make it ragged; no new colours · Each stroke jumbles more",
   text: "Click where the text goes and type · Enter puts it on the tile to move into place · Esc cancels · Right-click uses the secondary colour",
+  slice:
+    "Drag to mark a part of the tile · Click a slice to pick it, drag to move it · Del removes it · Export saves each slice as its own PNG",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",

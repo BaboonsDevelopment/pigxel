@@ -1,4 +1,5 @@
 import type { Bitmap, Size } from "@/lib/image/bitmap";
+import type { Slice } from "@/lib/slices/slices";
 import type { SheetLayout } from "./constants";
 
 /** How many frames a sheet has across and down. */
@@ -55,6 +56,7 @@ export function sheetData({
   layout,
   frame,
   scale,
+  slices = [],
 }: {
   /** The tile's name, which each frame's name starts with. */
   name: string;
@@ -65,7 +67,11 @@ export function sheetData({
   /** One frame's size on the sheet, scaled. */
   frame: Size;
   scale: number;
+  /** The tile's slices, listed as Aseprite lists them, scaled. */
+  slices?: Slice[];
 }) {
+  const scaled = <T extends Record<string, number>>(r: T) =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v * scale])) as T;
   const { cols } = sheetGrid(durations.length, layout);
   const whole = { x: 0, y: 0, ...frame };
   return {
@@ -87,7 +93,18 @@ export function sheetData({
       scale: String(scale),
       frameTags: [],
       layers: [],
-      slices: [],
+      slices: slices.map((slice) => ({
+        name: slice.name,
+        color: "#0000ffff",
+        keys: [
+          {
+            frame: 0,
+            bounds: scaled(slice.bounds),
+            ...(slice.center && { center: scaled(slice.center) }),
+            ...(slice.pivot && { pivot: scaled(slice.pivot) }),
+          },
+        ],
+      })),
     },
   };
 }

@@ -22,6 +22,7 @@ export type PaintTool =
   | "bucket"
   | "gradient"
   | "text"
+  | "slice"
   | "pipette"
   | "marquee"
   | "ellipseMarquee"

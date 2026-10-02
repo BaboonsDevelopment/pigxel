@@ -12,6 +12,12 @@ import {
   type Ref,
 } from "react";
 import { ellipsePoints, rectPoints } from "@/lib/edit/raster";
+import {
+  nextSliceName,
+  resizedSlice,
+  sliceAt,
+  type Slice,
+} from "@/lib/slices/slices";
 import { frameIndex } from "@/lib/sprite/frames";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
@@ -82,6 +88,7 @@ import {
   type Floating,
   type SelectMode,
 } from "./selection";
+import { SliceOverlay } from "./components/slice-overlay";
 import { textPiece } from "./text";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
@@ -190,6 +197,8 @@ export function PixelCanvas({
   onPickColor,
   onUseColor,
   onTextPlaced,
+  sliceId = null,
+  onSelectSlice,
   ref,
 }: {
   tool: PaintTool;
@@ -209,6 +218,9 @@ export function PixelCanvas({
   onUseColor?: (color: string) => void;
   /** Called when typed text is put on the tile as a floating piece, to move it. */
   onTextPlaced?: () => void;
+  /** The slice picked with the Slice tool, and picking another (null for none). */
+  sliceId?: string | null;
+  onSelectSlice?: (id: string | null) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
@@ -220,6 +232,12 @@ export function PixelCanvas({
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
   const [spraying, setSpraying] = useState(false);
   const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
+  // A slice being drawn, or the picked one being dragged by (dx, dy).
+  const [sliceDrag, setSliceDrag] = useState<
+    | { kind: "new"; from: Point; to: Point }
+    | { kind: "move"; id: string; from: Point; dx: number; dy: number }
+    | null
+  >(null);
   // The text tool's box: where its text goes, in which colour, and what is typed.
   const [textBox, setTextBox] = useState<{
     at: Point;
@@ -447,6 +465,7 @@ export function PixelCanvas({
     tool !== "ellipseMarquee" &&
     tool !== "lasso" &&
     tool !== "polygonLasso" &&
+    tool !== "slice" &&
     tool !== "wand";
   const overSelection =
     !!hover && isSelected(mask, size, hover) && tool !== "wand";
@@ -755,6 +774,7 @@ export function PixelCanvas({
     if (tool === "pipette" || (e.altKey && !isSelectionTool))
       return pickColor(point, slot);
     if (isSelectionTool) return startSelect(e, point);
+    if (tool === "slice") return startSlice(e, point);
     if (blocked) return;
     // A click opens the text box there, or moves it, keeping what is typed.
     // Keeping the default stops the click taking focus from the box.
@@ -986,11 +1006,75 @@ export function PixelCanvas({
     onTextPlaced?.();
   };
 
+  // A press on a slice picks it and drags it; elsewhere it draws a new one.
+  const startSlice = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const picked = sprite.slices.find((s) => s.id === sliceId);
+    const hit =
+      picked && sliceAt([picked], p.x, p.y)
+        ? picked
+        : sliceAt(sprite.slices, p.x, p.y);
+    if (hit) {
+      onSelectSlice?.(hit.id);
+      setSliceDrag({ kind: "move", id: hit.id, from: p, dx: 0, dy: 0 });
+    } else setSliceDrag({ kind: "new", from: p, to: p });
+  };
+
+  const moveSlice = (p: Point) => {
+    if (!sliceDrag) return;
+    if (sliceDrag.kind === "new") {
+      if (p.x !== sliceDrag.to.x || p.y !== sliceDrag.to.y)
+        setSliceDrag({ ...sliceDrag, to: p });
+      return;
+    }
+    const dx = p.x - sliceDrag.from.x;
+    const dy = p.y - sliceDrag.from.y;
+    if (dx !== sliceDrag.dx || dy !== sliceDrag.dy)
+      setSliceDrag({ ...sliceDrag, dx, dy });
+  };
+
+  // A click on an empty spot leaves no slice picked.
+  const endSlice = () => {
+    const drag = sliceDrag;
+    setSliceDrag(null);
+    if (!drag) return;
+    if (drag.kind === "move") {
+      if (!drag.dx && !drag.dy) return;
+      return sprite.setSlices(
+        sprite.slices.map((s) =>
+          s.id === drag.id
+            ? {
+                ...s,
+                bounds: {
+                  ...s.bounds,
+                  x: s.bounds.x + drag.dx,
+                  y: s.bounds.y + drag.dy,
+                },
+              }
+            : s,
+        ),
+      );
+    }
+    if (drag.from.x === drag.to.x && drag.from.y === drag.to.y)
+      return onSelectSlice?.(null);
+    const slice: Slice = {
+      id: crypto.randomUUID(),
+      name: nextSliceName(sprite.slices),
+      bounds: areaBetween(drag.from, drag.to, size),
+      center: null,
+      pivot: null,
+    };
+    sprite.setSlices([...sprite.slices, slice]);
+    onSelectSlice?.(slice.id);
+  };
+
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const point = pixelAt(e);
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
     if (selectDrag) return moveSelect(point, e.shiftKey);
+    if (sliceDrag) return moveSlice(point);
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
@@ -1047,6 +1131,7 @@ export function PixelCanvas({
 
   const endPointer = () => {
     if (selectDrag) return endSelect();
+    if (sliceDrag) return endSlice();
     const current = stroke.current;
     // A polygon stays open between clicks.
     if (!current || current.tool === "polygon") return;
@@ -1127,6 +1212,7 @@ export function PixelCanvas({
     !blocked &&
     !isSelectionTool &&
     tool !== "text" &&
+    tool !== "slice" &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
   // The corners of a polygonal lasso or of a polygon being drawn.
@@ -1364,6 +1450,23 @@ export function PixelCanvas({
         >
           {marquee.w} × {marquee.h}
         </span>
+      )}
+
+      {tool === "slice" && (
+        <SliceOverlay
+          slices={sprite.slices}
+          size={size}
+          scale={scale}
+          pickedId={sliceId}
+          drag={sliceDrag}
+          onResize={(bounds) =>
+            sprite.setSlices(
+              sprite.slices.map((s) =>
+                s.id === sliceId ? resizedSlice(s, bounds) : s,
+              ),
+            )
+          }
+        />
       )}
 
       {openText && textPreview && (

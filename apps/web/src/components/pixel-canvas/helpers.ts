@@ -192,7 +192,7 @@ export function atLeastPlacementSize(area: Area, tile: Size): Area {
 
 /**
  * `start` with the dragged `edges` moved by `dx × dy` tile pixels, kept inside
- * the tile and no smaller than `MIN_PLACEMENT_SIDE` (or the tile).
+ * the tile and no smaller than `minSide` (or the tile).
  */
 export function adjustFrame(
   start: Area,
@@ -200,6 +200,7 @@ export function adjustFrame(
   dx: number,
   dy: number,
   tile: Size,
+  minSide = MIN_PLACEMENT_SIDE,
 ): Area {
   const axis = (
     pos: number,
@@ -209,7 +210,7 @@ export function adjustFrame(
     high: boolean,
     max: number,
   ) => {
-    const min = Math.min(MIN_PLACEMENT_SIDE, max);
+    const min = Math.min(minSide, max);
     if (low && high) {
       return [Math.max(0, Math.min(max - len, pos + delta)), len] as const;
     }

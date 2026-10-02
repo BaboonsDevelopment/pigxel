@@ -1,6 +1,7 @@
 import { deflateSync, inflateSync } from "fflate";
 import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
+import { readSlices, type Slice } from "@/lib/slices/slices";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
@@ -14,7 +15,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * {
  *   "format": "pigxel",
  *   "id": "…",
- *   "version": 5,
+ *   "version": 6,
  *   "width": 32,
  *   "height": 32,
  *   "background": "white",
@@ -27,7 +28,9 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *       "children": [ …layers… ] }
  *   ],
  *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …],
- *   "palette": ["#1d2b53", …]
+ *   "palette": ["#1d2b53", …],
+ *   "slices": [{ "id": "…", "name": "door", "bounds": { "x": 0, "y": 0, "w": 8, "h": 8 },
+ *     "center": { "x": 2, "y": 2, "w": 4, "h": 4 } | null, "pivot": { "x": 4, "y": 7 } | null }]
  * }
  *
  * `frames` are the animation in playing order, each shown for `duration`
@@ -40,8 +43,11 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * runs 0–255 and `blend` is one of the blend modes in lib/layers.
  * `background` (default "transparent") is what the eraser paints on the
  * Background layer. `palette` is the tile's colours to paint from, as
- * `#rrggbb`, at most 256.
+ * `#rrggbb`, at most 256. `slices` are named parts of the tile, the same in
+ * every frame, with `center` (the 9-slice centre) and `pivot` relative to
+ * their `bounds`.
  *
+ * Version 5 was the same without slices.
  * Version 4 was the same without a palette (a tile gets the default one).
  * Version 3 was the same with uncompressed cels. Version 2 had no frames: every layer but a group carried its `pixels`.
  * Version 1 had only a flat list of `{ name, visible, opacity (0–1), pixels }`
@@ -51,7 +57,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 5;
+export const PIGXEL_VERSION = 6;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -84,6 +90,8 @@ export type PigxelDocument = {
   cels: Cels;
   /** Colours to paint from, as `#rrggbb`. */
   palette: string[];
+  /** Named parts of the tile, for exporting and game engines. */
+  slices: Slice[];
 };
 
 /**
@@ -118,6 +126,7 @@ export function blankDocument(
     frames: [frame],
     cels: new Map([[frame.id, frameCels]]),
     palette: [...DEFAULT_PALETTE],
+    slices: [],
   };
 }
 
@@ -189,6 +198,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     layers: doc.layers.map(toFile),
     cels,
     palette: doc.palette,
+    slices: doc.slices,
   });
 }
 
@@ -260,7 +270,19 @@ export function parsePigxel(text: string): PigxelDocument {
       : crypto.randomUUID();
   // Files before version 5 have no palette; neither may a hand-edited one.
   const palette = readPalette(file.palette) ?? [...DEFAULT_PALETTE];
-  return { id, width, height, background, layers, frames, cels, palette };
+  // Files before version 6 have no slices.
+  const slices = readSlices(file.slices);
+  return {
+    id,
+    width,
+    height,
+    background,
+    layers,
+    frames,
+    cels,
+    palette,
+    slices,
+  };
 }
 
 /** Called for each layer with pixels, with the layer's id and its file entry. */

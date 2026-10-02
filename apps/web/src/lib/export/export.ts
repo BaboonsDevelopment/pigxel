@@ -4,6 +4,7 @@ import {
   safeFileBase,
   type Background,
 } from "@/lib/pigxel-file/format";
+import { clipToTile, type Slice } from "@/lib/slices/slices";
 import type { Frame } from "@/lib/sprite/types";
 import {
   EXPORT_FORMATS,
@@ -27,6 +28,8 @@ export type ExportSource = {
   background: Background;
   /** A frame's layers combined as they are exported, i.e. without references. */
   picture: (frameId: string) => Uint8ClampedArray;
+  /** Named parts of the tile: exported one by one, and listed in sheet data. */
+  slices: Slice[];
 };
 
 /**
@@ -43,16 +46,36 @@ export const clampScale = (scale: number) =>
     Math.max(MIN_EXPORT_SCALE, Math.round(scale) || MIN_EXPORT_SCALE),
   );
 
-/** The size of the picture an export makes: one frame, or the whole sheet. */
+/** The parts of the tile each slice covers, those off the tile left out. */
+function slicesOnTile(slices: Slice[], tile: Size) {
+  return slices.flatMap((slice) => {
+    const area = clipToTile(slice.bounds, tile.w, tile.h);
+    return area ? [{ slice, area }] : [];
+  });
+}
+
+/**
+ * The size of the picture an export makes: one frame, the whole sheet, or
+ * the biggest slice.
+ */
 export function exportSize(
   settings: ExportSettings,
   tile: Size,
   frameCount: number,
+  slices: Slice[] = [],
 ): Size {
-  const frame = { w: tile.w * settings.scale, h: tile.h * settings.scale };
-  return settings.format === "sheet"
-    ? sheetSize(frameCount, settings.layout, frame)
-    : frame;
+  const { scale } = settings;
+  const frame = { w: tile.w * scale, h: tile.h * scale };
+  if (settings.format === "sheet")
+    return sheetSize(frameCount, settings.layout, frame);
+  if (settings.format === "slices") {
+    const areas = slicesOnTile(slices, tile).map((s) => s.area);
+    return {
+      w: Math.max(0, ...areas.map((a) => a.w)) * scale,
+      h: Math.max(0, ...areas.map((a) => a.h)) * scale,
+    };
+  }
+  return frame;
 }
 
 /** Whether a browser can draw a picture this big. */
@@ -104,6 +127,32 @@ export function exportFiles(
     ];
   }
 
+  if (format === "slices") {
+    const picture = source.picture(source.frameId);
+    const used = new Set<string>();
+    return slicesOnTile(source.slices, tile).map(({ slice, area }) => {
+      const rgba = new Uint8ClampedArray(area.w * area.h * 4);
+      for (let y = 0; y < area.h; y++) {
+        const from = ((area.y + y) * tile.w + area.x) * 4;
+        rgba.set(picture.subarray(from, from + area.w * 4), y * area.w * 4);
+      }
+      // Slices with the same name get a number, so no file replaces another.
+      const own = safeFileBase(slice.name);
+      let name = own;
+      for (let n = 2; used.has(name.toLowerCase()); n++) name = `${own} ${n}`;
+      used.add(name.toLowerCase());
+      return {
+        name: name + extension,
+        mime,
+        image: resizeNearest(
+          { rgba, w: area.w, h: area.h },
+          area.w * scale,
+          area.h * scale,
+        ),
+      };
+    });
+  }
+
   if (format === "gif")
     return [
       {
@@ -137,6 +186,7 @@ export function exportFiles(
     layout: settings.layout,
     frame,
     scale,
+    slices: source.slices,
   });
   return [
     sheet,
