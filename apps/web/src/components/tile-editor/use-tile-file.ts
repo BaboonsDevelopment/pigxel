@@ -110,7 +110,7 @@ export function useTileFile({
   const [syncError, setSyncError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<FileStatus | null>(() =>
-    canStoreDrafts()
+    canStoreDrafts(userId)
       ? (notice ?? null)
       : {
           tone: "error",
@@ -132,16 +132,23 @@ export function useTileFile({
     return doc;
   };
 
-  /** Saves the tile to `target` (the same place, or a new one) and returns where it now lives. */
+  /**
+   * Saves a tile (this one, unless `image` and `tileName` say another) to
+   * `target` (the same place, or a new one) and returns where it now lives.
+   */
   const saveTo = async (
     target: TileLocation["kind"],
     current: TileLocation | null,
+    image = currentImage(),
+    tileName = name,
   ): Promise<TileLocation> => {
-    const image = currentImage();
     const contents = serializePigxel(image);
     if (target === "cloud") {
       const tile: CloudTile = await saveCloudTile(
-        { id: current?.kind === "cloud" ? current.tile.id : undefined, name },
+        {
+          id: current?.kind === "cloud" ? current.tile.id : undefined,
+          name: tileName,
+        },
         contents,
         image,
         thumbnailDataUrl(image),
@@ -149,7 +156,10 @@ export function useTileFile({
       return { kind: "cloud", tile };
     }
     const file: DriveFile = await saveDriveFile(
-      { id: current?.kind === "drive" ? current.file.id : undefined, name },
+      {
+        id: current?.kind === "drive" ? current.file.id : undefined,
+        name: tileName,
+      },
       contents,
     );
     return { kind: "drive", file };
@@ -211,26 +221,38 @@ export function useTileFile({
 
   const openFromComputer = () => fileInput.current?.click();
 
+  /**
+   * Opens a tile made here (from a picture, an Aseprite file, a sprite sheet)
+   * as a new tile called `tileName`. It's saved where this tile lives, so a
+   * Pigxel cloud tile's imports land in Pigxel cloud too; if that fails, or
+   * this tile lives only here, the new one is kept in this browser.
+   */
+  const openNew = async (doc: PigxelDocument, tileName: string) => {
+    let home: TileLocation | null = null;
+    if (location && (location.kind === "cloud" || drive.available))
+      try {
+        home = await saveTo(location.kind, null, doc, tileName);
+      } catch {
+        // It can be saved there from the new tile's editor.
+      }
+    onOpen(await draftFromDocument(userId, doc, tileName, home));
+  };
+
   // A picture (PNG, GIF, JPEG, …) or an Aseprite file opens as a new tile;
   // anything else is read as a .pigxel file.
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
     void run(async () =>
-      onOpen(
-        isAsepriteFile(file.name)
-          ? draftFromDocument(
-              userId,
-              readAseprite(new Uint8Array(await file.arrayBuffer())),
-              asepriteBaseName(file.name),
-            )
-          : isImageFile(file)
-            ? draftFromDocument(
-                userId,
-                await documentFromImage(file),
-                imageBaseName(file.name),
-              )
-            : draftFromFile(userId, await file.text(), file.name, null),
-      ),
+      isAsepriteFile(file.name)
+        ? openNew(
+            readAseprite(new Uint8Array(await file.arrayBuffer())),
+            asepriteBaseName(file.name),
+          )
+        : isImageFile(file)
+          ? openNew(await documentFromImage(file), imageBaseName(file.name))
+          : onOpen(
+              await draftFromFile(userId, await file.text(), file.name, null),
+            ),
     );
   };
 
@@ -238,19 +260,16 @@ export function useTileFile({
   const openFrames = (files: File[]) => {
     if (!files.length) return;
     void run(async () =>
-      onOpen(
-        draftFromDocument(
-          userId,
-          await documentFromSequence(files),
-          sequenceName(files.map((f) => f.name)),
-        ),
+      openNew(
+        await documentFromSequence(files),
+        sequenceName(files.map((f) => f.name)),
       ),
     );
   };
 
   /** Opens a tile made here (e.g. from a sprite sheet) as a new tile called `tileName`. */
   const openDocument = (doc: PigxelDocument, tileName: string) =>
-    void run(async () => onOpen(draftFromDocument(userId, doc, tileName)));
+    void run(() => openNew(doc, tileName));
 
   const openDriveFile = (picked: DriveFile) =>
     void run(async () => onOpen(await draftForDriveFile(userId, picked)));

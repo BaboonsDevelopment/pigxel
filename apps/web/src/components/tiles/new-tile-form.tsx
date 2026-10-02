@@ -14,7 +14,7 @@ import {
 } from "@pigxel/ui/components/input";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { createDraft } from "@/lib/pigxel-file/draft";
+import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   MAX_PIGXEL_SIZE,
@@ -111,6 +111,7 @@ function Form({ userId, drive, driveError }: FormProps) {
       return;
     }
     // Every new tile gets its own draft; other tiles are left as they are.
+    await loadDrafts(userId);
     const draft = createDraft(userId, {
       name,
       file,

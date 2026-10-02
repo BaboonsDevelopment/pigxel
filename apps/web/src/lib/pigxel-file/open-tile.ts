@@ -1,5 +1,5 @@
 import { readCloudTile } from "./cloud";
-import { createDraft, findDraftFor } from "./draft";
+import { createDraft, findDraftFor, loadDrafts } from "./draft";
 import {
   PigxelFileError,
   parsePigxel,
@@ -15,44 +15,48 @@ export function editorUrl(draftId: string) {
   return `/tiles/edit?id=${encodeURIComponent(draftId)}`;
 }
 
-const FULL = new PigxelFileError(
-  "This browser can’t keep more tiles. Remove some from My projects, or save them to Pigxel cloud.",
+const REFUSED = new PigxelFileError(
+  "This browser won’t keep tiles. Allow site data for Pigxel, or remove some tiles from My projects.",
 );
 
 /** Starts a draft for file contents; checks they are a valid .pigxel file first. */
-export function draftFromFile(
+export async function draftFromFile(
   userId: string,
   contents: string,
   fileName: string,
   location: TileLocation | null,
-): string {
+): Promise<string> {
   parsePigxel(contents);
+  await loadDrafts(userId);
   const draft = createDraft(userId, {
     name: stripPigxelExtension(fileName),
     file: contents,
     location,
     dirty: false,
   });
-  if (!draft) throw FULL;
+  if (!draft) throw REFUSED;
   return draft.id;
 }
 
 /**
- * Starts a draft for a tile made from a picture; it is saved nowhere yet, so
- * it starts with unsaved changes.
+ * Starts a draft for a tile made here, e.g. from a picture, already saved to
+ * `location`. With none it is saved nowhere yet, so it starts with unsaved
+ * changes.
  */
-export function draftFromDocument(
+export async function draftFromDocument(
   userId: string,
   doc: PigxelDocument,
   name: string,
-): string {
+  location: TileLocation | null = null,
+): Promise<string> {
+  await loadDrafts(userId);
   const draft = createDraft(userId, {
     name,
     file: serializePigxel(doc),
-    location: null,
-    dirty: true,
+    location,
+    dirty: !location,
   });
-  if (!draft) throw FULL;
+  if (!draft) throw REFUSED;
   return draft.id;
 }
 
@@ -62,6 +66,7 @@ export async function draftForCloudTile(
   tile: CloudTile,
 ): Promise<string> {
   const location: TileLocation = { kind: "cloud", tile };
+  await loadDrafts(userId);
   const open = findDraftFor(userId, location);
   if (open) return open.id;
   return draftFromFile(
@@ -78,6 +83,7 @@ export async function draftForDriveFile(
   file: DriveFile,
 ): Promise<string> {
   const location: TileLocation = { kind: "drive", file };
+  await loadDrafts(userId);
   const open = findDraftFor(userId, location);
   if (open) return open.id;
   return draftFromFile(
