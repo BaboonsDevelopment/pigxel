@@ -73,11 +73,7 @@ function ConfirmDialog({
         >
           Cancel
         </Button>
-        <Button
-          type="button"
-          variant="destructive"
-          onClick={() => close(true)}
-        >
+        <Button type="button" variant="destructive" onClick={() => close(true)}>
           {confirmLabel}
         </Button>
       </div>

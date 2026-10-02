@@ -13,9 +13,10 @@ export function isTyping(target: EventTarget | null) {
 /** The setting `[` and `]` change for a tool, if it has a size. */
 export function sizeKey(
   tool: ToolId,
-): "size" | "brushSize" | "eraserSize" | null {
+): "size" | "brushSize" | "eraserSize" | "sprayWidth" | null {
   if (tool === "brush") return "brushSize";
   if (tool === "eraser") return "eraserSize";
+  if (tool === "spray") return "sprayWidth";
   return tool === "pen" ||
     tool === "line" ||
     tool === "rect" ||

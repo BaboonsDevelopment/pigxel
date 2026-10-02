@@ -39,6 +39,76 @@ export function inPattern(x: number, y: number, density = 100) {
   return density >= 100 || BAYER[y & 3]![x & 3]! < (density / 100) * 16;
 }
 
+/** How the gradient tool spreads its colours: along the line, or out from its start. */
+export type GradientShape = "linear" | "radial";
+
+/** How the gradient tool blends: mixed colours, or an ordered dither of the two. */
+export type GradientDither = "none" | "bayer4" | "bayer8";
+
+/** The 8×8 Bayer matrix, built from the 4×4 one: values 0–63. */
+function bayer8(x: number, y: number) {
+  const corner = [
+    [0, 2],
+    [3, 1],
+  ][(y >> 2) & 1]![(x >> 2) & 1]!;
+  return 4 * BAYER[y & 3]![x & 3]! + corner;
+}
+
+/** How far (0–1) the pixel (x, y) is along a gradient dragged from `from` to `to`. */
+export function gradientAt(
+  x: number,
+  y: number,
+  from: Point,
+  to: Point,
+  shape: GradientShape,
+): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const clamp = (t: number) => Math.max(0, Math.min(1, t));
+  if (shape === "radial") {
+    const radius = Math.hypot(dx, dy);
+    return radius ? clamp(Math.hypot(x - from.x, y - from.y) / radius) : 0;
+  }
+  const length = dx * dx + dy * dy;
+  return length ? clamp(((x - from.x) * dx + (y - from.y) * dy) / length) : 0;
+}
+
+/**
+ * Fills `data` (RGBA of the whole tile), or the masked part of it, with a
+ * gradient from `start` at `from` to `end` at `to`. A dither keeps to the
+ * two colours; without one they are mixed, which makes new shades.
+ */
+export function paintGradient(
+  data: Uint8ClampedArray,
+  from: Point,
+  to: Point,
+  start: Rgba,
+  end: Rgba,
+  shape: GradientShape,
+  dither: GradientDither,
+  options: Pick<PaintOptions, "size" | "mask">,
+) {
+  const { size, mask } = options;
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const i = y * size.w + x;
+      if (mask && !mask[i]) continue;
+      const t = gradientAt(x, y, from, to, shape);
+      if (dither === "none") {
+        data.set(
+          start.map((v, c) => Math.round(v + (end[c]! - v) * t)),
+          i * 4,
+        );
+        continue;
+      }
+      const threshold =
+        dither === "bayer8"
+          ? (bayer8(x, y) + 0.5) / 64
+          : (BAYER[y & 3]![x & 3]! + 0.5) / 16;
+      data.set(t > threshold ? end : start, i * 4);
+    }
+}
+
 const mod = (value: number, n: number) => ((value % n) + n) % n;
 
 /**

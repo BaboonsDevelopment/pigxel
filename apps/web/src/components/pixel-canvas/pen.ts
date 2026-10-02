@@ -1,4 +1,5 @@
 import { linePoints, type Point } from "@/lib/edit/raster";
+import type { GradientDither, GradientShape } from "./paint";
 
 // The tools draw with the same pixel lines as AI edits.
 export { linePoints, type Point };
@@ -7,11 +8,13 @@ export { linePoints, type Point };
 export type PaintTool =
   | "pen"
   | "brush"
+  | "spray"
   | "eraser"
   | "line"
   | "rect"
   | "ellipse"
   | "bucket"
+  | "gradient"
   | "pipette"
   | "marquee"
   | "ellipseMarquee"
@@ -55,8 +58,16 @@ export type PenSettings = {
   brushSize: number;
   /** Width and height of the square eraser, in tile pixels. */
   eraserSize: number;
+  /** Radius of the circle the spray scatters dots in, in tile pixels. */
+  sprayWidth: number;
+  /** How fast the spray lays dots, 1–100. */
+  spraySpeed: number;
   /** The bucket and magic wand take only the connected area, not every pixel of that colour. */
   contiguous: boolean;
+  /** The gradient runs along the dragged line, or out from its start. */
+  gradientShape: GradientShape;
+  /** The gradient keeps to its two colours in an ordered dither, or mixes them. */
+  gradientDither: GradientDither;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -72,8 +83,41 @@ export const DEFAULT_PEN: PenSettings = {
   pixelPerfect: true,
   brushSize: 3,
   eraserSize: 1,
+  sprayWidth: 4,
+  spraySpeed: 40,
   contiguous: true,
+  gradientShape: "linear",
+  gradientDither: "bayer4",
 };
+
+export const MIN_SPRAY_SPEED = 1;
+export const MAX_SPRAY_SPEED = 100;
+
+/** Dots a second the spray lays at full speed; slower speeds lay a share of it. */
+const SPRAY_DOTS_PER_SECOND = 200;
+
+/** How many dots the spray lays in `seconds`, at `speed` (1–100). */
+export function sprayDotCount(speed: number, seconds: number): number {
+  return (SPRAY_DOTS_PER_SECOND * speed * seconds) / MAX_SPRAY_SPEED;
+}
+
+/** `count` pixels picked evenly at random inside a circle of `radius` around `center`. */
+export function sprayDots(
+  center: Point,
+  radius: number,
+  count: number,
+  random = Math.random,
+): Point[] {
+  return Array.from({ length: count }, () => {
+    const angle = random() * Math.PI * 2;
+    // The square root spreads dots evenly over the area, not bunched in the middle.
+    const distance = Math.sqrt(random()) * (radius + 0.5);
+    return {
+      x: Math.round(center.x + Math.cos(angle) * distance),
+      y: Math.round(center.y + Math.sin(angle) * distance),
+    };
+  });
+}
 
 export function clampPenSize(size: number) {
   return Math.max(MIN_PEN_SIZE, Math.min(MAX_PEN_SIZE, Math.round(size)));

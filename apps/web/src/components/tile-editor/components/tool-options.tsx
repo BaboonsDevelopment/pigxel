@@ -4,7 +4,9 @@ import { Input } from "@pigxel/ui/components/input";
 import type { Stamp } from "@/components/pixel-canvas/paint";
 import {
   MAX_PEN_SIZE,
+  MAX_SPRAY_SPEED,
   MIN_PEN_SIZE,
+  MIN_SPRAY_SPEED,
   clampPenSize,
   type PenSettings,
 } from "@/components/pixel-canvas/pen";
@@ -51,7 +53,8 @@ export function ToolOptions({
   const transforms = selection.mask !== null || tool === "move";
   const inkTool = tool === "pen" || tool === "brush";
   const paints =
-    inkTool || ["eraser", "line", "rect", "ellipse", "bucket"].includes(tool);
+    inkTool ||
+    ["spray", "eraser", "line", "rect", "ellipse", "bucket"].includes(tool);
   return (
     <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       {inkTool && stamp && (
@@ -72,10 +75,45 @@ export function ToolOptions({
 
       {key && !(inkTool && stamp) && (
         <SizeField
-          label={tool === "brush" ? "Brush size" : "Size"}
+          label={
+            tool === "brush"
+              ? "Brush size"
+              : tool === "spray"
+                ? "Width"
+                : "Size"
+          }
           value={pen[key]}
           onChange={(size) => onChange({ ...pen, [key]: clampPenSize(size) })}
         />
+      )}
+
+      {tool === "spray" && (
+        <label
+          className="flex items-center gap-2"
+          title="How fast dots appear while you hold the button"
+        >
+          <span className="text-muted-foreground">Speed</span>
+          <Input
+            type="number"
+            inputSize="sm"
+            min={MIN_SPRAY_SPEED}
+            max={MAX_SPRAY_SPEED}
+            value={pen.spraySpeed}
+            onChange={(e) =>
+              onChange({
+                ...pen,
+                spraySpeed: Math.max(
+                  MIN_SPRAY_SPEED,
+                  Math.min(
+                    MAX_SPRAY_SPEED,
+                    Math.round(Number(e.target.value) || MIN_SPRAY_SPEED),
+                  ),
+                ),
+              })
+            }
+            className="w-14 px-1 text-center tabular-nums"
+          />
+        </label>
       )}
 
       {tool === "pen" && (
@@ -98,7 +136,7 @@ export function ToolOptions({
         </label>
       )}
 
-      {inkTool && !stamp && (
+      {((inkTool && !stamp) || tool === "spray") && (
         <OptionSelect
           label="Ink"
           title="Shading moves each pixel one step along the palette: left button forwards, right button back"
@@ -134,6 +172,32 @@ export function ToolOptions({
           />
           Filled
         </label>
+      )}
+
+      {tool === "gradient" && (
+        <>
+          <OptionSelect
+            label="Shape"
+            title="Linear runs along the line; radial spreads out from where you start"
+            value={pen.gradientShape}
+            options={[
+              ["linear", "Linear"],
+              ["radial", "Radial"],
+            ]}
+            onChange={(gradientShape) => onChange({ ...pen, gradientShape })}
+          />
+          <OptionSelect
+            label="Dither"
+            title="A dither keeps to the two colours; Smooth mixes them into new shades"
+            value={pen.gradientDither}
+            options={[
+              ["bayer4", "Ordered 4×4"],
+              ["bayer8", "Ordered 8×8"],
+              ["none", "Smooth"],
+            ]}
+            onChange={(gradientDither) => onChange({ ...pen, gradientDither })}
+          />
+        </>
       )}
 
       {(tool === "bucket" || tool === "wand") && (
@@ -294,6 +358,8 @@ const SELECT_HINT =
 const HINTS: Record<ToolId, string> = {
   pen: PAINT_HINT,
   brush: PAINT_HINT,
+  spray:
+    "Hold to scatter dots; the longer you hold, the denser · Right button sprays the secondary colour · Alt+click picks a colour",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",
@@ -301,6 +367,8 @@ const HINTS: Record<ToolId, string> = {
   ellipse:
     "Drag to draw · Shift makes a circle · Right button uses the secondary colour",
   bucket: "Click fills · Right-click fills with the secondary colour",
+  gradient:
+    "Drag from the primary colour to the secondary · Fills the selection, or the whole layer · Shift snaps to 45° · Right button swaps the colours",
   pipette: "Click picks the primary colour · Right-click the secondary",
   marquee: SELECT_HINT,
   ellipseMarquee: `Shift while dragging makes a circle · ${SELECT_HINT}`,

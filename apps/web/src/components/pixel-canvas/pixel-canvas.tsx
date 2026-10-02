@@ -39,6 +39,7 @@ import {
 import {
   inPattern,
   mirrored,
+  paintGradient,
   paintPoints,
   paintStamp,
   rgbaOf,
@@ -59,6 +60,8 @@ import {
   linePoints,
   pixelColor,
   snapLine,
+  sprayDotCount,
+  sprayDots,
   squareFrom,
   strokePixels,
   type PaintTool,
@@ -183,6 +186,7 @@ export function PixelCanvas({
   const [selecting, setSelecting] = useState(false);
   const [aiArea, setAiArea] = useState<Area | null>(null);
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
+  const [spraying, setSpraying] = useState(false);
   // Picking another tool drops a polygon that isn't closed yet.
   const [polygonTool, setPolygonTool] = useState(tool);
   if (polygonTool !== tool) {
@@ -360,12 +364,23 @@ export function PixelCanvas({
 
   const isSelectionTool = SELECTION_TOOLS.includes(tool);
   // The brush is round; the pen, eraser, line and shapes have a square tip.
+  // The spray's "tip" is the circle it scatters dots in.
   const tipSize = (t: PaintTool) =>
-    t === "brush" ? pen.brushSize : t === "eraser" ? pen.eraserSize : pen.size;
-  const hoverSize = tool === "bucket" || tool === "pipette" ? 1 : tipSize(tool);
-  const hoverTip = brushTip(hoverSize, tool === "brush");
+    t === "brush"
+      ? pen.brushSize
+      : t === "eraser"
+        ? pen.eraserSize
+        : t === "spray"
+          ? pen.sprayWidth * 2 + 1
+          : pen.size;
+  const hoverSize =
+    tool === "bucket" || tool === "gradient" || tool === "pipette"
+      ? 1
+      : tipSize(tool);
+  const hoverTip = brushTip(hoverSize, tool === "brush" || tool === "spray");
   // Tools that don't lay down the pen colour show only the outline of their tip.
-  const hoverOutline = tool === "pipette" || tool === "eraser";
+  const hoverOutline =
+    tool === "pipette" || tool === "eraser" || tool === "spray";
   // Selecting works on any layer; painting and moving need one that can change.
   const blocked =
     !sprite.canPaint &&
@@ -389,7 +404,7 @@ export function PixelCanvas({
     const inkTool = current.tool === "pen" || current.tool === "brush";
     // Shading moves pixels along the palette: forwards with the left button.
     const ink: Ink =
-      inkTool && pen.ink === "shading"
+      (inkTool || current.tool === "spray") && pen.ink === "shading"
         ? shadingInk(current.before, sprite.palette, current.secondary ? -1 : 1)
         : current.rgba;
     const paint = (points: Point[], thin = false) =>
@@ -413,6 +428,24 @@ export function PixelCanvas({
       paint(shape(box, false));
     } else if (current.tool === "line") {
       paint(linePoints(start, current.end));
+    } else if (current.tool === "spray") {
+      paint(current.points, true);
+    } else if (current.tool === "gradient") {
+      // Until the line has a length there is no direction, so nothing changes.
+      // The right button runs the gradient the other way round.
+      const primary = rgbaOf(pen.color);
+      const secondary = rgbaOf(pen.secondary);
+      if (start.x !== current.end.x || start.y !== current.end.y)
+        paintGradient(
+          data,
+          start,
+          current.end,
+          current.secondary ? secondary : primary,
+          current.secondary ? primary : secondary,
+          pen.gradientShape,
+          pen.gradientDither,
+          paintOptions,
+        );
     } else if (inkTool && stamp) {
       // A picture brush: its own colours, or a silhouette with the right button.
       paintStamp(
@@ -436,6 +469,30 @@ export function PixelCanvas({
     );
     sprite.touched();
   };
+
+  // While the spray is held it keeps laying dots, even with the pointer still:
+  // `seconds` since the last frame decides how many.
+  const sprayTick = useEffectEvent((seconds: number) => {
+    const current = stroke.current;
+    const ctx = sprite.context();
+    if (current?.tool !== "spray" || !ctx) return;
+    const count = sprayDotCount(pen.spraySpeed, seconds);
+    // The fraction left over becomes a dot now and then, so slow speeds still spray.
+    const dots = Math.floor(count) + (Math.random() < count % 1 ? 1 : 0);
+    if (!dots) return;
+    current.points.push(...sprayDots(current.end, pen.sprayWidth, dots));
+    drawStroke(ctx, current);
+  });
+  useEffect(() => {
+    if (!spraying) return;
+    let last = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      sprayTick((now - last) / 1000);
+      last = now;
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [spraying]);
 
   // The pipette picks what is seen, all layers combined.
   const pickColor = (point: Point, slot: ColorSlot) => {
@@ -514,9 +571,7 @@ export function PixelCanvas({
     if (selectDrag.kind === "move")
       selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
     else if (selectDrag.kind === "marquee") {
-      const to = selectDrag.ellipse
-        ? squareFrom(selectDrag.from, p, shift)
-        : p;
+      const to = selectDrag.ellipse ? squareFrom(selectDrag.from, p, shift) : p;
       if (to.x !== selectDrag.to.x || to.y !== selectDrag.to.y)
         setSelectDrag({ ...selectDrag, to });
     } else if (selectDrag.kind === "polygon") {
@@ -615,23 +670,30 @@ export function PixelCanvas({
     e.currentTarget.setPointerCapture(e.pointerId);
     const freehand = tool === "pen" || tool === "brush" || erase;
     const shading =
-      pen.ink === "shading" && (tool === "pen" || tool === "brush") && !stamp;
+      pen.ink === "shading" &&
+      (((tool === "pen" || tool === "brush") && !stamp) || tool === "spray");
     stroke.current = {
       tool,
       points:
-        freehand && e.shiftKey && lastPoint.current
-          ? linePoints(lastPoint.current, point)
-          : [point],
+        tool === "spray"
+          ? sprayDots(point, pen.sprayWidth, 1)
+          : freehand && e.shiftKey && lastPoint.current
+            ? linePoints(lastPoint.current, point)
+            : [point],
       end: point,
       rgba,
       secondary: slot === "secondary",
       // Shading and picture brushes don't lay down one colour.
-      color: shading || (stamp && freehand && !erase) ? null : color,
+      color:
+        shading || (stamp && freehand && !erase) || tool === "gradient"
+          ? null
+          : color,
       before: new Uint8ClampedArray(
         ctx.getImageData(0, 0, size.w, size.h).data,
       ),
     };
     drawStroke(ctx, stroke.current);
+    if (tool === "spray") setSpraying(true);
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -642,16 +704,22 @@ export function PixelCanvas({
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
+    // The spray lays its dots on a timer, around wherever the pointer is.
+    if (current.tool === "spray") {
+      current.end = point;
+      return;
+    }
     if (
       current.tool === "line" ||
+      current.tool === "gradient" ||
       current.tool === "rect" ||
       current.tool === "ellipse"
     ) {
-      // Lines and shapes are redrawn from their start; Shift keeps a line to
-      // 45° steps and makes a shape a square or circle.
+      // Lines, gradients and shapes are redrawn from their start; Shift keeps
+      // a line to 45° steps and makes a shape a square or circle.
       const from = current.points[0]!;
       const end =
-        current.tool === "line"
+        current.tool === "line" || current.tool === "gradient"
           ? e.shiftKey
             ? snapLine(from, point)
             : point
@@ -673,6 +741,7 @@ export function PixelCanvas({
     lastPoint.current =
       current.tool === "line" ? current.end : (current.points.at(-1) ?? null);
     stroke.current = null;
+    setSpraying(false);
     sprite.commit();
     if (current.color) onUseColor?.(current.color);
   };

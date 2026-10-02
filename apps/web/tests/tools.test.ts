@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
 import {
+  gradientAt,
   inPattern,
+  paintGradient,
   paintPoints,
   paintStamp,
   shadingInk,
   type PaintOptions,
 } from "@/components/pixel-canvas/paint";
-import { brushTip } from "@/components/pixel-canvas/pen";
+import {
+  brushTip,
+  sprayDotCount,
+  sprayDots,
+} from "@/components/pixel-canvas/pen";
 import { onionFrames } from "@/components/pixel-canvas/view";
 import { parsePaletteFile, toGpl } from "@/lib/palette/files";
 
@@ -97,6 +103,67 @@ describe("picture brush", () => {
     const data = blank();
     paintStamp(data, [{ x: 0, y: 0 }], stamp, BLACK, options);
     expect([...data.slice(0, 4)]).toEqual([...BLACK]);
+  });
+});
+
+describe("spray", () => {
+  it("scatters dots inside the circle around the pointer", () => {
+    let seed = 1;
+    const random = () =>
+      ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+    const dots = sprayDots({ x: 10, y: 10 }, 3, 500, random);
+    expect(dots).toHaveLength(500);
+    for (const { x, y } of dots)
+      expect(Math.hypot(x - 10, y - 10)).toBeLessThanOrEqual(
+        3.5 + Math.SQRT1_2,
+      );
+    // Spread over the circle, not stuck in one spot.
+    expect(new Set(dots.map((d) => `${d.x},${d.y}`)).size).toBeGreaterThan(20);
+  });
+  it("lays dots in proportion to speed and time held", () => {
+    expect(sprayDotCount(100, 1)).toBe(2 * sprayDotCount(50, 1));
+    expect(sprayDotCount(40, 0.5)).toBe(sprayDotCount(40, 1) / 2);
+  });
+});
+
+describe("gradient", () => {
+  const wide = { w: 4, h: 1 };
+  const row = (data: Uint8ClampedArray) =>
+    Array.from({ length: data.length / 4 }, (_, i) => data[i * 4]!);
+  const from = { x: 0, y: 0 };
+  const to = { x: 3, y: 0 };
+
+  it("measures how far along the line, or from the centre, a pixel is", () => {
+    expect(
+      [0, 1, 2, 3].map((x) => gradientAt(x, 0, from, to, "linear")),
+    ).toEqual([0, 1 / 3, 2 / 3, 1]);
+    // Pixels before the start and past the end keep the end colours.
+    expect(gradientAt(-2, 0, from, to, "linear")).toBe(0);
+    expect(gradientAt(5, 0, from, to, "linear")).toBe(1);
+    expect(gradientAt(0, 3, from, to, "radial")).toBe(1);
+  });
+  it("mixes the colours smoothly without a dither", () => {
+    const data = new Uint8ClampedArray(wide.w * 4);
+    paintGradient(data, from, to, BLACK, RED, "linear", "none", {
+      size: wide,
+      mask: null,
+    });
+    expect(row(data)).toEqual([0, 85, 170, 255]);
+  });
+  it("keeps to the two colours with a dither, and stays in the selection", () => {
+    const data = new Uint8ClampedArray(wide.w * 4);
+    const mask = new Uint8Array([1, 1, 1, 0]);
+    paintGradient(data, from, to, BLACK, RED, "linear", "bayer4", {
+      size: wide,
+      mask,
+    });
+    expect(
+      row(data)
+        .slice(0, 3)
+        .every((v) => v === 0 || v === 255),
+    ).toBe(true);
+    expect(row(data)[0]).toBe(0);
+    expect(data[3 * 4 + 3]).toBe(0);
   });
 });
 
