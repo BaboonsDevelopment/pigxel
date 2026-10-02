@@ -14,14 +14,18 @@ export type PaintTool =
   | "bucket"
   | "pipette"
   | "marquee"
+  | "ellipseMarquee"
   | "lasso"
+  | "polygonLasso"
   | "wand"
   | "move";
 
 /** Tools that pick pixels or move them rather than paint. */
 export const SELECTION_TOOLS: readonly PaintTool[] = [
   "marquee",
+  "ellipseMarquee",
   "lasso",
+  "polygonLasso",
   "wand",
   "move",
 ];

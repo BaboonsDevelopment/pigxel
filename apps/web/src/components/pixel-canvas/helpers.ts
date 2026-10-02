@@ -68,6 +68,16 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/** The box with corners `a` and `b`, not clamped to the tile. */
+export function boxBetween(a: Point, b: Point): Area {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x) + 1,
+    h: Math.abs(b.y - a.y) + 1,
+  };
+}
+
 /** True when every pixel is transparent. */
 export function isBlank(image: ImageData): boolean {
   for (let i = 3; i < image.data.length; i += 4) {

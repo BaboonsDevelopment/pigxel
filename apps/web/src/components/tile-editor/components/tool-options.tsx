@@ -42,7 +42,9 @@ export function ToolOptions({
   const key = sizeKey(tool);
   const selectionTool =
     tool === "marquee" ||
+    tool === "ellipseMarquee" ||
     tool === "lasso" ||
+    tool === "polygonLasso" ||
     tool === "wand" ||
     tool === "move";
   // The Move tool flips and turns the whole layer when nothing is selected.
@@ -301,7 +303,10 @@ const HINTS: Record<ToolId, string> = {
   bucket: "Click fills · Right-click fills with the secondary colour",
   pipette: "Click picks the primary colour · Right-click the secondary",
   marquee: SELECT_HINT,
+  ellipseMarquee: `Shift while dragging makes a circle · ${SELECT_HINT}`,
   lasso: `Draw around the pixels · ${SELECT_HINT}`,
+  polygonLasso:
+    "Click to place corners · Click the first one, double-click or Enter closes · Esc cancels · Shift adds · Alt takes away",
   wand: "Click selects a colour area · Shift adds · Alt takes away",
   move: "Drag moves the selection, or the whole layer · Arrow keys nudge · Enter drops",
 };

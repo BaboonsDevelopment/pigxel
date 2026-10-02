@@ -27,6 +27,7 @@ import {
 } from "./constants";
 import {
   areaBetween,
+  boxBetween,
   canvasOf,
   isBlank,
   largestEmptyArea,
@@ -65,6 +66,7 @@ import {
   type Point,
 } from "./pen";
 import {
+  ellipseMask,
   isSelected,
   maskOutline,
   polygonMask,
@@ -95,9 +97,25 @@ type Stroke = {
 
 /** A selection being dragged out, or selected pixels being moved. */
 type SelectDrag =
-  | { kind: "marquee"; from: Point; to: Point; mode: SelectMode }
+  | {
+      kind: "marquee";
+      from: Point;
+      to: Point;
+      mode: SelectMode;
+      /** The elliptical marquee: the ellipse that fits the dragged box. */
+      ellipse: boolean;
+    }
   | { kind: "lasso"; points: Point[]; mode: SelectMode }
+  | PolygonDrag
   | { kind: "move"; from: Point };
+
+/** The polygonal lasso: corners placed click by click, and where the pointer is. */
+type PolygonDrag = {
+  kind: "polygon";
+  points: Point[];
+  pointer: Point;
+  mode: SelectMode;
+};
 
 export type ColorSlot = "primary" | "secondary";
 
@@ -165,6 +183,12 @@ export function PixelCanvas({
   const [selecting, setSelecting] = useState(false);
   const [aiArea, setAiArea] = useState<Area | null>(null);
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
+  // Picking another tool drops a polygon that isn't closed yet.
+  const [polygonTool, setPolygonTool] = useState(tool);
+  if (polygonTool !== tool) {
+    setPolygonTool(tool);
+    if (selectDrag?.kind === "polygon") setSelectDrag(null);
+  }
   const screenRef = useRef<HTMLCanvasElement>(null);
   const onionRef = useRef<HTMLCanvasElement>(null);
   const copies = useRef(new Set<HTMLCanvasElement>());
@@ -347,7 +371,9 @@ export function PixelCanvas({
     !sprite.canPaint &&
     tool !== "pipette" &&
     tool !== "marquee" &&
+    tool !== "ellipseMarquee" &&
     tool !== "lasso" &&
+    tool !== "polygonLasso" &&
     tool !== "wand";
   const overSelection =
     !!hover && isSelected(mask, size, hover) && tool !== "wand";
@@ -451,6 +477,7 @@ export function PixelCanvas({
 
   const startSelect = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
     if (e.button !== 0) return;
+    if (selectDrag?.kind === "polygon") return addCorner(selectDrag, p);
     const mode = selectModeOf(e);
     const inside = isSelected(mask, size, p);
     if (tool === "move" || (mode === "replace" && inside && tool !== "wand")) {
@@ -465,21 +492,36 @@ export function PixelCanvas({
       selection.select(wandMask(cel, size, p, pen.contiguous), mode);
       return;
     }
+    if (tool === "polygonLasso")
+      return setSelectDrag({ kind: "polygon", points: [p], pointer: p, mode });
     e.currentTarget.setPointerCapture(e.pointerId);
     setSelectDrag(
       tool === "lasso"
         ? { kind: "lasso", points: [p], mode }
-        : { kind: "marquee", from: p, to: p, mode },
+        : {
+            kind: "marquee",
+            from: p,
+            to: p,
+            mode,
+            ellipse: tool === "ellipseMarquee",
+          },
     );
   };
 
-  const moveSelect = (p: Point) => {
+  // Shift while dragging the elliptical marquee makes a circle.
+  const moveSelect = (p: Point, shift: boolean) => {
     if (!selectDrag) return;
     if (selectDrag.kind === "move")
       selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
     else if (selectDrag.kind === "marquee") {
-      if (p.x !== selectDrag.to.x || p.y !== selectDrag.to.y)
-        setSelectDrag({ ...selectDrag, to: p });
+      const to = selectDrag.ellipse
+        ? squareFrom(selectDrag.from, p, shift)
+        : p;
+      if (to.x !== selectDrag.to.x || to.y !== selectDrag.to.y)
+        setSelectDrag({ ...selectDrag, to });
+    } else if (selectDrag.kind === "polygon") {
+      if (p.x !== selectDrag.pointer.x || p.y !== selectDrag.pointer.y)
+        setSelectDrag({ ...selectDrag, pointer: p });
     } else {
       const points = extendStroke(selectDrag.points, p);
       if (points !== selectDrag.points)
@@ -487,18 +529,57 @@ export function PixelCanvas({
     }
   };
 
+  // The polygon is closed by a click on its first corner, a double click or Enter.
+  const addCorner = (current: PolygonDrag, p: Point) => {
+    const [first] = current.points;
+    const last = current.points.at(-1)!;
+    if (current.points.length >= 3 && p.x === first!.x && p.y === first!.y)
+      return closePolygon(current);
+    if (p.x !== last.x || p.y !== last.y)
+      setSelectDrag({ ...current, points: [...current.points, p] });
+  };
+
+  const closePolygon = (current: PolygonDrag) => {
+    setSelectDrag(null);
+    // Fewer than three corners make no area: the polygon is just dropped.
+    if (current.points.length >= 3)
+      selection.select(polygonMask(size, current.points), current.mode);
+  };
+
+  // Enter closes the polygon and Esc drops it, before the editor's own
+  // Enter (drop the selection) and Esc (deselect) see the key.
+  const polygon = selectDrag?.kind === "polygon" ? selectDrag : null;
+  const onPolygonKey = useEffectEvent((e: KeyboardEvent) => {
+    if (!polygon || (e.key !== "Enter" && e.key !== "Escape")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === "Enter") closePolygon(polygon);
+    else setSelectDrag(null);
+  });
+  const polygonOpen = polygon !== null;
+  useEffect(() => {
+    if (!polygonOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => onPolygonKey(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [polygonOpen]);
+
   const endSelect = () => {
     const current = selectDrag;
+    // The polygon stays open between clicks.
+    if (current?.kind === "polygon") return;
     setSelectDrag(null);
     if (!current) return;
     if (current.kind === "move") return selection.endMove();
     if (current.kind === "marquee") {
-      const { from, to, mode } = current;
+      const { from, to, mode, ellipse } = current;
       // A click without a drag clears the selection, as in Aseprite.
       if (from.x === to.x && from.y === to.y && mode === "replace")
         return selection.deselect();
       return selection.select(
-        rectMask(size, areaBetween(from, to, size)),
+        ellipse
+          ? ellipseMask(size, boxBetween(from, to))
+          : rectMask(size, areaBetween(from, to, size)),
         mode,
       );
     }
@@ -557,7 +638,7 @@ export function PixelCanvas({
     const point = pixelAt(e);
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
-    if (selectDrag) return moveSelect(point);
+    if (selectDrag) return moveSelect(point, e.shiftKey);
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
@@ -636,12 +717,15 @@ export function PixelCanvas({
     onPointerUp: selecting ? endAiArea : endPointer,
     onPointerCancel: selecting ? endAiArea : endPointer,
     onPointerLeave: () => setHover(null),
+    onDoubleClick: () => {
+      if (polygon) closePolygon(polygon);
+    },
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
   const cursor =
     blocked && !selecting
       ? "cursor-not-allowed"
-      : tool === "move" || (overSelection && isSelectionTool)
+      : tool === "move" || (overSelection && isSelectionTool && !polygon)
         ? "cursor-move"
         : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
@@ -654,11 +738,18 @@ export function PixelCanvas({
     !isSelectionTool &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
-  const lasso = selectDrag?.kind === "lasso" ? selectDrag.points : null;
+  const lasso =
+    selectDrag?.kind === "lasso"
+      ? selectDrag.points
+      : polygon && [...polygon.points, polygon.pointer];
+  // The ellipse may run off the tile, so its box isn't clamped to it.
   const marquee =
     selectDrag?.kind === "marquee"
-      ? areaBetween(selectDrag.from, selectDrag.to, size)
+      ? selectDrag.ellipse
+        ? boxBetween(selectDrag.from, selectDrag.to)
+        : areaBetween(selectDrag.from, selectDrag.to, size)
       : null;
+  const ellipseMarquee = selectDrag?.kind === "marquee" && selectDrag.ellipse;
 
   const tile = (
     <div
@@ -759,7 +850,7 @@ export function PixelCanvas({
         />
       )}
 
-      {(outline || marquee || lasso) && (
+      {(outline || marquee || lasso || polygon) && (
         <svg
           aria-hidden="true"
           viewBox={`0 0 ${size.w} ${size.h}`}
@@ -786,7 +877,19 @@ export function PixelCanvas({
               />
             </>
           )}
-          {marquee && (
+          {marquee && ellipseMarquee && (
+            <ellipse
+              cx={marquee.x + marquee.w / 2}
+              cy={marquee.y + marquee.h / 2}
+              rx={marquee.w / 2}
+              ry={marquee.h / 2}
+              fill="rgb(59 130 246 / 0.12)"
+              stroke="rgb(59 130 246)"
+              strokeDasharray="4 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {marquee && !ellipseMarquee && (
             <rect
               x={marquee.x}
               y={marquee.y}
@@ -807,6 +910,26 @@ export function PixelCanvas({
               vectorEffect="non-scaling-stroke"
             />
           )}
+          {polygon?.points.map((p, i) => {
+            // The first corner fills in when a click on it would close the shape.
+            const closes =
+              i === 0 &&
+              polygon.points.length >= 3 &&
+              p.x === polygon.pointer.x &&
+              p.y === polygon.pointer.y;
+            return (
+              <rect
+                key={i}
+                x={p.x}
+                y={p.y}
+                width={1}
+                height={1}
+                fill={closes ? "rgb(59 130 246)" : "white"}
+                stroke="rgb(59 130 246)"
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
         </svg>
       )}
 
