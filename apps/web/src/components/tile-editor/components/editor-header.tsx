@@ -39,6 +39,7 @@ export function EditorHeader({
   onOpenFrom,
   onConnectDrive,
   onExport,
+  onPublish,
   onImportSheet,
   menus,
 }: {
@@ -52,6 +53,8 @@ export function EditorHeader({
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
   onExport: () => void;
+  /** For admins: puts the tile on the Assets page. */
+  onPublish?: () => void;
   /** Picks a sprite sheet to cut into the frames of a new tile. */
   onImportSheet: () => void;
   /** More menus after File, e.g. Edit and View. */
@@ -139,6 +142,11 @@ export function EditorHeader({
               label: "Export…",
               shortcut: `${mod}E`,
               onSelect: onExport,
+            },
+            {
+              label: "Publish to Assets…",
+              onSelect: () => onPublish?.(),
+              hidden: !onPublish,
             },
           ],
         ]}

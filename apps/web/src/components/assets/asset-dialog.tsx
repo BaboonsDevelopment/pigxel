@@ -4,33 +4,38 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
+import { removeAsset } from "@/app/(app)/assets/actions";
+import { confirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import { useModifierLabel } from "@/components/tile-editor/use-modifier-label";
 import {
   ASSET_CATEGORIES,
-  assetPalette,
-  assetPng,
-  assetSize,
+  assetBlob,
+  assetFramePng,
   type Asset,
 } from "@/lib/assets/assets";
 import { downloadBlob } from "@/lib/download";
-import { useModifierLabel } from "@/components/tile-editor/use-modifier-label";
-import { AssetSprite } from "./asset-sprite";
+import { AssetImage } from "./asset-image";
 
 /**
  * One asset up close, with the ways to use it: start a tile from it, copy it
- * to paste into a tile, or download it.
+ * to paste into a tile, or download it. Each fetches only the file it needs.
+ * Admins can take it off the page.
  */
 export function AssetDialog({
   asset,
+  canRemove,
   onClose,
 }: {
   asset: Asset;
+  canRemove: boolean;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [copied, setCopied] = useState<"done" | "failed" | null>(null);
+  const [status, setStatus] = useState<{
+    text: string;
+    error?: boolean;
+  } | null>(null);
   const mod = useModifierLabel();
-  const { w, h } = assetSize(asset);
-  const frames = asset.frames.length;
   const category = ASSET_CATEGORIES.find((c) => c.id === asset.category);
 
   useEffect(() => {
@@ -39,25 +44,40 @@ export function AssetDialog({
 
   const copy = () => {
     if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-      setCopied("failed");
+      setStatus({
+        error: true,
+        text: "This browser won’t copy pictures. Use Edit › Insert asset… in the editor instead.",
+      });
       return;
     }
     // The picture is handed over as a promise, so Safari keeps the click.
     navigator.clipboard
-      .write([
-        new ClipboardItem({
-          "image/png": assetPng(asset, { frame: 0 }).then((blob) => blob!),
-        }),
-      ])
+      .write([new ClipboardItem({ "image/png": assetFramePng(asset) })])
       .then(
-        () => setCopied("done"),
-        () => setCopied("failed"),
+        () => setStatus({ text: `Copied. Paste it into a tile with ${mod}V.` }),
+        () => setStatus({ error: true, text: "Couldn’t copy it. Try again." }),
       );
   };
 
-  const download = async () => {
-    const blob = await assetPng(asset);
-    if (blob) downloadBlob(blob, `${asset.id}.png`);
+  const download = async (url: string, name: string) => {
+    try {
+      downloadBlob(await assetBlob(url), name);
+    } catch {
+      setStatus({ error: true, text: "Couldn’t download it. Try again." });
+    }
+  };
+
+  const remove = async () => {
+    const confirmed = await confirmDialog({
+      title: `Remove “${asset.name}”?`,
+      message:
+        "It goes from the Assets page for everyone. Tiles already made from it keep their copy.",
+      confirmLabel: "Remove",
+    });
+    if (!confirmed) return;
+    const { error } = await removeAsset(asset.id);
+    if (error) setStatus({ error: true, text: error });
+    else dialog.current?.close();
   };
 
   // On <body>, outside the scaled page, so it fits the window.
@@ -74,10 +94,10 @@ export function AssetDialog({
     >
       <div className="grid sm:grid-cols-[minmax(0,1fr)_17rem]">
         <div className="flex aspect-square items-center justify-center bg-checker p-10">
-          <AssetSprite
+          <AssetImage
             asset={asset}
-            repeat={asset.category === "tiles" ? 3 : 1}
-            className="size-full"
+            repeat={asset.category === "tiles"}
+            className="max-h-full w-full"
           />
         </div>
         <div className="flex flex-col gap-5 p-5">
@@ -90,8 +110,8 @@ export function AssetDialog({
                 {asset.name}
               </h2>
               <p className="mt-0.5 font-mono text-xs text-muted-foreground tabular-nums">
-                {category?.label} · {w} × {h}
-                {frames > 1 && ` · ${frames} frames`}
+                {category?.label} · {asset.width} × {asset.height}
+                {asset.frames > 1 && ` · ${asset.frames} frames`}
               </p>
             </div>
             <Button
@@ -106,43 +126,72 @@ export function AssetDialog({
             </Button>
           </div>
 
-          <ul aria-label="Colours" className="flex flex-wrap gap-1">
-            {assetPalette(asset).map((color) => (
-              <li
-                key={color}
-                title={color}
-                className="size-5 rounded-[3px] ring-1 ring-black/10"
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </ul>
+          {asset.colors.length > 0 && (
+            <ul aria-label="Colours" className="flex flex-wrap gap-1">
+              {asset.colors.map((color) => (
+                <li
+                  key={color}
+                  title={color}
+                  className="size-5 rounded-[3px] ring-1 ring-black/10"
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </ul>
+          )}
 
           <div className="flex flex-col gap-2">
             <Link
-              href={`/tiles/new?asset=${asset.id}`}
+              href={`/tiles/new?asset=${encodeURIComponent(asset.id)}`}
               className={buttonVariants()}
             >
               New tile from it
             </Link>
             <Button type="button" variant="secondary" onClick={copy}>
-              {copied === "done" ? "Copied" : "Copy"}
+              Copy
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void download()}
-            >
-              {frames > 1 ? "Download sprite sheet" : "Download PNG"}
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void download(asset.sheetUrl, `${asset.id}.png`)}
+              >
+                {asset.frames > 1 ? "PNG sheet" : "PNG"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  void download(asset.fileUrl, `${asset.id}.pigxel`)
+                }
+              >
+                .pigxel
+              </Button>
+            </div>
           </div>
 
-          <p role="status" className="text-xs text-muted-foreground">
-            {copied === "failed"
-              ? "This browser won’t copy pictures. Use Edit › Insert asset… in the editor instead."
-              : copied === "done"
-                ? `Paste it into any tile with ${mod}V.`
-                : "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on."}
+          <p
+            role="status"
+            className={
+              status?.error
+                ? "text-xs text-destructive"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {status?.text ??
+              "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on."}
           </p>
+
+          {canRemove && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void remove()}
+              className="mt-auto self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              Remove from Assets
+            </Button>
+          )}
         </div>
       </div>
     </dialog>,

@@ -11,6 +11,8 @@ export type EditorProps = {
   driveError?: boolean;
   /** The tutorial whose interactive guide is open, from the URL. */
   guide?: string;
+  /** Admins can put the tile on the Assets page. */
+  canPublish?: boolean;
 };
 
 export type ToolId = PaintTool;

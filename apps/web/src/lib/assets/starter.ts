@@ -1,13 +1,16 @@
+import { createLayer } from "@/lib/layers/tree";
+import type { PigxelDocument } from "@/lib/pigxel-file/format";
+import { createFrame } from "@/lib/sprite/frames";
+import type { AssetCategory } from "./assets";
+
 /**
- * The predefined assets: small pixel sprites and seamless tiles anyone can
- * start a tile from or drop into their own. Each is drawn as rows of
- * letters, one letter per pixel; `colors` says what each letter paints and
- * "." is transparent. Kept free of imports so it stays plain data.
+ * The starter set: the first sprites and seamless tiles on the Assets page,
+ * drawn as rows of letters, one letter per pixel; `colors` says what each
+ * letter paints and "." is transparent. Assets live in Supabase; this is
+ * only loaded when an admin imports the set (see ImportStarterSet), and can
+ * go once it's in.
  */
-
-export type AssetCategory = "characters" | "items" | "nature" | "tiles";
-
-export type Asset = {
+export type StarterAsset = {
   id: string;
   name: string;
   category: AssetCategory;
@@ -26,7 +29,7 @@ const art = (text: string) =>
     .split("\n")
     .map((row) => row.trim());
 
-export const ASSETS: Asset[] = [
+export const STARTER_ASSETS: StarterAsset[] = [
   // Characters
   {
     id: "slime",
@@ -824,3 +827,43 @@ export const ASSETS: Asset[] = [
     ],
   },
 ];
+
+const channels = (color: string) =>
+  [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+
+/** One frame of a starter asset as RGBA pixels, row by row from the top-left. */
+export function starterPixels(asset: StarterAsset, frame = 0) {
+  const rows = asset.frames[frame]!;
+  const w = rows[0]!.length;
+  const pixels = new Uint8ClampedArray(w * rows.length * 4);
+  rows.forEach((row, y) => {
+    for (let x = 0; x < w; x++) {
+      const color = asset.colors[row[x]!];
+      if (color) pixels.set([...channels(color), 255], (y * w + x) * 4);
+    }
+  });
+  return pixels;
+}
+
+/** A starter asset as a tile: one layer holding its frames, its colours as the palette. */
+export function starterDocument(asset: StarterAsset): PigxelDocument {
+  const rows = asset.frames[0]!;
+  const layer = createLayer("normal", asset.name);
+  const frames = asset.frames.map(() => createFrame(asset.duration));
+  return {
+    id: crypto.randomUUID(),
+    width: rows[0]!.length,
+    height: rows.length,
+    background: "transparent",
+    layers: [layer],
+    frames,
+    cels: new Map(
+      frames.map((frame, i) => [
+        frame.id,
+        new Map([[layer.id, starterPixels(asset, i)]]),
+      ]),
+    ),
+    palette: [...new Set(Object.values(asset.colors))],
+    slices: [],
+  };
+}
