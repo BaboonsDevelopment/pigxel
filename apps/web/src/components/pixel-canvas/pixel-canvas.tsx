@@ -79,8 +79,10 @@ import {
   rectMask,
   selectModeOf,
   wandMask,
+  type Floating,
   type SelectMode,
 } from "./selection";
+import { textPiece } from "./text";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
 import { onionFrames, type CanvasView } from "./view";
@@ -165,6 +167,10 @@ export type PixelCanvasHandle = {
   adjustArea: (area: Area) => Promise<Area | null>;
 };
 
+/** Why typed text draws nothing: the font has none of its letters. */
+const NO_GLYPHS =
+  "This font has none of these letters. For Cyrillic, pick Tiny5, DotGothic16 or Press Start 2P.";
+
 /** Where copies of the tile sit around it in tiled mode, in rows. */
 function tiledCells(tiled: TiledMode): Point[] {
   const xs = tiled === "x" || tiled === "both" ? [-1, 0, 1] : [0];
@@ -183,6 +189,7 @@ export function PixelCanvas({
   highlight,
   onPickColor,
   onUseColor,
+  onTextPlaced,
   ref,
 }: {
   tool: PaintTool;
@@ -200,6 +207,8 @@ export function PixelCanvas({
   onPickColor?: (color: string, slot: ColorSlot) => void;
   /** Called with the colour of each finished stroke or fill. */
   onUseColor?: (color: string) => void;
+  /** Called when typed text is put on the tile as a floating piece, to move it. */
+  onTextPlaced?: () => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
@@ -211,6 +220,15 @@ export function PixelCanvas({
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
   const [spraying, setSpraying] = useState(false);
   const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
+  // The text tool's box: where its text goes, in which colour, and what is typed.
+  const [textBox, setTextBox] = useState<{
+    at: Point;
+    rgba: Rgba;
+    text: string;
+  } | null>(null);
+  const [textPreview, setTextPreview] = useState<Floating | null>(null);
+  const textInput = useRef<HTMLInputElement>(null);
+  const [textError, setTextError] = useState<string | null>(null);
   // The corners of an unfinished polygon and where the pointer is, for the guides.
   const [paintPolygon, setPaintPolygon] = useState<{
     points: Point[];
@@ -738,6 +756,14 @@ export function PixelCanvas({
       return pickColor(point, slot);
     if (isSelectionTool) return startSelect(e, point);
     if (blocked) return;
+    // A click opens the text box there, or moves it, keeping what is typed.
+    // Keeping the default stops the click taking focus from the box.
+    if (tool === "text") {
+      e.preventDefault();
+      const rgba = rgbaOf(slot === "primary" ? pen.color : pen.secondary);
+      setTextError(null);
+      return setTextBox((box) => ({ at: point, rgba, text: box?.text ?? "" }));
+    }
     // Drawing puts lifted pixels down first.
     selection.drop();
     // A layer with nothing in this frame yet gets its cel now.
@@ -913,6 +939,53 @@ export function PixelCanvas({
   });
   useEffect(() => keepShape(), [tool, sprite.layerId, sprite.frameId]);
 
+  // The text box shows only with the text tool; switching away drops it.
+  const openText = tool === "text" ? textBox : null;
+
+  // The typed text, drawn as it will land on the tile.
+  useEffect(() => {
+    if (!openText) return;
+    let live = true;
+    void textPiece(
+      openText.text,
+      pen.textFont,
+      pen.textScale,
+      openText.rgba,
+      openText.at.x,
+      openText.at.y,
+    ).then((piece) => {
+      if (live) setTextPreview(piece);
+    });
+    return () => {
+      live = false;
+    };
+  }, [openText, pen.textFont, pen.textScale]);
+
+  // Typing goes to the box wherever it was opened or moved to.
+  const textAt = openText?.at;
+  useEffect(() => textInput.current?.focus(), [textAt]);
+
+  // Enter puts the text on the tile as a floating piece, to move and drop
+  // like a paste; it stays inside the tile.
+  const placeText = async () => {
+    if (!openText) return;
+    const piece = await textPiece(
+      openText.text,
+      pen.textFont,
+      pen.textScale,
+      openText.rgba,
+      openText.at.x,
+      openText.at.y,
+    );
+    // The box stays open, saying why, when there is nothing to put down.
+    if (!piece) return setTextError(NO_GLYPHS);
+    if (!selection.paste(piece))
+      return setTextError("Pick a visible, unlocked layer to put the text on.");
+    setTextBox(null);
+    setTextPreview(null);
+    onTextPlaced?.();
+  };
+
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const point = pixelAt(e);
     const at = wrapPixel(point.x, point.y, size, tiled);
@@ -1042,7 +1115,9 @@ export function PixelCanvas({
       ? "cursor-not-allowed"
       : tool === "move" || (overSelection && isSelectionTool && !polygon)
         ? "cursor-move"
-        : "cursor-crosshair";
+        : tool === "text"
+          ? "cursor-text"
+          : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
   const showTip =
     hover &&
@@ -1051,6 +1126,7 @@ export function PixelCanvas({
     !frame &&
     !blocked &&
     !isSelectionTool &&
+    tool !== "text" &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
   // The corners of a polygonal lasso or of a polygon being drawn.
@@ -1289,6 +1365,73 @@ export function PixelCanvas({
           {marquee.w} × {marquee.h}
         </span>
       )}
+
+      {openText && textPreview && (
+        <canvas
+          aria-hidden="true"
+          width={textPreview.w}
+          height={textPreview.h}
+          className="pointer-events-none absolute outline-1 outline-blue-500 outline-dashed [image-rendering:pixelated]"
+          style={{
+            left: openText.at.x * scale,
+            top: openText.at.y * scale,
+            width: textPreview.w * scale,
+            height: textPreview.h * scale,
+          }}
+          ref={(canvas) =>
+            canvas
+              ?.getContext("2d")
+              ?.putImageData(
+                new ImageData(
+                  textPreview.pixels as Uint8ClampedArray<ArrayBuffer>,
+                  textPreview.w,
+                  textPreview.h,
+                ),
+                0,
+                0,
+              )
+          }
+        />
+      )}
+      {openText && (
+        <input
+          ref={textInput}
+          aria-label="Text"
+          placeholder="Type, then Enter"
+          value={openText.text}
+          onChange={(e) => {
+            setTextBox({ ...openText, text: e.target.value });
+            setTextError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void placeText();
+            if (e.key === "Escape") {
+              setTextBox(null);
+              setTextPreview(null);
+              setTextError(null);
+            }
+          }}
+          className="absolute z-10 h-7 w-44 rounded-md border bg-background px-2 text-sm text-foreground shadow-md"
+          style={{
+            left: openText.at.x * scale,
+            top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 6,
+          }}
+        />
+      )}
+      {openText &&
+        (textError ??
+          (openText.text.trim() && !textPreview ? NO_GLYPHS : null)) && (
+          <p
+            role="status"
+            className="absolute z-10 w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md"
+            style={{
+              left: openText.at.x * scale,
+              top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 40,
+            }}
+          >
+            {textError ?? NO_GLYPHS}
+          </p>
+        )}
 
       {aiArea && (
         <div

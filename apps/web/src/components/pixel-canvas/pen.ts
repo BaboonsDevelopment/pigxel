@@ -1,5 +1,6 @@
 import { linePoints, type Point } from "@/lib/edit/raster";
 import type { GradientDither, GradientShape } from "./paint";
+import type { TextFont } from "./text";
 
 // The tools draw with the same pixel lines as AI edits.
 export { linePoints, type Point };
@@ -20,6 +21,7 @@ export type PaintTool =
   | "ellipse"
   | "bucket"
   | "gradient"
+  | "text"
   | "pipette"
   | "marquee"
   | "ellipseMarquee"
@@ -73,6 +75,10 @@ export type PenSettings = {
   gradientShape: GradientShape;
   /** The gradient keeps to its two colours in an ordered dither, or mixes them. */
   gradientDither: GradientDither;
+  /** The font the text tool writes with. */
+  textFont: TextFont;
+  /** How many times its own pixel size the text tool writes, 1–3. */
+  textScale: number;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -93,6 +99,8 @@ export const DEFAULT_PEN: PenSettings = {
   contiguous: true,
   gradientShape: "linear",
   gradientDither: "bayer4",
+  textFont: "tiny5",
+  textScale: 1,
 };
 
 export const MIN_SPRAY_SPEED = 1;

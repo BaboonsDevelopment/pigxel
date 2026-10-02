@@ -15,6 +15,7 @@ import type {
   Transform,
 } from "@/components/pixel-canvas/use-selection";
 import type { CanvasView } from "@/components/pixel-canvas/view";
+import { TEXT_FONTS, TEXT_SCALES } from "@/components/pixel-canvas/text";
 import type { ToolId } from "../constants";
 import { sizeKey } from "../helpers";
 
@@ -187,6 +188,25 @@ export function ToolOptions({
           />
           Filled
         </label>
+      )}
+
+      {tool === "text" && (
+        <>
+          <OptionSelect
+            label="Font"
+            title={TEXT_FONTS.find((f) => f.id === pen.textFont)?.title ?? ""}
+            value={pen.textFont}
+            options={TEXT_FONTS.map((f) => [f.id, f.label])}
+            onChange={(textFont) => onChange({ ...pen, textFont })}
+          />
+          <OptionSelect
+            label="Size"
+            title="How many times bigger than the font's own pixels"
+            value={String(pen.textScale)}
+            options={TEXT_SCALES.map((n) => [String(n), `${n}×`])}
+            onChange={(scale) => onChange({ ...pen, textScale: Number(scale) })}
+          />
+        </>
       )}
 
       {tool === "gradient" && (
@@ -382,6 +402,7 @@ const HINTS: Record<ToolId, string> = {
   blur: "Drag over an edge to soften it; it adds in-between colours · Each stroke blurs once more",
   jumble:
     "Drag over an edge to make it ragged; no new colours · Each stroke jumbles more",
+  text: "Click where the text goes and type · Enter puts it on the tile to move into place · Esc cancels · Right-click uses the secondary colour",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",

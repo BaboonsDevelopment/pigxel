@@ -442,6 +442,7 @@ export function Editor({
               view={view}
               stamp={stamp}
               highlight={highlight}
+              onTextPlaced={() => setTool("move")}
               onPickColor={(color, slot) =>
                 setPen((p) =>
                   slot === "primary"
