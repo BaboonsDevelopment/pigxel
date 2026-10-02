@@ -55,6 +55,7 @@ import {
   SELECTION_TOOLS,
   brushOrigin,
   brushTip,
+  curvePoints,
   extendStroke,
   fillPoints,
   linePoints,
@@ -96,6 +97,24 @@ type Stroke = {
   color: string | null;
   /** The cel before the stroke, so each redraw starts from it. */
   before: Uint8ClampedArray;
+  /** The curve's bend, set by the drags after the first. */
+  curve?: CurveBend;
+};
+
+/**
+ * A curve takes three drags: the first places its ends, the second bends it
+ * (`c1` and `c2` together), the third moves `c2` alone. `held` is true while
+ * one of them is being dragged.
+ */
+type CurveBend = { c1: Point; c2: Point; stage: 0 | 1 | 2; held: boolean };
+
+/** What the canvas shows over an unfinished curve: its ends and bend handles. */
+type CurveGuide = {
+  start: Point;
+  end: Point;
+  c1: Point;
+  c2: Point;
+  stage: number;
 };
 
 /** A selection being dragged out, or selected pixels being moved. */
@@ -187,6 +206,12 @@ export function PixelCanvas({
   const [aiArea, setAiArea] = useState<Area | null>(null);
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
   const [spraying, setSpraying] = useState(false);
+  const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
+  // The corners of an unfinished polygon and where the pointer is, for the guides.
+  const [paintPolygon, setPaintPolygon] = useState<{
+    points: Point[];
+    pointer: Point;
+  } | null>(null);
   // Picking another tool drops a polygon that isn't closed yet.
   const [polygonTool, setPolygonTool] = useState(tool);
   if (polygonTool !== tool) {
@@ -374,7 +399,11 @@ export function PixelCanvas({
           ? pen.sprayWidth * 2 + 1
           : pen.size;
   const hoverSize =
-    tool === "bucket" || tool === "gradient" || tool === "pipette"
+    tool === "bucket" ||
+    tool === "gradient" ||
+    tool === "contour" ||
+    tool === "polygon" ||
+    tool === "pipette"
       ? 1
       : tipSize(tool);
   const hoverTip = brushTip(hoverSize, tool === "brush" || tool === "spray");
@@ -404,7 +433,11 @@ export function PixelCanvas({
     const inkTool = current.tool === "pen" || current.tool === "brush";
     // Shading moves pixels along the palette: forwards with the left button.
     const ink: Ink =
-      (inkTool || current.tool === "spray") && pen.ink === "shading"
+      (inkTool ||
+        current.tool === "spray" ||
+        current.tool === "contour" ||
+        current.tool === "polygon") &&
+      pen.ink === "shading"
         ? shadingInk(current.before, sprite.palette, current.secondary ? -1 : 1)
         : current.rgba;
     const paint = (points: Point[], thin = false) =>
@@ -428,8 +461,25 @@ export function PixelCanvas({
       paint(shape(box, false));
     } else if (current.tool === "line") {
       paint(linePoints(start, current.end));
+    } else if (current.curve) {
+      const { c1, c2 } = current.curve;
+      paint(strokePixels(curvePoints(start, c1, c2, current.end), pen));
     } else if (current.tool === "spray") {
       paint(current.points, true);
+    } else if (current.tool === "contour" || current.tool === "polygon") {
+      // The outline drawn so far, closed back to its start and filled; an
+      // unfinished polygon reaches to the pointer.
+      const inside = polygonMask(
+        size,
+        current.tool === "polygon"
+          ? [...current.points, current.end]
+          : current.points,
+      );
+      const points: Point[] = [];
+      inside.forEach((on, i) => {
+        if (on) points.push({ x: i % size.w, y: Math.floor(i / size.w) });
+      });
+      paint(points, true);
     } else if (current.tool === "gradient") {
       // Until the line has a length there is no direction, so nothing changes.
       // The right button runs the gradient the other way round.
@@ -648,6 +698,21 @@ export function PixelCanvas({
     if (frame || (e.button !== 0 && e.button !== 2)) return;
     const point = pixelAt(e);
     const slot: ColorSlot = e.button === 2 ? "secondary" : "primary";
+    // The second and third drags of a curve bend it.
+    const unfinished = stroke.current;
+    if (unfinished?.curve && !unfinished.curve.held) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      unfinished.curve.held = true;
+      return bendCurve(unfinished, point);
+    }
+    // Each further click on an unfinished polygon places a corner.
+    if (unfinished?.tool === "polygon") {
+      const last = unfinished.points.at(-1)!;
+      return addShapeCorner(
+        unfinished,
+        e.shiftKey ? snapLine(last, point) : point,
+      );
+    }
     // Alt+click picks a colour with the drawing tools, as in Aseprite
     // (selection tools use Alt to take away from the selection).
     if (tool === "pipette" || (e.altKey && !isSelectionTool))
@@ -671,7 +736,10 @@ export function PixelCanvas({
     const freehand = tool === "pen" || tool === "brush" || erase;
     const shading =
       pen.ink === "shading" &&
-      (((tool === "pen" || tool === "brush") && !stamp) || tool === "spray");
+      (((tool === "pen" || tool === "brush") && !stamp) ||
+        tool === "spray" ||
+        tool === "contour" ||
+        tool === "polygon");
     stroke.current = {
       tool,
       points:
@@ -691,10 +759,130 @@ export function PixelCanvas({
       before: new Uint8ClampedArray(
         ctx.getImageData(0, 0, size.w, size.h).data,
       ),
+      // Straight until it is bent: the controls sit on the ends.
+      curve:
+        tool === "curve"
+          ? { c1: point, c2: point, stage: 0, held: true }
+          : undefined,
     };
     drawStroke(ctx, stroke.current);
     if (tool === "spray") setSpraying(true);
+    if (tool === "curve") showCurve(stroke.current);
+    if (tool === "polygon") showPolygon(stroke.current);
   };
+
+  const showPolygon = (current: Stroke) =>
+    setPaintPolygon({ points: [...current.points], pointer: current.end });
+
+  // A click on the first corner closes the polygon; others add a corner.
+  const addShapeCorner = (current: Stroke, point: Point) => {
+    const first = current.points[0]!;
+    const last = current.points.at(-1)!;
+    if (
+      current.points.length >= 3 &&
+      point.x === first.x &&
+      point.y === first.y
+    )
+      return closeShape(current);
+    if (point.x === last.x && point.y === last.y) return;
+    current.points.push(point);
+    current.end = point;
+    const ctx = sprite.context();
+    if (ctx) drawStroke(ctx, current);
+    showPolygon(current);
+  };
+
+  // Fills the polygon without the stretch to the pointer; with fewer than
+  // three corners there is no area, so it is dropped.
+  const closeShape = (current: Stroke) => {
+    if (current.points.length < 3) return cancelStroke(current);
+    current.end = current.points.at(-1)!;
+    const ctx = sprite.context();
+    if (ctx) drawStroke(ctx, current);
+    finishStroke(current);
+  };
+
+  const showCurve = (current: Stroke) =>
+    setCurveGuide(
+      current.curve
+        ? {
+            start: current.points[0]!,
+            end: current.end,
+            c1: current.curve.c1,
+            c2: current.curve.c2,
+            stage: current.curve.stage,
+          }
+        : null,
+    );
+
+  // The second drag bends the curve with both controls, the third with the second alone.
+  const bendCurve = (current: Stroke, point: Point) => {
+    const ctx = sprite.context();
+    if (!current.curve || !ctx) return;
+    if (current.curve.stage === 1) {
+      current.curve.c1 = point;
+      current.curve.c2 = point;
+    } else current.curve.c2 = point;
+    drawStroke(ctx, current);
+    showCurve(current);
+  };
+
+  const finishStroke = (current: Stroke) => {
+    lastPoint.current =
+      current.tool === "line" || current.curve
+        ? current.end
+        : (current.points.at(-1) ?? null);
+    stroke.current = null;
+    setSpraying(false);
+    setCurveGuide(null);
+    setPaintPolygon(null);
+    sprite.commit();
+    if (current.color) onUseColor?.(current.color);
+  };
+
+  // Esc puts the cel back as it was before the curve or polygon.
+  const cancelStroke = (current: Stroke) => {
+    stroke.current = null;
+    setCurveGuide(null);
+    setPaintPolygon(null);
+    const ctx = sprite.context();
+    if (!ctx) return;
+    ctx.putImageData(
+      new ImageData(current.before as Uint8ClampedArray<ArrayBuffer>, size.w),
+      0,
+      0,
+    );
+    sprite.touched();
+  };
+
+  // Enter finishes an unfinished curve or polygon as it is, Esc drops it,
+  // before the editor's own Enter and Esc see the key.
+  const onShapeKey = useEffectEvent((e: KeyboardEvent) => {
+    const current = stroke.current;
+    const open = current?.curve || current?.tool === "polygon";
+    if (!current || !open || (e.key !== "Enter" && e.key !== "Escape")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === "Escape") cancelStroke(current);
+    else if (current.curve) finishStroke(current);
+    else closeShape(current);
+  });
+  const shapeOpen = curveGuide !== null || paintPolygon !== null;
+  useEffect(() => {
+    if (!shapeOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => onShapeKey(e);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [shapeOpen]);
+
+  // Picking another tool, layer or frame keeps an unfinished curve or
+  // polygon as it is, so its next clicks can't land on another cel.
+  const keepShape = useEffectEvent(() => {
+    const current = stroke.current;
+    if (current?.curve) finishStroke(current);
+    else if (current?.tool === "polygon") closeShape(current);
+  });
+  useEffect(() => keepShape(), [tool, sprite.layerId, sprite.frameId]);
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const point = pixelAt(e);
@@ -709,7 +897,22 @@ export function PixelCanvas({
       current.end = point;
       return;
     }
+    // An unfinished polygon stretches from its last corner to the pointer.
+    if (current.tool === "polygon") {
+      const last = current.points.at(-1)!;
+      const end = e.shiftKey ? snapLine(last, point) : point;
+      if (end.x === current.end.x && end.y === current.end.y) return;
+      current.end = end;
+      drawStroke(ctx, current);
+      return showPolygon(current);
+    }
+    // A curve bends only while its second or third drag is held.
+    if (current.curve && current.curve.stage > 0) {
+      if (current.curve.held) bendCurve(current, point);
+      return;
+    }
     if (
+      current.curve ||
       current.tool === "line" ||
       current.tool === "gradient" ||
       current.tool === "rect" ||
@@ -719,13 +922,19 @@ export function PixelCanvas({
       // a line to 45° steps and makes a shape a square or circle.
       const from = current.points[0]!;
       const end =
-        current.tool === "line" || current.tool === "gradient"
+        current.curve || current.tool === "line" || current.tool === "gradient"
           ? e.shiftKey
             ? snapLine(from, point)
             : point
           : squareFrom(from, point, e.shiftKey);
       if (end.x === current.end.x && end.y === current.end.y) return;
       current.end = end;
+      // The first drag of a curve draws it straight, its controls on the ends.
+      if (current.curve) {
+        current.curve.c1 = from;
+        current.curve.c2 = end;
+        showCurve(current);
+      }
     } else {
       const points = extendStroke(current.points, point);
       if (points === current.points) return;
@@ -737,13 +946,20 @@ export function PixelCanvas({
   const endPointer = () => {
     if (selectDrag) return endSelect();
     const current = stroke.current;
-    if (!current) return;
-    lastPoint.current =
-      current.tool === "line" ? current.end : (current.points.at(-1) ?? null);
-    stroke.current = null;
-    setSpraying(false);
-    sprite.commit();
-    if (current.color) onUseColor?.(current.color);
+    // A polygon stays open between clicks.
+    if (!current || current.tool === "polygon") return;
+    const curve = current.curve;
+    if (curve) {
+      curve.held = false;
+      const start = current.points[0]!;
+      const dot = start.x === current.end.x && start.y === current.end.y;
+      // A curve waits for its bending drags; a click without a drag is a dot.
+      if (curve.stage < 2 && !(curve.stage === 0 && dot)) {
+        curve.stage = curve.stage === 0 ? 1 : 2;
+        return showCurve(current);
+      }
+    }
+    finishStroke(current);
   };
 
   const startAiArea = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -788,6 +1004,7 @@ export function PixelCanvas({
     onPointerLeave: () => setHover(null),
     onDoubleClick: () => {
       if (polygon) closePolygon(polygon);
+      if (stroke.current?.tool === "polygon") closeShape(stroke.current);
     },
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
@@ -807,6 +1024,8 @@ export function PixelCanvas({
     !isSelectionTool &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
+  // The corners of a polygonal lasso or of a polygon being drawn.
+  const corners = polygon ?? paintPolygon;
   const lasso =
     selectDrag?.kind === "lasso"
       ? selectDrag.points
@@ -919,7 +1138,7 @@ export function PixelCanvas({
         />
       )}
 
-      {(outline || marquee || lasso || polygon) && (
+      {(outline || marquee || lasso || corners || curveGuide) && (
         <svg
           aria-hidden="true"
           viewBox={`0 0 ${size.w} ${size.h}`}
@@ -979,13 +1198,41 @@ export function PixelCanvas({
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {polygon?.points.map((p, i) => {
+          {/* Once the ends are placed, the bend handles and the lines tying
+              them to the ends show where the next drag pulls. */}
+          {curveGuide &&
+            curveGuide.stage > 0 &&
+            [
+              { from: curveGuide.start, handle: curveGuide.c1 },
+              { from: curveGuide.end, handle: curveGuide.c2 },
+            ].map(({ from, handle }, i) => (
+              <g key={i}>
+                <line
+                  x1={from.x + 0.5}
+                  y1={from.y + 0.5}
+                  x2={handle.x + 0.5}
+                  y2={handle.y + 0.5}
+                  stroke="rgb(59 130 246)"
+                  strokeDasharray="4 3"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle
+                  cx={handle.x + 0.5}
+                  cy={handle.y + 0.5}
+                  r={0.5}
+                  fill="white"
+                  stroke="rgb(59 130 246)"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            ))}
+          {corners?.points.map((p, i) => {
             // The first corner fills in when a click on it would close the shape.
             const closes =
               i === 0 &&
-              polygon.points.length >= 3 &&
-              p.x === polygon.pointer.x &&
-              p.y === polygon.pointer.y;
+              corners.points.length >= 3 &&
+              p.x === corners.pointer.x &&
+              p.y === corners.pointer.y;
             return (
               <rect
                 key={i}

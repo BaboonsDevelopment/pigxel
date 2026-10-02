@@ -11,6 +11,9 @@ export type PaintTool =
   | "spray"
   | "eraser"
   | "line"
+  | "curve"
+  | "contour"
+  | "polygon"
   | "rect"
   | "ellipse"
   | "bucket"
@@ -129,6 +132,42 @@ export function extendStroke(stroke: Point[], to: Point): Point[] {
   if (!last) return [to];
   if (last.x === to.x && last.y === to.y) return stroke;
   return [...stroke, ...linePoints(last, to).slice(1)];
+}
+
+/**
+ * The pixels of a cubic Bézier curve from `start` to `end`, bent towards the
+ * control points `c1` and `c2`: a connected line with no gaps.
+ */
+export function curvePoints(
+  start: Point,
+  c1: Point,
+  c2: Point,
+  end: Point,
+): Point[] {
+  // Enough samples that neighbouring ones are under a pixel apart.
+  const steps = Math.max(
+    1,
+    Math.ceil(
+      2 *
+        (Math.hypot(c1.x - start.x, c1.y - start.y) +
+          Math.hypot(c2.x - c1.x, c2.y - c1.y) +
+          Math.hypot(end.x - c2.x, end.y - c2.y)),
+    ),
+  );
+  let points: Point[] = [start];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+    const along = (a: number, b: number, c: number, d: number) =>
+      Math.round(
+        u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d,
+      );
+    points = extendStroke(points, {
+      x: along(start.x, c1.x, c2.x, end.x),
+      y: along(start.y, c1.y, c2.y, end.y),
+    });
+  }
+  return points;
 }
 
 /**

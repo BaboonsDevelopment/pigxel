@@ -54,7 +54,17 @@ export function ToolOptions({
   const inkTool = tool === "pen" || tool === "brush";
   const paints =
     inkTool ||
-    ["spray", "eraser", "line", "rect", "ellipse", "bucket"].includes(tool);
+    [
+      "spray",
+      "contour",
+      "polygon",
+      "eraser",
+      "line",
+      "curve",
+      "rect",
+      "ellipse",
+      "bucket",
+    ].includes(tool);
   return (
     <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 text-sm">
       {inkTool && stamp && (
@@ -116,7 +126,7 @@ export function ToolOptions({
         </label>
       )}
 
-      {tool === "pen" && (
+      {(tool === "pen" || tool === "curve") && (
         <label
           className="flex items-center gap-2 has-disabled:opacity-50"
           title={
@@ -136,7 +146,10 @@ export function ToolOptions({
         </label>
       )}
 
-      {((inkTool && !stamp) || tool === "spray") && (
+      {((inkTool && !stamp) ||
+        tool === "spray" ||
+        tool === "contour" ||
+        tool === "polygon") && (
         <OptionSelect
           label="Ink"
           title="Shading moves each pixel one step along the palette: left button forwards, right button back"
@@ -360,9 +373,15 @@ const HINTS: Record<ToolId, string> = {
   brush: PAINT_HINT,
   spray:
     "Hold to scatter dots; the longer you hold, the denser · Right button sprays the secondary colour · Alt+click picks a colour",
+  contour:
+    "Draw around a shape; it closes and fills as you go · Right button fills with the secondary colour · Alt+click picks a colour",
+  polygon:
+    "Click to place corners · Click the first one, double-click or Enter fills it · Shift snaps to 45° · Esc cancels · Right button uses the secondary colour",
   eraser:
     "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   line: "Drag to draw · Shift snaps to 45° · Right button uses the secondary colour",
+  curve:
+    "Drag the ends, then drag to bend it, then drag again to bend its far end · Enter keeps it as it is · Esc cancels",
   rect: "Drag to draw · Shift makes a square · Right button uses the secondary colour",
   ellipse:
     "Drag to draw · Shift makes a circle · Right button uses the secondary colour",

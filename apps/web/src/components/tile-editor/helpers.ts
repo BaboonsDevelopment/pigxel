@@ -19,6 +19,7 @@ export function sizeKey(
   if (tool === "spray") return "sprayWidth";
   return tool === "pen" ||
     tool === "line" ||
+    tool === "curve" ||
     tool === "rect" ||
     tool === "ellipse"
     ? "size"

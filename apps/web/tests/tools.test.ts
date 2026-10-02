@@ -13,6 +13,7 @@ import {
   brushTip,
   sprayDotCount,
   sprayDots,
+  curvePoints,
 } from "@/components/pixel-canvas/pen";
 import { onionFrames } from "@/components/pixel-canvas/view";
 import { parsePaletteFile, toGpl } from "@/lib/palette/files";
@@ -103,6 +104,32 @@ describe("picture brush", () => {
     const data = blank();
     paintStamp(data, [{ x: 0, y: 0 }], stamp, BLACK, options);
     expect([...data.slice(0, 4)]).toEqual([...BLACK]);
+  });
+});
+
+describe("curve", () => {
+  it("runs from end to end without gaps or doubled pixels", () => {
+    const start = { x: 0, y: 10 };
+    const end = { x: 12, y: 10 };
+    const points = curvePoints(start, { x: 2, y: 0 }, { x: 10, y: 0 }, end);
+    expect(points[0]).toEqual(start);
+    expect(points.at(-1)).toEqual(end);
+    for (let i = 1; i < points.length; i++) {
+      const step = Math.max(
+        Math.abs(points[i]!.x - points[i - 1]!.x),
+        Math.abs(points[i]!.y - points[i - 1]!.y),
+      );
+      expect(step).toBe(1);
+    }
+    // Bent towards the controls, above the straight line between the ends.
+    expect(Math.min(...points.map((p) => p.y))).toBeLessThan(6);
+  });
+  it("is a straight line while the controls sit on the ends", () => {
+    const start = { x: 0, y: 0 };
+    const end = { x: 5, y: 0 };
+    expect(curvePoints(start, start, end, end)).toEqual(
+      [0, 1, 2, 3, 4, 5].map((x) => ({ x, y: 0 })),
+    );
   });
 });
 
