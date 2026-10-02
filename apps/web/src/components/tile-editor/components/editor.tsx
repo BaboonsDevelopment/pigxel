@@ -20,6 +20,7 @@ import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
+import { maskBounds } from "@/components/pixel-canvas/selection";
 import {
   pasteSource,
   useSelection,
@@ -49,7 +50,8 @@ import {
   writePen,
   type Draft,
 } from "@/lib/pigxel-file/draft";
-import type { PigxelDocument } from "@/lib/pigxel-file/format";
+import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import { drawnBounds } from "@/lib/sprite/canvas-size";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import {
@@ -331,6 +333,37 @@ export function Editor({
     return placed;
   };
 
+  /** Makes the tile just `area` of itself, in every layer and frame. */
+  const cropTo = (area: { x: number; y: number; w: number; h: number }) => {
+    selection.deselect();
+    sprite.resize({ w: area.w, h: area.h }, { x: -area.x, y: -area.y });
+  };
+  // Crop: the tile becomes the box around the selection.
+  const cropToSelection = () => {
+    const area = selection.mask && maskBounds(selection.mask, sprite.size);
+    if (area) cropTo(area);
+  };
+  // Trim: the empty edges around everything drawn, in any frame, are cut off.
+  const trim = async () => {
+    const fill = backgroundColor(sprite.background);
+    const area = drawnBounds(
+      sprite.frames.map((f) => sprite.composite(["reference"], f.id)),
+      sprite.size.w,
+      sprite.size.h,
+      fill ? (rgbaOf(fill).slice(0, 3) as [number, number, number]) : null,
+    );
+    if (area && (area.w < sprite.size.w || area.h < sprite.size.h))
+      return cropTo(area);
+    await choiceDialog({
+      title: "Nothing to trim",
+      message: area
+        ? "The drawing already reaches every edge of the tile."
+        : "Nothing is drawn on the tile yet.",
+      choices: [],
+      cancelLabel: "OK",
+    });
+  };
+
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
   const editMenu: MenuSections = [
     [
@@ -344,7 +377,15 @@ export function Editor({
       { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
-    [{ label: "Canvas size…", onSelect: () => setResizing(true) }],
+    [
+      { label: "Canvas size…", onSelect: () => setResizing(true) },
+      {
+        label: "Crop to selection",
+        onSelect: cropToSelection,
+        disabled: !selection.mask,
+      },
+      { label: "Trim empty edges", onSelect: () => void trim() },
+    ],
     [
       {
         label: "Select all",

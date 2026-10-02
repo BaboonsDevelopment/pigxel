@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bordersFor, movedSlices, sizeWith } from "@/lib/sprite/canvas-size";
+import {
+  bordersFor,
+  drawnBounds,
+  movedSlices,
+  sizeWith,
+} from "@/lib/sprite/canvas-size";
 import type { Slice } from "@/lib/slices/slices";
 
 const tile = { w: 32, h: 32 };
@@ -71,5 +76,42 @@ describe("canvas size", () => {
     });
     // Cut away entirely: gone.
     expect(movedSlices([door], -8, 0, 24, 32)).toEqual([]);
+  });
+
+  it("finds the box around everything drawn in any frame, for Trim", () => {
+    const frame = (dots: [number, number, string?][]) => {
+      const rgba = new Uint8ClampedArray(8 * 8 * 4);
+      for (const [x, y, colour] of dots) {
+        const at = (y * 8 + x) * 4;
+        rgba.set(
+          colour === "white" ? [255, 255, 255, 255] : [200, 0, 0, 255],
+          at,
+        );
+      }
+      return rgba;
+    };
+    // A dot at (2, 3) in one frame and (5, 4) in another: both are kept.
+    expect(drawnBounds([frame([[2, 3]]), frame([[5, 4]])], 8, 8)).toEqual({
+      x: 2,
+      y: 3,
+      w: 4,
+      h: 2,
+    });
+    // Nothing drawn.
+    expect(drawnBounds([frame([])], 8, 8)).toBeNull();
+    // On a white background, white counts as empty.
+    expect(
+      drawnBounds(
+        [
+          frame([
+            [0, 0, "white"],
+            [3, 3],
+          ]),
+        ],
+        8,
+        8,
+        [255, 255, 255],
+      ),
+    ).toEqual({ x: 3, y: 3, w: 1, h: 1 });
   });
 });

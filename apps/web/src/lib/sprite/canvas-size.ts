@@ -91,3 +91,40 @@ export function movedSlices(
     return [{ ...slice, bounds, center, pivot: pivotInside ? pivot : null }];
   });
 }
+
+/**
+ * The smallest rectangle holding everything drawn in any of `pictures`
+ * (frames of a `w × h` tile), for Trim; null when nothing is drawn. Clear
+ * pixels count as empty, and so does `background` (an [r, g, b] colour),
+ * the Background layer's fill.
+ */
+export function drawnBounds(
+  pictures: Uint8ClampedArray[],
+  w: number,
+  h: number,
+  background: readonly [number, number, number] | null = null,
+): { x: number; y: number; w: number; h: number } | null {
+  let left = w;
+  let top = h;
+  let right = -1;
+  let bottom = -1;
+  for (const rgba of pictures)
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const at = (y * w + x) * 4;
+        const empty =
+          rgba[at + 3] === 0 ||
+          (background !== null &&
+            rgba[at] === background[0] &&
+            rgba[at + 1] === background[1] &&
+            rgba[at + 2] === background[2]);
+        if (empty) continue;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+  return right < 0
+    ? null
+    : { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
+}
