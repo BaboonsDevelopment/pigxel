@@ -79,7 +79,6 @@ export const SNAPSHOT_SIDE = 512;
 export const SNAPSHOT_BACKGROUND = "#d4d4d4";
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 256;
-export const DEFAULT_SIZE: Size = { w: 32, h: 32 };
 
 export const HANDLES: { edge: Edge; title: string; className: string }[] = [
   {

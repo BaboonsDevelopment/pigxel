@@ -7,7 +7,7 @@ import { pickImageFile } from "./helpers";
 import type { Playback } from "./use-playback";
 
 /** Asks for a picture and adds it as a reference layer, fitted to the tile. */
-export async function addReference(sprite: SpriteApi) {
+async function addReference(sprite: SpriteApi) {
   const file = await pickImageFile();
   if (!file) return;
   const { w, h } = sprite.size;

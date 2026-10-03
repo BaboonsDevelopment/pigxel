@@ -93,7 +93,7 @@ export function insertLayer(
 }
 
 /** True when `id` is `ancestorId` or somewhere inside it. */
-export function isInside(tree: Layer[], id: string, ancestorId: string) {
+function isInside(tree: Layer[], id: string, ancestorId: string) {
   const ancestor = findLayer(tree, ancestorId)?.layer;
   return (
     id === ancestorId ||
@@ -164,7 +164,7 @@ export const isShown = (tree: Layer[], id: string) =>
   withAncestors(tree, id).every((layer) => layer.visible);
 
 /** Locked when the layer or any group around it is locked. */
-export const isLocked = (tree: Layer[], id: string) =>
+const isLocked = (tree: Layer[], id: string) =>
   withAncestors(tree, id).some((layer) => layer.locked);
 
 /** Whether the tools may draw on the layer: a shown, unlocked sheet of pixels. */

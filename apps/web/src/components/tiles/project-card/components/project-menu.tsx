@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
-export type ProjectMenuItem = {
+type ProjectMenuItem = {
   label: string;
   onSelect: () => void;
   destructive?: boolean;

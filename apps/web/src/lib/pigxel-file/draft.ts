@@ -26,7 +26,7 @@ export type Draft = {
   savedAt: number;
 };
 
-export type DraftInput = Omit<Draft, "savedAt">;
+type DraftInput = Omit<Draft, "savedAt">;
 
 /** Where drafts are stored: IndexedDB, or localStorage when it's unavailable. */
 export type DraftBackend = {

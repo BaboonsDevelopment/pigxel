@@ -26,7 +26,7 @@ export function pixelAt(e: PointerEvent<HTMLCanvasElement>): Point {
 }
 
 /** The pixel of `canvas` at a point on screen; outside it, past its edges. */
-export function pixelUnder(
+function pixelUnder(
   canvas: HTMLCanvasElement,
   clientX: number,
   clientY: number,

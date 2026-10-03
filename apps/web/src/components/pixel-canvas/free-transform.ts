@@ -45,7 +45,7 @@ export function identityTransform(piece: {
 type Matrix = [number, number, number, number]; // a b c d: x' = a x + b y, y' = c x + d y
 
 /** The linear part of `t`: scale, then skew, then rotation. */
-export function matrixOf(t: FreeTransform): Matrix {
+function matrixOf(t: FreeTransform): Matrix {
   const r = (t.angle * Math.PI) / 180;
   const k = Math.tan((t.skew * Math.PI) / 180);
   const cos = Math.cos(r);
@@ -58,7 +58,7 @@ export function matrixOf(t: FreeTransform): Matrix {
 }
 
 /** Where a point relative to the piece's centre (unchanged) ends up, relative to the new centre. */
-export function apply(m: Matrix, x: number, y: number) {
+function apply(m: Matrix, x: number, y: number) {
   return { x: m[0] * x + m[1] * y, y: m[2] * x + m[3] * y };
 }
 
@@ -145,9 +145,4 @@ export function transformFloating(
       } else pixels.set(source.pixels.subarray(j * 4, j * 4 + 4), o * 4);
     }
   return { x: x0, y: y0, w, h, pixels, mask };
-}
-
-/** Whether `t` leaves the piece as it was lifted (only moved, maybe). */
-export function onlyMoved(t: FreeTransform) {
-  return t.scaleX === 1 && t.scaleY === 1 && t.angle === 0 && t.skew === 0;
 }

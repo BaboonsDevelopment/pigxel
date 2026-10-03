@@ -21,7 +21,7 @@ export type SearchResults = {
 };
 
 const LIMIT = 6;
-export const MAX_QUERY = 50;
+const MAX_QUERY = 50;
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -29,7 +29,7 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 const literal = (query: string) => query.replace(/[\\%_]/g, "\\$&");
 
 /** True when `query` asks for people only, e.g. "@ada". */
-export const isHandleQuery = (query: string) => query.trim().startsWith("@");
+const isHandleQuery = (query: string) => query.trim().startsWith("@");
 
 function toResult(row: ProfileRow): ArtistResult {
   const profile = toArtistProfile(row);

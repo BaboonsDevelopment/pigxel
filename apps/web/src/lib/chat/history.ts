@@ -8,14 +8,14 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
  * signed-in browser session.
  */
 
-export type SavedMessage = {
+type SavedMessage = {
   role: "user" | "assistant";
   content: string;
   /** The id of the message's picture in the browser's cache. */
   picture?: string;
 };
 
-export type SavedChat = { messages: SavedMessage[] };
+type SavedChat = { messages: SavedMessage[] };
 
 /** Most messages kept per tile; older ones drop off. */
 const MAX_MESSAGES = 200;

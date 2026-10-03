@@ -7,10 +7,10 @@ import {
 import { GIF_ALPHA_CUTOFF, GIF_MAX_COLORS, GIF_MIN_DELAY } from "./constants";
 
 /** One picture of a GIF and how long it shows, in milliseconds. */
-export type GifFrame = { rgba: Uint8ClampedArray; duration: number };
+type GifFrame = { rgba: Uint8ClampedArray; duration: number };
 
 /** Frames as indices into one shared palette. */
-export type IndexedFrames = {
+type IndexedFrames = {
   palette: RGB[];
   /** The index transparent pixels have, or null when every pixel is opaque. */
   transparent: number | null;

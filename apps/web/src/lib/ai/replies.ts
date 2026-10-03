@@ -19,7 +19,7 @@ import type {
 export const INTENTS = ["generate", "edit", "animate", "undo", "chat"] as const;
 
 /** Most pictures one request may add at once. */
-export const MAX_COUNT = 12;
+const MAX_COUNT = 12;
 
 function parseJson<T>(text: string): Partial<T> | null {
   try {

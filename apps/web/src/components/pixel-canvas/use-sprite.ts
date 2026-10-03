@@ -34,7 +34,7 @@ export type LayerPatch = Partial<
 export type SpriteApi = ReturnType<typeof useSprite>;
 
 /** A layer to add, with its name and its pixels by frame id. */
-export type NewLayer = {
+type NewLayer = {
   name?: string;
   cels?: Map<string, Uint8ClampedArray>;
   /**

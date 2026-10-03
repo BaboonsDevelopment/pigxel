@@ -18,7 +18,7 @@ import { safeFileBase } from "@/lib/pigxel-file/format";
 import { swatchProps, withColor } from "./helpers";
 
 /** How the palette changed, for an indexed tile's pixels to follow. */
-export type PaletteChange = {
+type PaletteChange = {
   /** One colour changed to another in place. */
   edited?: { from: string; to: string };
   /** A whole palette loaded over the old one (a preset or a file). */

@@ -24,7 +24,7 @@ import {
 
 export const ASSET_NAME_MAX = 40;
 /** The most frames an asset can have, as the database allows. */
-export const ASSET_MAX_FRAMES = 64;
+const ASSET_MAX_FRAMES = 64;
 
 /** Every asset, for the editor's Insert asset. */
 export async function listAssetsInBrowser(): Promise<Asset[]> {

@@ -10,7 +10,7 @@ import type { AssetCategory } from "./assets";
  * only loaded when an admin imports the set (see ImportStarterSet), and can
  * go once it's in.
  */
-export type StarterAsset = {
+type StarterAsset = {
   id: string;
   name: string;
   category: AssetCategory;

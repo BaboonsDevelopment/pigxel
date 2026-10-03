@@ -12,7 +12,7 @@ type ConfirmOptions = {
 };
 
 /** A button of a choice dialog, and the answer it gives. */
-export type DialogChoice<T extends string> = {
+type DialogChoice<T extends string> = {
   value: T;
   label: string;
   variant?: ButtonVariant;

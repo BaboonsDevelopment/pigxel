@@ -11,7 +11,7 @@ import {
 } from "react";
 import styles from "./landing.module.css";
 
-export type Feature = {
+type Feature = {
   id: string;
   title: string;
   text: string;

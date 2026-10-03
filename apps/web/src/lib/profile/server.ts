@@ -59,7 +59,7 @@ export async function sidebarProfile(user: User): Promise<Profile> {
     : fallback;
 }
 
-export type ProfileLookup =
+type ProfileLookup =
   | { kind: "found"; profile: ArtistProfile }
   | { kind: "private" }
   | { kind: "missing" };

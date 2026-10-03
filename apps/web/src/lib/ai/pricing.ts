@@ -5,7 +5,7 @@
  */
 type Price = { input: number; output: number; imageOutput?: number };
 
-export const PRICES: Record<string, Price> = {
+const PRICES: Record<string, Price> = {
   // Doubles from 2027-01-01 ($1.50 in, $7.50 out).
   "gemini-3.7-flash": { input: 0.75, output: 3.75 },
   "gemini-3.6-flash": { input: 0.75, output: 3.75 },

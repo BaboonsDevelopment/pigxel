@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server";
  * a fixed allowance for now, and each request takes what it cost from it,
  * 10 credits a cent.
  */
-export const CREDIT_LIMIT = 5000;
-export const CREDITS_PER_DOLLAR = 1000;
+const CREDIT_LIMIT = 5000;
+const CREDITS_PER_DOLLAR = 1000;
 
 /** Dollars as credits, unrounded. */
 export const creditsOf = (usd: number) => usd * CREDITS_PER_DOLLAR;

@@ -13,11 +13,13 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "knip": "knip",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "test": "turbo run test"
   },
   "devDependencies": {
+    "knip": "^5.88.1",
     "prettier": "^3.6.2",
     "supabase": "^2.50.0",
     "turbo": "^2.5.8"

@@ -1,4 +1,4 @@
-export type AiErrorCode =
+type AiErrorCode =
   | "overloaded"
   | "rate_limited"
   | "timeout"

@@ -40,7 +40,7 @@ import {
 } from "@/lib/pigxel-file/import-image";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 
-export type FileStatus = {
+type FileStatus = {
   tone: "info" | "error";
   text: string;
   /** Label of a button that saves to the tile's location again. */

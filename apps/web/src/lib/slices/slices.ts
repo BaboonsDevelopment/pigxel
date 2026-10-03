@@ -40,7 +40,7 @@ export const PIVOTS = [
   },
 ] as const;
 
-export type PivotId = (typeof PIVOTS)[number]["id"];
+type PivotId = (typeof PIVOTS)[number]["id"];
 
 /** Which of the offered pivots a slice has; "none" when it has another one. */
 export function pivotIdOf(slice: Slice): PivotId {

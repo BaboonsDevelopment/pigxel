@@ -11,7 +11,7 @@ import {
   type RGBA,
 } from "./raster";
 
-export type Op =
+type Op =
   | { t: "pal"; c: string; hex: string }
   | { t: "px"; c: string; pts: Point[] }
   | { t: "blit"; at: Point; rows: string[] }

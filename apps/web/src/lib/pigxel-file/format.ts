@@ -69,7 +69,7 @@ import type { Cels, Frame } from "@/lib/sprite/types";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 6;
+const PIGXEL_VERSION = 6;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;

@@ -11,7 +11,7 @@ export function sheetGrid(count: number, layout: SheetLayout) {
 }
 
 /** Where frame number `n` goes on the sheet, filling rows left to right. */
-export function sheetCell(n: number, cols: number, frame: Size) {
+function sheetCell(n: number, cols: number, frame: Size) {
   return {
     x: (n % cols) * frame.w,
     y: Math.floor(n / cols) * frame.h,

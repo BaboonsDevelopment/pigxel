@@ -14,7 +14,7 @@ import { removeStrayPixels } from "./steps/remove-stray-pixels";
 import { paletteSize } from "./steps/shrink-to-tile";
 
 /** How a sprite sheet is divided: `cols × rows` equal cells, read row by row. */
-export type Grid = { cols: number; rows: number };
+type Grid = { cols: number; rows: number };
 
 /** Specks smaller than this (in sheet pixels) are noise, not part of a pose. */
 const MIN_PART = 3;
@@ -220,7 +220,7 @@ export function posesToFrames(
  * frames of one scene seen by a fixed camera, where what is drawn moves
  * within the frame and must keep its place. Empty cells give null.
  */
-export function sheetCells(
+function sheetCells(
   image: Bitmap,
   grid: Grid,
   count: number,

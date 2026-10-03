@@ -17,7 +17,7 @@ export const PANELS = [
 ] as const;
 export type PanelId = (typeof PANELS)[number];
 export type DockSide = "left" | "right" | "bottom" | "innerLeft" | "innerRight";
-export const DOCKS: DockSide[] = [
+const DOCKS: DockSide[] = [
   "left",
   "right",
   "bottom",
@@ -48,7 +48,7 @@ export const MIN_PANEL = 56;
  * panels (folded ones take only their title bar). `size` is its width in
  * pixels in a side dock, and its share of the width in the bottom dock.
  */
-export type Stack = { panels: PanelId[]; weights: number[]; size: number };
+type Stack = { panels: PanelId[]; weights: number[]; size: number };
 
 export type Dock = {
   stacks: Stack[];
@@ -190,7 +190,7 @@ export type PanelTarget =
     }
   | { kind: "dock"; dock: DockSide; where: "start" | "end" };
 
-export const dockOf = (layout: Layout, id: PanelId): DockSide | null =>
+const dockOf = (layout: Layout, id: PanelId): DockSide | null =>
   DOCKS.find((d) =>
     layout.docks[d].stacks.some((s) => s.panels.includes(id)),
   ) ?? null;
@@ -201,7 +201,7 @@ const withDock = (layout: Layout, side: DockSide, dock: Dock): Layout => ({
 });
 
 /** `layout` without `id` anywhere; a stack left empty goes. */
-export function withoutPanel(layout: Layout, id: PanelId): Layout {
+function withoutPanel(layout: Layout, id: PanelId): Layout {
   let out = layout;
   for (const side of DOCKS) {
     const dock = out.docks[side];
@@ -344,7 +344,3 @@ export function shownStacks(layout: Layout, side: DockSide) {
     return items.length ? [{ index, size: s.size, items }] : [];
   });
 }
-
-/** The panels shown anywhere, for the Window menu's checks. */
-export const isShown = (layout: Layout, id: PanelId) =>
-  !layout.hidden.includes(id);

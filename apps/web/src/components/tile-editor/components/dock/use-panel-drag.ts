@@ -10,7 +10,7 @@ import type {
 export type PanelDrag = ReturnType<typeof usePanelDrag>;
 
 /** A drop place with the screen area it would take, to show while dragging. */
-export type DropPreview = {
+type DropPreview = {
   target: PanelTarget;
   area: { left: number; top: number; width: number; height: number };
 };

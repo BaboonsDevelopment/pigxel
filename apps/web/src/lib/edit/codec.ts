@@ -1,7 +1,7 @@
 import { GRID } from "./constants";
 import type { Rect } from "./raster";
 
-export type EncodedTile = {
+type EncodedTile = {
   /** The grid the AI reads: size, rulers, one character per pixel, legend. */
   text: string;
   /** Character → #rrggbb for every colour in the grid. */

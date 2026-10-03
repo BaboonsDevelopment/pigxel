@@ -1,13 +1,13 @@
 import type { BlendMode } from "./types";
 
 /** A colour with channels from 0 to 1. */
-export type Rgb = [number, number, number];
+type Rgb = [number, number, number];
 
 /**
  * Blend formulas from the W3C Compositing spec (the ones Aseprite uses), plus
  * Aseprite's Addition, Subtract and Divide. `b` is the backdrop, `s` the layer.
  */
-export type Channel = (b: number, s: number) => number;
+type Channel = (b: number, s: number) => number;
 
 const multiply: Channel = (b, s) => b * s;
 const screen: Channel = (b, s) => b + s - b * s;

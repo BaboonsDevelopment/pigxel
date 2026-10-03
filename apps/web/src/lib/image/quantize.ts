@@ -3,7 +3,7 @@ export type RGB = { r: number; g: number; b: number };
 /** Upper bound on palette size. */
 const MAX_COLORS = 62;
 
-export type QuantizeOpts = {
+type QuantizeOpts = {
   /** Palette size; capped at MAX_COLORS. */
   colors?: number;
   bgTolerance?: number;
@@ -13,7 +13,7 @@ export type QuantizeOpts = {
   detail?: "sharp" | "smooth";
 };
 
-export type Quantized = {
+type Quantized = {
   buf: Uint8ClampedArray;
   palette: string[];
   removed: number;

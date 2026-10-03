@@ -146,7 +146,7 @@ export function mirrored(point: Point, size: Size, symmetry: Symmetry) {
  * Sets one pixel of `data` (RGBA of the whole tile) and its mirror copies,
  * wrapping or clipping at the edges and skipping pixels outside the mask.
  */
-export function plot(
+function plot(
   data: Uint8ClampedArray,
   point: Point,
   ink: Ink,

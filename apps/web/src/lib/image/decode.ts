@@ -1,4 +1,4 @@
-export type DecodedImage = { rgba: Uint8ClampedArray; w: number; h: number };
+type DecodedImage = { rgba: Uint8ClampedArray; w: number; h: number };
 
 const sourceCap = (target: number) =>
   Math.min(2048, Math.max(1024, target * 8));

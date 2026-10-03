@@ -3,7 +3,7 @@
  * /patch-notes shows one release at a time, the newest unless another is
  * picked. Add a new entry at the top with each release.
  */
-export type PatchNote = {
+type PatchNote = {
   /** "0.1"; also the page's ?v= value. */
   version: string;
   /** ISO date of the release. */
