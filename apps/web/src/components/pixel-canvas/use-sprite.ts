@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
+import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
@@ -70,6 +71,7 @@ type Snapshot = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  colorMode: ColorMode;
 };
 
 /**
@@ -107,6 +109,9 @@ export function useSprite(
   const [frames, setFrames] = useState(initial.frames);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
+  const [colorMode, setColorModeState] = useState<ColorMode>(
+    initial.colorMode ?? "rgb",
+  );
   const [layerId, setLayerIdState] = useState(() =>
     kept && layerTree.findLayer(initial.layers, kept.layerId)
       ? kept.layerId
@@ -143,6 +148,7 @@ export function useSprite(
         cels: initial.cels,
         palette: initial.palette,
         slices: initial.slices,
+        colorMode: initial.colorMode ?? "rgb",
       }),
   );
 
@@ -205,8 +211,32 @@ export function useSprite(
       size?: Size;
       palette?: string[];
       slices?: Slice[];
+      colorMode?: ColorMode;
+      /** Colours to turn into others first, on an indexed tile (see inColorMode). */
+      recolor?: ReadonlyMap<string, string>;
     } = {},
   ) => {
+    // In indexed and grayscale modes, what was drawn is brought into the mode.
+    const mode = next.colorMode ?? colorMode;
+    if (mode !== "rgb")
+      for (const canvas of changed.current) {
+        const ctx = contextOf(canvas);
+        if (!ctx) continue;
+        const { width, height } = canvas;
+        const out = inColorMode(
+          ctx.getImageData(0, 0, width, height).data,
+          mode,
+          next.palette ?? palette,
+          next.recolor,
+        );
+        if (!out) continue;
+        ctx.putImageData(
+          new ImageData(out as Uint8ClampedArray<ArrayBuffer>, width, height),
+          0,
+          0,
+        );
+        cels.invalidate(canvas);
+      }
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
       frames: next.frames ?? frames,
@@ -214,6 +244,7 @@ export function useSprite(
       cels: new Map(),
       palette: next.palette ?? palette,
       slices: next.slices ?? slices,
+      colorMode: mode,
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
@@ -328,6 +359,7 @@ export function useSprite(
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
+    setColorModeState(snapshot.colorMode);
     if (!layerTree.findLayer(snapshot.tree, layerId))
       setLayerIdState(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
     if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
@@ -633,10 +665,36 @@ export function useSprite(
     finish({ slices: next });
   };
 
-  /** Changes the tile's palette, as one undo step. */
-  const setPalette = (next: string[]) => {
+  /** Marks every cel as changed, so finishing brings them all into the colour mode. */
+  const touchAll = () => {
+    for (const { canvas } of cels.list()) changed.current.add(canvas);
+  };
+
+  /**
+   * Changes the tile's palette, as one undo step. On an indexed tile the
+   * pixels follow: `recolor` turns colours into others (a colour edited in
+   * the palette, or a palette loaded over the old one), and colours no
+   * longer in the palette become the nearest one left.
+   */
+  const setPalette = (
+    next: string[],
+    recolor?: ReadonlyMap<string, string>,
+  ) => {
+    if (colorMode === "indexed") touchAll();
     setPaletteState(next);
-    finish({ palette: next });
+    finish({ palette: next, recolor });
+  };
+
+  /**
+   * Switches the colour mode, as one undo step. To indexed, every pixel
+   * becomes the nearest palette colour; to grayscale, its grey. Back to RGB
+   * changes no pixels.
+   */
+  const setColorMode = (mode: ColorMode) => {
+    if (mode === colorMode) return;
+    if (mode !== "rgb") touchAll();
+    setColorModeState(mode);
+    finish({ colorMode: mode });
   };
 
   return {
@@ -648,6 +706,8 @@ export function useSprite(
     background,
     palette,
     setPalette,
+    colorMode,
+    setColorMode,
     slices,
     setSlices,
     layerId,
@@ -715,6 +775,7 @@ export function useSprite(
       background,
       palette,
       slices,
+      colorMode,
       layers: tree,
       frames,
       cels: new Map(

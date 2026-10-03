@@ -1,5 +1,6 @@
 import { deflateSync, inflateSync } from "fflate";
 import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
+import { readColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { readSlices, type Slice } from "@/lib/slices/slices";
 import { flatten } from "@/lib/layers/composite";
@@ -30,7 +31,8 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …],
  *   "palette": ["#1d2b53", …],
  *   "slices": [{ "id": "…", "name": "door", "bounds": { "x": 0, "y": 0, "w": 8, "h": 8 },
- *     "center": { "x": 2, "y": 2, "w": 4, "h": 4 } | null, "pivot": { "x": 4, "y": 7 } | null }]
+ *     "center": { "x": 2, "y": 2, "w": 4, "h": 4 } | null, "pivot": { "x": 4, "y": 7 } | null }],
+ *   "colorMode": "indexed"
  * }
  *
  * `frames` are the animation in playing order, each shown for `duration`
@@ -45,7 +47,9 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * Background layer. `palette` is the tile's colours to paint from, as
  * `#rrggbb`, at most 256. `slices` are named parts of the tile, the same in
  * every frame, with `center` (the 9-slice centre) and `pivot` relative to
- * their `bounds`.
+ * their `bounds`. `colorMode` (optional, "rgb" when missing) is "indexed"
+ * when every pixel is a palette colour, or "grayscale"; pixels are stored as
+ * colours in every mode, so an older reader that ignores it opens the tile.
  *
  * Version 5 was the same without slices.
  * Version 4 was the same without a palette (a tile gets the default one).
@@ -92,6 +96,8 @@ export type PigxelDocument = {
   palette: string[];
   /** Named parts of the tile, for exporting and game engines. */
   slices: Slice[];
+  /** Which colours the pixels may have; RGB (any) when missing. */
+  colorMode?: ColorMode;
 };
 
 /**
@@ -199,6 +205,8 @@ export function serializePigxel(doc: PigxelDocument): string {
     cels,
     palette: doc.palette,
     slices: doc.slices,
+    ...(doc.colorMode &&
+      doc.colorMode !== "rgb" && { colorMode: doc.colorMode }),
   });
 }
 
@@ -282,6 +290,7 @@ export function parsePigxel(text: string): PigxelDocument {
     cels,
     palette,
     slices,
+    colorMode: readColorMode(file.colorMode),
   };
 }
 

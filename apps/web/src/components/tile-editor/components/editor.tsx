@@ -43,6 +43,7 @@ import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
+import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import {
   readDraft,
@@ -201,6 +202,7 @@ export function Editor({
           cels: now.cels,
           palette: now.palette,
           slices: now.slices,
+          colorMode: now.colorMode,
         },
         scale: latestScale.current,
         savedAt: saved.savedAt,
@@ -460,6 +462,14 @@ export function Editor({
     sprite.transformAll(t);
   };
   const tileMenu: MenuSections = [
+    // Indexed: only palette colours; Grayscale: only greys.
+    COLOR_MODES.map(({ value, label }) => ({
+      label: check(sprite.colorMode === value, label),
+      onSelect: () => {
+        selection.deselect();
+        sprite.setColorMode(value);
+      },
+    })),
     [
       { label: "Canvas size…", onSelect: () => setResizing(true) },
       { label: "Sprite size…", onSelect: () => setScaling(true) },
@@ -732,7 +742,26 @@ export function Editor({
           pen={pen}
           onChange={setPen}
           palette={sprite.palette}
-          onPaletteChange={sprite.setPalette}
+          colorMode={sprite.colorMode}
+          onPaletteChange={(next, change) => {
+            const edited = change?.edited;
+            sprite.setPalette(
+              next,
+              edited
+                ? new Map([[edited.from, edited.to]])
+                : change?.loaded
+                  ? recolorByPlace(sprite.palette, next)
+                  : undefined,
+            );
+            // The pen keeps painting with the colour it had, now changed.
+            if (edited)
+              setPen((p) => ({
+                ...p,
+                color: p.color === edited.from ? edited.to : p.color,
+                secondary:
+                  p.secondary === edited.from ? edited.to : p.secondary,
+              }));
+          }}
           frameColors={() => colorsOf(sprite.composite(["reference"]))}
           fileName={file.name}
         />
