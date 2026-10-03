@@ -1,21 +1,5 @@
 import type { Slice } from "@/lib/slices/slices";
 
-/**
- * Sprite size, as Aseprite's Sprite › Sprite Size: the whole tile (every
- * layer and frame) scaled to a new size, unlike Canvas size, which only
- * adds or cuts space.
- */
-
-/**
- * How pixels are scaled:
- * - nearest: each new pixel takes the nearest old one. Crisp; best for whole
- *   multiples (2×, ½×).
- * - bilinear: blends the four nearest old pixels. Smooth, but adds new
- *   in-between colours and soft edges.
- * - rotsprite: smooths the stair-steps of diagonal lines and curves without
- *   adding colours (the RotSprite algorithm: Scale2x three times, then the
- *   nearest pixel). Best for odd factors like 1.5×.
- */
 export type ScaleMethod = "nearest" | "bilinear" | "rotsprite";
 
 export const SCALE_METHODS: { value: ScaleMethod; label: string }[] = [
@@ -26,7 +10,6 @@ export const SCALE_METHODS: { value: ScaleMethod; label: string }[] = [
 
 type Picture = { rgba: Uint8ClampedArray; w: number; h: number };
 
-/** `picture` scaled to `w × h` by `method`. */
 export function scalePicture(
   picture: Picture,
   w: number,
@@ -60,7 +43,6 @@ function nearest(picture: Picture, w: number, h: number) {
   return out;
 }
 
-/** Blends with premultiplied alpha, so clear pixels don't darken the edges. */
 function bilinear(picture: Picture, w: number, h: number) {
   const { rgba } = picture;
   const out = new Uint8ClampedArray(w * h * 4);
@@ -105,12 +87,7 @@ function bilinear(picture: Picture, w: number, h: number) {
   return out;
 }
 
-/**
- * Scale2x (EPX): each pixel becomes 2 × 2, its corners taking a neighbour's
- * colour where two neighbours agree, which rounds off stair-steps.
- */
 export function scale2x({ rgba, w, h }: Picture): Picture {
-  // A copy, so its bytes line up as whole pixels.
   const px = new Uint32Array(new Uint8ClampedArray(rgba).buffer);
   const get = (x: number, y: number) =>
     px[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))]!;
@@ -131,7 +108,6 @@ export function scale2x({ rgba, w, h }: Picture): Picture {
   return { rgba: new Uint8ClampedArray(out.buffer), w: w * 2, h: h * 2 };
 }
 
-/** The size of a `w × h` tile scaled to `percent`, at least 1 px a side. */
 export function sizeAtPercent(w: number, h: number, percent: number) {
   return {
     w: Math.max(1, Math.round((w * percent) / 100)),
@@ -139,7 +115,6 @@ export function sizeAtPercent(w: number, h: number, percent: number) {
   };
 }
 
-/** Slices scaled with the tile, from `w × h` to `next`; ones that shrink to nothing go. */
 export function scaledSlices(
   slices: Slice[],
   from: { w: number; h: number },

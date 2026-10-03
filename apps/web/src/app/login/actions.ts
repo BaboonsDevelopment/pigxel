@@ -51,7 +51,6 @@ export async function authenticate(
         return reply({
           error: "We couldn’t send the email. Please try again later.",
         });
-      // The same response for missing/existing accounts avoids account enumeration.
       return reply({
         message:
           "If an account exists for this email, you’ll receive a password reset link.",
@@ -80,7 +79,6 @@ export async function authenticate(
             "We couldn’t create your account. Please try again later, or log in if you already have an account.",
         });
       }
-      // Signup signs the user in directly; Supabase must have email confirmation disabled.
       if (!data.session)
         return reply({
           error:
@@ -113,6 +111,5 @@ export async function signOut(): Promise<AuthState> {
     return { error: "Unable to sign out. Please try again." };
   }
   revalidatePath("/", "layout");
-  // Back to the landing page, the front door for signed-out visitors.
   redirect("/");
 }

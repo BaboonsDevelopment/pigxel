@@ -20,12 +20,10 @@ import type {
   Rect,
 } from "./types";
 
-/** Wraps a subject description in the pixel-art style rules for a grid size. */
 export function buildImagePrompt(
   subject: string,
   width: number,
   height: number,
-  /** Whether pictures to draw from come with the prompt. */
   withReferences = false,
 ): string {
   return [
@@ -36,13 +34,11 @@ export function buildImagePrompt(
   ].join(" ");
 }
 
-/** How far a frame shape is from `width × height`, on a log scale. */
 function ratioDistance(ratio: string, width: number, height: number) {
   const [w = 1, h = 1] = ratio.split(":").map(Number);
   return Math.abs(Math.log(w / h) - Math.log(width / height));
 }
 
-/** The supported frame shape closest to `width × height`. */
 export function closestAspectRatio(width: number, height: number): string {
   return ASPECT_RATIOS.reduce((best, r) =>
     ratioDistance(r, width, height) < ratioDistance(best, width, height)
@@ -51,7 +47,6 @@ export function closestAspectRatio(width: number, height: number): string {
   );
 }
 
-/** Asks for a spot on a `width × height` tile where `subject` fits the scene. */
 export function buildComposePrompt(
   subject: string,
   width: number,
@@ -68,7 +63,6 @@ export function buildComposePrompt(
   ].join(" ");
 }
 
-/** Keeps a rectangle inside a `width × height` tile, at least 1×1. */
 export function clampRect(rect: Rect, width: number, height: number): Rect {
   const int = (n: number) => (Number.isFinite(n) ? Math.round(n) : 0);
   const x = Math.max(0, Math.min(width - 1, int(rect.x)));
@@ -81,7 +75,6 @@ export function clampRect(rect: Rect, width: number, height: number): Rect {
   };
 }
 
-/** The system prompt for precise edits, with the table of operations. */
 export function buildEditSystemPrompt(): string {
   const table = OPS.map((op) => `  ${op.syntax.padEnd(30)} ${op.doc}`).join(
     "\n",
@@ -108,16 +101,10 @@ ${EDIT_CRAFT_RULES}
 ${rules}`;
 }
 
-/** The user turn of a precise edit: the grid plus the request. */
 export function buildEditUserMessage(grid: string, request: string): string {
   return `<tile>\n${grid}\n</tile>\n<request>${request}</request>`;
 }
 
-/**
- * Asks the image model to redraw a picture of the edited object for the
- * target grid. It gets the same pixel style and background rules as a new
- * picture, so the result goes through the same pipeline into pixels.
- */
 export function buildRedrawPrompt(
   instruction: string,
   width: number,
@@ -134,7 +121,6 @@ export function buildRedrawPrompt(
 
 const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
 
-/** Numbered object boxes for a prompt, each with the layer it is on. */
 function objectList(objects: Rect[], layers: string[]) {
   if (!objects.length) return "(nothing drawn)";
   return objects
@@ -145,13 +131,11 @@ function objectList(objects: Rect[], layers: string[]) {
     .join("\n");
 }
 
-/** Asks the planner how to carry out an edit on the tile shown in the picture. */
 export function buildPlanPrompt(args: {
   request: string;
   width: number;
   height: number;
   objects: Rect[];
-  /** The name of the layer each object is on. */
   layers: string[];
   selection: Rect | null;
 }): string {
@@ -167,7 +151,6 @@ export function buildPlanPrompt(args: {
   ].join("\n\n");
 }
 
-/** Asks the placement planner where new pictures go on the tile shown. */
 export function buildPlacementPrompt(args: {
   subject: string;
   where: string;
@@ -175,9 +158,7 @@ export function buildPlacementPrompt(args: {
   width: number;
   height: number;
   objects: Rect[];
-  /** The name of the layer each object is on. */
   layers: string[];
-  /** Recent turns, so "5 more apples" is tied to the apple drawn before. */
   recent: ChatMessage[];
 }): string {
   const objects = objectList(args.objects, args.layers);
@@ -192,16 +173,8 @@ export function buildPlacementPrompt(args: {
   ].join("\n\n");
 }
 
-// ── Animations ──────────────────────────────────────────────────────────────
-
-/** How a sprite sheet is laid out: `cols × rows` cells, read row by row. */
 export type SheetLayout = { cols: number; rows: number; aspectRatio: string };
 
-/**
- * The grid for `count` cells of `cellW × cellH` whose overall shape comes
- * closest to a frame shape the image model can draw; fewer empty cells win
- * a tie.
- */
 export function sheetLayout(
   count: number,
   cellW: number,
@@ -221,13 +194,6 @@ export function sheetLayout(
   return { cols, rows, aspectRatio };
 }
 
-/**
- * Asks the image model to change every frame of an animation at once: the
- * picture sent along is the frames as a sprite sheet laid out by `layout`.
- * One picture keeps the changed subject the same in every frame, which
- * frames redrawn one by one never are. Frame 1 sets the look: the others
- * follow it, as the model otherwise keeps differences already there.
- */
 export function buildSheetRedrawPrompt(args: {
   instruction: string;
   count: number;
@@ -253,11 +219,6 @@ export function buildSheetRedrawPrompt(args: {
     .join(" ");
 }
 
-/**
- * Asks the image model for several different things in one picture, one per
- * cell of a sheet, so they come out in one style and to one scale; each is
- * cut out into a layer of its own.
- */
 export function buildSetPrompt(args: {
   subjects: string[];
   cellW: number;
@@ -287,11 +248,6 @@ export function buildSetPrompt(args: {
     .join(" ");
 }
 
-/**
- * Asks the image model for a sprite sheet: the same subject in every cell,
- * one pose per cell. With `fromReference`, the picture sent along shows the
- * subject, whose look must be kept.
- */
 export function buildSheetPrompt(args: {
   subject: string;
   poses: string[];
@@ -301,8 +257,6 @@ export function buildSheetPrompt(args: {
   fromReference: boolean;
 }): string {
   const { cols, rows } = args.layout;
-  // Every frame gets its cell by name: models told only "left to right" still
-  // fill sheets column by column now and then.
   const frames = args.poses
     .map(
       (pose, i) =>
@@ -328,14 +282,11 @@ export function buildSheetPrompt(args: {
     .join(" ");
 }
 
-/** Asks the animation planner to plan `request` on the tile shown. */
 export function buildAnimationPrompt(args: {
   request: string;
   width: number;
   height: number;
-  /** Drawn layers, with the box of what is drawn in the current frame. */
   layers: { name: string; box: Rect | null }[];
-  /** Separate drawn things in the current frame, and the layer each is on. */
   objects: Rect[];
   objectLayers: string[];
   frames: number;
@@ -358,7 +309,6 @@ export function buildAnimationPrompt(args: {
   ].join("\n\n");
 }
 
-/** Asks the checker whether an edit came out right (see EDIT_REVIEW_RULES). */
 export function buildEditReviewPrompt(request: string, instruction: string) {
   return [
     `REQUEST: ${request}`,
@@ -367,12 +317,6 @@ export function buildEditReviewPrompt(request: string, instruction: string) {
   ].join("\n\n");
 }
 
-/**
- * Turns the planner's answer into a plan that fits the tile: frame count and
- * duration in range, the box inside the tile, one pose per frame, and one
- * track (the whole animation is one layer) with something to show.
- * `asked` is the frame count the user asked for (0 when they did not).
- */
 export function clampAnimationPlan(
   reply: Partial<AnimationReply>,
   width: number,

@@ -1,7 +1,3 @@
-/**
- * Pale pixels scattered behind Home, some drifting gently. Positions are
- * fixed so the server and the browser draw the same thing.
- */
 const PIXELS: {
   top: string;
   left: string;

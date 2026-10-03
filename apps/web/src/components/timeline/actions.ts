@@ -6,29 +6,21 @@ import { frameIndex } from "@/lib/sprite/frames";
 import { pickImageFile } from "./helpers";
 import type { Playback } from "./use-playback";
 
-/** Asks for a picture and adds it as a reference layer, fitted to the tile. */
 async function addReference(sprite: SpriteApi) {
   const file = await pickImageFile();
   if (!file) return;
   const { w, h } = sprite.size;
   const pixels = await fitImageToTile(file, w, h);
-  // A picture to trace belongs to every frame.
   sprite.addLayer("reference", {
     cels: new Map(sprite.frames.map((frame) => [frame.id, pixels])),
   });
 }
 
-/**
- * Everything that can be done with the active layer: the Layer menu at the
- * top and a layer's right-click menu. `rename` is given where the name can
- * be edited in place.
- */
 export function layerActions(
   sprite: SpriteApi,
   rename?: () => void,
 ): MenuSections {
   const { activeLayer: layer, layerId } = sprite;
-  // Where the layer goes when taken out of its group: right above the group.
   const outside = placeOutside(sprite.tree, layerId);
   return [
     [
@@ -79,7 +71,6 @@ export function layerActions(
   ];
 }
 
-/** Everything that can be done with the active frame: the Frame menu and a frame's right-click menu. */
 export function frameActions(
   sprite: SpriteApi,
   playback: Playback,

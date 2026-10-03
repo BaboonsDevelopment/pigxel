@@ -1,13 +1,3 @@
-/**
- * How the editor's panels are laid out, kept per person in this browser, as
- * in Visual Studio: docks along the window's left and right edges, under
- * the canvas, and beside the canvas only (above the bottom dock, so it
- * keeps its width), each a row of stacks side by side, each stack panels one above the
- * other. Panels are moved between stacks and docks, folded, closed and
- * sized; the layout also keeps which tools the tool panel shows and the
- * tool each tool group last showed.
- */
-
 export const PANELS = [
   "tools",
   "colors",
@@ -25,7 +15,6 @@ const DOCKS: DockSide[] = [
   "innerRight",
 ];
 
-/** Whether a dock's stacks have their sizer on the right (it sits on the left of what it borders). */
 export const onLeft = (side: DockSide) =>
   side === "left" || side === "innerLeft";
 
@@ -37,34 +26,22 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   timeline: "Timeline",
 };
 
-/** Sizes in screen pixels. A side stack's width; the bottom dock's height. */
 export const STACK_WIDTH = { initial: 240, min: 64, max: 640 };
 export const BOTTOM_HEIGHT = { initial: 224, min: 96, max: 640 };
-/** The least a panel's body gets when stacks are resized. */
 export const MIN_PANEL = 56;
 
-/**
- * Panels one above another. `weights` share the stack's height between its
- * panels (folded ones take only their title bar). `size` is its width in
- * pixels in a side dock, and its share of the width in the bottom dock.
- */
 type Stack = { panels: PanelId[]; weights: number[]; size: number };
 
 export type Dock = {
   stacks: Stack[];
-  /** The bottom dock's height in pixels; unused for the sides. */
   size: number;
 };
 
 export type Layout = {
   docks: Record<DockSide, Dock>;
-  /** Folded to their title bar. */
   collapsed: PanelId[];
-  /** Closed; Window brings them back. */
   hidden: PanelId[];
-  /** Tools left off the tool panel; their shortcuts and menus still work. */
   hiddenTools: string[];
-  /** The tool each group's button shows, by group id. */
   groupTools: Record<string, string>;
 };
 
@@ -91,7 +68,6 @@ export const DEFAULT_LAYOUT: Layout = {
   groupTools: {},
 };
 
-/** Where each panel goes when a stored layout has lost it. */
 const HOME: Record<PanelId, DockSide> = {
   tools: "left",
   colors: "left",
@@ -110,12 +86,6 @@ const stringList = (v: unknown): string[] =>
 const panelList = (v: unknown): PanelId[] =>
   Array.isArray(v) ? [...new Set(v.filter(isPanel))] : [];
 
-/**
- * A layout from storage, made safe: unknown panels and empty stacks are
- * dropped, a panel listed twice keeps its first place, sizes are kept in
- * range, and a panel missing everywhere goes back to its home dock, so a
- * newer or broken layout never loses one.
- */
 export function readLayout(raw: unknown): Layout {
   if (typeof raw !== "object" || raw === null) return DEFAULT_LAYOUT;
   const v = raw as Record<string, unknown>;
@@ -181,7 +151,6 @@ export function readLayout(raw: unknown): Layout {
   return layout;
 }
 
-/** Where a dragged panel lands, next to another panel or at a dock's edge. */
 export type PanelTarget =
   | {
       kind: "panel";
@@ -200,7 +169,6 @@ const withDock = (layout: Layout, side: DockSide, dock: Dock): Layout => ({
   docks: { ...layout.docks, [side]: dock },
 });
 
-/** `layout` without `id` anywhere; a stack left empty goes. */
 function withoutPanel(layout: Layout, id: PanelId): Layout {
   let out = layout;
   for (const side of DOCKS) {
@@ -219,7 +187,6 @@ function withoutPanel(layout: Layout, id: PanelId): Layout {
   return out;
 }
 
-/** A new stack of just `id` at the start or end of a dock. */
 function placeAtEdge(
   layout: Layout,
   id: PanelId,
@@ -233,11 +200,6 @@ function placeAtEdge(
   return withDock(layout, side, { ...dock, stacks });
 }
 
-/**
- * Moves `id` to `target`: above or below another panel (into its stack, with
- * an even share of the height), left or right of it (a new stack beside its
- * stack), or a new stack at a dock's edge. A closed panel is shown again.
- */
 export function movePanel(
   layout: Layout,
   id: PanelId,
@@ -264,8 +226,6 @@ export function movePanel(
     weights.splice(at, 0, share);
     stacks[index] = { ...host, panels, weights };
   } else {
-    // Beside it: a side stack starts at the usual width; a bottom one
-    // shares the width with its neighbour.
     const size = side === "bottom" ? host.size / 2 : STACK_WIDTH.initial;
     if (side === "bottom") stacks[index] = { ...host, size: host.size / 2 };
     stacks.splice(
@@ -281,12 +241,10 @@ const without = <T>(list: T[], item: T) => list.filter((x) => x !== item);
 const toggled = <T>(list: T[], item: T, on: boolean) =>
   on ? (list.includes(item) ? list : [...list, item]) : without(list, item);
 
-/** Shows or closes a panel. */
 export function setPanelShown(layout: Layout, id: PanelId, shown: boolean) {
   return { ...layout, hidden: toggled(layout.hidden, id, !shown) };
 }
 
-/** Folds a panel to its title bar, or opens it again. */
 export function setPanelCollapsed(
   layout: Layout,
   id: PanelId,
@@ -295,12 +253,10 @@ export function setPanelCollapsed(
   return { ...layout, collapsed: toggled(layout.collapsed, id, collapsed) };
 }
 
-/** Shows or leaves out a tool on the tool panel. */
 export function setToolShown(layout: Layout, tool: string, shown: boolean) {
   return { ...layout, hiddenTools: toggled(layout.hiddenTools, tool, !shown) };
 }
 
-/** Changes one stack: its weights, its size. */
 export function updateStack(
   layout: Layout,
   side: DockSide,
@@ -323,7 +279,6 @@ export function updateStack(
   return withDock(layout, side, { ...dock, stacks });
 }
 
-/** The bottom dock's height. */
 export function setBottomHeight(layout: Layout, height: number): Layout {
   return withDock(layout, "bottom", {
     ...layout.docks.bottom,
@@ -331,11 +286,6 @@ export function setBottomHeight(layout: Layout, height: number): Layout {
   });
 }
 
-/**
- * The stacks a dock shows, with their place in the dock (`index`), each with
- * only its open panels, their weight and place in the stack; empty ones
- * are left out.
- */
 export function shownStacks(layout: Layout, side: DockSide) {
   return layout.docks[side].stacks.flatMap((s, index) => {
     const items = s.panels.flatMap((id, at) =>

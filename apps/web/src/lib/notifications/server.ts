@@ -7,14 +7,12 @@ import {
   type ProfileRow,
 } from "@/lib/profile/profile";
 
-/** Something to tell the person about; for now, a new follower. */
 export type AppNotification = {
   id: string;
   kind: "follow";
   name: string;
   username: string;
   avatarUrl: string | null;
-  /** "5 minutes ago". */
   ago: string;
   unread: boolean;
 };
@@ -31,7 +29,6 @@ async function seenAt(userId: string) {
   return data?.notifications_seen_at ?? null;
 }
 
-/** How many notifications came in since the person last opened the bell. */
 export async function countUnreadNotifications(
   userId: string,
 ): Promise<number> {
@@ -47,7 +44,6 @@ export async function countUnreadNotifications(
   return error ? 0 : (count ?? 0);
 }
 
-/** The latest notifications, newest first. */
 export async function listNotifications(
   userId: string,
 ): Promise<AppNotification[]> {
@@ -68,7 +64,6 @@ export async function listNotifications(
   return (
     data as unknown as { created_at: string; follower: ProfileRow | null }[]
   ).flatMap((row) => {
-    // Followers with private profiles stay out of sight.
     if (!row.follower) return [];
     const follower = toArtistProfile(row.follower);
     return [
@@ -102,7 +97,6 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["minute", 60_000],
 ];
 
-/** "3 hours ago", "yesterday", "just now". */
 export function timeAgo(then: number, now: number) {
   const elapsed = now - then;
   const format = new Intl.RelativeTimeFormat("en", { numeric: "auto" });

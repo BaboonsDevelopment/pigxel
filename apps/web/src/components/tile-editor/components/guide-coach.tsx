@@ -8,14 +8,8 @@ import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import type { GuideState, Tutorial } from "@/lib/tutorials/tutorials";
 import { useModifierLabel } from "../use-modifier-label";
 
-/** How long a finished step shows its tick before the next one. */
 const ADVANCE_MS = 900;
 
-/**
- * A tutorial's interactive guide over the editor: one step at a time, with
- * what it's about outlined on screen. A step that watches the editor ticks
- * off by itself once done and moves on; the rest wait for Next.
- */
 export function GuideCoach({
   tutorial,
   sprite,
@@ -24,13 +18,11 @@ export function GuideCoach({
 }: {
   tutorial: Tutorial;
   sprite: SpriteApi;
-  /** The editor's state apart from what the pixels tell. */
   editor: Omit<GuideState, "painted" | "framesDiffer">;
   onExit: () => void;
 }) {
   const state: GuideState = { ...editor, ...pixelState(sprite) };
   const [index, setIndex] = useState(0);
-  // The editor as it was when the step began.
   const [from, setFrom] = useState(state);
   const [hidden, setHidden] = useState(false);
   const mod = useModifierLabel();
@@ -38,7 +30,6 @@ export function GuideCoach({
   const step = steps[index];
 
   const done = !!step?.done?.(state, from);
-  // A step done already when it began waits for Next instead of skipping by.
   const doneAtStart = !!step?.done?.(from, from);
 
   const go = (to: number) => {
@@ -197,7 +188,6 @@ export function GuideCoach({
   );
 }
 
-/** What the guide learns from the pixels: how much is drawn, and whether the frames differ. */
 function pixelState(
   sprite: SpriteApi,
 ): Pick<GuideState, "painted" | "framesDiffer"> {
@@ -215,7 +205,6 @@ function pixelState(
   return { painted, framesDiffer };
 }
 
-/** A ring around what the step is about, following it as the layout moves. */
 function Spotlight({ selector }: { selector: string }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
 

@@ -12,10 +12,8 @@ import { PopularCard } from "./popular-card/popular-card";
 import { SignInBanner } from "./sign-in-banner";
 import styles from "./gallery.module.css";
 
-/** How far below the visible part the next arts start loading, so scrolling never waits. */
 const PRELOAD = "1500px";
 
-/** Popular arts that keep loading as you scroll, until there are no more. */
 export function PopularFeed({
   period,
   initial,
@@ -24,20 +22,15 @@ export function PopularFeed({
 }: {
   period: Period;
   initial: PublicTile[];
-  /** How many there are in all. */
   count: number;
-  /** Signed out: past the first arts, a bar asks them to sign in. */
   guest: boolean;
 }) {
   const [tiles, setTiles] = useState(initial);
   const [density, setDensity] = useState<"comfortable" | "compact">(
     "comfortable",
   );
-  // How many have been fetched; ahead of tiles.length when ranks shifted.
   const [offset, setOffset] = useState(initial.length);
   const [done, setDone] = useState(initial.length >= count);
-  // A guest who reaches the end gets the sign-in bar, and the page stops
-  // scrolling; closing it lets the next arts load, until the next end.
   const [banner, setBanner] = useState(false);
   const [allowed, setAllowed] = useState(!guest);
   const loading = useRef(false);
@@ -54,7 +47,6 @@ export function PopularFeed({
         if (!more.length || offset + more.length >= count) setDone(true);
         setOffset(offset + more.length);
         if (guest) setAllowed(false);
-        // Ranks shift as likes come in; an art already shown stays put.
         setTiles((all) => {
           const shown = new Set(all.map((t) => t.id));
           return [...all, ...more.filter((t) => !shown.has(t.id))];
@@ -71,7 +63,6 @@ export function PopularFeed({
       },
       {
         root: scrollParent(target),
-        // A guest's bar waits until they really reach the end.
         rootMargin: `0px 0px ${guest ? "0px" : PRELOAD} 0px`,
       },
     );
@@ -84,7 +75,6 @@ export function PopularFeed({
     const scroller = scrollParent(sentinel.current);
     const element = scroller ?? document.documentElement;
     const { overflowY, scrollbarGutter } = element.style;
-    // Keeps the scrollbar's room, so the arts don't jump sideways.
     element.style.scrollbarGutter = "stable";
     element.style.overflowY = "hidden";
     return () => {

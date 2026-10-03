@@ -10,17 +10,9 @@ import { applyOps, parseOps } from "@/lib/edit/ops";
 import { mergeRedraw } from "@/lib/edit/redraw";
 import { cropBitmap, opaqueBox, type Bitmap } from "@/lib/image/bitmap";
 
-/**
- * Pure changes to a cel (full-tile RGBA of `size`) that the AI flows make:
- * each takes the cel as it is and returns it changed, so the flows decide
- * which cels to change and write them all back as one undo step.
- */
-
-/** An empty cel. */
 export const emptyCel = (size: Size): Uint8ClampedArray =>
   new Uint8ClampedArray(size.w * size.h * 4);
 
-/** `cel` with `art` (an `area`-sized picture) painted where it is empty. */
 export const paint = (
   cel: Uint8ClampedArray,
   size: Size,
@@ -28,14 +20,9 @@ export const paint = (
   area: Area,
 ) => drawOnEmpty(cel, size.w, art, area);
 
-/** The box around what is drawn on a cel, or null when it is empty. */
 export const drawnBox = (cel: Uint8ClampedArray, size: Size): Area | null =>
   opaqueBox({ rgba: cel, ...size });
 
-/**
- * Pixels an edit of `area` may not change: neighbours reaching into it and
- * the objects the plan said to keep.
- */
 function protectedMask(
   cel: Uint8ClampedArray,
   size: Size,
@@ -47,10 +34,6 @@ function protectedMask(
   return mask;
 }
 
-/**
- * Runs a precise edit's operations inside `area`; drawings that only reach
- * into it (a neighbour's edge) and the objects in `keep` stay as they are.
- */
 export function applyEdit(
   cel: Uint8ClampedArray,
   size: Size,
@@ -64,7 +47,6 @@ export function applyEdit(
   return { cel: keepMasked(cel, result.pixels, mask), applied: result.applied };
 }
 
-/** Puts a redrawn picture of `area` back, changing only what differs. */
 export function applyRedraw(
   cel: Uint8ClampedArray,
   size: Size,
@@ -82,11 +64,6 @@ export function applyRedraw(
   return keepMasked(cel, after, protectedMask(cel, size, area, keep));
 }
 
-/**
- * Takes the drawings lying fully inside `source` off the cel and paints
- * `art` into `target` instead, never over other drawings: a redrawn object
- * that moved or changed size.
- */
 export function replaceObject(
   cel: Uint8ClampedArray,
   size: Size,
@@ -98,7 +75,6 @@ export function replaceObject(
   return paint(rest, size, art.rgba, target);
 }
 
-/** Moves the drawings inside `source` so its corner lands on `to`, pixel for pixel. */
 export function moveObject(
   cel: Uint8ClampedArray,
   size: Size,
@@ -111,7 +87,6 @@ export function moveObject(
   return paint(rest, size, lifted, { x, y, w: source.w, h: source.h });
 }
 
-/** Copies the drawings inside `source` into each of `targets`, on empty pixels. */
 export function copyObject(
   cel: Uint8ClampedArray,
   size: Size,
@@ -126,11 +101,6 @@ export function copyObject(
   );
 }
 
-/**
- * Where `area` goes when `source` is moved and resized into `target`: the
- * same shift and scale, kept inside the tile. Lets an edit planned on the
- * frame on screen carry over to the same drawing in other frames.
- */
 export function follow(
   area: Area,
   source: Area,
@@ -151,14 +121,12 @@ export function follow(
   };
 }
 
-/** Whether two cels hold exactly the same pixels. */
 export function samePixels(a: Uint8ClampedArray, b: Uint8ClampedArray) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-/** `area` grown by `margin` on every side, kept inside the tile. */
 export function grown(area: Area, margin: number, size: Size): Area {
   const x = Math.max(0, area.x - margin);
   const y = Math.max(0, area.y - margin);

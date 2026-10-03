@@ -7,21 +7,8 @@ import { RecentProjects } from "./recent-projects";
 import { StartCreating } from "./start-creating";
 import { Tutorials } from "./tutorials";
 
-/** How many recent projects Home shows before the "New project" card. */
 export const RECENT = 4;
 
-/**
- * Home: ways to start something new, the latest projects, then templates and
- * tutorials side by side.
- *
- * On wide screens it never scrolls and looks the same on every display: the
- * page is laid out at one design size (a 1290 × 726 area, what a MacBook's
- * browser has under the top bar) and zoomed as a whole, text included, to fit
- * the space it gets. The zoom is the smaller of the width and height ratios;
- * `tan(atan2(a, b))` is a / b as a plain number, which CSS can't divide
- * lengths into directly. Below 0.8 the text gets too small, so the page
- * scrolls instead.
- */
 export function HomeView({
   userId,
   cloudTiles,

@@ -9,7 +9,6 @@ import {
   type Slice,
 } from "@/lib/slices/slices";
 
-/** The picked slice's settings: its name, 9-slice border and pivot. */
 export function SliceOptions({
   slice,
   onChange,
@@ -20,7 +19,6 @@ export function SliceOptions({
   onDelete: () => void;
 }) {
   const { bounds } = slice;
-  // The widest border that still leaves a centre of at least one pixel.
   const maxBorder = Math.floor((Math.min(bounds.w, bounds.h) - 1) / 2);
   const border = borderOf(slice);
   const rename = (name: string) => {
@@ -40,7 +38,6 @@ export function SliceOptions({
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
       <label className="flex items-center gap-2">
         <span className="text-muted-foreground">Name</span>
-        {/* Saved when it loses focus or on Enter, as one undo step. */}
         <Input
           key={slice.id + slice.name}
           inputSize="sm"

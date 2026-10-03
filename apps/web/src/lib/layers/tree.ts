@@ -1,11 +1,6 @@
 import { DEFAULT_NAMES, MAX_OPACITY } from "./constants";
 import type { GroupLayer, Layer, LayerKind, Place } from "./types";
 
-/**
- * Pure operations on the layer tree. The tree is a list bottom to top where
- * groups hold their own list; every change returns a new tree.
- */
-
 type Found = { layer: Layer; parent: GroupLayer | null; index: number };
 
 export function findLayer(
@@ -23,21 +18,18 @@ export function findLayer(
   return null;
 }
 
-/** Every layer, groups and their contents, bottom to top. */
 export function allLayers(tree: Layer[]): Layer[] {
   return tree.flatMap((layer) =>
     layer.kind === "group" ? [layer, ...allLayers(layer.children)] : [layer],
   );
 }
 
-/** The ids of layers that hold pixels. */
 export function pixelLayerIds(tree: Layer[]): string[] {
   return allLayers(tree)
     .filter((layer) => layer.kind !== "group")
     .map((layer) => layer.id);
 }
 
-/** Rebuilds the tree with `change` applied to every layer. */
 function mapTree(tree: Layer[], change: (layer: Layer) => Layer): Layer[] {
   return tree.map((layer) => {
     const next = change(layer);
@@ -47,7 +39,6 @@ function mapTree(tree: Layer[], change: (layer: Layer) => Layer): Layer[] {
   });
 }
 
-/** Changes the settings of one layer; `kind` and `children` stay as they are. */
 export function updateLayer(
   tree: Layer[],
   id: string,
@@ -58,7 +49,6 @@ export function updateLayer(
   );
 }
 
-/** The tree without the layer (and, for a group, everything in it). */
 export function removeLayer(tree: Layer[], id: string): Layer[] {
   return tree
     .filter((layer) => layer.id !== id)
@@ -69,7 +59,6 @@ export function removeLayer(tree: Layer[], id: string): Layer[] {
     );
 }
 
-/** Lowest index a layer may take in a list: above the background, which stays first. */
 const lowestIndex = (list: Layer[]) => (list[0]?.kind === "background" ? 1 : 0);
 
 export function insertLayer(
@@ -92,7 +81,6 @@ export function insertLayer(
   );
 }
 
-/** True when `id` is `ancestorId` or somewhere inside it. */
 function isInside(tree: Layer[], id: string, ancestorId: string) {
   const ancestor = findLayer(tree, ancestorId)?.layer;
   return (
@@ -101,38 +89,29 @@ function isInside(tree: Layer[], id: string, ancestorId: string) {
   );
 }
 
-/**
- * Moves a layer to `place`, given in terms of the tree before the move. The
- * background never moves, and a group can't go inside itself.
- */
 export function moveLayer(tree: Layer[], id: string, place: Place): Layer[] {
   const found = findLayer(tree, id);
   if (!found || found.layer.kind === "background") return tree;
   if (place.parentId && isInside(tree, place.parentId, id)) return tree;
   const sameList = (found.parent?.id ?? null) === place.parentId;
-  // Taking the layer out shifts everything above it down by one.
   const index =
     sameList && found.index < place.index ? place.index - 1 : place.index;
   return insertLayer(removeLayer(tree, id), found.layer, { ...place, index });
 }
 
-/** The place right above a layer, in the same list; the top when there is none. */
 export function placeAbove(tree: Layer[], id: string | null): Place {
   const found = id ? findLayer(tree, id) : null;
   if (!found) return { parentId: null, index: tree.length };
   return { parentId: found.parent?.id ?? null, index: found.index + 1 };
 }
 
-/** The place right above a layer's group, for taking it out; null at the top level. */
 export function placeOutside(tree: Layer[], id: string): Place | null {
   const parent = findLayer(tree, id)?.parent;
   return parent ? placeAbove(tree, parent.id) : null;
 }
 
-/** A layer as the panel lists it, with where it sits in the tree. */
 export type PanelRow = { layer: Layer; depth: number } & Place;
 
-/** Layers as the panel lists them: top to bottom, indented, collapsed groups closed. */
 export function panelRows(
   tree: Layer[],
   depth = 0,
@@ -149,7 +128,6 @@ export function panelRows(
     ]);
 }
 
-/** The layer and the groups around it, innermost first. */
 function withAncestors(tree: Layer[], id: string): Layer[] {
   const found = findLayer(tree, id);
   if (!found) return [];
@@ -159,15 +137,12 @@ function withAncestors(tree: Layer[], id: string): Layer[] {
   ];
 }
 
-/** Hidden when the layer or any group around it is hidden. */
 export const isShown = (tree: Layer[], id: string) =>
   withAncestors(tree, id).every((layer) => layer.visible);
 
-/** Locked when the layer or any group around it is locked. */
 const isLocked = (tree: Layer[], id: string) =>
   withAncestors(tree, id).some((layer) => layer.locked);
 
-/** Whether the tools may draw on the layer: a shown, unlocked sheet of pixels. */
 export function canPaint(tree: Layer[], id: string | null) {
   const layer = id ? findLayer(tree, id)?.layer : undefined;
   return (
@@ -178,7 +153,6 @@ export function canPaint(tree: Layer[], id: string | null) {
   );
 }
 
-/** "Layer 3" after "Layer 1" and "Layer 2": one more than the highest number used. */
 export function nextName(tree: Layer[], kind: LayerKind): string {
   const base = DEFAULT_NAMES[kind];
   const used = allLayers(tree).map((layer) => {
@@ -188,7 +162,6 @@ export function nextName(tree: Layer[], kind: LayerKind): string {
   return `${base} ${Math.max(0, ...used) + 1}`;
 }
 
-/** A new layer with default settings; a group starts empty and open. */
 export function createLayer(kind: LayerKind, name: string): Layer {
   const base = {
     id: crypto.randomUUID(),

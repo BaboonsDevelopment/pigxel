@@ -23,7 +23,6 @@ import { sizeKey } from "../helpers";
 import { SliceOptions } from "./slice-options";
 import { TransformOptions } from "./transform-options";
 
-/** The settings of the selected tool, shown above the canvas, and the canvas-wide modes. */
 export function ToolOptions({
   tool,
   pen,
@@ -40,11 +39,9 @@ export function ToolOptions({
   pen: PenSettings;
   onChange: (pen: PenSettings) => void;
   selection: SelectionApi;
-  /** The picture brush, when one is in use. */
   stamp: Stamp | null;
   onClearStamp: () => void;
   onUseAsBrush: () => void;
-  /** The slice picked with the Slice tool, if any. */
   slice: Slice | null;
   onSliceChange: (slice: Slice) => void;
   onSliceDelete: () => void;
@@ -57,7 +54,6 @@ export function ToolOptions({
     tool === "polygonLasso" ||
     tool === "wand" ||
     tool === "move";
-  // The Move tool flips and turns the whole layer when nothing is selected.
   const transforms = selection.mask !== null || tool === "move";
   const inkTool = tool === "pen" || tool === "brush";
   const paints =
@@ -414,7 +410,6 @@ export function ToolOptions({
         <TransformOptions selection={selection} />
       )}
 
-      {/* How the tool works, shown on hover so the bar stays one row. */}
       <span className="group relative ml-auto">
         <span
           tabIndex={0}
@@ -434,7 +429,6 @@ export function ToolOptions({
   );
 }
 
-/** What each ink does, for its tooltip. */
 const INK_TITLES: Record<string, string> = {
   simple:
     "Paints the colour; a see-through colour lies over drawn pixels and goes on as it is where nothing is drawn",
@@ -482,7 +476,6 @@ const TRANSFORMS: {
 const PAINT_HINT =
   "Right button paints the secondary colour · Shift+click draws a line · Alt+click picks a colour · F3 onion skin";
 
-/** The picture brush, small, on a checkerboard. */
 function StampPreview({ stamp }: { stamp: Stamp }) {
   return (
     <canvas

@@ -22,7 +22,6 @@ describe("colour modes", () => {
     expect([...out!]).toEqual([
       ...[255, 0, 0, 255],
       ...[0, 0, 0, 255],
-      // Mostly see-through: clear.
       ...[0, 0, 0, 0],
     ]);
   });

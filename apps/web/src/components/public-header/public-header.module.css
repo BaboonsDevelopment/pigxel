@@ -1,5 +1,3 @@
-/* A compact floating pill, sized after Mobbin's header. */
-
 .header {
   --sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --ink: #141414;
@@ -13,7 +11,6 @@
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
-  /* Only the pill takes clicks, not the clear strip around it. */
   pointer-events: none;
 }
 
@@ -52,7 +49,6 @@
   transform: rotate(-8deg) translateY(-1px);
 }
 
-/* The app's name in its display face, as the sidebar sets it. */
 .wordmark {
   font:
     600 21px/1 var(--font-fredoka),
@@ -84,7 +80,6 @@
   text-underline-offset: 6px;
 }
 
-/* Folded away until the opening section scrolls past, then it grows in. */
 .join {
   display: inline-flex;
   align-items: center;

@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import mascot from "../../public/art/pigxel-mascot-sitting.png";
 
-/** Pigxel's mascot: the sitting pig the app's sidebar shows. */
 export function BrandMascot({
   className,
   priority,
@@ -22,7 +21,6 @@ export function BrandMascot({
   );
 }
 
-/** The mascot and the name, linking home. */
 export function Brand() {
   return (
     <Link

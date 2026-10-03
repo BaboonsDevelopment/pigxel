@@ -1,13 +1,8 @@
-/**
- * A tile card's hover state: a pixel grid, a few sparkles and a pill with
- * `label`. Put it in a `group` card over the picture.
- */
 export function HoverOverlay({
   label,
   force = false,
 }: {
   label: string;
-  /** Shows it without hovering, e.g. while the tile opens. */
   force?: boolean;
 }) {
   return (

@@ -4,29 +4,19 @@ import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { MAX_PIGXEL_SIZE } from "./format";
 import { pixelScale, unscaled } from "./import-image";
 
-/** How a sprite sheet is cut into frames, as Aseprite's Import Sprite Sheet asks. */
 export type SheetGrid = {
-  /** One frame's size, in pixels. */
   frameW: number;
   frameH: number;
-  /** Where the first frame starts. */
   offsetX: number;
   offsetY: number;
-  /** Empty space between frames. */
   gapX: number;
   gapY: number;
-  /** Leaves out cells with nothing drawn, e.g. the end of the last row. */
   skipEmpty: boolean;
-  /** How long each frame shows, in milliseconds. */
   duration: number;
 };
 
 export type Picture = { rgba: Uint8ClampedArray; w: number; h: number };
 
-/**
- * The sheet at its own size: a sheet exported enlarged (Scale 4× makes every
- * pixel a 4 × 4 block) comes back to one pixel per pixel; `scale` says by how much.
- */
 export function nativeSheet(picture: Picture): {
   picture: Picture;
   scale: number;
@@ -44,16 +34,10 @@ export function nativeSheet(picture: Picture): {
   };
 }
 
-/**
- * How different the sheet is from itself moved `shift` pixels along it
- * (across for a row of frames, down for a column), on average per pixel.
- * Moved by one frame, an animation lands on frames that look alike.
- */
 function shiftDifference(picture: Picture, shift: number, across: boolean) {
   const { rgba, w, h } = picture;
   const [spanX, spanY] = across ? [w - shift, h] : [w, h - shift];
   if (spanX < 1 || spanY < 1) return Infinity;
-  // Big sheets are sampled, every few pixels.
   const step = Math.max(1, Math.floor(Math.sqrt((spanX * spanY) / 65536)));
   const offset = (across ? shift : shift * w) * 4;
   let total = 0;
@@ -68,14 +52,6 @@ function shiftDifference(picture: Picture, shift: number, across: boolean) {
   return total / pixels;
 }
 
-/**
- * The frame size along one direction of the sheet (across or down), or
- * null when the sheet doesn't repeat that way. A size that divides the
- * sheet evenly counts when the sheet moved by it looks much more like itself
- * than moved by half of it: true for the real frame size, not for its
- * multiples (moved by half of those, it also matches) or for a picture that
- * isn't a sheet. The most alike of those wins.
- */
 function repeatSize(picture: Picture, across: boolean): number | null {
   const length = across ? picture.w : picture.h;
   let best: { size: number; score: number } | null = null;
@@ -89,11 +65,6 @@ function repeatSize(picture: Picture, across: boolean): number | null {
   return best?.size ?? null;
 }
 
-/**
- * A first guess at a sheet's grid: frames in a row, a column or a grid,
- * found by how the sheet repeats across and down (see repeatSize). Where it
- * doesn't repeat, a frame is as wide or as tall as the whole picture.
- */
 export function guessSheetGrid(picture: Picture): SheetGrid {
   const { w, h } = picture;
   const frame = {
@@ -112,7 +83,6 @@ export function guessSheetGrid(picture: Picture): SheetGrid {
   };
 }
 
-/** What is wrong with a grid for a picture of `w × h`, or null when it can be cut. */
 export function sheetGridProblem(grid: SheetGrid, w: number, h: number) {
   if (grid.frameW < 1 || grid.frameH < 1)
     return "A frame must be at least 1 × 1 px.";
@@ -123,7 +93,6 @@ export function sheetGridProblem(grid: SheetGrid, w: number, h: number) {
   return null;
 }
 
-/** Where each whole frame is on the sheet, row by row. */
 export function sheetCells(grid: SheetGrid, w: number, h: number): Rect[] {
   const { frameW, frameH, offsetX, offsetY, gapX, gapY } = grid;
   if (frameW < 1 || frameH < 1) return [];
@@ -134,7 +103,6 @@ export function sheetCells(grid: SheetGrid, w: number, h: number): Rect[] {
   return cells;
 }
 
-/** The sheet cut into frames, row by row, each shown for the grid's duration. */
 export function cutSheet(picture: Picture, grid: SheetGrid): DecodedAnimation {
   const frames = sheetCells(grid, picture.w, picture.h).flatMap((cell) => {
     const rgba = new Uint8ClampedArray(cell.w * cell.h * 4);

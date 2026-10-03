@@ -17,19 +17,10 @@ import { safeFileBase } from "@/lib/pigxel-file/format";
 
 import { swatchProps, withColor } from "./helpers";
 
-/** How the palette changed, for an indexed tile's pixels to follow. */
 type PaletteChange = {
-  /** One colour changed to another in place. */
   edited?: { from: string; to: string };
-  /** A whole palette loaded over the old one (a preset or a file). */
   loaded?: boolean;
 };
-/**
- * The tile's palette: swatches to paint from (click: primary, right-click:
- * secondary), dragged into another order or double-clicked to change their
- * colour (on an indexed tile, everywhere it is drawn); + and − add or take
- * out the primary colour; Load… brings presets, files and the frame's colours.
- */
 export function PalettePanel({
   pen,
   onChange,
@@ -44,22 +35,18 @@ export function PalettePanel({
   palette: string[];
   onPaletteChange: (palette: string[], change?: PaletteChange) => void;
   colorMode: ColorMode;
-  /** The colours the frame on screen uses, for a palette made from it. */
   frameColors: () => string[];
-  /** The tile's name, for the palette file saved from it. */
   fileName: string;
 }) {
   const [dragged, setDragged] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  // The colour picker for the swatch being changed, and which one it is.
   const editInput = useRef<HTMLInputElement>(null);
   const editing = useRef<string | null>(null);
   const latest = useRef({ palette, onPaletteChange });
   useEffect(() => {
     latest.current = { palette, onPaletteChange };
   });
-  // Applied once the picker closes ("change"), not on every step of a drag.
   useEffect(() => {
     const input = editInput.current;
     if (!input) return;
@@ -69,7 +56,6 @@ export function PalettePanel({
       const { palette, onPaletteChange } = latest.current;
       editing.current = null;
       if (!from || from === to) return;
-      // A colour already in the palette merges the two.
       const next = palette.includes(to)
         ? palette.filter((c) => c !== from)
         : palette.map((c) => (c === from ? to : c));
@@ -86,7 +72,6 @@ export function PalettePanel({
     input.click();
   };
 
-  /** Loads a palette file (.gpl, .hex, .txt) or the colours of a picture. */
   const importFile = async (chosen: File | undefined) => {
     if (!chosen) return;
     setProblem(null);

@@ -14,7 +14,6 @@ import {
 } from "@pigxel/ui/components/typography";
 import type { FileItem, Listing } from "../constants";
 
-/** A list of saved tiles in one place (Pigxel cloud or Google Drive) to pick one to open. */
 export function FilesDialog({
   title,
   subtitle,
@@ -26,10 +25,8 @@ export function FilesDialog({
 }: {
   title: string;
   subtitle?: string | null;
-  /** Shown when there is nothing to open yet. */
   empty: string;
   load: () => Promise<FileItem[]>;
-  /** A link to fix a failed listing, e.g. connecting Google Drive. */
   errorAction?: (error: unknown) => { label: string; href: string } | null;
   onPick: (item: FileItem) => void;
   onClose: () => void;
@@ -58,7 +55,6 @@ export function FilesDialog({
     return () => {
       active = false;
     };
-    // Loads once when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

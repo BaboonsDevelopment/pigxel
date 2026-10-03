@@ -1,8 +1,3 @@
-/**
- * Rules for what people put on their profile. The database enforces the same
- * limits (see the profiles migration); these give friendly messages first.
- */
-
 export const NAME_MAX = 50;
 export const BIO_MAX = 200;
 export const MAX_LINKS = 3;
@@ -11,7 +6,6 @@ const LINK_URL_MAX = 200;
 const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
 
-/** Kept in step with private.reserved_username() in the database. */
 const RESERVED = new Set([
   "admin",
   "administrator",
@@ -33,12 +27,10 @@ const RESERVED = new Set([
 
 export type ProfileLink = { label?: string; url: string };
 
-/** Usernames are stored lowercase, without a leading "@". */
 export function normalizeUsername(raw: string) {
   return raw.trim().replace(/^@/, "").toLowerCase();
 }
 
-/** Why `username` can't be used, or null when it's fine (taken or not). */
 export function usernameError(username: string): string | null {
   if (username.length < USERNAME_MIN || username.length > USERNAME_MAX)
     return `Use ${USERNAME_MIN}–${USERNAME_MAX} characters.`;
@@ -48,10 +40,6 @@ export function usernameError(username: string): string | null {
   return null;
 }
 
-/**
- * A link as typed, as a full https URL; "pinterest.com/ada" becomes
- * "https://pinterest.com/ada". Null when it isn't a web address.
- */
 export function normalizeUrl(raw: string): string | null {
   const text = raw.trim();
   if (!text || text.length > LINK_URL_MAX || /\s/.test(text)) return null;
@@ -86,7 +74,6 @@ const SITES: [RegExp, string][] = [
   [/(^|\.)github\.com$/, "GitHub"],
 ];
 
-/** What a link is called on the profile: its label, the site's name, or its domain. */
 export function linkTitle(link: ProfileLink): string {
   if (link.label?.trim()) return link.label.trim();
   let host: string;
@@ -98,10 +85,6 @@ export function linkTitle(link: ProfileLink): string {
   return SITES.find(([pattern]) => pattern.test(host))?.[1] ?? host;
 }
 
-/**
- * The links from the profile form (`linkUrl`/`linkLabel` fields, in order),
- * skipping empty rows, or the first problem found.
- */
 export function parseLinks(
   urls: string[],
   labels: string[],
@@ -124,7 +107,6 @@ export function parseLinks(
   return { links };
 }
 
-/** Links read back from the database, dropping anything malformed. */
 export function readLinks(value: unknown): ProfileLink[] {
   if (!Array.isArray(value)) return [];
   return value

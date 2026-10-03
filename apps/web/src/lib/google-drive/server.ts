@@ -6,19 +6,16 @@ import {
 } from "@/lib/supabase/admin";
 import { DRIVE_UNAVAILABLE, type DriveStatus } from "./status";
 
-/** Only files Pigxel creates or opens: no Google verification needed. */
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const TABLE = "google_drive_connections";
 
-/** Google sign-in needs the OAuth client that is also set in Supabase Auth. */
 export function isGoogleSignInAvailable() {
   return isSupabaseConfigured() && Boolean(process.env.GOOGLE_CLIENT_ID);
 }
 
-/** Drive additionally needs the client secret and the Supabase secret key. */
 export function isDriveAvailable() {
   return (
     isGoogleSignInAvailable() &&
@@ -55,7 +52,6 @@ export async function saveDriveConnection(
     throw new Error(`Couldn’t save the Drive connection: ${error.message}`);
 }
 
-/** Forgets the connection, and asks Google to revoke Pigxel's access when `revoke`. */
 export async function deleteDriveConnection(
   userId: string,
   { revoke }: { revoke: boolean },
@@ -74,10 +70,6 @@ export async function deleteDriveConnection(
     }).catch(() => {});
 }
 
-/**
- * A short-lived Google access token for this person's Drive, or null when
- * Drive isn't connected (including when Google has revoked the access).
- */
 export async function getDriveAccessToken(
   userId: string,
 ): Promise<{ accessToken: string; expiresIn: number } | null> {
@@ -103,7 +95,6 @@ export async function getDriveAccessToken(
     error?: string;
   };
   if (body.error === "invalid_grant") {
-    // Revoked in the Google account or expired: the person must connect again.
     await deleteDriveConnection(userId, { revoke: false });
     return null;
   }

@@ -1,5 +1,3 @@
-/* The sign-in pages: the form beside drifting art, in the landing's look. */
-
 .page {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -7,11 +5,6 @@
   background: #fff;
 }
 
-/*
- * The landing's monochrome values for the app's colour tokens: the shared
- * components read these variables, so inside the panel the fields and the
- * main button match the landing (black pill, grey fields) as they are.
- */
 .panel {
   --background: #ffffff;
   --foreground: #0a0a0a;
@@ -24,7 +17,6 @@
   --primary: #0a0a0a;
   --primary-hover: #27272a;
   --primary-foreground: #ffffff;
-  /* The primary button's shadow reads this one directly. */
   --color-primary: #0a0a0a;
   --ring: #e04a6a;
 
@@ -53,7 +45,6 @@
   border-radius: 12px;
 }
 
-/* The mascot bobs gently while the form waits. */
 .logoIcon {
   display: block;
   width: 84px;
@@ -92,9 +83,6 @@
   margin-top: 36px;
 }
 
-/* The art: columns of the landing's pieces, tilted and drifting. */
-
-/* A soft grey card inset from the window's edges, as on the landing. */
 .art {
   position: relative;
   margin: 12px 12px 12px 0;

@@ -1,4 +1,3 @@
-/** A 16×16 icon drawn from rows of text, one "#" per filled pixel. */
 export function pixelIcon(rows: string[], className = "size-5") {
   const d = rows
     .flatMap((row, y) =>

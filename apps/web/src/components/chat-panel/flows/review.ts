@@ -9,16 +9,6 @@ import { unionOf } from "@/lib/edit/raster";
 import { REVIEW_MARGIN, type Chat } from "../constants";
 import { grown } from "../helpers";
 
-/**
- * A second look (text model) at an edit before it is
- * applied. A check that fails counts as "fine": it never blocks the result.
- */
-
-/**
- * Checks one frame of an edit of a layer: its `source` and `target` areas
- * as the layer is now and in `after` (the new cel). The review when it found
- * a problem, else null.
- */
 export async function checkEdit(
   chat: Chat,
   args: {

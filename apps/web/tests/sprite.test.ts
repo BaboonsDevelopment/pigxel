@@ -42,11 +42,9 @@ describe("frames", () => {
     expect(clampDuration(NaN)).toBe(100);
   });
   it("turns a drop beside a frame into the index moveFrame expects", () => {
-    // Dragging "a" after "c": a b c d → b c a d
     expect(ids(moveFrame(frames, "a", frameDropIndex(0, 2, "after")))).toBe(
       "bcad",
     );
-    // Dragging "d" before "b": a b c d → a d b c
     expect(ids(moveFrame(frames, "d", frameDropIndex(3, 1, "before")))).toBe(
       "adbc",
     );

@@ -110,9 +110,6 @@ import type { ModifyKind } from "./modify-selection-dialog";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
-// Loaded on their own so the canvas is ready first: the chat brings the AI,
-// editing and picture-to-pixel-art code; the file picker and export open on
-// demand.
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
@@ -144,11 +141,6 @@ const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
 
-/**
- * The editor for one tile: file bar and tool settings on top, tools on the
- * left, canvas and timeline in the middle, AI chat on the right; with a
- * tutorial's guide over it when one is open.
- */
 export function Editor({
   userId,
   drive,
@@ -161,13 +153,11 @@ export function Editor({
 }: EditorProps & {
   draft: Draft;
   image: PigxelDocument;
-  /** Where this tile was left when switching tabs, to pick up from. */
   kept: KeptTile | null;
 }) {
   const router = useRouter();
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
-  // A sprite sheet picked to cut into a new tile's frames.
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
     name: string;
@@ -179,20 +169,16 @@ export function Editor({
   const [scaling, setScaling] = useState(false);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
-  // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
-  // Kept while the tile is open, so Export comes back with the last choices.
   const [exportSettings, setExportSettings] =
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
-  // Which panels are where, folded or closed; kept in this browser.
   const [layout, setLayout] = useEditorLayout(userId);
   const panelDrag = usePanelDrag((id, target) =>
     setLayout((l) => movePanel(l, id, target)),
   );
   const [customizing, setCustomizing] = useState(false);
-  // Each tool group's button shows the tool used last in it.
   const toolGroup = groupOf(tool)?.id;
   if (toolGroup && layout.groupTools[toolGroup] !== tool)
     setLayout((l) => ({
@@ -201,7 +187,6 @@ export function Editor({
     }));
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
-  // A picture the pen and brush paint with, from Edit › Use as brush.
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
@@ -211,7 +196,6 @@ export function Editor({
   const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
-    // Back on a tab, the tile comes back at the zoom it was left at.
     initial: kept?.scale,
   });
   const fileInput = useRef<HTMLInputElement>(null);
@@ -234,14 +218,12 @@ export function Editor({
       : undefined,
   });
 
-  // Every finished change to the sprite marks the tile for saving.
   const sprite = useSprite(image, file.markDirty, kept?.sprite);
   const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;
     latestScale.current = scale;
   });
-  // Leaving for another tab keeps undo and the zoom, to pick up on return.
   useEffect(
     () => () => {
       const left = tile.current;
@@ -273,7 +255,6 @@ export function Editor({
   const playback = usePlayback(sprite);
   const selection = useSelection(sprite);
 
-  // The slice picked with the Slice tool; gone when undo takes it away.
   const [sliceId, setSliceId] = useState<string | null>(null);
   const slice = sprite.slices.find((s) => s.id === sliceId) ?? null;
   const changeSlice = (next: Slice) =>
@@ -283,10 +264,8 @@ export function Editor({
     setSliceId(null);
   };
 
-  // Tool colour and sizes carry over to every tile.
   useEffect(() => writePen(userId, pen), [userId, pen]);
 
-  /** Goes to Google to link the account, then back to this tile with its draft intact. */
   const connectDrive = () =>
     window.location.assign(connectDriveUrl(editorUrl(draft.id)));
 
@@ -295,7 +274,6 @@ export function Editor({
     if (key) setPen((p) => ({ ...p, [key]: clampPenSize(p[key] + step) }));
   };
 
-  /** Selects the layer `step` rows down the timeline (up when negative). */
   const selectLayer = (step: 1 | -1) => {
     const rows = panelRows(sprite.tree);
     const at = rows.findIndex((row) => row.layer.id === sprite.layerId);
@@ -307,7 +285,6 @@ export function Editor({
     save: file.save,
     open: file.openFromComputer,
     export: () => setExporting(true),
-    // Undo first takes back lifted or pasted pixels that aren't down yet.
     undo: () => {
       if (!selection.cancel()) sprite.undo();
     },
@@ -320,7 +297,6 @@ export function Editor({
     layerAbove: () => selectLayer(-1),
     layerBelow: () => selectLayer(1),
     newLayer: () => sprite.addLayer("normal"),
-    // With the Slice tool, Delete removes the picked slice instead.
     clearLayer: () =>
       tool === "slice" && slice
         ? deleteSlice()
@@ -342,7 +318,6 @@ export function Editor({
     cut: () => {
       if (selection.copy()) selection.clear();
     },
-    // Pasted pixels float until dropped, so the Move tool is ready for them.
     paste: () => {
       if (selection.paste()) setTool("move");
     },
@@ -357,7 +332,6 @@ export function Editor({
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
   };
 
-  /** Changes the active cel (inside the selection, if any) as one step. */
   const applyEffect = (
     change: (
       pixels: Uint8ClampedArray,
@@ -368,7 +342,6 @@ export function Editor({
     sprite.editCel((pixels) => change(pixels, selection.mask));
   };
 
-  /** The selected pixels become the pen and brush tip, in their own colours. */
   const useAsBrush = () => {
     const piece = selection.selectedPiece();
     if (!piece) return;
@@ -380,10 +353,6 @@ export function Editor({
     setTool("pen");
   };
 
-  /**
-   * Puts an asset's first frame in the middle of the active cel, floating,
-   * to be moved into place; says why not when it can't.
-   */
   const insertAsset = async (asset: Asset): Promise<string | null> => {
     let frame;
     try {
@@ -409,17 +378,14 @@ export function Editor({
     return null;
   };
 
-  /** Makes the tile just `area` of itself, in every layer and frame. */
   const cropTo = (area: { x: number; y: number; w: number; h: number }) => {
     selection.deselect();
     sprite.resize({ w: area.w, h: area.h }, { x: -area.x, y: -area.y });
   };
-  // Crop: the tile becomes the box around the selection.
   const cropToSelection = () => {
     const area = selection.mask && maskBounds(selection.mask, sprite.size);
     if (area) cropTo(area);
   };
-  // Trim: the empty edges around everything drawn, in any frame, are cut off.
   const trim = async () => {
     const fill = backgroundColor(sprite.background);
     const area = drawnBounds(
@@ -455,7 +421,6 @@ export function Editor({
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
       {
-        // The selection, or the active layer when nothing is selected.
         label: "Transform",
         submenu: [
           [
@@ -590,7 +555,6 @@ export function Editor({
       },
     ],
   ];
-  /** The whole tile at once, every layer and frame: Aseprite's Sprite menu. */
   const transformTile = (t: TileTransform) => {
     selection.deselect();
     sprite.transformAll(t);
@@ -640,7 +604,6 @@ export function Editor({
     ],
     [
       {
-        // Indexed: only palette colours; Grayscale: only greys.
         label: "Colour mode",
         submenu: [
           COLOR_MODES.map(({ value, label }) => ({
@@ -706,7 +669,6 @@ export function Editor({
     ],
     [
       {
-        // Draws mirror copies across the middle of the tile.
         label: "Mirror",
         submenu: [
           SYMMETRY_OPTIONS.map(([value, label]) => ({
@@ -716,7 +678,6 @@ export function Editor({
         ],
       },
       {
-        // Repeats the tile around itself; strokes wrap across the edges.
         label: "Tiled",
         submenu: [
           TILED_OPTIONS.map(([value, label]) => ({
@@ -739,7 +700,6 @@ export function Editor({
     ],
   ];
 
-  // Pasting: a picture copied in another app, or our own copy.
   const onPaste = useEffectEvent(async (e: ClipboardEvent) => {
     if (isTyping(e.target)) return;
     e.preventDefault();
@@ -758,15 +718,11 @@ export function Editor({
           pixels: rgba,
           mask: new Uint8Array(w * h).fill(1),
         };
-      } catch {
-        // Not a picture the browser can read: paste our own copy instead.
-      }
+      } catch {}
     }
     if (selection.paste(pasteSource(image))) setTool("move");
   });
 
-  // Dropping a file: a picture goes on this tile where it lands (or opens as
-  // a new tile), a .pigxel file opens as a new tile; a dialog asks first.
   const [dropping, setDropping] = useState(false);
   const dragDepth = useRef(0);
   const hasFiles = (e: React.DragEvent) =>
@@ -776,7 +732,6 @@ export function Editor({
     dragDepth.current = 0;
     setDropping(false);
     const all = [...e.dataTransfer.files];
-    // Several pictures at once: the frames of an animation, as numbered.
     if (all.length > 1 && all.every(isImageFile)) {
       const open = await choiceDialog({
         title: `Open ${all.length} pictures as frames?`,
@@ -821,7 +776,6 @@ export function Editor({
     if (choice !== "place") return;
     try {
       const { rgba, w, h } = await pictureForTile(dropped, sprite.size);
-      // Centred where it was dropped; the paste keeps it on the tile.
       const centre = at ?? { x: sprite.size.w / 2, y: sprite.size.h / 2 };
       const placed = selection.paste({
         x: Math.round(centre.x - w / 2),
@@ -861,7 +815,6 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // The panels beside the canvas, placed in the docks by the layout.
   const panels: Record<PanelId, PanelContent> = {
     tools: {
       fit: true,
@@ -892,7 +845,6 @@ export function Editor({
                   ? recolorByPlace(sprite.palette, next)
                   : undefined,
             );
-            // The pen keeps painting with the colour it had, now changed.
             if (edited)
               setPen((p) => ({
                 ...p,
@@ -940,7 +892,6 @@ export function Editor({
         if (!dragDepth.current) setDropping(false);
       }}
       onDrop={(e) => {
-        // The chat box takes pictures dropped on it as attachments.
         if (e.defaultPrevented) {
           dragDepth.current = 0;
           setDropping(false);
@@ -1086,7 +1037,6 @@ export function Editor({
         className="hidden"
         onChange={async (e) => {
           const chosen = e.target.files?.[0];
-          // Lets the same file be chosen again later.
           e.target.value = "";
           if (!chosen) return;
           try {
@@ -1144,7 +1094,6 @@ export function Editor({
           size={sprite.size}
           picture={sprite.composite(["reference"])}
           onApply={(next, method) => {
-            // A selection made for the old size wouldn't line up any more.
             selection.deselect();
             sprite.rescale(next, method);
           }}
@@ -1156,7 +1105,6 @@ export function Editor({
           size={sprite.size}
           picture={sprite.composite(["reference"])}
           onApply={(next, offset) => {
-            // A selection made for the old size wouldn't line up any more.
             selection.deselect();
             sprite.resize(next, offset);
           }}

@@ -10,9 +10,7 @@ type Start = {
   title: string;
   description: string;
   image: StaticImageData;
-  /** Tailwind classes for the card's pastel background. */
   tint: string;
-  /** Where the card leads; kinds of project not built yet have none. */
   href?: string;
 };
 
@@ -44,7 +42,6 @@ const STARTS: Start[] = [
   },
 ];
 
-/** Home's "Start creating": one card per kind of project. */
 export function StartCreating() {
   return (
     <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">

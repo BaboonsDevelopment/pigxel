@@ -10,7 +10,6 @@ export const ASSET_TABS = [
 
 export type AssetTab = (typeof ASSET_TABS)[number]["value"];
 
-/** Which kind of assets the page shows, as one bordered group of tabs. */
 export function AssetTabs({ active }: { active: AssetTab }) {
   return (
     <nav

@@ -10,7 +10,6 @@ import {
 const RED = [255, 0, 0, 255];
 const CLEAR = [0, 0, 0, 0];
 
-/** A `w × h` picture from rows of "#" (red) and "." (clear). */
 function picture(rows: string[]) {
   const w = rows[0]!.length;
   const rgba = new Uint8ClampedArray(w * rows.length * 4);
@@ -44,7 +43,6 @@ describe("sprite size", () => {
   });
   it("blends neighbours with bilinear, without darkening clear edges", () => {
     const out = scalePicture(picture(["#."]), 4, 1, "bilinear");
-    // Red fades out; where it's half clear, it is still pure red, just see-through.
     expect([...out.slice(0, 4)]).toEqual(RED);
     expect(out[4 * 2]).toBe(255);
     expect(out[4 * 2 + 3]).toBeGreaterThan(0);

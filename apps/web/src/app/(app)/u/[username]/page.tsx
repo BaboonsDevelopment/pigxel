@@ -23,7 +23,6 @@ export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ username: string }> };
 
-/** The username in the address, lowercase and without "@". */
 function usernameIn(segment: string) {
   try {
     return normalizeUsername(decodeURIComponent(segment));

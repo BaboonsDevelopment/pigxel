@@ -2,11 +2,6 @@ import Image from "next/image";
 import type { CSSProperties, SVGProps } from "react";
 import mascot from "../../../public/art/pigxel-mascot-sitting.png";
 
-/**
- * A sprite drawn from rows of characters, one per pixel: `.` is empty and
- * every other character is looked up in `colors`. Runs of one colour become
- * one rect, so even a 16×16 sprite stays a handful of elements.
- */
 export function PixelSprite({
   rows,
   colors,
@@ -49,7 +44,6 @@ export function PixelSprite({
   );
 }
 
-/** Little 8×8 icons for the "made for" strip. */
 export const ICONS = {
   heart: {
     rows: [
@@ -173,7 +167,6 @@ export const ICONS = {
   { rows: readonly string[]; colors: Record<string, string> }
 >;
 
-/** The flower the playground and the AI demo start from. */
 export const FLOWER = [
   "................",
   "................",
@@ -193,10 +186,6 @@ export const FLOWER = [
   "................",
 ] as const;
 
-/**
- * The mascot as one frame of a hop: `lift` raises it (in steps of 6% of its
- * height) and the landing frame squashes a little, like a real bounce.
- */
 export function MascotFrame({
   lift = 0,
   squash = false,
@@ -224,7 +213,6 @@ export function MascotFrame({
   );
 }
 
-/** The four frames of the mascot's hop, as the demos play them. */
 export const HOP_FRAMES = [
   { lift: 0, squash: true },
   { lift: 1 },

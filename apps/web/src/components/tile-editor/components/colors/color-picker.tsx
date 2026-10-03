@@ -3,15 +3,9 @@
 import { useState, type PointerEvent } from "react";
 import { hexToHsv, hsvToHex, readHex, type Hsv } from "@/lib/palette/hsv";
 
-/** Every hue, left to right, for the hue bar. */
 const HUES =
   "linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)";
 
-/**
- * A colour picker always open in the Colors panel: a square of saturation
- * (across) and brightness (up) for the hue picked on the bar below it, and
- * the colour as hex to type or copy. Dragging changes the colour as you go.
- */
 export function ColorPicker({
   color,
   onChange,
@@ -19,7 +13,6 @@ export function ColorPicker({
   color: string;
   onChange: (color: string) => void;
 }) {
-  // Kept here, so the hue isn't lost on greys (where it can't be read back).
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(color));
   const [shown, setShown] = useState(color);
   const [text, setText] = useState(color);
@@ -40,7 +33,6 @@ export function ColorPicker({
     onChange(hex);
   };
 
-  /** Follows the pointer over `el` while the button is down, as fractions 0–1. */
   const drag = (
     e: PointerEvent<HTMLElement>,
     apply: (fx: number, fy: number) => void,

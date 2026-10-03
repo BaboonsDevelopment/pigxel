@@ -6,25 +6,17 @@ import { sheetToFrames } from "@/lib/image/sheet";
 import { UNREACHABLE, type Chat, type LayerInfo } from "../constants";
 import { emptyCel, paint } from "../helpers";
 
-/** A track drawn into its cels, one per frame (null where it is not seen). */
 type Drawn = {
   cels: (Uint8ClampedArray | null)[];
   image: string;
 };
 
-/** What a failed step says; the flow stops there and changes nothing. */
 class StepError extends Error {}
 
-/**
- * Plans an animation (free) and shows the plan with a button: the whole
- * animation is one layer drawn frame by frame as one sprite sheet, a paid
- * picture, so nothing is drawn before the click.
- */
 export async function animate(chat: Chat, action: TileAction) {
   const { canvas } = chat;
   chat.setPending(true);
   const size = canvas.size();
-  // The planner refers to layers and objects by their place in these lists.
   const layers = canvas.layers();
   const objects = canvas.objects();
   const names = new Map(layers.map((l) => [l.id, l.name]));
@@ -66,11 +58,6 @@ export async function animate(chat: Chat, action: TileAction) {
   });
 }
 
-/**
- * Draws the animation (the paid picture), then adds its frames and layer in
- * one undo step and plays it. Nothing changes when the picture fails, and
- * the button stays for another try.
- */
 async function draw(
   chat: Chat,
   plan: AnimationPlan,
@@ -115,10 +102,6 @@ async function draw(
   }
 }
 
-/**
- * The frames drawn as one sprite sheet (from the existing layer's look when
- * it reuses one), cut into whole frames of its box, as by a fixed camera.
- */
 async function drawSheet(
   chat: Chat,
   track: SheetTrack,

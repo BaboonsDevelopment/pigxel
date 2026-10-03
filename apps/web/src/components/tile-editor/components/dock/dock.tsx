@@ -19,21 +19,10 @@ import { Panel } from "./panel";
 import { Splitter, shareBetween } from "./splitter";
 import type { PanelDrag } from "./use-panel-drag";
 
-/**
- * What a panel shows. A `fit` panel is as tall as what it holds (the tool
- * buttons), instead of sharing the stack's height.
- */
 export type PanelContent = { body: ReactNode; fit?: boolean };
 
 type SetLayout = (change: (layout: Layout) => Layout) => void;
 
-/**
- * One of the three docks: left or right of the canvas, or under it. It is a
- * row of stacks, each panels one above another; the bars between them (and
- * the dock's inner edge) are dragged to size them. A dock with nothing to
- * show disappears, except while a panel is dragged, when it is a strip to
- * drop the panel on.
- */
 export function Dock({
   side,
   layout,
@@ -50,7 +39,6 @@ export function Dock({
   const stacks = shownStacks(layout, side);
   const bottom = side === "bottom";
   const leftish = onLeft(side);
-  // Beside the canvas, empty docks take a drop on the canvas's edges instead.
   if (!stacks.length && (side === "innerLeft" || side === "innerRight"))
     return null;
 
@@ -67,7 +55,6 @@ export function Dock({
       </div>
     ) : null;
 
-  /** A side stack's width, changed by the bar on its inner side. */
   const widthBar = (index: number, size: number) => (
     <Splitter
       axis="x"
@@ -81,7 +68,6 @@ export function Dock({
     />
   );
 
-  // Shares as fractions of 1: flex-grow below 1 in all would leave space empty.
   const widthTotal = stacks.reduce((sum, s) => sum + s.size, 0) || 1;
   const column = (stack: (typeof stacks)[number]) => {
     const weightTotal = stack.items.reduce((sum, i) => sum + i.weight, 0) || 1;
@@ -98,7 +84,6 @@ export function Dock({
         {stack.items.map((item, i) => {
           const collapsed = layout.collapsed.includes(item.id);
           const next = stack.items[i + 1];
-          // A bar between two open panels shares the height between them.
           const fit = (id: PanelId) =>
             layout.collapsed.includes(id) || panels[id].fit;
           const bar =

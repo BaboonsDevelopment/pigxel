@@ -7,7 +7,6 @@ type AiErrorCode =
   | "no_credits"
   | "failed";
 
-/** A provider failure with a reason the user can be told. */
 export class AiError extends Error {
   constructor(
     readonly code: AiErrorCode,
@@ -45,10 +44,6 @@ export function errorForStatus(
   return new AiError("failed", message);
 }
 
-/**
- * Whether another model may succeed where this one failed: it is busy, too
- * slow, or this account can't use it.
- */
 export function canTryAnother(e: unknown): boolean {
   return (
     e instanceof AiError &&

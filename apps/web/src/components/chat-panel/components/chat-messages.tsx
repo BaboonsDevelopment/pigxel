@@ -7,9 +7,7 @@ type Props = {
   pending: boolean;
   error: string | null;
   onChoose: (index: number, placement: Placement) => void;
-  /** Runs the step message `index` waits for (its button). */
   onPress: (index: number) => void;
-  /** Points out on the canvas where a placement would draw. */
   onHover: (area: Area | null) => void;
 };
 

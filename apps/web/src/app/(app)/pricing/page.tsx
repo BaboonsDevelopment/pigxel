@@ -14,7 +14,6 @@ export const metadata: Metadata = {
     "Pigxel is free to use. Paid plans add more AI generations and cloud storage.",
 };
 
-/** The billing questions people ask, answered in a line each. */
 const FACTS: { text: string; href?: string }[] = [
   { text: "Cancel anytime" },
   { text: `Refunds within ${LEGAL.refundDays} days`, href: "/refunds" },
@@ -22,23 +21,14 @@ const FACTS: { text: string; href?: string }[] = [
   { text: "Your art stays yours" },
 ];
 
-/** Short policy links; the Refund Policy is linked from its fact above. */
 const POLICIES = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ];
 
-/**
- * The plans side by side on one screen, with the billing answers in a line
- * underneath. It sits in the app's layout: signed-in people keep their
- * sidebar, guests get the public header, and the page fades in either way.
- */
 export default async function Pricing() {
-  // Headers first: the page renders per request, so the config is checked
-  // when it's served rather than at build time.
   const country = countryFromHeaders(await headers());
   const { environment, token } = paddleClientConfig();
-  // The layout already looked the user up; this call reuses that result.
   const user = await getUser();
   const customer = user?.email ? { id: user.id, email: user.email } : undefined;
 

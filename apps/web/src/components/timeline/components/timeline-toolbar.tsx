@@ -8,11 +8,6 @@ import { ControlGroup } from "./control-group";
 import { FrameDuration } from "./frame-duration";
 import { LayerOptions } from "./layer-options";
 
-/**
- * The timeline's main controls, one group for the active layer and one for
- * the active frame. The rest is in the Layer and Frame menus at the top and
- * on right-click.
- */
 export function TimelineToolbar({
   sprite,
   playback,

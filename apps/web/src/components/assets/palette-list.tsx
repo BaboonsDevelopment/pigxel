@@ -7,10 +7,6 @@ import { downloadBlob } from "@/lib/download";
 import { toGpl } from "@/lib/palette/files";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 
-/**
- * Well-known pixel art palettes: start a tile with one, copy its colours, or
- * save it for another app. The editor's palette panel loads them too.
- */
 export function PaletteList() {
   return (
     <section aria-labelledby="assets-palettes" className="mt-8">

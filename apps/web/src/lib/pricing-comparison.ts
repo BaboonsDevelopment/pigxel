@@ -1,11 +1,9 @@
-/** Totals and currency from Paddle's localized price preview. */
 export type PriceQuote = {
   formattedTotal: string;
   total: string;
   currencyCode: string;
 };
 
-/** Compare the annual bill with twelve monthly bills in the same currency. */
 export function annualComparison(
   monthly: PriceQuote | undefined,
   annual: PriceQuote | undefined,
@@ -30,7 +28,6 @@ export function annualComparison(
     style: "currency",
     currency: monthly.currencyCode,
   });
-  // Paddle totals use minor units. Currency precision isn't always two digits.
   const precision = formatter.resolvedOptions().maximumFractionDigits ?? 2;
   return {
     regularPrice: formatter.format(regularTotal / 10 ** precision),

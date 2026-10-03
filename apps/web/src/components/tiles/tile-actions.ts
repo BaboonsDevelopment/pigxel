@@ -18,19 +18,16 @@ import { PigxelFileError } from "@/lib/pigxel-file/format";
 import { confirmDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { draftForCloudTile, editorUrl } from "@/lib/pigxel-file/open-tile";
 
-/** Opening and deleting Pigxel cloud tiles, shared by Home and My projects. */
 export function useCloudTileActions(userId: string) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Deleted tiles disappear at once; one comes back if deleting it fails.
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
 
   const open = async (tile: CloudTileSummary) => {
     setBusy(tile.id);
     setError(null);
     try {
-      // Reuses the tile's draft when it's already open in this browser.
       const draftId = await draftForCloudTile(userId, {
         id: tile.id,
         name: tile.name,
@@ -57,7 +54,6 @@ export function useCloudTileActions(userId: string) {
     setRemoved((ids) => new Set(ids).add(tile.id));
     try {
       await deleteCloudTile(tile.id);
-      // A copy open in this browser stays, as a tile kept only here.
       await loadDrafts(userId);
       const open = findDraftFor(userId, {
         kind: "cloud",
@@ -87,7 +83,6 @@ export function useCloudTileActions(userId: string) {
   return { busy, error, removed, open, remove };
 }
 
-/** Asks, then removes a tile kept in this browser; returns whether it was removed. */
 export async function confirmRemoveLocalTile(
   userId: string,
   tile: Draft,

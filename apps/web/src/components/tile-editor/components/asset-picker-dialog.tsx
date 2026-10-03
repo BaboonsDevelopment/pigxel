@@ -14,10 +14,6 @@ type Listing =
   | { state: "ready"; assets: Asset[] }
   | { state: "error" };
 
-/**
- * Edit › Insert asset…: the assets, loaded when it opens; one click puts
- * one on the tile. `onPick` says whether it could, or why not.
- */
 export default function AssetPickerDialog({
   onPick,
   onClose,
@@ -56,7 +52,6 @@ export default function AssetPickerDialog({
       ref={dialog}
       onClose={onClose}
       onClick={(e) => {
-        // A click on the dimmed backdrop closes it.
         if (e.target === dialog.current) dialog.current.close();
       }}
       aria-labelledby="asset-picker-title"

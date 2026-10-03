@@ -4,10 +4,6 @@ import { authUrl } from "@/lib/auth/config";
 import { safeNext, withParam } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Sends the person to Apple, then back to `next` through /auth/callback:
- * signed out it signs them in, signed in it links Apple to their account.
- */
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
   if (!isAppleSignInAvailable())

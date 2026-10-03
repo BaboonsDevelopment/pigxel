@@ -21,7 +21,6 @@ describe("resizing a slice", () => {
     );
     expect(resized.bounds).toEqual({ x: 1, y: 1, w: 12, h: 6 });
     expect(resized.center).toEqual({ x: 2, y: 2, w: 8, h: 2 });
-    // Bottom centre stays at the bottom centre.
     expect(resized.pivot).toEqual({ x: 6, y: 5 });
   });
   it("drops the centre when the corners no longer leave room for it", () => {

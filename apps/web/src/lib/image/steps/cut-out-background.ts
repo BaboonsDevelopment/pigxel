@@ -16,7 +16,6 @@ import {
   FRINGE_PASSES,
 } from "../constants";
 
-/** Opaque pixels that touch a transparent one. */
 function edgePixels(image: Bitmap): number[] {
   const out: number[] = [];
   for (let i = 0; i < image.w * image.h; i++) {
@@ -38,11 +37,6 @@ const isMagentaBlend = (image: Bitmap, i: number) => {
   );
 };
 
-/**
- * Removes the magenta background, then the magenta-tinted blend the model
- * paints where the subject meets it, then trims the outline slightly.
- * Only edge pixels are checked for blends, so purple inside the subject stays.
- */
 export function cutOutBackground(source: Bitmap): Bitmap {
   const image = copyBitmap(source);
   for (let i = 0; i < image.w * image.h; i++) {

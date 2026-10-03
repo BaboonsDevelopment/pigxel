@@ -3,10 +3,6 @@
 import { PANEL_LABELS } from "@/lib/editor-layout/layout";
 import type { PanelDrag } from "./use-panel-drag";
 
-/**
- * While a panel is dragged: the place it would land, lit up and gliding
- * from place to place, and a card with its name under the pointer.
- */
 export function DragOverlay({ drag }: { drag: PanelDrag }) {
   if (!drag.dragging) return null;
   const { preview, pointer } = drag;

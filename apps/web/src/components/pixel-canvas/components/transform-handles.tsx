@@ -5,24 +5,16 @@ import type { FreeTransform } from "../free-transform";
 
 type Box = { t: FreeTransform; w: number; h: number };
 
-/** Handles: x and y are -1, 0 or 1 across and down the box; 0, 0 is none. */
 const HANDLES = [-1, 0, 1]
   .flatMap((y) => [-1, 0, 1].map((x) => ({ x, y })))
   .filter((h) => h.x !== 0 || h.y !== 0);
 
-/** Snapping steps for Shift: whole 15° turns. */
 const ANGLE_STEP = 15;
 
 type Drag =
   | { kind: "scale"; hx: number; hy: number; start: Box }
   | { kind: "rotate"; start: Box; from: number };
 
-/**
- * Handles around the selected pixels with the Move tool, as in Aseprite: a
- * corner scales both ways (Shift keeps the shape), a side one way, the knob
- * above turns it (Shift snaps to 15°). The body is dragged by the Move tool
- * itself. Everything is worked out in tile pixels.
- */
 export function TransformHandles({
   box,
   scale,
@@ -30,11 +22,9 @@ export function TransformHandles({
   begin,
   onChange,
 }: {
-  /** The transform so far, or the selection's box when nothing is transformed. */
   box: Box;
   scale: number;
   size: { w: number; h: number };
-  /** Lifts the pixels and returns the transform to start from. */
   begin: () => Box | null;
   onChange: (t: FreeTransform) => void;
 }) {
@@ -44,7 +34,6 @@ export function TransformHandles({
   const width = Math.abs(w * t.scaleX) * scale;
   const height = Math.abs(h * t.scaleY) * scale;
 
-  /** The pointer in tile pixels (fractions kept). */
   const tileAt = (e: React.PointerEvent) => {
     const rect = area.current!.getBoundingClientRect();
     return {
@@ -76,7 +65,6 @@ export function TransformHandles({
       angle = ((((angle + 180) % 360) + 360) % 360) - 180;
       return onChange({ ...t0, angle: Math.round(angle * 10) / 10 });
     }
-    // The pointer in the box's own axes: turn and slant undone.
     const r = (-t0.angle * Math.PI) / 180;
     const dx = p.x - t0.cx;
     const dy = p.y - t0.cy;
@@ -87,7 +75,6 @@ export function TransformHandles({
       Math.tan((t0.skew * Math.PI) / 180) * ly;
     const w0 = s.w * t0.scaleX;
     const h0 = s.h * t0.scaleY;
-    // The opposite side stays put; the dragged one follows the pointer.
     let nw = d.hx ? Math.max(1, d.hx * lx + w0 / 2) : w0;
     let nh = d.hy ? Math.max(1, d.hy * ly + h0 / 2) : h0;
     if (e.shiftKey && d.hx && d.hy) {
@@ -95,7 +82,6 @@ export function TransformHandles({
       nw = w0 * k;
       nh = h0 * k;
     }
-    // The centre moves by half the growth, along the box's axes.
     const gx = (d.hx * (nw - w0)) / 2;
     const gy = (d.hy * (nh - h0)) / 2;
     const a = (t0.angle * Math.PI) / 180;
@@ -137,7 +123,6 @@ export function TransformHandles({
           transform: `translate(-50%, -50%) rotate(${t.angle}deg) skewX(${t.skew}deg)`,
         }}
       >
-        {/* The knob that turns the piece, above its top side. */}
         <div className="absolute bottom-full left-1/2 h-5 w-px -translate-x-1/2 bg-blue-500" />
         <div
           title="Drag to rotate · Shift snaps to 15°"
@@ -179,7 +164,6 @@ export function TransformHandles({
   );
 }
 
-/** The resize cursor pointing the way a handle drags, turned with the box. */
 function handleCursor(x: number, y: number, angle: number) {
   const CURSORS = ["ew-resize", "nwse-resize", "ns-resize", "nesw-resize"];
   const deg = (Math.atan2(y, x) * 180) / Math.PI + angle;

@@ -54,7 +54,6 @@ describe("fill and stroke the selection", () => {
   it("paints only the selected pixels", () => {
     const pixels = new Uint8ClampedArray(25 * 4);
     const out = filledMask(pixels, borderMask(block, size, 1), [9, 8, 7, 255]);
-    // The ring around the block's middle, not the middle itself.
     expect([...out.slice((1 * 5 + 1) * 4, (1 * 5 + 1) * 4 + 4)]).toEqual([
       9, 8, 7, 255,
     ]);

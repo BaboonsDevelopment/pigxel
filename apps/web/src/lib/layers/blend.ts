@@ -1,12 +1,7 @@
 import type { BlendMode } from "./types";
 
-/** A colour with channels from 0 to 1. */
 type Rgb = [number, number, number];
 
-/**
- * Blend formulas from the W3C Compositing spec (the ones Aseprite uses), plus
- * Aseprite's Addition, Subtract and Divide. `b` is the backdrop, `s` the layer.
- */
 type Channel = (b: number, s: number) => number;
 
 const multiply: Channel = (b, s) => b * s;
@@ -38,7 +33,6 @@ const SEPARABLE: Partial<Record<BlendMode, Channel>> = {
   divide: (b, s) => (s === 0 ? (b === 0 ? 0 : 1) : Math.min(1, b / s)),
 };
 
-// Hue, Saturation, Color and Luminosity work on the colour as a whole.
 const lum = ([r, g, b]: Rgb) => 0.3 * r + 0.59 * g + 0.11 * b;
 const sat = (c: Rgb) => Math.max(...c) - Math.min(...c);
 
@@ -72,11 +66,9 @@ const NON_SEPARABLE: Partial<Record<BlendMode, (b: Rgb, s: Rgb) => Rgb>> = {
   luminosity: (b, s) => setLum(b, lum(s)),
 };
 
-/** The per-channel formula of `mode`; none for Hue, Saturation, Color and Luminosity. */
 export const channelBlend = (mode: BlendMode): Channel | undefined =>
   SEPARABLE[mode];
 
-/** The colour a layer pixel `s` makes over the backdrop `b` in `mode`. */
 export function blend(mode: BlendMode, b: Rgb, s: Rgb): Rgb {
   const whole = NON_SEPARABLE[mode];
   if (whole) return whole(b, s);

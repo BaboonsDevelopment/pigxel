@@ -32,7 +32,6 @@ const sectionLooks: Record<
   },
 };
 
-/** One release at a time: the newest, or the one picked with ?v=. */
 export default async function PatchNotes({ searchParams }: Props) {
   const { v } = await searchParams;
   const note = PATCH_NOTES.find((n) => n.version === v) ?? PATCH_NOTES[0]!;

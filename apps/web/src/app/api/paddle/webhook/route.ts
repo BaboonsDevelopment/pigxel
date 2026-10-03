@@ -14,11 +14,6 @@ const SUBSCRIPTION_EVENTS = new Set<string>([
   EventName.SubscriptionTrialing,
 ]);
 
-/**
- * Paddle's notification destination. Every request is verified against
- * `PADDLE_WEBHOOK_SECRET`; subscription events are stored for the account
- * in their `customData.userId`. A non-2xx answer makes Paddle retry.
- */
 export async function POST(request: Request) {
   const secret = process.env.PADDLE_WEBHOOK_SECRET;
   if (!secret) {
@@ -32,7 +27,6 @@ export async function POST(request: Request) {
 
   let event;
   try {
-    // A Paddle client sets this up itself; verifying alone needs no API key.
     NodeRuntime.initialize();
     event = await new Webhooks().unmarshal(body, secret, signature);
   } catch {
@@ -46,13 +40,11 @@ export async function POST(request: Request) {
     event as Parameters<typeof subscriptionRecord>[0],
   );
   if (!record) {
-    // Bought while signed out: nothing ties it to an account yet.
     console.warn(`Paddle ${event.eventType} without a Pigxel userId.`);
     return NextResponse.json({ ok: true });
   }
 
   const error = await saveSubscription(record);
-  // 23503: the account was deleted; retrying won't help.
   if (error && error.code !== "23503") {
     console.error("Couldn’t store the Paddle subscription:", error.message);
     return NextResponse.json({ error: "store_failed" }, { status: 500 });

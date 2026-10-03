@@ -24,10 +24,6 @@ import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 import { frameActions, layerActions } from "@/components/timeline/actions";
 import type { Playback } from "@/components/timeline/use-playback";
 
-/**
- * The bar on top: back to the projects, the File, Edit, Tile, View, Layer and
- * Frame menus, the tile's name and where it is saved, and the AI tokens.
- */
 export function EditorHeader({
   draftId,
   file,
@@ -43,7 +39,6 @@ export function EditorHeader({
   menus,
   afterMenus = [],
 }: {
-  /** The tile's draft, for New tile to come back to on Cancel. */
   draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
@@ -53,13 +48,9 @@ export function EditorHeader({
   onOpenFrom: (source: OpenSource) => void;
   onConnectDrive: () => void;
   onExport: () => void;
-  /** For admins: puts the tile on the Assets page. */
   onPublish?: () => void;
-  /** Picks a sprite sheet to cut into the frames of a new tile. */
   onImportSheet: () => void;
-  /** More menus after File, e.g. Edit, Tile and View. */
   menus: { label: string; sections: MenuSections }[];
-  /** Menus after Layer and Frame, e.g. Window. */
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
@@ -88,7 +79,6 @@ export function EditorHeader({
               onSelect: () => router.push(newTileUrl(draftId)),
             },
             {
-              // A .pigxel file, or a picture as a new tile.
               label: "Open from your computer…",
               shortcut: `${mod}O`,
               onSelect: file.openFromComputer,
@@ -106,7 +96,6 @@ export function EditorHeader({
               hidden: !drive.available,
             },
             {
-              // Pictures turned into a new tile's frames.
               label: "Import",
               submenu: [
                 [
@@ -190,11 +179,9 @@ export function EditorHeader({
         className="hidden"
         onChange={(e) => {
           file.onFileChosen(e.target.files?.[0]);
-          // Lets the same file be chosen again later.
           e.target.value = "";
         }}
       />
-      {/* Numbered pictures (walk_01.png …) opened as one animation. */}
       <input
         ref={framesInput}
         type="file"

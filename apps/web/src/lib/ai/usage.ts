@@ -2,7 +2,6 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { costOf, type Tokens } from "./pricing";
 
-/** What Gemini reports a request used, as `usageMetadata` on its answer. */
 export type GeminiUsage = {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -10,7 +9,6 @@ export type GeminiUsage = {
   candidatesTokensDetails?: { modality?: string; tokenCount?: number }[];
 };
 
-/** The tokens of one answer, image output apart from text. */
 function tokensOf(usage: GeminiUsage): Tokens {
   const image =
     usage.candidatesTokensDetails
@@ -24,10 +22,6 @@ function tokensOf(usage: GeminiUsage): Tokens {
   };
 }
 
-/**
- * Records what one AI request used and cost, for the signed-in person's
- * usage list, and logs it on the server. Never fails the request.
- */
 export async function recordUsage(
   step: string,
   model: string,

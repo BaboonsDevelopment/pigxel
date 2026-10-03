@@ -3,10 +3,6 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { PATCH_NOTES, patchDate } from "@/lib/patch-notes";
 import { ChevronRightIcon, SparklesIcon } from "./icons";
 
-/**
- * The latest release above the account, laid out like the account row:
- * an icon, two short lines and a chevron. Opens the Patch notes page.
- */
 export function PatchNotesCard({
   active,
   onNavigate,

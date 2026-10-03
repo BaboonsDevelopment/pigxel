@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
-/** The one h1 of a page. */
 export function PageTitle({ className, ...props }: ComponentProps<"h1">) {
   return (
     <h1
@@ -14,7 +13,6 @@ export function PageTitle({ className, ...props }: ComponentProps<"h1">) {
   );
 }
 
-/** A heading for a part of a page, e.g. "Pinned" or "Email". */
 export function SectionTitle({ className, ...props }: ComponentProps<"h2">) {
   return (
     <h2
@@ -24,7 +22,6 @@ export function SectionTitle({ className, ...props }: ComponentProps<"h2">) {
   );
 }
 
-/** Supporting text under a title. */
 export function Lead({ className, ...props }: ComponentProps<"p">) {
   return (
     <p
@@ -34,6 +31,5 @@ export function Lead({ className, ...props }: ComponentProps<"p">) {
   );
 }
 
-/** Classes for a text link inside copy. */
 export const textLinkClassName =
   "font-medium text-foreground underline underline-offset-4 hover:text-primary";

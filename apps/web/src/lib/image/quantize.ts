@@ -1,10 +1,8 @@
 export type RGB = { r: number; g: number; b: number };
 
-/** Upper bound on palette size. */
 const MAX_COLORS = 62;
 
 type QuantizeOpts = {
-  /** Palette size; capped at MAX_COLORS. */
   colors?: number;
   bgTolerance?: number;
   bgRounds?: number;
@@ -19,7 +17,6 @@ type Quantized = {
   removed: number;
 };
 
-/** Reads one channel; callers stay in range, the fallback only satisfies the type checker. */
 const px = (buf: Uint8ClampedArray, i: number) => buf[i] ?? 0;
 
 const hex = (c: RGB) =>
@@ -82,7 +79,6 @@ const wdist2 = (a: RGB, b: RGB) =>
 
 const luma = (c: RGB) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 
-/** The palette entry closest to `c`, weighted the way the eye sees colour. */
 export function nearestIndex(c: RGB, palette: RGB[]): number {
   let best = 0;
   let bestD = Infinity;
@@ -158,10 +154,8 @@ function removeBackground(
   return removed;
 }
 
-/** A colour and how many pixels have it. */
 export type Bucket = { r: number; g: number; b: number; n: number };
 
-/** At most `max` colours that stand for all of `buckets`, split where they differ most. */
 export function medianCut(buckets: Bucket[], max: number): RGB[] {
   if (buckets.length === 0) return [];
   let boxes: Bucket[][] = [buckets];

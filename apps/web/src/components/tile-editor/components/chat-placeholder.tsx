@@ -1,6 +1,5 @@
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 
-/** The chat's body while its code loads. */
 export function ChatPlaceholder() {
   return (
     <div className="space-y-3 p-4" aria-hidden="true">

@@ -12,7 +12,6 @@ import {
   type Layout,
 } from "@/lib/editor-layout/layout";
 
-/** Each shown stack of a dock as its panel ids. */
 const stacks = (layout: Layout, side: DockSide) =>
   shownStacks(layout, side).map((s) => s.items.map((i) => i.id));
 
@@ -44,7 +43,6 @@ describe("editor layout", () => {
       where: "right",
     });
     expect(stacks(beside, "left")).toEqual([["tools", "colors"], ["palette"]]);
-    // A stack left empty goes.
     const alone = movePanel(DEFAULT_LAYOUT, "timeline", {
       kind: "panel",
       anchor: "assistant",
@@ -55,7 +53,6 @@ describe("editor layout", () => {
       ["timeline"],
       ["palette", "assistant"],
     ]);
-    // In the bottom dock the new stack shares the width.
     const below = movePanel(DEFAULT_LAYOUT, "palette", {
       kind: "panel",
       anchor: "timeline",
@@ -129,7 +126,6 @@ describe("editor layout", () => {
       panels: ["tools"],
       weights: [1],
     });
-    // Lost panels go back home: colours left (closed), assistant right, timeline below.
     expect(odd.docks.left.stacks.flatMap((s) => s.panels)).toContain("colors");
     expect(stacks(odd, "bottom")).toEqual([["timeline"]]);
     expect(odd.docks.bottom.size).toBe(BOTTOM_HEIGHT.min);

@@ -12,23 +12,16 @@ import { samePixels, zoomDialog } from "../helpers";
 type Picture = {
   width: number;
   height: number;
-  /** Each frame as one picture, with how long it shows. */
   frames: { pixels: ImageData; duration: number }[];
-  /** Whether any frame looks different from the first: empty or copied frames don't count. */
   animated: boolean;
 };
 
-/**
- * A published art large and crisp; an animation can be played. It grows out
- * of the card it opens from and shrinks back into it.
- */
 export function PreviewDialog({
   tile,
   origin,
   onClose,
 }: {
   tile: PublicTile;
-  /** Where the card is now, to open from and close into. */
   origin: () => DOMRect | undefined;
   onClose: () => void;
 }) {
@@ -46,7 +39,6 @@ export function PreviewDialog({
     if (!element) return;
     element.showModal();
     void zoomDialog(element, origin(), "in");
-    // Opens once, from where the card was then.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -111,18 +103,15 @@ export function PreviewDialog({
 
   const animated = picture?.animated ?? false;
 
-  // Rendered on <body>, outside Explore's scaled page, so it fits the window.
   return createPortal(
     <dialog
       ref={dialog}
       onClose={onClose}
       onCancel={(e) => {
-        // Escape shrinks it back too.
         e.preventDefault();
         void dismiss();
       }}
       onClick={(e) => {
-        // A click on the dimmed backdrop closes it.
         if (e.target === dialog.current) void dismiss();
       }}
       aria-label={tile.name}

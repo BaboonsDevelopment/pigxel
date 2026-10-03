@@ -34,7 +34,6 @@ export function ProfileForm({ profile }: { profile: ArtistProfile }) {
   const wanted = normalizeUsername(username);
   const changed = wanted !== profile.username;
 
-  // Checks a new username once typing pauses.
   useEffect(() => {
     if (!changed) return;
     let stale = false;
@@ -151,7 +150,6 @@ export function ProfileForm({ profile }: { profile: ArtistProfile }) {
       </fieldset>
 
       <div className="flex items-center gap-4">
-        {/* A username already known to be taken or invalid can't be saved. */}
         <Button disabled={pending || check?.available === false}>
           {pending ? "Saving…" : "Save profile"}
         </Button>

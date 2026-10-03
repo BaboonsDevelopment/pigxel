@@ -5,7 +5,6 @@ import { isAdmin, requireUser } from "@/lib/auth/session";
 import { ASSET_BUCKET, type AssetRow } from "@/lib/assets/assets";
 import { createClient } from "@/lib/supabase/server";
 
-/** Takes an asset off the Assets page, files and all. Admins only. */
 export async function removeAsset(id: string): Promise<{ error?: string }> {
   const user = await requireUser();
   if (!isAdmin(user)) return { error: "Only admins can remove assets." };

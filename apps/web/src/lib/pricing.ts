@@ -1,23 +1,10 @@
-/**
- * Pigxel's plans, as the Pricing page shows them: Free, then the paid tiers
- * sold through Paddle. Prices come from Paddle for the visitor's country, so
- * only the Paddle price IDs live here. TODO before launch: set each tier's
- * limits.
- */
 export type BillingCycle = "month" | "year";
 
 export interface Tier {
   name: "Starter" | "Pro" | "Advanced";
   description: string;
-  /** Everything in the tier, beyond what the one before it has. */
   features: string[];
-  /**
-   * Paddle price IDs (`pri_…`, Catalog → Products) for the account in
-   * `PADDLE_ENVIRONMENT`. Sandbox and live IDs differ: swap them when going
-   * live.
-   */
   priceId: Record<BillingCycle, string>;
-  /** Pointed out as the best fit for most artists. */
   highlighted?: boolean;
 }
 

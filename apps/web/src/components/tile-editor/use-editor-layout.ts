@@ -8,7 +8,6 @@ import {
 } from "@/lib/editor-layout/layout";
 
 const layoutKey = (userId: string) => `pigxel:layout:v2:${userId}`;
-/** The layout before docks had stacks; only its tool choices carry over. */
 const oldKey = (userId: string) => `pigxel:layout:v1:${userId}`;
 
 function storage() {
@@ -19,10 +18,6 @@ function storage() {
   }
 }
 
-/**
- * The editor's panel layout, kept in this browser per person; every change
- * is saved. The editor renders in the browser only, so it is read at once.
- */
 export function useEditorLayout(userId: string) {
   const [layout, setLayout] = useState<Layout>(() => {
     try {
@@ -42,9 +37,7 @@ export function useEditorLayout(userId: string) {
   useEffect(() => {
     try {
       storage()?.setItem(layoutKey(userId), JSON.stringify(layout));
-    } catch {
-      // The layout starts over next time.
-    }
+    } catch {}
   }, [userId, layout]);
   return [layout, setLayout] as const;
 }

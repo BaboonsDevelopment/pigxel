@@ -1,7 +1,6 @@
 import type { Command, Shortcut, ToolId } from "./constants";
 import { TOOLS } from "./tools";
 
-/** Typing in a field must not trigger editor shortcuts. */
 export function isTyping(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
@@ -10,7 +9,6 @@ export function isTyping(target: EventTarget | null) {
   );
 }
 
-/** The setting `[` and `]` change for a tool, if it has a size. */
 export function sizeKey(
   tool: ToolId,
 ): "size" | "brushSize" | "eraserSize" | "sprayWidth" | null {
@@ -27,7 +25,6 @@ export function sizeKey(
     : null;
 }
 
-/** "Pen (B)", "Ellipse (Shift+U)". */
 export function toolTitle(tool: {
   label: string;
   shortcut: string;
@@ -52,12 +49,6 @@ const NUDGES: Record<string, Command> = {
   ArrowRight: "nudgeRight",
 };
 
-/**
- * What a key press does in the editor, as in Aseprite and most drawing apps.
- * Keys are matched by position (`e.code`), so shortcuts work in any keyboard
- * layout, e.g. Ukrainian. Text fields keep their own keys, Ctrl+S and Ctrl+O
- * aside.
- */
 export function shortcutFor(e: KeyboardEvent): Shortcut | null {
   const { code, shiftKey: shift } = e;
   const zoomIn = code === "Equal" || code === "NumpadAdd";
@@ -77,8 +68,6 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
     if (code === "KeyD") return command("deselect");
     if (code === "KeyC") return command("copy");
     if (code === "KeyX") return command("cut");
-    // Ctrl+V is left to the browser: its paste event also brings pictures
-    // copied in other apps.
     if (zoomIn) return command("zoomIn");
     if (zoomOut) return command("zoomOut");
     if (code === "Digit0" || code === "Numpad0") return command("zoomReset");

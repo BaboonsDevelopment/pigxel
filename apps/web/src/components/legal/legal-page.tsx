@@ -2,10 +2,6 @@ import type { ReactNode } from "react";
 import { Notice } from "@pigxel/ui/components/notice";
 import { LEGAL, legalDate } from "@/lib/legal";
 
-/**
- * A policy page: its title, when it last changed, and its sections. Text
- * inside gets readable spacing for paragraphs, lists and links.
- */
 export function LegalPage({
   title,
   intro,
@@ -35,7 +31,6 @@ export function LegalPage({
   );
 }
 
-/** One numbered part of a policy. */
 export function LegalSection({
   title,
   children,
@@ -51,7 +46,6 @@ export function LegalSection({
   );
 }
 
-/** How to reach whoever runs Pigxel, for the end of each policy. */
 export function ContactDetails() {
   return (
     <p>

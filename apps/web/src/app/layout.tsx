@@ -8,8 +8,6 @@ export const metadata: Metadata = {
   description: "Pixel art with an AI helper.",
 };
 
-// The theme maps these to `font-sans` (Poppins), `font-display` (Fredoka)
-// and `font-mono` (DM Mono, for project names and small labels).
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
@@ -34,8 +32,6 @@ export default function RootLayout({
       lang="en"
       className={`${poppins.variable} ${fredoka.variable} ${dmMono.variable}`}
     >
-      {/* Browser extensions (Grammarly, Bitdefender, …) add attributes to
-          <body> before React loads; that alone isn't a hydration problem. */}
       <body className="min-h-screen" suppressHydrationWarning>
         {children}
       </body>

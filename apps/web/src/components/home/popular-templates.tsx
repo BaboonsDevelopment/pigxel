@@ -23,11 +23,6 @@ const TEMPLATES: Template[] = [
   },
 ];
 
-/**
- * Home's "Popular templates": ready-made starting points. Templates can't be
- * opened yet, so the cards only show what is coming. On wide screens the
- * pictures take whatever height Home has left.
- */
 export function PopularTemplates() {
   return (
     <section

@@ -1,16 +1,8 @@
-/**
- * What changed in Pigxel, newest first. The sidebar shows the first entry;
- * /patch-notes shows one release at a time, the newest unless another is
- * picked. Add a new entry at the top with each release.
- */
 type PatchNote = {
-  /** "0.1"; also the page's ?v= value. */
   version: string;
-  /** ISO date of the release. */
   date: string;
   title: string;
   summary: string;
-  /** The changes, grouped under headings. */
   sections: { title: string; changes: string[] }[];
 };
 
@@ -74,7 +66,6 @@ export const PATCH_NOTES: PatchNote[] = [
   },
 ];
 
-/** "September 30, 2026", or "Sep 30" when `short`. */
 export function patchDate(iso: string, short = false) {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
     month: short ? "short" : "long",

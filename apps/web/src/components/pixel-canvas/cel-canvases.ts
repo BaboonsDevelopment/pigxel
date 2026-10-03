@@ -5,17 +5,11 @@ import { canvasOf } from "./helpers";
 export const contextOf = (canvas: HTMLCanvasElement | undefined) =>
   canvas?.getContext("2d", { willReadFrequently: true }) ?? null;
 
-/** Whether every pixel is fully transparent. */
 export function isTransparent(pixels: Uint8ClampedArray) {
   for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) return false;
   return true;
 }
 
-/**
- * The canvases holding the cels while a tile is edited, by frame id, then
- * layer id. Tools draw straight on them; the pixels are read back only when
- * needed, and kept until the cel is drawn on again.
- */
 export class CelCanvases {
   private frames = new Map<string, Map<string, HTMLCanvasElement>>();
   private cache = new WeakMap<HTMLCanvasElement, Uint8ClampedArray>();
@@ -30,7 +24,6 @@ export class CelCanvases {
     return this.frames.get(frameId)?.get(layerId);
   }
 
-  /** Makes the cel a new canvas holding `pixels`, or transparent ones. */
   set(
     frameId: string,
     layerId: string,
@@ -59,7 +52,6 @@ export class CelCanvases {
     for (const frame of this.frames.values()) frame.delete(layerId);
   }
 
-  /** The cel's pixels; read from its canvas once per change. Never modify them. */
   pixels(frameId: string, layerId: string) {
     const canvas = this.get(frameId, layerId);
     if (!canvas) return undefined;
@@ -76,22 +68,16 @@ export class CelCanvases {
     return pixels;
   }
 
-  /** Forgets the pixels read from a canvas that was drawn on. */
   invalidate(canvas: HTMLCanvasElement) {
     this.cache.delete(canvas);
   }
 
-  /** Every cel, as a list so cels can be removed while going through it. */
   list() {
     return [...this.frames].flatMap(([frameId, frame]) =>
       [...frame].map(([layerId, canvas]) => ({ frameId, layerId, canvas })),
     );
   }
 
-  /**
-   * Grows or shrinks every cel, its old pixels placed at `offset` (the
-   * top-left by default); `fillOf` paints the new space.
-   */
   resize(
     next: Size,
     fillOf: (layerId: string) => string | null,

@@ -15,17 +15,12 @@ type Props = {
   frame: Area;
   tile: Size;
   scale: number;
-  /** How much wider or taller pixels are shown (the pixel ratio); 1 for square. */
   stretch?: { x: number; y: number };
   onChange: (frame: Area) => void;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
-/**
- * The frame where a new picture will go: drag inside to move it, drag a
- * handle to resize it, then confirm. Enter and Esc work too (see the canvas).
- */
 export function FrameEditor({
   frame,
   tile,
@@ -39,7 +34,6 @@ export function FrameEditor({
     null,
   );
 
-  // Which part is dragged comes from `data-side`: a handle, or the body.
   const start = (e: React.PointerEvent<HTMLElement>) => {
     e.preventDefault();
     e.stopPropagation();

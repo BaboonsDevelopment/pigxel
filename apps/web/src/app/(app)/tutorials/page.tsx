@@ -6,7 +6,6 @@ import { TUTORIALS } from "@/lib/tutorials/tutorials";
 
 export const metadata: Metadata = { title: "Tutorials · Pigxel" };
 
-/** Every tutorial: a video to watch and a guide to follow in the editor. */
 export default function Tutorials() {
   return (
     <ScaledPage>

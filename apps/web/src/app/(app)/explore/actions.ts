@@ -8,7 +8,6 @@ import { PAGE_SIZE, PERIODS, type Period } from "./constants";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** The next arts of the feed, after the `from` already shown. */
 export async function loadPopularTiles(
   period: Period,
   from: number,
@@ -25,7 +24,6 @@ export async function loadPopularTiles(
   return tiles;
 }
 
-/** Likes a published art, or takes the like back. */
 export async function setTileLiked(
   tileId: string,
   liked: boolean,

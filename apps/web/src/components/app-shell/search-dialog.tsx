@@ -31,10 +31,6 @@ type Result = {
 
 const EMPTY: SearchResults = { tiles: [], artists: [] };
 
-/**
- * The top bar's search: a round button (or ⌘K / Ctrl+K) opening a dialog
- * that finds your projects, in this browser and in Pigxel cloud, and artists.
- */
 export function SearchButton({ userId }: { userId: string }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -71,7 +67,6 @@ export function SearchButton({ userId }: { userId: string }) {
         aria-label="Search"
         onClose={() => setOpen(false)}
         onClick={(event) => {
-          // A click on the backdrop lands on the dialog itself.
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
         className="mx-auto mt-[12vh] w-[min(36rem,calc(100vw-2rem))] rounded-2xl border bg-popover p-0 text-foreground shadow-2xl backdrop:bg-foreground/25 backdrop:backdrop-blur-[2px]"
@@ -95,10 +90,8 @@ function SearchPanel({ userId, close }: { userId: string; close: () => void }) {
   });
   const [active, setActive] = useState(0);
   const [pending, startTransition] = useTransition();
-  // Tiles kept in this browser are listed once they are read.
   useDraftsLoaded(userId);
 
-  // Asks the server once typing pauses; answers for older text are ignored below.
   useEffect(() => {
     const text = query.trim();
     if (!text || text === "@") return;
@@ -114,7 +107,6 @@ function SearchPanel({ userId, close }: { userId: string; close: () => void }) {
   }, [query]);
 
   const text = query.trim().toLowerCase();
-  // "@ada" looks for people by @username only.
   const handleMode = text.startsWith("@");
   const server = text && found.query.toLowerCase() === text ? found : EMPTY;
   const local =

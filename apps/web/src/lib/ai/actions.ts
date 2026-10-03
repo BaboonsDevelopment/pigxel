@@ -46,20 +46,13 @@ import { requireUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 
 const MAX_GRID = 256;
-/** A PNG data URL of at most ~1.5 MB, capturing its base64 payload. */
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]{1,2000000})$/;
-/** A picture the user attached, the same size at most: its type and payload. */
 const IMAGE_DATA_URL =
   /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/;
-/** Guards against oversized requests; a full 256×256 tile grid is ~70k. */
 const MAX_GRID_TEXT = 100_000;
 
 const validSize = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
 
-/**
- * Runs one AI action, if the person has tokens left; any failure becomes a
- * message for them.
- */
 async function attempt<T>(label: string, run: () => Promise<T>) {
   try {
     if ((await creditBalance()).left <= 0)
@@ -71,23 +64,17 @@ async function attempt<T>(label: string, run: () => Promise<T>) {
   }
 }
 
-/**
- * Routes the latest message. Chat is answered right away; anything that
- * changes the tile comes back as an action the client carries out.
- */
 export async function sendMessage(
   messages: ChatMessage[],
 ): Promise<AiResult<ChatMessage>> {
   await requireUser();
   return attempt("sendMessage", async () => {
     const ai = getAiProvider();
-    // Recent turns give follow-ups like "make it bigger" their meaning.
     const recent = messages.slice(-MAX_HISTORY);
     const route = await ai.route(recent);
     if (route.intent === "chat") {
       return { role: "assistant", content: await ai.chat(recent) };
     }
-    // The router spells out what the latest message refers to.
     return {
       role: "assistant",
       content: `${route.intent}: ${route.subject}`,
@@ -104,12 +91,10 @@ export async function sendMessage(
   });
 }
 
-/** Draws `subject` as pixel art for a `width × height` grid; returns a data URL. */
 export async function generateImage(
   subject: string,
   width: number,
   height: number,
-  /** Pictures the user attached to draw from, as data URLs. */
   references: string[] = [],
 ): Promise<AiResult<string>> {
   await requireUser();
@@ -136,7 +121,6 @@ export async function generateImage(
   });
 }
 
-/** Precise edit: the tile as a text grid in, pixel operations out. */
 export async function editTile(
   request: string,
   grid: string,
@@ -153,7 +137,6 @@ export async function editTile(
   );
 }
 
-/** Creative edit: a picture of the area in, the changed picture out. */
 export async function redrawArea(
   request: string,
   picture: string,
@@ -176,10 +159,6 @@ export async function redrawArea(
   });
 }
 
-/**
- * Looks at the current tile (a PNG data URL) and picks the area where
- * `subject` would fit the existing scene best.
- */
 export async function suggestComposition(
   subject: string,
   tile: string,
@@ -200,19 +179,12 @@ export async function suggestComposition(
   });
 }
 
-/**
- * Decides how to carry out an edit: which object changes (`objects` are the
- * drawn things found on the tile), where the result goes, and whether exact
- * pixel operations or a redraw suit it. `drawn` is used when the edit is not
- * about one object; `selection` limits the edit to what the user selected.
- */
 export async function planEdit(args: {
   request: string;
   tile: string;
   width: number;
   height: number;
   objects: Rect[];
-  /** The name of the layer each object is on. */
   layers: string[];
   drawn: Rect;
   selection: Rect | null;
@@ -255,8 +227,6 @@ export async function planEdit(args: {
       width,
       height,
     );
-    // Exact operations work in place; a move keeps the size; only a
-    // redraw can resize.
     const placed = clampRect(reply.target, width, height);
     const target =
       reply.mode === "ops"
@@ -272,7 +242,6 @@ export async function planEdit(args: {
       mode: reply.mode,
       objects,
       source,
-      // Kept objects stay where they are, so the edit happens in place.
       target: keep.length ? source : target,
       keep,
       instruction: reply.instruction,
@@ -282,11 +251,6 @@ export async function planEdit(args: {
   });
 }
 
-/**
- * Decides where new pictures go on a tile that has drawings: free spots that
- * follow `where`, or copies of an existing object when the user asked for
- * more of it. `ask` comes back when there is no room without covering art.
- */
 export async function planPlacement(args: {
   subject: string;
   where: string;
@@ -295,7 +259,6 @@ export async function planPlacement(args: {
   width: number;
   height: number;
   objects: Rect[];
-  /** The name of the layer each object is on. */
   layers: string[];
   recent: ChatMessage[];
 }): Promise<AiResult<PlacementPlan>> {
@@ -332,7 +295,6 @@ export async function planPlacement(args: {
     const areas = reply.areas
       .slice(0, args.count)
       .map((r) => clampRect(r, width, height))
-      // A copy keeps the size of the original.
       .map((r) =>
         copied
           ? clampRect({ ...r, w: copied.w, h: copied.h }, width, height)
@@ -347,11 +309,6 @@ export async function planPlacement(args: {
   });
 }
 
-/**
- * Plans an animation of `request` on the tile (a PNG data URL): its frames
- * and one track per thing that moves. `layers` are the drawn layers, which
- * the plan may reuse by index; `frames` is the count asked for, or 0.
- */
 export async function planAnimation(args: {
   request: string;
   tile: string;
@@ -359,15 +316,12 @@ export async function planAnimation(args: {
   height: number;
   layers: { name: string; box: Rect | null }[];
   objects: Rect[];
-  /** The name of the layer each object is on. */
   objectLayers: string[];
   frames: number;
 }): Promise<AiResult<AnimationPlan>> {
   await requireUser();
   const { request, width, height } = args;
   const png = PNG_DATA_URL.exec(args.tile)?.[1];
-  // Input from the browser is untrusted, and a page still running older
-  // code may leave lists out.
   const list = <T>(value: T[] | undefined) =>
     Array.isArray(value) ? value : [];
   const layers = list(args.layers);
@@ -409,10 +363,6 @@ export async function planAnimation(args: {
   });
 }
 
-/**
- * Looks at an edit before it is applied: `before` and `after` are PNG data
- * URLs of the same area of the layer. Free (text model).
- */
 export async function reviewEdit(args: {
   request: string;
   instruction: string;
@@ -436,11 +386,6 @@ export async function reviewEdit(args: {
   );
 }
 
-/**
- * Draws several different things in one picture (paid once), one per cell of
- * a sheet, each cell sized for `cellW × cellH` tile pixels. Returns the
- * picture and its grid.
- */
 export async function generateSet(args: {
   subjects: string[];
   cellW: number;
@@ -471,12 +416,6 @@ export async function generateSet(args: {
   });
 }
 
-/**
- * Makes one change in every frame of an animation as one picture (paid
- * once): `sheet` is a PNG data URL of the `count` frames, each `cellW ×
- * cellH` tile pixels, laid out by sheetLayout. Returns the redrawn sheet and
- * its grid.
- */
 export async function redrawFrames(args: {
   instruction: string;
   sheet: string;
@@ -514,11 +453,6 @@ export async function redrawFrames(args: {
   });
 }
 
-/**
- * Draws `subject` in every pose as one sprite sheet (paid), each cell sized
- * for `cellW × cellH` tile pixels. With `reference` (a PNG data URL of what
- * is already drawn), its look is kept. Returns the picture and its grid.
- */
 export async function generateSheet(args: {
   subject: string;
   poses: string[];
@@ -560,10 +494,8 @@ export async function generateSheet(args: {
   });
 }
 
-/** One recorded AI request, for the usage list: its step and what it took. */
 export type UsageRow = { step: string; credits: number; at: string };
 
-/** The signed-in person's most recent AI requests, newest first. */
 export async function listAiUsage(): Promise<UsageRow[]> {
   await requireUser();
   const supabase = await createClient();
@@ -581,7 +513,6 @@ export async function listAiUsage(): Promise<UsageRow[]> {
   }));
 }
 
-/** The signed-in person's AI tokens: their allowance and what is left. */
 export async function getAiBalance(): Promise<{
   limit: number;
   left: number;

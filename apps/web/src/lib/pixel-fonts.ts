@@ -5,7 +5,6 @@ import {
   Tiny5,
 } from "next/font/google";
 
-/** Pixel fonts for the editor's text tool. */
 export const tiny5 = Tiny5({
   subsets: ["latin", "cyrillic"],
   weight: "400",

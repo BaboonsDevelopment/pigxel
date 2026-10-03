@@ -6,13 +6,10 @@ import {
 } from "@/lib/image/quantize";
 import { GIF_ALPHA_CUTOFF, GIF_MAX_COLORS, GIF_MIN_DELAY } from "./constants";
 
-/** One picture of a GIF and how long it shows, in milliseconds. */
 type GifFrame = { rgba: Uint8ClampedArray; duration: number };
 
-/** Frames as indices into one shared palette. */
 type IndexedFrames = {
   palette: RGB[];
-  /** The index transparent pixels have, or null when every pixel is opaque. */
   transparent: number | null;
   frames: Uint8Array[];
 };
@@ -20,12 +17,6 @@ type IndexedFrames = {
 const keyOf = (rgba: Uint8ClampedArray, p: number) =>
   (rgba[p]! << 16) | (rgba[p + 1]! << 8) | rgba[p + 2]!;
 
-/**
- * Turns the frames into palette indices. Pixel art rarely has more than 255
- * colours, and then every colour stays exact; otherwise the palette is cut
- * down to the 255 that stand for the rest best. A pixel less than half
- * opaque becomes transparent, the rest fully opaque.
- */
 export function toIndexed(frames: Uint8ClampedArray[]): IndexedFrames {
   const counts = new Map<number, number>();
   let hasTransparent = false;
@@ -63,7 +54,6 @@ export function toIndexed(frames: Uint8ClampedArray[]): IndexedFrames {
         palette,
       ),
     );
-  // Always one entry, so an all-transparent GIF still has a colour table.
   const transparent = hasTransparent || !palette.length ? palette.length : null;
 
   return {
@@ -83,7 +73,6 @@ export function toIndexed(frames: Uint8ClampedArray[]): IndexedFrames {
   };
 }
 
-/** A growing byte buffer. */
 class Bytes {
   private data = new Uint8Array(1024);
   length = 0;
@@ -97,7 +86,6 @@ class Bytes {
     this.data[this.length++] = value;
   }
 
-  /** Two bytes, little end first, as GIF stores numbers. */
   word(value: number) {
     this.byte(value & 0xff);
     this.byte((value >> 8) & 0xff);
@@ -112,14 +100,8 @@ class Bytes {
   }
 }
 
-/** Codes of the LZW table can't be wider than this. */
 const MAX_CODE_BITS = 12;
 
-/**
- * GIF's LZW compression of `indices` into `out`, in sub-blocks of up to 255
- * bytes. Code widths follow the decoder, which widens one code later than
- * the encoder adds the entry that needs it.
- */
 function writeLzw(out: Bytes, indices: Uint8Array, minCodeSize: number) {
   const clear = 1 << minCodeSize;
   const end = clear + 1;
@@ -159,7 +141,6 @@ function writeLzw(out: Bytes, indices: Uint8Array, minCodeSize: number) {
     }
     emit(prefix);
     if (next === 1 << MAX_CODE_BITS) {
-      // The table is full: start a new one.
       emit(clear);
       table = new Map();
       codeSize = minCodeSize + 1;
@@ -177,10 +158,6 @@ function writeLzw(out: Bytes, indices: Uint8Array, minCodeSize: number) {
   out.byte(0);
 }
 
-/**
- * An animated GIF of `frames` (RGBA of `width × height`) that loops forever.
- * Each frame replaces the one before, transparent pixels included.
- */
 export function encodeGif(
   frames: GifFrame[],
   width: number,
@@ -189,7 +166,6 @@ export function encodeGif(
   const indexed = toIndexed(frames.map((f) => f.rgba));
   const colors =
     indexed.palette.length + (indexed.transparent === null ? 0 : 1);
-  // The colour table has 2^depth entries.
   let depth = 1;
   while (1 << depth < colors) depth++;
 
@@ -197,10 +173,9 @@ export function encodeGif(
   out.text("GIF89a");
   out.word(width);
   out.word(height);
-  // A global colour table of 2^depth entries.
   out.byte(0x80 | ((depth - 1) << 4) | (depth - 1));
-  out.byte(0); // Background colour index
-  out.byte(0); // Pixel aspect ratio
+  out.byte(0);
+  out.byte(0);
   for (let i = 0; i < 1 << depth; i++) {
     const c = indexed.palette[i];
     out.byte(c?.r ?? 0);
@@ -208,7 +183,6 @@ export function encodeGif(
     out.byte(c?.b ?? 0);
   }
 
-  // Loop forever.
   out.byte(0x21);
   out.byte(0xff);
   out.byte(11);
@@ -219,8 +193,6 @@ export function encodeGif(
   out.byte(0);
 
   frames.forEach((frame, n) => {
-    // Graphic control: clear to transparent before the next frame, the delay,
-    // and which index is transparent.
     out.byte(0x21);
     out.byte(0xf9);
     out.byte(4);
@@ -229,7 +201,6 @@ export function encodeGif(
     out.byte(indexed.transparent ?? 0);
     out.byte(0);
 
-    // The image covers the whole canvas and uses the global colour table.
     out.byte(0x2c);
     out.word(0);
     out.word(0);

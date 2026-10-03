@@ -11,12 +11,6 @@ type SliceDrag =
   | { kind: "move"; id: string; from: Point; dx: number; dy: number }
   | null;
 
-/**
- * The tile's slices over the canvas, as the Slice tool shows them: each
- * outlined with its name, the picked one with its 9-slice centre and pivot,
- * and the one being drawn, moved or resized where the pointer has it. The
- * picked slice has handles on its corners and sides to resize it by.
- */
 export function SliceOverlay({
   slices,
   size,
@@ -29,11 +23,9 @@ export function SliceOverlay({
   slices: Slice[];
   size: Size;
   scale: number;
-  /** How much wider or taller pixels are shown (the pixel ratio); 1 for square. */
   stretch?: { x: number; y: number };
   pickedId: string | null;
   drag: SliceDrag;
-  /** Called with the picked slice's new bounds when a handle is let go. */
   onResize: (bounds: Rect) => void;
 }) {
   const [resizing, setResizing] = useState<Rect | null>(null);
@@ -42,10 +34,8 @@ export function SliceOverlay({
     x: number;
     y: number;
     start: Rect;
-    /** Where the handle has the slice now. */
     bounds: Rect;
   }>(null);
-  // Each slice as it shows now: moved or resized while being dragged.
   const shown = (slice: Slice): Slice => {
     if (slice.id === pickedId && resizing) return resizedSlice(slice, resizing);
     if (drag?.kind === "move" && drag.id === slice.id)
@@ -63,8 +53,6 @@ export function SliceOverlay({
   const picked = slices.find((s) => s.id === pickedId);
   const pickedBounds = picked && !drag ? boundsOf(picked) : null;
 
-  // Handles drag their edges by whole tile pixels, keeping the slice on the
-  // tile and at least a pixel big.
   const startResize = (
     e: React.PointerEvent<HTMLElement>,
     edges: FrameEdges,

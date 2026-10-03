@@ -4,11 +4,6 @@ import { useEffect, useRef } from "react";
 import { MenuList } from "./components/menu-list";
 import type { MenuSections } from "./constants";
 
-/**
- * A right-click menu at the pointer (`x`, `y` in window coordinates), kept
- * inside the window. It closes on a pick, an outside click, Escape, scrolling
- * or resizing.
- */
 export function ContextMenu({
   x,
   y,
@@ -25,7 +20,6 @@ export function ContextMenu({
   useEffect(() => {
     const menu = ref.current;
     if (menu) {
-      // Opens up or to the left when there is no room below or to the right.
       const { width, height } = menu.getBoundingClientRect();
       menu.style.left = `${Math.min(x, window.innerWidth - width - 4)}px`;
       menu.style.top = `${Math.min(y, window.innerHeight - height - 4)}px`;

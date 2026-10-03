@@ -1,10 +1,8 @@
 import { MAX_OBJECTS, MIN_OBJECT_PIXELS } from "./constants";
 import { sameRect, type Rect } from "./raster";
 
-/** A separate drawn thing: its box and the numbers of its pixels. */
 export type Component = { box: Rect; members: number[] };
 
-/** Groups touching opaque pixels (diagonals too) into separate drawn things. */
 export function components(
   pixels: Uint8ClampedArray,
   width: number,
@@ -48,7 +46,6 @@ export function components(
   return out;
 }
 
-/** Boxes of the drawn things on the tile, biggest first, specks left out. */
 export function findObjects(
   pixels: Uint8ClampedArray,
   width: number,
@@ -64,12 +61,6 @@ export function findObjects(
 const inside = (a: Rect, b: Rect) =>
   a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
 
-/**
- * Takes the drawn things lying fully inside `area` off the tile, and nothing
- * else, so a moved or resized object leaves no copy behind while its
- * neighbours stay. `rest` is the tile without them; `lifted` is just them,
- * as an `area`-sized picture.
- */
 export function liftObjectsInside(
   pixels: Uint8ClampedArray,
   width: number,
@@ -90,10 +81,6 @@ export function liftObjectsInside(
   return { rest, lifted };
 }
 
-/**
- * Marks the pixels of drawn things that reach into `area` without lying fully
- * inside it: neighbours an edit of `area` must leave exactly as they are.
- */
 export function neighbourMask(
   pixels: Uint8ClampedArray,
   width: number,
@@ -113,7 +100,6 @@ export function neighbourMask(
   return mask;
 }
 
-/** `after`, with every pixel marked in `mask` put back as it was in `before`. */
 export function keepMasked(
   before: Uint8ClampedArray,
   after: Uint8ClampedArray,
@@ -126,10 +112,6 @@ export function keepMasked(
   return out;
 }
 
-/**
- * Paints the opaque pixels of `art` (an `area`-sized picture) onto the tile,
- * only where the tile is empty, so nothing already drawn is covered.
- */
 export function drawOnEmpty(
   tile: Uint8ClampedArray,
   width: number,
@@ -149,7 +131,6 @@ export function drawOnEmpty(
   return out;
 }
 
-/** Marks the pixels of the drawn things whose boxes are listed in `boxes`. */
 export function objectMask(
   pixels: Uint8ClampedArray,
   width: number,

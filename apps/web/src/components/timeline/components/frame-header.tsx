@@ -6,10 +6,6 @@ import type { Frame } from "@/lib/sprite/types";
 import { FRAME_COLUMN, LAYER_COLUMN, type FrameSide } from "../constants";
 import { frameDropIndex, sideAt } from "../helpers";
 
-/**
- * The frame numbers above the cels: click one to show that frame, drag it
- * left or right to reorder the animation. Stays put while layers scroll.
- */
 export function FrameHeader({
   frames,
   frameId,
@@ -20,9 +16,7 @@ export function FrameHeader({
   frames: Frame[];
   frameId: string;
   onSelect: (id: string) => void;
-  /** Moves a frame to `index` of the list without it. */
   onMove: (id: string, index: number) => void;
-  /** Right-click on a frame: its menu. */
   onContextMenu: (id: string, e: React.MouseEvent) => void;
 }) {
   const [dragging, setDragging] = useState<number | null>(null);

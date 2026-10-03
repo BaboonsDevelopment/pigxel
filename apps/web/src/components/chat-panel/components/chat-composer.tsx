@@ -12,10 +12,8 @@ import { ICONS } from "../icons";
 type Props = {
   draft: string;
   onDraft: (text: string) => void;
-  /** Pictures attached to the message, for the AI to draw from. */
   references: string[];
   onReferences: (references: string[]) => void;
-  /** When on, a new picture goes into an area the user selects after sending. */
   selectArea: boolean;
   onSelectArea: (on: boolean) => void;
   pending: boolean;
@@ -43,7 +41,6 @@ export function ChatComposer({
     onDraft("");
   };
 
-  /** Adds the image files among `files`, up to MAX_REFERENCES in all. */
   const attach = async (files: File[]) => {
     const images = files.filter((f) => f.type.startsWith("image/"));
     const added = await Promise.all(
@@ -63,7 +60,6 @@ export function ChatComposer({
         e.preventDefault();
         submit();
       }}
-      // Pictures dropped here are attached, like chosen ones.
       onDragOver={(e) => {
         if (!e.dataTransfer.types.includes("Files") || !canAttach) return;
         e.preventDefault();
@@ -146,7 +142,6 @@ export function ChatComposer({
               submit();
             }
           }}
-          // Pasted pictures are attached, like chosen ones.
           onPaste={(e) => {
             const files = [...e.clipboardData.files];
             if (!files.some((f) => f.type.startsWith("image/")) || !canAttach)

@@ -26,18 +26,12 @@ type Status =
   | { state: "done"; id: string }
   | { state: "error"; message: string };
 
-/**
- * File › Publish to Assets… (admins): the tile as it is now goes on the
- * Assets page under a name and a kind. A name already taken asks first,
- * then replaces that asset.
- */
 export default function PublishAssetDialog({
   name: initialName,
   document,
   onClose,
 }: {
   name: string;
-  /** The tile at the moment it's published. */
   document: () => PigxelDocument;
   onClose: () => void;
 }) {
@@ -81,7 +75,6 @@ export default function PublishAssetDialog({
       ref={dialog}
       onClose={onClose}
       onClick={(e) => {
-        // A click on the dimmed backdrop closes it.
         if (e.target === dialog.current) dialog.current.close();
       }}
       aria-labelledby="publish-asset-title"

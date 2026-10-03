@@ -2,10 +2,6 @@ import { blend, channelBlend } from "./blend";
 import { MAX_OPACITY } from "./constants";
 import type { BlendMode, Layer, LayerKind, PixelsOf } from "./types";
 
-/**
- * Paints `src` over `dst` (both RGBA of the same size) in place, faded by
- * `opacity` (0–255) and mixed in `mode`, following the W3C source-over rule.
- */
 export function compositeOver(
   dst: Uint8ClampedArray,
   src: Uint8ClampedArray,
@@ -13,8 +9,6 @@ export function compositeOver(
   mode: BlendMode,
 ) {
   const fade = opacity / MAX_OPACITY;
-  // Runs for every pixel of every layer on each repaint, so it avoids
-  // allocating: separable modes go channel by channel.
   const channel = channelBlend(mode);
   const mixed = [0, 0, 0];
   for (let i = 0; i < dst.length; i += 4) {
@@ -22,7 +16,6 @@ export function compositeOver(
     if (as === 0) continue;
     const ab = dst[i + 3]! / 255;
     if (ab === 0 || mode === "normal") {
-      // Where nothing is below, the layer shows as it is.
       mixed[0] = src[i]! / 255;
       mixed[1] = src[i + 1]! / 255;
       mixed[2] = src[i + 2]! / 255;
@@ -50,12 +43,6 @@ export function compositeOver(
   }
 }
 
-/**
- * The picture the layers make together: every shown layer painted bottom to
- * top with its opacity and blend mode. A group first combines its own layers,
- * then goes over what is below as one picture, as in Aseprite. Layers of the
- * `skip` kinds are left out, e.g. references when exporting.
- */
 export function flatten(
   tree: Layer[],
   pixelsOf: PixelsOf,

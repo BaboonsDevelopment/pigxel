@@ -534,7 +534,6 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-/** The tool panel's groups, as Aseprite's: one button each, the rest of the group in its flyout. */
 export const TOOL_GROUPS: { id: string; label: string; tools: ToolId[] }[] = [
   {
     id: "select",

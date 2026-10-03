@@ -5,7 +5,6 @@ import styles from "./demos.module.css";
 const vars = (values: Record<string, string | number>) =>
   values as CSSProperties;
 
-/** The title bar of a little app window. */
 function WindowBar({ title, meta }: { title: string; meta: string }) {
   return (
     <div className={styles.bar}>
@@ -20,7 +19,6 @@ function WindowBar({ title, meta }: { title: string; meta: string }) {
   );
 }
 
-/** Frames on a timeline: the mascot hops, with the last frame as onion skin. */
 export function AnimateDemo() {
   return (
     <figure className={styles.window}>
@@ -67,7 +65,6 @@ export function AnimateDemo() {
 
 const petalCenter = { x: 7, y: 6 };
 
-/** A chat asks for a change and the canvas beside it follows. */
 export function AiDemo() {
   return (
     <div className={styles.aiGrid}>
@@ -113,7 +110,6 @@ export function AiDemo() {
         </div>
         <ol className={styles.messages}>
           <li className={styles.userMessage}>Make the petals blue</li>
-          {/* The typing dots and the reply share one slot, so nothing jumps. */}
           <li className={styles.reply}>
             <span className={styles.typing} aria-hidden="true">
               <i />
@@ -141,7 +137,6 @@ const FORMATS = [
   { name: "Sheet", text: "Sprite sheet + Aseprite JSON for engines" },
 ];
 
-/** A sprite sheet and the formats it can leave Pigxel in. */
 export function ExportDemo() {
   return (
     <figure className={`${styles.window} ${styles.exportWindow}`}>

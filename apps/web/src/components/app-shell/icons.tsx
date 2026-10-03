@@ -1,6 +1,5 @@
 import type { SVGProps } from "react";
 
-/** Line icons for the sidebar, drawn to one 24px grid and stroke. */
 function Icon({ children, ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg

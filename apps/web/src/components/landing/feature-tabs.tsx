@@ -25,12 +25,6 @@ function subscribeMotion(callback: () => void) {
   return () => media.removeEventListener("change", callback);
 }
 
-/**
- * The features as tabs beside one big preview. While nobody touches them
- * they take turns, a progress bar under the open one; picking a tab or
- * drawing in the preview stops that for good. Every panel stays mounted, so
- * a drawing survives switching tabs, and each demo restarts when shown.
- */
 export function FeatureTabs({ features }: { features: Feature[] }) {
   const [active, setActive] = useState(0);
   const [auto, setAuto] = useState(true);

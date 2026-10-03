@@ -13,25 +13,17 @@ import { recoverPixelGrid } from "./steps/recover-pixel-grid";
 import { removeStrayPixels } from "./steps/remove-stray-pixels";
 import { paletteSize } from "./steps/shrink-to-tile";
 
-/** How a sprite sheet is divided: `cols × rows` equal cells, read row by row. */
 type Grid = { cols: number; rows: number };
 
-/** Specks smaller than this (in sheet pixels) are noise, not part of a pose. */
 const MIN_PART = 3;
-/**
- * Drawn things closer than this share of the sheet's shorter side belong to
- * one pose; poses on a sheet are drawn with more space between them.
- */
 const POSE_GAP = 0.02;
 
-/** An empty `w × h` bitmap. */
 const blank = (w: number, h: number): Bitmap => ({
   rgba: new Uint8ClampedArray(w * h * 4),
   w,
   h,
 });
 
-/** Copies `from` into `to` with its top-left at `x`, `y`, clipped to `to`. */
 function paste(to: Bitmap, from: Bitmap, x: number, y: number) {
   for (let row = 0; row < from.h; row++) {
     const ty = y + row;
@@ -46,7 +38,6 @@ function paste(to: Bitmap, from: Bitmap, x: number, y: number) {
   }
 }
 
-/** A pose on the sheet: the drawn things it is made of, and their box. */
 type Group = { parts: Component[]; box: Box; size: number };
 
 const centre = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
@@ -66,19 +57,12 @@ const near = (a: Box, b: Box, gap: number) =>
   a.y - gap < b.y + b.h &&
   b.y - gap < a.y + a.h;
 
-/**
- * The poses as the model actually drew them, whatever grid it used (it often
- * draws 2×3 when asked for 3×2): drawn things close together make one pose
- * (a beaver and the carrot it holds), and the poses are read row by row, left
- * to right. Null when they don't come out as \`count\` poses.
- */
 function findPoses(parts: Component[], count: number, gap: number) {
   let groups: Group[] = parts.map((p) => ({
     parts: [p],
     box: p.box,
     size: p.members.length,
   }));
-  // Join what lies within \`gap\` of each other until nothing more joins.
   for (let joined = true; joined;) {
     joined = false;
     for (let i = 0; i < groups.length && !joined; i++)
@@ -94,7 +78,6 @@ function findPoses(parts: Component[], count: number, gap: number) {
         joined = true;
       }
   }
-  // Stray bits that stand apart join the pose nearest to them.
   while (groups.length > count) {
     groups.sort((a, b) => a.size - b.size);
     const [small, ...rest] = groups as [Group, ...Group[]];
@@ -108,7 +91,6 @@ function findPoses(parts: Component[], count: number, gap: number) {
     groups = rest;
   }
   if (groups.length !== count) return null;
-  // Rows: a pose starts a new row when its centre is below the row's poses.
   groups.sort((a, b) => centre(a.box).y - centre(b.box).y);
   const rows: Group[][] = [];
   for (const g of groups) {
@@ -122,7 +104,6 @@ function findPoses(parts: Component[], count: number, gap: number) {
   );
 }
 
-/** The drawn things by cell of the \`grid\` their centres lie in. */
 function byGrid(image: Bitmap, parts: Component[], grid: Grid, count: number) {
   const cellW = image.w / grid.cols;
   const cellH = image.h / grid.rows;
@@ -136,11 +117,6 @@ function byGrid(image: Bitmap, parts: Component[], grid: Grid, count: number) {
   return cells;
 }
 
-/**
- * The poses of a cut-out sprite sheet, in order. They are found as drawn
- * (see findPoses); when that fails, each drawn thing goes to the cell of the
- * asked-for \`grid\` its centre lies in. Missing poses give null.
- */
 export function splitSheet(
   image: Bitmap,
   grid: Grid,
@@ -171,12 +147,6 @@ export function splitSheet(
   });
 }
 
-/**
- * Pixel art frames of `box` size from the cut-out poses. All poses shrink by
- * one factor, so the subject keeps its size from frame to frame, and share
- * one palette; each stands centred on the bottom edge of its frame, so it
- * does not jump around. Missing poses stay null.
- */
 export function posesToFrames(
   poses: (Bitmap | null)[],
   box: Size,
@@ -185,7 +155,6 @@ export function posesToFrames(
   if (!present.length) return poses.map(() => null);
   const slotW = Math.max(...present.map((p) => p.w));
   const slotH = Math.max(...present.map((p) => p.h));
-  // Every pose in a slot of one strip, so one pass gives one palette.
   const strip = blank(slotW * present.length, slotH);
   present.forEach((p, i) =>
     paste(strip, p, i * slotW + Math.floor((slotW - p.w) / 2), slotH - p.h),
@@ -215,11 +184,6 @@ export function posesToFrames(
   });
 }
 
-/**
- * The first `count` cells of `grid` cut out as they are, all one size: for
- * frames of one scene seen by a fixed camera, where what is drawn moves
- * within the frame and must keep its place. Empty cells give null.
- */
 function sheetCells(
   image: Bitmap,
   grid: Grid,
@@ -238,13 +202,6 @@ function sheetCells(
   });
 }
 
-/**
- * A sprite sheet from the image model turned into `count` pixel art frames
- * of `box` size (null where a cell is empty). By "poses" (separate things,
- * each found as drawn and stood on the bottom of its frame) or by "cells"
- * (whole frames of one scene, kept as framed). Browser-only: decoding needs
- * a canvas.
- */
 export async function sheetToFrames(
   source: Blob,
   grid: Grid,

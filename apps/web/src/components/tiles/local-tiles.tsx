@@ -12,10 +12,6 @@ import { TileThumbnail } from "./tile-thumbnail";
 
 type LocalTile = Draft & { image: PigxelDocument };
 
-/**
- * Tiles kept in this browser that aren't in Pigxel cloud: ones stored nowhere
- * else, and Google Drive files opened here. Cloud tiles are listed separately.
- */
 export function LocalTiles(props: { userId: string; hasCloudTiles: boolean }) {
   if (!useDraftsLoaded(props.userId)) return <div className="mt-6 min-h-48" />;
   return <List {...props} />;

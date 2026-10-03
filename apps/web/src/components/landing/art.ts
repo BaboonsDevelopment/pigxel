@@ -15,15 +15,10 @@ import buildTileset from "../../../public/art/tutorials/build-tileset.png";
 import firstAnimation from "../../../public/art/tutorials/first-animation.png";
 import basics from "../../../public/art/tutorials/pixel-art-basics.png";
 
-/**
- * A piece on the landing: full-bleed scenes fill their card, transparent
- * sprites sit on a soft tint. All of them are AI art studies (artwork.md).
- */
 export type Art = {
   image: StaticImageData;
   name: string;
   alt: string;
-  /** Background for a transparent sprite; scenes have none. */
   tint?: string;
 };
 
@@ -113,7 +108,6 @@ export const ART = {
 
 const a = ART;
 
-/** The hero wall: six columns, each a different mix so no two rows match. */
 export const WALL_COLUMNS: Art[][] = [
   [a.coast, a.robot, a.characters, a.readingPig, a.buildTileset],
   [a.sittingPig, a.cozyRooms, a.firstAnimation, a.tiles, a.night],
@@ -123,7 +117,6 @@ export const WALL_COLUMNS: Art[][] = [
   [a.readingPig, a.basics, a.shrine, a.cozyRooms, a.sittingPig],
 ];
 
-/** The thumbnails that drift along the bottom of the closing call to action. */
 export const STRIP: Art[] = [
   a.sittingPig,
   a.coast,

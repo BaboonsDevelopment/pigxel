@@ -10,11 +10,6 @@ import { blankDocument, serializePigxel } from "@/lib/pigxel-file/format";
 import { guideUrl } from "@/lib/pigxel-file/open-tile";
 import { findTutorial } from "@/lib/tutorials/tutorials";
 
-/**
- * Opens the editor on a fresh practice tile, kept in this browser, with the
- * tutorial's guide walking through it. A practice that starts from an asset
- * loads it now; without it, the tile starts blank.
- */
 export function StartGuideButton({
   userId,
   slug,
@@ -22,7 +17,6 @@ export function StartGuideButton({
 }: {
   userId: string;
   slug: string;
-  /** The asset the practice starts from, when it has one and it's there. */
   asset: Asset | null;
 }) {
   const router = useRouter();

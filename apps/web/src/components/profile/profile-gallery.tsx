@@ -12,10 +12,6 @@ import { ArtCard } from "./art-card";
 type Change = Pick<ProfileTile, "id"> &
   Partial<Pick<ProfileTile, "visibility" | "pinOrder">>;
 
-/**
- * Pinned arts, then `children` (the activity row), then the rest. The owner's publish and pin changes show at
- * once and roll back by themselves if the server turns them down.
- */
 export function ProfileGallery({
   tiles,
   isOwner,
@@ -118,7 +114,6 @@ function Gallery({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** A free pinned slot, shown to the owner. */
 function EmptyPin() {
   return (
     <li className="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary-soft bg-white/50 p-4 text-center text-xs text-muted-foreground">

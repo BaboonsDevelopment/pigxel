@@ -27,7 +27,6 @@ type TileRow = {
   updated_at: string;
 };
 
-/** The signed-in person's own profile; null until the profiles table exists. */
 export const getOwnProfile = cache(
   async (userId: string): Promise<ArtistProfile | null> => {
     if (!isSupabaseConfigured()) return null;
@@ -42,7 +41,6 @@ export const getOwnProfile = cache(
   },
 );
 
-/** What the sidebar shows: the profile, or the sign-in details before it exists. */
 export async function sidebarProfile(user: User): Promise<Profile> {
   const [own, plan] = await Promise.all([
     getOwnProfile(user.id),
@@ -64,10 +62,6 @@ type ProfileLookup =
   | { kind: "private" }
   | { kind: "missing" };
 
-/**
- * The profile at /u/<username>, as far as the signed-in person may see it.
- * A failed lookup throws, so it shows as an error instead of "not found".
- */
 export async function findProfile(username: string): Promise<ProfileLookup> {
   if (!isSupabaseConfigured()) return { kind: "missing" };
   const supabase = await createClient();
@@ -87,10 +81,6 @@ export async function findProfile(username: string): Promise<ProfileLookup> {
   return isPrivate === true ? { kind: "private" } : { kind: "missing" };
 }
 
-/**
- * A person's cloud tiles, pinned first, and how many there are. Row-level
- * security leaves visitors only the public ones, so both fit the viewer.
- */
 export async function listProfileTiles(
   userId: string,
 ): Promise<{ tiles: ProfileTile[]; count: number }> {
@@ -136,20 +126,12 @@ type PublicTileRow = TileRow & {
     | "provider_avatar_url"
   >;
   likes: { count: number }[];
-  /** Left out for guests. */
   mine?: { user_id: string }[];
 };
 
 const PUBLIC_TILE_COLUMNS =
   "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
 
-/**
- * Up to `limit` of everyone's arts published in the last `days` days,
- * skipping the first `from`: most liked in that time first, each with its
- * author, its likes and whether `viewerId` liked it (never, for a guest's
- * null), and how many there are in all — in one request. Row-level security
- * leaves out those of private profiles.
- */
 export async function listPublicTiles(
   from: number,
   limit: number,
@@ -190,7 +172,6 @@ export async function listPublicTiles(
   };
 }
 
-/** How many follow the artist, and whether the viewer is one of them. */
 export async function getFollowStats(
   profileId: string,
   viewerId: string,
@@ -212,9 +193,7 @@ export async function getFollowStats(
 }
 
 export type ProfileActivity = {
-  /** Arts worked on per UTC day, keyed "YYYY-MM-DD", over about the last year. */
   days: Map<string, number>;
-  /** Midnight UTC today, where the heatmap ends. */
   today: number;
 };
 

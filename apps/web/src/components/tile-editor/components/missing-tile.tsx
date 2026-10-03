@@ -2,7 +2,6 @@ import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 
-/** A link to a tile that isn't in this browser, e.g. opened on another device. */
 export function MissingTile() {
   return (
     <main className="flex h-dvh items-center justify-center bg-canvas p-6">

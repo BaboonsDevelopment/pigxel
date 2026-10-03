@@ -9,14 +9,9 @@ import { AVATAR_BUCKET, type ArtistProfile } from "@/lib/profile/profile";
 import { createClient } from "@/lib/supabase/client";
 import { setAvatar } from "./actions";
 
-/** Pictures are stored at most this many pixels a side. */
 const AVATAR_SIDE = 256;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-/**
- * The centre square of `file` as a PNG. Small pictures (pixel art) are
- * enlarged by whole steps without blurring; big ones are scaled down.
- */
 async function squarePng(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
   const side = Math.min(bitmap.width, bitmap.height);
@@ -59,7 +54,6 @@ export function AvatarField({
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // The new picture shows while it saves, and goes back if saving fails.
   const [avatarUrl, showAvatar] = useOptimistic(profile.avatarUrl);
 
   const choose = (kind: "none" | "provider") =>
@@ -102,7 +96,6 @@ export function AvatarField({
         await storage.remove([path]);
         setError(result.error);
       }
-      // The saved picture has replaced the preview by now.
       setTimeout(() => URL.revokeObjectURL(preview), 5000);
     });
   };

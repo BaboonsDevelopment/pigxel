@@ -21,16 +21,8 @@ import { animate } from "./flows/animate";
 import { edit } from "./flows/edit";
 import { drawOnNewLayer, generate } from "./flows/generate";
 
-/** How long the chat waits after a change before saving it. */
 const SAVE_DELAY = 800;
 
-/**
- * The AI chat. Each message is routed: talk is answered, and a request to
- * draw, change or animate the tile runs its flow (see flows/), which works
- * on the tile's layers and frames through `canvas`. The chat is kept in
- * Pigxel cloud under the tile's id (see lib/chat), so it is there again when
- * the tile is opened.
- */
 export function ChatPanel({
   canvas,
   tileId,
@@ -39,19 +31,15 @@ export function ChatPanel({
   tileId: string;
 }) {
   const [messages, setMessages] = useState<ChatEntry[]>([]);
-  // Nothing is saved before the stored chat is back, so it isn't overwritten.
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState(false);
-  // The token balance is read again each time the assistant is done.
   useEffect(() => {
     if (!pending) notifyAiSpent();
   }, [pending]);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  // Pictures attached to the message being written, to draw from.
   const [references, setReferences] = useState<string[]>([]);
   const [selectArea, setSelectArea] = useState(false);
-  // Pictures already in the browser's cache, by data URL, to keep each once.
   const kept = useRef(new Map<string, string>());
 
   useEffect(() => {
@@ -77,8 +65,6 @@ export function ChatPanel({
     };
   }, [tileId]);
 
-  // Saves a moment after the chat changes. Steps waiting for a click
-  // (buttons, placement choices) are not kept: they belong to this visit.
   useEffect(() => {
     if (!loaded) return;
     const timer = setTimeout(async () => {
@@ -128,7 +114,6 @@ export function ChatPanel({
     setReferences([]);
     setError(null);
     setPending(true);
-    // Pictures stay on the client; the router only hears that there are some.
     const result = await sendMessage(
       conversation.map(({ role, content, references }) => ({
         role,
@@ -138,7 +123,6 @@ export function ChatPanel({
     setPending(false);
 
     if (!result.ok) {
-      // Unanswered: take the message back so resending is one Enter.
       setMessages(messages);
       setDraft((current) => current || text);
       setReferences((current) => (current.length ? current : attached));
@@ -159,14 +143,12 @@ export function ChatPanel({
     else await edit(chat, action);
   };
 
-  /** Draws the picture of message `index` where the chosen placement says. */
   const choose = async (index: number, placement: Placement) => {
     const entry = messages[index];
     const action = entry?.action;
     if (!action || pending) return;
     canvas.highlight(null);
     const replace = placement.kind === "replace";
-    // Anything but a replacement can be moved and resized on the tile first.
     if (!replace) append({ role: "assistant", content: ASK_FRAME });
     const area = replace
       ? placement.area
@@ -181,11 +163,9 @@ export function ChatPanel({
       [area],
       replace,
     );
-    // Bring the choice back so the user can simply try again.
     if (!drawn) change(index, { placements: entry.placements });
   };
 
-  /** Runs the step a message waits for; its button comes back if it fails. */
   const press = async (index: number) => {
     const button = messages[index]?.button;
     if (!button || pending) return;
@@ -193,7 +173,6 @@ export function ChatPanel({
     if (!(await button.run())) change(index, { button });
   };
 
-  // It sits in an editor panel, which titles, folds and sizes it.
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-4">

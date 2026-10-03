@@ -3,10 +3,6 @@ import Link from "next/link";
 import { TUTORIALS } from "@/lib/tutorials/tutorials";
 import pigReading from "../../../public/art/pigxel-mascot-reading.png";
 
-/**
- * Home's "Learn & Tutorials": a row per tutorial, with the mascot reading
- * along. On wide screens the rows share whatever height Home has left.
- */
 export function Tutorials() {
   return (
     <section

@@ -2,11 +2,6 @@ import type { CSSProperties } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Asset } from "@/lib/assets/assets";
 
-/**
- * An asset scaled up crisply from its 1× sheet. An animation plays with CSS,
- * stepping through the frames, and holds the first with reduced motion.
- * `repeat` lays a tile out 3 × 3, as it meets its neighbours.
- */
 export function AssetImage({
   asset,
   repeat = false,
@@ -17,7 +12,6 @@ export function AssetImage({
   className?: string;
 }) {
   const { sheetUrl, width, height, frames, frameMs } = asset;
-  // A still tile repeats as a background; an animated one, as nine plays.
   if (repeat && frames === 1)
     return (
       <span

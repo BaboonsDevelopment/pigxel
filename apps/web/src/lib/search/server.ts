@@ -25,10 +25,8 @@ const MAX_QUERY = 50;
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
-/** `query` with ILIKE's wildcards taken literally. */
 const literal = (query: string) => query.replace(/[\\%_]/g, "\\$&");
 
-/** True when `query` asks for people only, e.g. "@ada". */
 const isHandleQuery = (query: string) => query.trim().startsWith("@");
 
 function toResult(row: ProfileRow): ArtistResult {
@@ -41,12 +39,10 @@ function toResult(row: ProfileRow): ArtistResult {
   };
 }
 
-/** Artists whose @username starts with `handle`: an exact match first, then the shortest. */
 async function byHandle(
   supabase: Supabase,
   handle: string,
 ): Promise<ArtistResult[]> {
-  // Usernames are only a–z, 0–9 and _, so anything else can't match.
   if (!/^[a-z0-9_]+$/.test(handle) || handle.length > USERNAME_MAX) return [];
   const { data } = await supabase
     .from("profiles")
@@ -60,11 +56,6 @@ async function byHandle(
     .slice(0, LIMIT);
 }
 
-/**
- * "@ada" finds artists by @username only. Anything else finds your own
- * cloud tiles by name, and artists by name or @username. Row-level security
- * leaves public profiles and your own.
- */
 export async function search(
   userId: string,
   query: string,
@@ -110,7 +101,6 @@ export async function search(
   const exact = text.toLowerCase();
   return {
     tiles: (tiles.data ?? []).map(toSummary),
-    // Someone whose @username is exactly what was typed comes first.
     artists: [...artists.values()]
       .sort(
         (a, b) => Number(b.username === exact) - Number(a.username === exact),

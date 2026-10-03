@@ -1,9 +1,5 @@
 import type { Rect, Slice } from "@/lib/slices/slices";
 
-/**
- * Turning or mirroring the whole tile, as Aseprite's Sprite › Rotate Canvas
- * and Flip Canvas: every layer and frame at once.
- */
 export type TileTransform =
   | "flipHorizontal"
   | "flipVertical"
@@ -11,11 +7,9 @@ export type TileTransform =
   | "rotateLeft"
   | "rotate180";
 
-/** Whether the transform swaps the width and height. */
 export const turnsSideways = (t: TileTransform) =>
   t === "rotateRight" || t === "rotateLeft";
 
-/** Where pixel (x, y) of a `w × h` picture ends up. */
 function moved(t: TileTransform, x: number, y: number, w: number, h: number) {
   switch (t) {
     case "flipHorizontal":
@@ -31,7 +25,6 @@ function moved(t: TileTransform, x: number, y: number, w: number, h: number) {
   }
 }
 
-/** A `w × h` picture turned or mirrored; its size swaps for a quarter turn. */
 export function transformPixels(
   rgba: Uint8ClampedArray,
   w: number,
@@ -49,7 +42,6 @@ export function transformPixels(
   return { rgba: out, w: nw, h: nh };
 }
 
-/** A rectangle inside a `w × h` area, turned or mirrored with it. */
 function transformRect(r: Rect, w: number, h: number, t: TileTransform): Rect {
   const a = moved(t, r.x, r.y, w, h);
   const b = moved(t, r.x + r.w - 1, r.y + r.h - 1, w, h);
@@ -58,7 +50,6 @@ function transformRect(r: Rect, w: number, h: number, t: TileTransform): Rect {
   return { x, y, w: Math.abs(a.x - b.x) + 1, h: Math.abs(a.y - b.y) + 1 };
 }
 
-/** Slices turned or mirrored with a `w × h` tile, their centre and pivot too. */
 export function transformSlices(
   slices: Slice[],
   w: number,
@@ -70,7 +61,6 @@ export function transformSlices(
     return {
       ...slice,
       bounds: transformRect(slice.bounds, w, h, t),
-      // The centre and pivot are relative to the bounds, which turn too.
       center: slice.center && transformRect(slice.center, bw, bh, t),
       pivot: slice.pivot && moved(t, slice.pivot.x, slice.pivot.y, bw, bh),
     };

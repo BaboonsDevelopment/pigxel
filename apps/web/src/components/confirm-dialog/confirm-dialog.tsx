@@ -11,7 +11,6 @@ type ConfirmOptions = {
   confirmLabel: string;
 };
 
-/** A button of a choice dialog, and the answer it gives. */
 type DialogChoice<T extends string> = {
   value: T;
   label: string;
@@ -21,13 +20,10 @@ type DialogChoice<T extends string> = {
 type ChoiceOptions<T extends string> = {
   title: string;
   message: string;
-  /** Shown after Cancel, in order; the last is the main one. */
   choices: DialogChoice<T>[];
-  /** The label of the button that closes without an answer; "Cancel" by default. */
   cancelLabel?: string;
 };
 
-/** Asks in a modal instead of the browser's confirm(); resolves to the answer. */
 export async function confirmDialog({
   confirmLabel,
   ...options
@@ -39,7 +35,6 @@ export async function confirmDialog({
   return answer === "yes";
 }
 
-/** Asks in a modal with several answers; resolves to the one picked, or null when cancelled. */
 export function choiceDialog<T extends string>(
   options: ChoiceOptions<T>,
 ): Promise<T | null> {
@@ -84,7 +79,6 @@ function ChoiceDialog<T extends string>({
       ref={dialog}
       onClose={() => onDone(answer.current)}
       onClick={(e) => {
-        // A click on the dimmed backdrop cancels.
         if (e.target === dialog.current) close(null);
       }}
       aria-labelledby="confirm-dialog-title"

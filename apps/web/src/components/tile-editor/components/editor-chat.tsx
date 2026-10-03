@@ -18,11 +18,6 @@ import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { findObjects } from "@/lib/edit/objects";
 import { allLayers, canPaint, isShown } from "@/lib/layers/tree";
 
-/**
- * The AI chat, wired to the tile. It pulls in the AI, editing and
- * picture-to-pixel-art code, so the editor loads it separately (see
- * editor.tsx) and drawing is ready before it arrives.
- */
 export default function EditorChat({
   canvas,
   sprite,
@@ -34,13 +29,10 @@ export default function EditorChat({
   playback: Playback;
   onHighlight: (area: Area | null) => void;
 }) {
-  // The chat's requests take a while; they must see the tile as it is by
-  // then, not as it was when they started.
   const latest = useRef({ sprite, playback, onHighlight });
   useLayoutEffect(() => {
     latest.current = { sprite, playback, onHighlight };
   });
-  // The bridge reads the refs only when the chat calls it, never while rendering.
   // eslint-disable-next-line react-hooks/refs
   const [bridge] = useState(() =>
     createBridge(
@@ -51,7 +43,6 @@ export default function EditorChat({
   return <ChatPanel canvas={bridge} tileId={sprite.id} />;
 }
 
-/** What the bridge reads, always the latest. */
 type Latest = {
   sprite: SpriteApi;
   playback: Playback;
@@ -83,7 +74,6 @@ function createBridge(
     freeArea: () => canvas()?.freeArea() ?? null,
     snapshot: (area, background) => canvas()?.snapshot(area, background) ?? "",
     overlapsDrawing(area) {
-      // Art on any layer counts, not only the one being drawn on.
       const pixels = canvas()?.readTile(area) ?? new Uint8ClampedArray();
       let drawn = 0;
       for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) drawn++;
@@ -117,7 +107,6 @@ function createBridge(
       return tileSnapshot(cel, area, background);
     },
     addLayer(name, pixels, replace) {
-      // Something new that doesn't move is there in every frame.
       const cels = new Map(sprite().frames.map((f) => [f.id, pixels]));
       return sprite().addLayer("normal", {
         name,
@@ -133,7 +122,6 @@ function createBridge(
         layers.map(({ name, pixels }, i) => ({
           name,
           cels: new Map(frames.map((f) => [f.id, pixels])),
-          // A new tile's empty "Layer 1" takes the first picture.
           reuseEmpty: i === 0,
         })),
       );

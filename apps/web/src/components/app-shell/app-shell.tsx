@@ -12,11 +12,6 @@ import { NotificationBell } from "./notification-bell";
 import { SearchButton } from "./search-dialog";
 import { Sidebar } from "./sidebar";
 
-/**
- * The signed-in layout: the sidebar on the left, and the page on the right
- * under a top bar with search and notifications.
- * On narrow screens the sidebar becomes a menu that slides in from the left.
- */
 export function AppShell({
   userId,
   profile,
@@ -42,9 +37,6 @@ export function AppShell({
 
   return (
     <div className="flex h-dvh bg-canvas">
-      {/* Named so page transitions leave the sidebar still. The name makes it
-          a stacking context, so it's raised for the account menu, which opens
-          beside it over the page. */}
       <div
         className="relative z-30 hidden shrink-0 border-r border-border md:block"
         style={{ viewTransitionName: "app-sidebar" }}

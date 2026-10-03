@@ -26,33 +26,19 @@ import type { Cels, Frame, History } from "@/lib/sprite/types";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
 
-/** Layer settings the panel can change. */
 export type LayerPatch = Partial<
   Pick<Layer, "name" | "visible" | "locked" | "opacity" | "blend">
 > & { collapsed?: boolean };
 
 export type SpriteApi = ReturnType<typeof useSprite>;
 
-/** A layer to add, with its name and its pixels by frame id. */
 type NewLayer = {
   name?: string;
   cels?: Map<string, Uint8ClampedArray>;
-  /**
-   * Puts the pixels on the active layer instead when it is an untouched
-   * drawing layer (a new tile's "Layer 1"), so empty layers don't pile up.
-   */
   reuseEmpty?: boolean;
-  /** Hides the other drawing layers, so the new one takes the tile's place. */
   hideOthers?: boolean;
 };
 
-/**
- * An animation to add: it runs from the first frame for `frameCount` frames,
- * with one layer per entry of `layers` (bottom to top), whose `cels` are its
- * full-tile pixels per frame (null where it is not seen). New layers go in a
- * group called `name`; an entry that `replaces` an existing layer gives that
- * layer these cels instead.
- */
 export type AnimationSpec = {
   name: string;
   frameCount: number;
@@ -64,7 +50,6 @@ export type AnimationSpec = {
   }[];
 };
 
-/** The tile at one point of its history. Unchanged cels share their pixels. */
 type Snapshot = {
   tree: Layer[];
   frames: Frame[];
@@ -76,27 +61,12 @@ type Snapshot = {
   pixelRatio: PixelRatio;
 };
 
-/**
- * What a tile's editor keeps when it closes, to pick up where it left off:
- * undo and redo, and the layer and frame being drawn on.
- */
 export type KeptSprite = {
   history: History<Snapshot>;
   layerId: string;
   frameId: string;
 };
 
-/**
- * The tile being edited, as Aseprite calls it a sprite: a layer tree, a list
- * of frames, and a cel (one layer's pixels in one frame) wherever something
- * is drawn. The tree and the frames are React state; the cels live in
- * canvases (see CelCanvases), so the tools draw on the active cel (the
- * active layer in the active frame) and the screen shows the active frame
- * with every layer combined.
- *
- * Every finished change is a step Ctrl+Z can undo, and fires `onChange`, for
- * saving. With `kept` (whose present is `initial`) undo goes on from there.
- */
 export function useSprite(
   initial: PigxelDocument,
   onChange: () => void,
@@ -128,8 +98,6 @@ export function useSprite(
       ? kept.frameId
       : initial.frames[0]!.id,
   );
-  // Called before another cel becomes the active one, e.g. to put down a
-  // floating selection on the cel it belongs to.
   const beforeLeave = useRef<(() => void) | null>(null);
   const setLayerId = (id: string) => {
     if (id !== layerId) beforeLeave.current?.();
@@ -139,10 +107,8 @@ export function useSprite(
     if (id !== frameId) beforeLeave.current?.();
     setFrameIdState(id);
   };
-  // Bumped when what the screen shows changes, so the canvas repaints.
   const [version, setVersion] = useState(0);
   const [cels] = useState(() => new CelCanvases(initial.cels, size));
-  // Cels drawn on since the last finished change.
   const changed = useRef(new Set<HTMLCanvasElement>());
   const past = useRef<History<Snapshot>>(
     kept?.history ??
@@ -163,11 +129,9 @@ export function useSprite(
   const isBackground = (id: string, inTree = tree) =>
     layerTree.findLayer(inTree, id)?.layer.kind === "background";
 
-  /** What fills a cel of `id` where nothing is drawn: the Background's colour. */
   const fillOf = (id: string) =>
     isBackground(id) ? backgroundColor(background) : null;
 
-  /** Adds a cel: a copy of `pixels`, or empty (the Background filled). */
   const addCel = (frame: string, layer: string, pixels?: Uint8ClampedArray) => {
     const canvas = cels.set(frame, layer, size, pixels);
     const fill = !pixels && fillOf(layer);
@@ -179,10 +143,6 @@ export function useSprite(
     return canvas;
   };
 
-  /**
-   * The drawing context of the active cel. With `create`, an empty cel is
-   * made first where the active layer has none in this frame yet.
-   */
   const context = (create = false) => {
     let canvas = cels.get(frameId, layerId);
     const active = layerTree.findLayer(tree, layerId)?.layer;
@@ -191,11 +151,9 @@ export function useSprite(
     return contextOf(canvas);
   };
 
-  /** A frame's layers combined (the active frame by default), without the kinds in `skip`. */
   const composite = (skip: LayerKind[] = [], frame = frameId) =>
     flatten(tree, (id) => cels.pixels(frame, id), size.w * size.h * 4, skip);
 
-  /** Marks the active cel as drawn on; the screen repaints. */
   const touched = () => {
     const canvas = cels.get(frameId, layerId);
     if (canvas) {
@@ -205,11 +163,6 @@ export function useSprite(
     repaint();
   };
 
-  /**
-   * Ends a change: it becomes a step to undo, the screen repaints and the
-   * tile is saved. Only cels drawn on are read back from their canvases, and
-   * those erased to nothing are removed.
-   */
   const finish = (
     next: {
       tree?: Layer[];
@@ -219,11 +172,9 @@ export function useSprite(
       slices?: Slice[];
       colorMode?: ColorMode;
       pixelRatio?: PixelRatio;
-      /** Colours to turn into others first, on an indexed tile (see inColorMode). */
       recolor?: ReadonlyMap<string, string>;
     } = {},
   ) => {
-    // In indexed and grayscale modes, what was drawn is brought into the mode.
     const mode = next.colorMode ?? colorMode;
     if (mode !== "rgb")
       for (const canvas of changed.current) {
@@ -277,16 +228,11 @@ export function useSprite(
     onChange();
   };
 
-  /** Records a finished drawing on the active cel. */
   const commit = () => {
     touched();
     finish();
   };
 
-  /**
-   * Throws away what was drawn on the active cel since the last finished
-   * change, e.g. a floating selection that is cancelled.
-   */
   const revert = () => {
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !changed.current.has(canvas)) return;
@@ -297,10 +243,6 @@ export function useSprite(
     repaint();
   };
 
-  /**
-   * Changes the active cel's pixels with `change` (which gets them and
-   * returns new ones, or null to leave them), as one undo step.
-   */
   const editCel = (
     change: (pixels: Uint8ClampedArray) => Uint8ClampedArray | null,
   ) => {
@@ -319,7 +261,6 @@ export function useSprite(
     commit();
   };
 
-  /** Empties the active cel; on the Background it goes back to the colour. */
   const clearCel = () => {
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !layerTree.canPaint(tree, layerId)) return;
@@ -345,7 +286,6 @@ export function useSprite(
     finish({ frames: next });
   };
 
-  /** Puts the tile back as it was at `snapshot`, redrawing only cels that differ. */
   const restore = (snapshot: Snapshot) => {
     const { present } = past.current;
     const sameSize =
@@ -381,7 +321,6 @@ export function useSprite(
     onChange();
   };
 
-  /** Takes back the last change; false when there is none. */
   const undo = () => {
     const back = history.undo(past.current);
     if (!back) return false;
@@ -397,10 +336,8 @@ export function useSprite(
     past.current = forward;
   };
 
-  /** Whether a layer has nothing drawn in any frame. */
   const isEmptyLayer = (id: string) => frames.every((f) => !cels.get(f.id, id));
 
-  /** Makes the cels of a layer these pixels (null empties the cel). */
   const putCels = (
     id: string,
     next: Iterable<[string, Uint8ClampedArray | null]>,
@@ -411,15 +348,9 @@ export function useSprite(
     }
   };
 
-  /** Adds a layer above the active one, in one undo step; returns its id. */
   const addLayer = (kind: Exclude<LayerKind, "background">, layer?: NewLayer) =>
     addLayers(kind, [layer ?? {}])[0]!;
 
-  /**
-   * Adds layers above the active one, each above the one before, in one undo
-   * step; returns their ids. Calling addLayer once for each would not do:
-   * every call starts from the same layer tree until the next render.
-   */
   const addLayers = (
     kind: Exclude<LayerKind, "background">,
     layers: NewLayer[],
@@ -468,11 +399,6 @@ export function useSprite(
     return ids;
   };
 
-  /**
-   * Moves what `id` shows inside `area` (in every frame it has a cel) to a
-   * new layer called `name` right above it, in one undo step; returns the
-   * new layer's id.
-   */
   const cutToLayer = (id: string, area: Area, name: string) => {
     const layer = layerTree.createLayer("normal", name);
     const inside = (i: number) => {
@@ -502,7 +428,6 @@ export function useSprite(
     return layer.id;
   };
 
-  /** Replaces cels of a layer by frame id, in one undo step. */
   const writeCels = (
     id: string,
     next: Map<string, Uint8ClampedArray | null>,
@@ -511,10 +436,7 @@ export function useSprite(
     finish();
   };
 
-  /** Adds an animation (see AnimationSpec) in one undo step. */
   const addAnimation = (spec: AnimationSpec) => {
-    // The animation runs from the first frame. Missing frames are added,
-    // showing what the last frame shows, so the still scene stays.
     const last = frames.at(-1)!;
     const nextFrames = frames.map((frame, i) =>
       i < spec.frameCount ? { ...frame, duration: spec.duration } : frame,
@@ -562,7 +484,6 @@ export function useSprite(
     finish({ tree: nextTree, frames: nextFrames });
   };
 
-  /** A tile keeps at least one layer to draw on, so that one can't be removed. */
   const canRemoveLayer = (id: string) =>
     layerTree
       .allLayers(layerTree.removeLayer(tree, id))
@@ -585,11 +506,6 @@ export function useSprite(
     changeTree(next);
   };
 
-  /**
-   * Adds a frame after the active one and moves to it. A copy repeats every
-   * cel of the active frame; an empty one keeps only the Background and the
-   * references, which belong to every frame.
-   */
   const addFrame = (copy: boolean) => {
     const current = frames.find((f) => f.id === frameId)!;
     const frame = frameList.createFrame(current.duration);
@@ -616,11 +532,6 @@ export function useSprite(
     changeFrames(next);
   };
 
-  /**
-   * Grows or shrinks every cel, the drawing moved by `offset` (kept at the
-   * top-left by default); a Background fills new space. Slices move along,
-   * cut to the new size. One undo step.
-   */
   const resize = (next: Size, offset = { x: 0, y: 0 }) => {
     cels.resize(next, fillOf, offset);
     for (const cel of cels.list()) changed.current.add(cel.canvas);
@@ -630,7 +541,6 @@ export function useSprite(
     finish({ size: next, slices: nextSlices });
   };
 
-  /** Scales every cel to `next` by `method`, slices too, as one undo step. */
   const rescale = (next: Size, method: ScaleMethod) => {
     for (const { frameId: frame, layerId: layer } of cels.list()) {
       const rgba = cels.pixels(frame, layer)!;
@@ -648,7 +558,6 @@ export function useSprite(
     finish({ size: next, slices: nextSlices });
   };
 
-  /** Turns or mirrors every cel, slices too, as one undo step. */
   const transformAll = (t: TileTransform) => {
     const next = turnsSideways(t) ? { w: size.h, h: size.w } : size;
     for (const { frameId: frame, layerId: layer } of cels.list()) {
@@ -668,23 +577,15 @@ export function useSprite(
 
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
 
-  /** Changes the tile's slices, as one undo step. */
   const setSlices = (next: Slice[]) => {
     setSlicesState(next);
     finish({ slices: next });
   };
 
-  /** Marks every cel as changed, so finishing brings them all into the colour mode. */
   const touchAll = () => {
     for (const { canvas } of cels.list()) changed.current.add(canvas);
   };
 
-  /**
-   * Changes the tile's palette, as one undo step. On an indexed tile the
-   * pixels follow: `recolor` turns colours into others (a colour edited in
-   * the palette, or a palette loaded over the old one), and colours no
-   * longer in the palette become the nearest one left.
-   */
   const setPalette = (
     next: string[],
     recolor?: ReadonlyMap<string, string>,
@@ -694,18 +595,12 @@ export function useSprite(
     finish({ palette: next, recolor });
   };
 
-  /** Changes the shape of the pixels, as one undo step; no pixel changes. */
   const setPixelRatio = (next: PixelRatio) => {
     if (next.w === pixelRatio.w && next.h === pixelRatio.h) return;
     setPixelRatioState(next);
     finish({ pixelRatio: next });
   };
 
-  /**
-   * Switches the colour mode, as one undo step. To indexed, every pixel
-   * becomes the nearest palette colour; to grayscale, its grey. Back to RGB
-   * changes no pixels.
-   */
   const setColorMode = (mode: ColorMode) => {
     if (mode === colorMode) return;
     if (mode !== "rgb") touchAll();
@@ -714,7 +609,6 @@ export function useSprite(
   };
 
   return {
-    /** The tile's own id (see PigxelDocument). */
     id: initial.id,
     size,
     tree,
@@ -730,10 +624,8 @@ export function useSprite(
     setSlices,
     layerId,
     activeLayer,
-    /** What erasing the active layer leaves: the Background's colour, or null for transparency. */
     eraseFill: fillOf(layerId),
     frameId,
-    /** Whether the tools may draw on the active layer. */
     canPaint: layerTree.canPaint(tree, layerId),
     version,
     context,
@@ -748,16 +640,13 @@ export function useSprite(
     transformAll,
     undo,
     redo,
-    /** Whether a layer has anything drawn in a frame. */
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
-    /** A layer's full-tile pixels in a frame; transparent where it has no cel. */
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
     cutToLayer,
     addAnimation,
     selectLayer: setLayerId,
-    /** Registers what to do before another cel becomes the active one. */
     onLeaveCel: (callback: () => void) => {
       beforeLeave.current = callback;
     },
@@ -770,7 +659,6 @@ export function useSprite(
     moveLayer: (id: string, place: Place) =>
       changeTree(layerTree.moveLayer(tree, id, place)),
     selectFrame: setFrameId,
-    /** Moves to the frame `step` places away, wrapping around. */
     stepFrame: (step: number) =>
       setFrameId(frameList.stepFrame(frames, frameId, step).id),
     addFrame,
@@ -783,9 +671,7 @@ export function useSprite(
           duration: frameList.clampDuration(ms),
         }),
       ),
-    /** Undo history and the active cel, to keep when the editor closes. */
     keep: (): KeptSprite => ({ history: past.current, layerId, frameId }),
-    /** The tile as a document, for saving. Its pixels are shared: never modify them. */
     document: (): PigxelDocument => ({
       id: initial.id,
       width: size.w,

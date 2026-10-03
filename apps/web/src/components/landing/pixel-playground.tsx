@@ -50,7 +50,6 @@ export function PixelPlayground() {
     }
     const index = y * size + x;
     const previous = lastPixel.current;
-    // Interpolate between pointer samples so quick strokes stay continuous.
     const fromX = previous === null ? x : previous % size;
     const fromY = previous === null ? y : Math.floor(previous / size);
     const steps = Math.max(Math.abs(x - fromX), Math.abs(y - fromY), 1);

@@ -2,36 +2,19 @@ import { DEFAULT_PEN, type PenSettings } from "@/components/pixel-canvas/pen";
 import type { DriveFile } from "./google-drive";
 import type { TileLocation } from "./location";
 
-/**
- * Tiles being worked on, kept in the browser so they survive navigating
- * around the site and reloading. Each tile has its own draft, so creating or
- * opening a tile never replaces another. Drafts are kept per signed-in user,
- * so people sharing a browser never see each other's work.
- *
- * They live in IndexedDB, which holds far more than localStorage's few
- * megabytes (a couple of imported pictures used to fill that). `loadDrafts`
- * reads them once per page; after that reading and writing are immediate,
- * and every write is stored in the background.
- */
 export type Draft = {
-  /** Identifies the draft in this browser and in the editor URL. */
   id: string;
   name: string;
-  /** The tile as .pigxel file contents. */
   file: string;
-  /** Where the tile lives and autosaves to: Pigxel cloud, Google Drive, or only here. */
   location: TileLocation | null;
-  /** Whether it has changes that weren't downloaded or saved to its location yet. */
   dirty: boolean;
   savedAt: number;
 };
 
 type DraftInput = Omit<Draft, "savedAt">;
 
-/** Where drafts are stored: IndexedDB, or localStorage when it's unavailable. */
 export type DraftBackend = {
   all: (userId: string) => Promise<Draft[]>;
-  /** May throw at once (localStorage is full) or fail later (IndexedDB). */
   put: (userId: string, draft: Draft) => void | Promise<void>;
   remove: (userId: string, id: string) => void | Promise<void>;
 };
@@ -42,10 +25,8 @@ export function draftKey(userId: string, id: string) {
   return `${PREFIX}draft:v2:${userId}:${id}`;
 }
 const penKey = (userId: string) => `${PREFIX}pen:v1:${userId}`;
-/** The single draft kept before tiles had their own drafts. */
 const legacyKey = (userId: string) => `${PREFIX}draft:v1:${userId}`;
 
-/** The signed-in person's drafts, once read; with no backend they last this page only. */
 let loaded: {
   userId: string;
   drafts: Map<string, Draft>;
@@ -54,17 +35,10 @@ let loaded: {
 let loading: { userId: string; done: Promise<void> } | null = null;
 const listeners = new Set<() => void>();
 
-/**
- * Other tabs of the site in this browser. Each keeps its own copy of the
- * drafts, so every write and removal is told to the others: a tab opening a
- * tile changed elsewhere shows the latest, instead of an old copy it would
- * then save over the new one.
- */
 type DraftMessage = { userId: string } & (
   { draft: Draft } | { removed: string }
 );
 let otherTabs: BroadcastChannel | null = null;
-/** Messages that came while this tab was still reading its drafts. */
 let early: DraftMessage[] = [];
 
 function listenToOtherTabs() {
@@ -86,19 +60,12 @@ function applyMessage(drafts: Map<string, Draft>, message: DraftMessage) {
 function tellOtherTabs(message: DraftMessage) {
   try {
     otherTabs?.postMessage(message);
-  } catch {
-    // The other tabs read the drafts again when they reload.
-  }
+  } catch {}
 }
 
-/**
- * Reads this person's drafts from the browser, once per page. Drafts kept in
- * localStorage by earlier versions move to IndexedDB, freeing localStorage.
- */
 export function loadDrafts(userId: string): Promise<void> {
   if (loaded?.userId === userId) return Promise.resolve();
   if (loading?.userId === userId) return loading.done;
-  // Listening starts before reading, so no change from another tab is missed.
   listenToOtherTabs();
   early = [];
   const done = (async () => {
@@ -115,7 +82,6 @@ export function loadDrafts(userId: string): Promise<void> {
   return done;
 }
 
-/** Reads drafts from `backend` (null keeps them for this page only); for tests and `loadDrafts`. */
 export async function startDrafts(
   userId: string,
   backend: DraftBackend | null,
@@ -123,9 +89,7 @@ export async function startDrafts(
   let drafts: Draft[] = [];
   try {
     drafts = (await backend?.all(userId)) ?? [];
-  } catch {
-    // Unreadable storage starts empty.
-  }
+  } catch {}
   const byId = new Map(drafts.map((draft) => [draft.id, draft]));
   for (const message of early)
     if (message.userId === userId) applyMessage(byId, message);
@@ -134,12 +98,10 @@ export async function startDrafts(
   listeners.forEach((listener) => listener());
 }
 
-/** Whether `loadDrafts` has finished for this person. */
 export function draftsLoaded(userId: string) {
   return loaded?.userId === userId;
 }
 
-/** Calls `listener` whenever drafts finish loading; returns how to stop. */
 export function onDraftsLoaded(listener: () => void) {
   listeners.add(listener);
   return () => void listeners.delete(listener);
@@ -148,19 +110,16 @@ export function onDraftsLoaded(listener: () => void) {
 const draftsOf = (userId: string) =>
   loaded?.userId === userId ? loaded : null;
 
-/** A tile's draft, or null when there is none or drafts aren't loaded. */
 export function readDraft(userId: string, id: string): Draft | null {
   return draftsOf(userId)?.drafts.get(id) ?? null;
 }
 
-/** All of this person's drafts in this browser, most recently changed first. */
 export function listDrafts(userId: string): Draft[] {
   return [...(draftsOf(userId)?.drafts.values() ?? [])].sort(
     (a, b) => b.savedAt - a.savedAt,
   );
 }
 
-/** The draft of a tile that lives in Pigxel cloud or Google Drive, if it's open here already. */
 export function findDraftFor(
   userId: string,
   location: TileLocation,
@@ -175,15 +134,12 @@ export function findDraftFor(
   );
 }
 
-/** Saves a draft; returns false when the browser refuses (full or blocked storage). */
 export function writeDraft(userId: string, draft: DraftInput): boolean {
   const store = draftsOf(userId);
   if (!store?.backend) return false;
   const saved = { ...draft, savedAt: Date.now() };
   try {
-    void Promise.resolve(store.backend.put(userId, saved)).catch(() => {
-      // The draft is still kept for this page.
-    });
+    void Promise.resolve(store.backend.put(userId, saved)).catch(() => {});
   } catch {
     return false;
   }
@@ -192,7 +148,6 @@ export function writeDraft(userId: string, draft: DraftInput): boolean {
   return true;
 }
 
-/** Starts a new draft and returns it, or null when the browser won't keep it. */
 export function createDraft(
   userId: string,
   draft: Omit<DraftInput, "id">,
@@ -208,12 +163,9 @@ export function removeDraft(userId: string, id: string) {
   tellOtherTabs({ userId, removed: id });
   try {
     void Promise.resolve(store.backend?.remove(userId, id)).catch(() => {});
-  } catch {
-    // Nothing to remove when storage is blocked.
-  }
+  } catch {}
 }
 
-/** The pen colour and size, shared by all tiles. */
 export function readPen(
   userId: string,
   storage: Storage | undefined = browserStorage(),
@@ -233,17 +185,13 @@ export function writePen(
 ) {
   try {
     storage?.setItem(penKey(userId), JSON.stringify(pen));
-  } catch {
-    // The pen falls back to its defaults next time.
-  }
+  } catch {}
 }
 
-/** Whether this browser lets the site keep drafts (it may block site data). */
 export function canStoreDrafts(userId: string): boolean {
   return Boolean(draftsOf(userId)?.backend);
 }
 
-/** Drafts in localStorage, as kept before IndexedDB; also the fallback without it. */
 export function storageBackend(storage: Storage): DraftBackend {
   return {
     all: async (userId) => {
@@ -264,7 +212,6 @@ export function storageBackend(storage: Storage): DraftBackend {
   };
 }
 
-/** Moves drafts kept in localStorage into `target`, removing each once it's there. */
 export async function moveToIndexedDb(
   userId: string,
   storage: Storage,
@@ -276,9 +223,7 @@ export async function moveToIndexedDb(
       await target.put(userId, draft);
       old.remove(userId, draft.id);
     }
-  } catch {
-    // Whatever didn't move stays in localStorage and moves next time.
-  }
+  } catch {}
 }
 
 const DB_NAME = "pigxel";
@@ -286,7 +231,6 @@ const STORE = "drafts";
 
 type DraftRecord = Draft & { key: string; userId: string };
 
-/** Drafts in IndexedDB, or null when the browser won't open it. */
 async function indexedDbBackend(): Promise<DraftBackend | null> {
   let db: IDBDatabase;
   try {
@@ -344,7 +288,6 @@ function newDraftId() {
     : `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 }
 
-/** A stored draft (JSON from localStorage, or an IndexedDB record), or null when unreadable. */
 function parseDraft(raw: string | object | null): Draft | null {
   if (!raw) return null;
   try {
@@ -370,10 +313,6 @@ function parseDraft(raw: string | object | null): Draft | null {
   }
 }
 
-/**
- * Moves the single draft from before per-tile drafts into the collection, with
- * its pen settings, and turns an old Google Drive link into a location.
- */
 function migrateLegacyDraft(userId: string, storage: Storage) {
   const raw = safeGet(storage, legacyKey(userId));
   if (!raw) return;
@@ -402,12 +341,9 @@ function migrateLegacyDraft(userId: string, storage: Storage) {
       if (old.pen) writePen(userId, old.pen, storage);
     }
     storage.removeItem(legacyKey(userId));
-  } catch {
-    // An unreadable old draft is left alone.
-  }
+  } catch {}
 }
 
-/** Whether `storage` accepts writes (the browser may block site data). */
 function canStore(storage: Storage) {
   try {
     storage.setItem(`${PREFIX}probe`, "1");
@@ -430,7 +366,6 @@ function browserStorage() {
   try {
     return typeof window === "undefined" ? undefined : window.localStorage;
   } catch {
-    // Accessing localStorage throws when the browser blocks site data.
     return undefined;
   }
 }

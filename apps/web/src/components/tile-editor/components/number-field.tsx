@@ -4,10 +4,6 @@ import { useState } from "react";
 import { Label } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 
-/**
- * A whole-number field that lets you type freely ("-", or nothing for a
- * moment) and reports a number once there is one.
- */
 export function NumberField({
   id,
   label,
@@ -23,7 +19,6 @@ export function NumberField({
 }) {
   const [text, setText] = useState(String(value));
   const [shown, setShown] = useState(value);
-  // Follows changes made elsewhere, e.g. the anchor or another field.
   if (shown !== value) {
     setShown(value);
     if (Number(text) !== value) setText(String(value));

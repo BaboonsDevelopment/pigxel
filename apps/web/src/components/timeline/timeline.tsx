@@ -13,16 +13,8 @@ import type { DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
 import type { Playback } from "./use-playback";
 
-/** An open right-click menu: whose actions, and where. */
 type OpenMenu = { of: "layer" | "frame"; x: number; y: number };
 
-/**
- * The timeline, a panel (under the canvas at first), as in Aseprite: a row per layer (top layer
- * first) and a column per frame, each cell being that layer's cel in that
- * frame. Layers are shown, locked, renamed and dragged into order or into
- * groups; frames are played, timed and dragged into order. A right-click on
- * a layer or a frame picks it and opens its menu.
- */
 export function Timeline({
   sprite,
   playback,
@@ -48,7 +40,6 @@ export function Timeline({
     setOver(null);
   };
 
-  // A panel in a dock, which titles, folds and sizes it.
   return (
     <section
       aria-label="Timeline"

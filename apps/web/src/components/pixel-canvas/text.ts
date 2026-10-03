@@ -7,11 +7,9 @@ import {
 import type { Rgba } from "./paint";
 import type { Floating } from "./selection";
 
-/** The fonts the text tool writes with. */
 export type TextFont =
   "tiny5" | "dotGothic" | "pressStart" | "silkscreen" | "tiny";
 
-/** Readable ones first; the heights are of a capital letter at 1×. */
 export const TEXT_FONTS: { id: TextFont; label: string; title: string }[] = [
   {
     id: "tiny5",
@@ -41,13 +39,8 @@ export const TEXT_FONTS: { id: TextFont; label: string; title: string }[] = [
   },
 ];
 
-/** How many times bigger than its own pixel size the text is written. */
 export const TEXT_SCALES = [1, 2, 3];
 
-/**
- * The web pixel fonts, each with the size it is drawn at so its pixels land
- * on whole tile pixels (its em in font pixels).
- */
 const WEB_FONTS: Record<
   Exclude<TextFont, "tiny">,
   { family: string; px: number }
@@ -58,10 +51,6 @@ const WEB_FONTS: Record<
   silkscreen: { family: silkscreen.style.fontFamily, px: 8 },
 };
 
-/**
- * The 3 × 5 font: five rows of three pixels per glyph, 1 drawn. Lowercase
- * letters use the capitals; glyphs narrower than 3 lose their empty columns.
- */
 const TINY: Record<string, string> = {
   A: "010 101 111 101 101",
   B: "110 101 110 101 110",
@@ -123,7 +112,6 @@ const TINY: Record<string, string> = {
 
 type Bitmap = { w: number; h: number; on: Uint8Array };
 
-/** The 3 × 5 glyph of `char` with its empty side columns dropped; null when there is none. */
 function tinyGlyph(char: string): Bitmap | null {
   const rows = TINY[char.toUpperCase()]?.replaceAll(" ", "");
   if (!rows) return null;
@@ -139,7 +127,6 @@ function tinyGlyph(char: string): Bitmap | null {
   return { w, h: 5, on };
 }
 
-/** `text` in the 3 × 5 font, a pixel apart; unknown characters leave a gap. */
 function tinyText(text: string): Bitmap {
   const glyphs = [...text].map(
     (char) => tinyGlyph(char) ?? { w: 2, h: 5, on: new Uint8Array(10) },
@@ -155,7 +142,6 @@ function tinyText(text: string): Bitmap {
   return { w, h: 5, on };
 }
 
-/** `text` in a web pixel font, drawn at its own pixel size with no smoothing. */
 async function webFontText(
   text: string,
   { family, px }: { family: string; px: number },
@@ -173,12 +159,10 @@ async function webFontText(
   ctx.fillText(text, 1, px);
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const on = new Uint8Array(canvas.width * canvas.height);
-  // Edge pixels the browser smoothed are kept only when mostly covered.
   for (let i = 0; i < on.length; i++) on[i] = data[i * 4 + 3]! >= 128 ? 1 : 0;
   return { w: canvas.width, h: canvas.height, on };
 }
 
-/** The bitmap cut to the box around its drawn pixels; null when nothing is drawn. */
 function cropped(b: Bitmap): Bitmap | null {
   let [x0, y0, x1, y1] = [b.w, b.h, -1, -1];
   for (let y = 0; y < b.h; y++)
@@ -198,10 +182,6 @@ function cropped(b: Bitmap): Bitmap | null {
   return { w, h, on };
 }
 
-/**
- * `text` written in `font`, `scale` times its pixel size, in `rgba`, as a
- * floating piece at (`x`, `y`); null when it draws nothing.
- */
 export async function textPiece(
   text: string,
   font: TextFont,
@@ -210,8 +190,6 @@ export async function textPiece(
   x: number,
   y: number,
 ): Promise<Floating | null> {
-  // Settings saved before the text tool existed have no font or size:
-  // Tiny5 at 1× stands in for them.
   const web =
     font === "tiny" ? undefined : (WEB_FONTS[font] ?? WEB_FONTS.tiny5);
   const k = TEXT_SCALES.includes(scale) ? scale : 1;

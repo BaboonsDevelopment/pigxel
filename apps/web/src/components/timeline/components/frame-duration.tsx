@@ -3,10 +3,6 @@
 import { useState } from "react";
 import { MAX_FRAME_DURATION, MIN_FRAME_DURATION } from "@/lib/sprite/constants";
 
-/**
- * How long the active frame shows, in milliseconds. The change is kept on
- * Enter or when leaving the field, so typing makes one undo step.
- */
 export function FrameDuration({
   duration,
   onChange,

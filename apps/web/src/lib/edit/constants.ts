@@ -1,25 +1,15 @@
-// Settings of the AI pixel edits (see ops.ts and codec.ts).
-
-/** Symbols in the text grid the AI reads and writes. */
 export const GRID = {
   transparent: ".",
-  /** In blit rows: leave the pixel as it is. */
   keep: "_",
-  /** One character per colour. */
   alphabet: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
 } as const;
 
-/** Smallest group of pixels that counts as a separate drawn thing. */
 export const MIN_OBJECT_PIXELS = 6;
-/** How many drawn things the planner is told about, biggest first. */
 export const MAX_OBJECTS = 24;
 
-/** Pixels kept around the drawing when the edit area is cropped to it. */
 export const EDIT_MARGIN = 2;
-/** Cap on coordinates in one `px` operation. */
 export const MAX_POINTS_PER_OP = 4096;
 
-/** Operations the AI may answer with; the table goes into its prompt. */
 export const OPS = [
   {
     syntax: "pal <char> <#rrggbb>",
@@ -54,8 +44,4 @@ export const OPS = [
   { syntax: "clear", doc: "erase everything in the area" },
 ] as const;
 
-/**
- * A redrawn pixel this close to the original keeps the original colour, so
- * only what the AI really changed lands on the tile.
- */
 export const REDRAW_KEEP_DISTANCE = 48;

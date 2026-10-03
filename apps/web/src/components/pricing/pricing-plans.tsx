@@ -19,28 +19,16 @@ const CYCLES: { id: BillingCycle; label: string }[] = [
   { id: "year", label: "Yearly" },
 ];
 
-/** Keep formatted checkout totals and raw minor units for honest comparisons. */
 type Prices = Partial<Record<string, PriceQuote>>;
 
 type Props = {
   environment: Environments;
-  /** Paddle client-side token; public by design. */
   token: string;
-  /** ISO country from the request; without it Paddle uses the visitor's IP. */
   country?: string;
-  /** The signed-in person, so checkout knows their email and account. */
   customer?: { id: string; email: string };
-  /** The page's title, set beside the billing toggle. */
   heading: ReactNode;
 };
 
-/**
- * The billing toggle and the plan cards. Prices are Paddle's totals for the
- * visitor's country, shown exactly as Paddle formats them; Subscribe opens
- * Paddle Checkout for the price on the card. It grows to fill the page, so
- * on a desktop screen the plans sit in the middle of what's left; on short
- * screens (under 820px tall) the cards tighten up to still fit.
- */
 export function PricingPlans({
   environment,
   token,
@@ -60,7 +48,6 @@ export function PricingPlans({
         if (!instance) throw new Error("Paddle.js didn't load.");
         if (!active) return;
         setPaddle(instance);
-        // One preview per cycle, so the toggle switches without a wait.
         const previews = await Promise.all(
           CYCLES.map(({ id }) =>
             instance.PricePreview({
@@ -253,8 +240,6 @@ function Price({
   note: string;
   comparison?: ReturnType<typeof annualComparison>;
 }) {
-  // The yearly comparison takes the note's line, so switching cycles never
-  // changes the card's height.
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">

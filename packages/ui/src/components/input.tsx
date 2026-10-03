@@ -1,7 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
-/** The look shared by text boxes: border, focus ring, placeholder. */
 const fieldClassName =
   "w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
 
@@ -33,10 +32,6 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   );
 }
 
-/**
- * A text box with fixed text before or after the value, e.g. "@" before a
- * username or ".pigxel" after a file name. Put an <InputGroupInput> inside.
- */
 export function InputGroup({ className, ...props }: ComponentProps<"div">) {
   return (
     <div

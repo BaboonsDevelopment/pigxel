@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils";
 
-/** What a list shows when it has nothing in it yet, with a way forward. */
 export function EmptyState({
   title,
   description,

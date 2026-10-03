@@ -5,10 +5,6 @@ import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-/**
- * The verified user, or null for a signed-out visitor. Cached per request,
- * so a layout and its page share one check.
- */
 export const getUser = cache(async (): Promise<User | null> => {
   if (!isSupabaseConfigured()) return null;
   const supabase = await createClient();
@@ -19,16 +15,10 @@ export const getUser = cache(async (): Promise<User | null> => {
   return error ? null : user;
 });
 
-/**
- * Whether the user may change shared content such as assets: "role": "admin"
- * in their app_metadata, which only the dashboard or the service role sets.
- * The database checks the same.
- */
 export function isAdmin(user: Pick<User, "app_metadata"> | null) {
   return user?.app_metadata?.role === "admin";
 }
 
-/** Returns the verified user, or sends signed-out visitors to the login page. */
 export const requireUser = cache(async () => {
   const user = await getUser();
   if (!user) redirect("/login");
@@ -38,15 +28,11 @@ export const requireUser = cache(async () => {
 export type Profile = {
   name: string;
   email: string | null;
-  /** Their @username; null before their profile exists. */
   username: string | null;
-  /** A profile picture, e.g. from Google; null shows the initial instead. */
   avatarUrl: string | null;
-  /** Their plan's name, e.g. "Pro"; Free when absent. */
   plan?: string;
 };
 
-/** What the app shows for a person: their Google name and picture, or their email. */
 export function profileOf(user: User): Profile {
   const meta = user.user_metadata ?? {};
   const text = (value: unknown) =>

@@ -21,7 +21,6 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: mocks.auth,
-    // The tiles page lists Pigxel cloud tiles; none in these tests.
     from: () => ({
       select: () => ({
         eq: () => ({
@@ -47,7 +46,6 @@ vi.mock("next/navigation", () => ({
   },
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }),
 }));
-// next/font is a compile-time transform; the landing page only needs its class names.
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "" }),
   Geist_Pixel: () => ({ variable: "" }),
@@ -386,7 +384,6 @@ describe("email callbacks and route guards", () => {
     expect(mocks.auth.getUser).toHaveBeenCalledOnce();
     expect(html).toContain("person@example.com");
     expect(html).toContain("Your password has been updated.");
-    // Signed up with email: no password identity yet in this mock user.
     expect(html).toContain("Set a password");
   });
   it("forwards auth codes that arrive at the default Site URL", async () => {

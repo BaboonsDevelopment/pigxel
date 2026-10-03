@@ -36,7 +36,6 @@ function size(token = ""): { w: number; h: number } | null {
     : null;
 }
 
-/** Reads the AI's operation lines; bad lines are reported and skipped. */
 export function parseOps(lines: string[]): { ops: Op[]; errors: string[] } {
   const ops: Op[] = [];
   const errors: string[] = [];
@@ -104,10 +103,6 @@ export function parseOps(lines: string[]): { ops: Op[]; errors: string[] } {
   return { ops, errors };
 }
 
-/**
- * Runs `ops` on a copy of the tile. Every write is clipped to `area`, so the
- * AI cannot touch pixels outside what it was given.
- */
 export function applyOps(
   source: Uint8ClampedArray,
   width: number,
@@ -141,7 +136,6 @@ export function applyOps(
   };
   const rgbaAt = (p: Point) =>
     pixels.slice((p.y * width + p.x) * 4, (p.y * width + p.x) * 4 + 4);
-  /** Every pixel of the area that has exactly the colour `c`. */
   const pixelsOf = (c: RGBA) => {
     const match: Point[] = [];
     for (let y = area.y; y < area.y + area.h; y++) {
@@ -158,8 +152,6 @@ export function applyOps(
   ops.forEach((op, i) => {
     switch (op.t) {
       case "pal": {
-        // Rebinding a colour already in the grid recolours its pixels: that
-        // is what the model means when it answers "pal 3 #aa2211".
         const before = op.c in palette ? color(op.c) : null;
         colors[op.c] = op.hex;
         if (before) draw(i, pixelsOf(before), op.c);

@@ -106,7 +106,6 @@ describe("brush", () => {
   });
 });
 
-/** An image drawn from rows of letters: r(ed), b(lue) or "." for transparent. */
 function image(rows: string[]): ImageData {
   const colors: Record<string, number[]> = {
     ".": [0, 0, 0, 0],
@@ -177,7 +176,6 @@ describe("fillPoints", () => {
     expect(fillPoints(image(["r.", ".r"]), p(1, 1), true)).toEqual([3]);
   });
   it("takes close shades too, up to the tolerance on every channel", () => {
-    // A sky of three blues a few steps apart, and a white cloud.
     const sky = {
       width: 4,
       height: 1,
@@ -191,7 +189,6 @@ describe("fillPoints", () => {
     expect(fillPoints(sky, p(0, 0), true)).toEqual([0]);
     expect(fillPoints(sky, p(0, 0), true, 10).sort()).toEqual([0, 1]);
     expect(fillPoints(sky, p(0, 0), true, 30).sort()).toEqual([0, 1, 2]);
-    // Measured from the clicked colour, not from step to step.
     expect(fillPoints(sky, p(0, 0), false, 20).sort()).toEqual([0, 1]);
   });
 });

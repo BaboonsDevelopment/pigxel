@@ -3,15 +3,12 @@ import type { CSSProperties } from "react";
 export type Edge = "e" | "s" | "se";
 export type Size = { w: number; h: number };
 export type ResizeDrag = { edge: Edge; x: number; y: number } & Size;
-/** A rectangle of tile pixels. */
 export type Area = { x: number; y: number } & Size;
 
-/** Screen pixels per tile pixel; the mouse wheel zooms between the bounds. */
 export const DEFAULT_SCALE = 16;
 export const MIN_SCALE = 2;
 export const MAX_SCALE = 48;
 export const ZOOM_FACTOR = 1.15;
-/** Which edges of a frame a handle drags; all four move the whole frame. */
 export type FrameEdges = {
   left: boolean;
   right: boolean;
@@ -26,7 +23,6 @@ const edges = (sides: string): FrameEdges => ({
   bottom: sides.includes("s"),
 });
 
-/** Handles of the frame that picks where a picture goes, by compass side. */
 export const FRAME_HANDLES = [
   {
     side: "nw",
@@ -71,11 +67,8 @@ export const FRAME_HANDLES = [
 ];
 export const MOVE_FRAME: FrameEdges = edges("nsew");
 
-/** Smallest area a new picture is drawn into; less is too small to read. */
 export const MIN_PLACEMENT_SIDE = 16;
-/** Longest side of the enlarged tile picture sent to the AI. */
 export const SNAPSHOT_SIDE = 512;
-/** Shown in place of transparent pixels in that picture. */
 export const SNAPSHOT_BACKGROUND = "#d4d4d4";
 export const MIN_SIZE = 1;
 export const MAX_SIZE = 256;
@@ -98,7 +91,6 @@ export const HANDLES: { edge: Edge; title: string; className: string }[] = [
   },
 ];
 
-/** Checkerboard shown through transparent pixels. */
 export const CHECKER_STYLE: CSSProperties = {
   backgroundColor: "#fff",
   backgroundImage: [
@@ -111,7 +103,6 @@ export const CHECKER_STYLE: CSSProperties = {
   backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0",
 };
 
-/** One grid cell per tile pixel; `backgroundSize` is set from the zoom. */
 export const GRID_STYLE: CSSProperties = {
   backgroundImage: [
     "linear-gradient(to right, rgba(127,127,127,0.3) 1px, transparent 1px)",
@@ -119,7 +110,6 @@ export const GRID_STYLE: CSSProperties = {
   ].join(", "),
 };
 
-/** The grid every few pixels (View › Grid); `backgroundSize` is set from its size and the zoom. */
 export const MAJOR_GRID_STYLE: CSSProperties = {
   backgroundImage: [
     "linear-gradient(to right, rgba(59,130,246,0.55) 1px, transparent 1px)",
@@ -127,5 +117,4 @@ export const MAJOR_GRID_STYLE: CSSProperties = {
   ].join(", "),
 };
 
-/** How many finished changes Ctrl+Z can step back through. */
 export const MAX_UNDO = 100;
