@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Notice } from "@pigxel/ui/components/notice";
-import { Lead, SectionTitle, Text } from "@pigxel/ui/components/typography";
+import { Lead, Text } from "@pigxel/ui/components/typography";
 import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -12,9 +11,13 @@ import {
   isGoogleSignInAvailable,
 } from "@/lib/google-drive/server";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { EmailForm, UnlinkButton } from "./account-forms";
-import { disconnectDrive } from "./actions";
-import { SignOutButton } from "./sign-out-button";
+import {
+  EmailForm,
+  UnlinkButton,
+} from "@/features/settings/account/account-forms";
+import { disconnectDrive } from "@/features/settings/account/actions";
+import { SignOutButton } from "@/features/settings/account/sign-out-button";
+import { SettingsSection } from "@/features/settings/components/settings-section";
 
 export const metadata: Metadata = { title: "Account settings · Pigxel" };
 export const dynamic = "force-dynamic";
@@ -68,7 +71,7 @@ export default async function AccountSettings({
         </Notice>
       )}
 
-      <Section title="Email">
+      <SettingsSection title="Email">
         <Lead className="mt-2">
           You sign in and get Pigxel emails at{" "}
           <span className="font-medium break-words text-foreground">
@@ -82,9 +85,9 @@ export default async function AccountSettings({
           </Lead>
         )}
         <EmailForm current={user.email ?? null} />
-      </Section>
+      </SettingsSection>
 
-      <Section title="Password">
+      <SettingsSection title="Password">
         <Lead className="mt-2">
           {hasPassword
             ? "Change the password you use with your email."
@@ -96,10 +99,10 @@ export default async function AccountSettings({
         >
           {hasPassword ? "Change password" : "Set a password"}
         </Link>
-      </Section>
+      </SettingsSection>
 
       {providers.length > 0 && (
-        <Section title="Connected accounts">
+        <SettingsSection title="Connected accounts">
           <Lead className="mt-2">
             Sign in to Pigxel with these as well as your email.
           </Lead>
@@ -138,11 +141,11 @@ export default async function AccountSettings({
               );
             })}
           </ul>
-        </Section>
+        </SettingsSection>
       )}
 
       {drive.available && (
-        <Section title="Google Drive">
+        <SettingsSection title="Google Drive">
           {driveResult === "error" && (
             <FormMessage tone="error" className="mt-3">
               Google Drive wasn’t connected. Try again when you’re ready.
@@ -174,22 +177,13 @@ export default async function AccountSettings({
               </a>
             )}
           </div>
-        </Section>
+        </SettingsSection>
       )}
 
-      <Section title="Sign out">
+      <SettingsSection title="Sign out">
         <Lead className="mt-2 mb-4">Sign out of Pigxel on this device.</Lead>
         <SignOutButton />
-      </Section>
+      </SettingsSection>
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="border-b py-8 first-of-type:pt-0 last:border-b-0">
-      <SectionTitle>{title}</SectionTitle>
-      {children}
-    </section>
   );
 }

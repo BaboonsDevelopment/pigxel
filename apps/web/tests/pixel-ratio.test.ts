@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stretchedSource } from "@/lib/export/export";
+import { stretchedSource } from "@/features/editor/export/export";
 import {
   blankDocument,
   parsePigxel,

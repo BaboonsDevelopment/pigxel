@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Landing } from "@/components/landing/landing";
+import { Landing } from "@/features/landing/components/landing";
 
 export const metadata: Metadata = {
   title: "Pigxel — Small pixels. Wild imagination.",

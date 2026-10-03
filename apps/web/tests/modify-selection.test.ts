@@ -3,8 +3,8 @@ import {
   borderMask,
   contractMask,
   expandMask,
-} from "@/components/pixel-canvas/selection";
-import { filledMask } from "@/components/pixel-canvas/effects";
+} from "@/features/editor/pixel-canvas/selection";
+import { filledMask } from "@/features/editor/pixel-canvas/effects";
 
 const size = { w: 5, h: 5 };
 

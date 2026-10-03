@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { PopularFeed } from "@/components/explore/popular-feed";
+import { PopularFeed } from "@/features/explore/components/popular-feed";
 import { getUser } from "@/lib/auth/session";
-import { listPublicTiles } from "@/lib/profile/server";
-import { PAGE_SIZE, PERIODS } from "./constants";
+import { listPublicTiles } from "@/features/profile/server";
+import { PAGE_SIZE, PERIODS } from "@/features/explore/constants";
 
 export const metadata: Metadata = { title: "Explore · Pigxel" };
 export const dynamic = "force-dynamic";

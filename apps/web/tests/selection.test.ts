@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { brushTip } from "@/components/pixel-canvas/pen";
+import { brushTip } from "@/features/editor/pixel-canvas/pen";
 import {
   mirrored,
   paintPoints,
   wrapPixel,
   type PaintOptions,
-} from "@/components/pixel-canvas/paint";
+} from "@/features/editor/pixel-canvas/paint";
 import {
   combineMasks,
   ellipseMask,
@@ -21,7 +21,7 @@ import {
   selectModeOf,
   stampFloating,
   wandMask,
-} from "@/components/pixel-canvas/selection";
+} from "@/features/editor/pixel-canvas/selection";
 import {
   DEFAULT_PALETTE,
   colorsOf,

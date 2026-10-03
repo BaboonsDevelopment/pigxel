@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { textPiece } from "@/components/pixel-canvas/text";
+import { textPiece } from "@/features/editor/pixel-canvas/text";
 
 const RED = [255, 0, 0, 255] as const;
 

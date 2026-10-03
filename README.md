@@ -33,6 +33,10 @@ supabase/                    Local configuration and password reset email templa
 
 Add product features in `apps/web` as they are developed. Extract shared logic into a package when there is a concrete need. Future mobile, desktop, and extension apps can live under `apps/`; React Native would use its own UI.
 
+## Product and technical requirements
+
+See [the product and technical specification](docs/product-technical-requirements.md) for every page and editor tool, feature behavior, acceptance requirements, architecture, integrations, data access rules, and known implementation gaps.
+
 ## UI components
 
 Tailwind CSS and shadcn/ui are configured with a neutral theme. Button and input components are included for the auth form. Add more from the web workspace:
@@ -54,6 +58,8 @@ Copy `apps/web/.env.example` to `apps/web/.env.local` when connecting services.
 
 ## Supabase Auth setup
 
+For Google and Apple provider credentials, callbacks, account linking, and live verification, follow [the social sign-in setup guide](docs/supabase-social-auth.md).
+
 1. In `apps/web/.env.local`, set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `APP_URL` (locally `http://localhost:3000`). Restart the dev server after changing these values.
 2. In Supabase Auth, enable the Email provider and turn **Confirm email** off (Authentication → Sign In / Providers → Email). Signup then signs the user in immediately. Set Site URL to your app origin and allow `${APP_URL}/auth/callback?next=/auth/update-password` and `${APP_URL}/auth/confirm` as redirect URLs (replace `${APP_URL}` with the actual origin).
 3. For password reset links that work across browsers, replace the **Reset password** email template with the contents of `supabase/templates/recovery.html`. Local Supabase already uses it.
@@ -66,7 +72,7 @@ The session is kept in cookies and refreshed by `src/proxy.ts` on every page, so
 
 Every account gets a profile (`supabase/migrations/20260929120000_profiles.sql`) with a username, display name, description (up to 200 characters), up to three links, an avatar and a public/private setting. `/u/<username>` shows the profile, its art count, pinned arts (up to six) and published arts; `/profile` goes to your own. Tiles in Pigxel cloud stay private until published from the profile. `/settings` has Profile, Account (email, password, connected Google/Apple sign-in, Google Drive, sign-out), Subscription and Privacy tabs.
 
-Apple sign-in is optional: it needs an Apple Developer account, the Apple provider enabled in Supabase, and `APPLE_CLIENT_ID` in `apps/web/.env.local`. The login page always shows the Google and Apple buttons; one whose client ID isn’t set shows as unavailable ("isn’t set up yet").
+Apple sign-in is optional: it needs an Apple Developer account, a website Services ID and generated client secret in Supabase's Apple provider, and `APPLE_CLIENT_ID` in `apps/web/.env.local`. Rotate the Apple secret before expiry (at most six months). Basic Google sign-in needs the Google provider configured in Supabase and `GOOGLE_CLIENT_ID` in the app; the app's Google secret and Supabase secret key are needed only for Drive integration. The login page always shows the Google and Apple buttons; one whose client ID isn’t set shows as unavailable ("isn’t set up yet").
 
 Implementation follows [Supabase’s Next.js auth guide](https://supabase.com/docs/guides/getting-started/tutorials/with-nextjs).
 

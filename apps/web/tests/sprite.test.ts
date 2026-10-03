@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frameDropIndex } from "@/components/timeline/helpers";
+import { frameDropIndex } from "@/features/editor/timeline/helpers";
 import {
   clampDuration,
   insertFrame,

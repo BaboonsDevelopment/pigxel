@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { EventName, NodeRuntime, Webhooks } from "@paddle/paddle-node-sdk";
-import { saveSubscription } from "@/lib/billing/server";
-import { subscriptionRecord } from "@/lib/billing/subscription";
+import { saveSubscription } from "@/features/billing/server";
+import { subscriptionRecord } from "@/features/billing/subscription";
 
 const SUBSCRIPTION_EVENTS = new Set<string>([
   EventName.SubscriptionCreated,

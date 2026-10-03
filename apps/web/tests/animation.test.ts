@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { drawnBox, follow } from "@/components/chat-panel/helpers";
-import { ASPECT_RATIOS, MAX_FRAMES } from "@/lib/ai/constants";
-import { clampAnimationPlan, sheetLayout } from "@/lib/ai/helpers";
-import type { AnimationReply } from "@/lib/ai/types";
+import { drawnBox, follow } from "@/features/ai/components/chat-panel/helpers";
+import { ASPECT_RATIOS, MAX_FRAMES } from "@/features/ai/constants";
+import { clampAnimationPlan, sheetLayout } from "@/features/ai/helpers";
+import type { AnimationReply } from "@/features/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { posesToFrames, splitSheet } from "@/lib/image/sheet";
 

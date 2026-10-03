@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
-import { getOwnProfile } from "@/lib/profile/server";
+import { getOwnProfile } from "@/features/profile/server";
 
 export const dynamic = "force-dynamic";
 

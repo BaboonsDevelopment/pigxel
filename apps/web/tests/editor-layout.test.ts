@@ -10,7 +10,7 @@ import {
   shownStacks,
   type DockSide,
   type Layout,
-} from "@/lib/editor-layout/layout";
+} from "@/features/editor/layout";
 
 const stacks = (layout: Layout, side: DockSide) =>
   shownStacks(layout, side).map((s) => s.items.map((i) => i.id));
@@ -137,8 +137,7 @@ describe("editor layout", () => {
 
 describe("tool groups", () => {
   it("puts every tool in exactly one group", async () => {
-    const { TOOLS, TOOL_GROUPS } =
-      await import("@/components/tile-editor/tools");
+    const { TOOLS, TOOL_GROUPS } = await import("@/features/editor/tools");
     const grouped = TOOL_GROUPS.flatMap((g) => g.tools);
     expect([...grouped].sort()).toEqual(TOOLS.map((t) => t.id).sort());
   });

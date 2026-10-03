@@ -6,9 +6,9 @@ import {
   textLinkClassName,
 } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
-import { getOwnProfile } from "@/lib/profile/server";
-import { AvatarField } from "./avatar-field";
-import { ProfileForm } from "./profile-form";
+import { getOwnProfile } from "@/features/profile/server";
+import { AvatarField } from "@/features/settings/profile/avatar-field";
+import { ProfileForm } from "@/features/settings/profile/profile-form";
 
 export const metadata: Metadata = { title: "Profile settings · Pigxel" };
 export const dynamic = "force-dynamic";

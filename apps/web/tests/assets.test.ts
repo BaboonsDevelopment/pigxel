@@ -4,13 +4,13 @@ import {
   keepFrames,
   toAsset,
   type AssetRow,
-} from "@/lib/assets/assets";
-import { assetIdFor, sheetPixels } from "@/lib/assets/publish";
+} from "@/features/assets/assets";
+import { assetIdFor, sheetPixels } from "@/features/assets/publish";
 import {
   STARTER_ASSETS,
   starterDocument,
   starterPixels,
-} from "@/lib/assets/starter";
+} from "@/features/assets/starter";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
   flattenDocument,
@@ -22,7 +22,7 @@ import {
   TUTORIALS,
   findTutorial,
   type GuideState,
-} from "@/lib/tutorials/tutorials";
+} from "@/features/tutorials/tutorials";
 
 describe("the starter set", () => {
   it("has unique ids that work as asset ids", () => {

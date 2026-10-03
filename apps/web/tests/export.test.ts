@@ -1,14 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
+import {
+  DEFAULT_EXPORT,
+  type ExportSettings,
+} from "@/features/editor/export/constants";
 import {
   exportFiles,
   exportSize,
   fitsCanvas,
   onColor,
   type ExportSource,
-} from "@/lib/export/export";
-import { encodeGif, toIndexed } from "@/lib/export/gif";
-import { buildSheet, sheetData, sheetGrid } from "@/lib/export/sheet";
+} from "@/features/editor/export/export";
+import { encodeGif, toIndexed } from "@/features/editor/export/gif";
+import {
+  buildSheet,
+  sheetData,
+  sheetGrid,
+} from "@/features/editor/export/sheet";
 
 const solid = (w: number, h: number, rgba: number[]) => {
   const out = new Uint8ClampedArray(w * h * 4);

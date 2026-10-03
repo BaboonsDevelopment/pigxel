@@ -6,7 +6,7 @@ import {
   pageFrom,
   readFeedback,
   titlePattern,
-} from "@/lib/feedback/feedback";
+} from "@/features/feedback/feedback";
 
 const report = {
   kind: "bug",

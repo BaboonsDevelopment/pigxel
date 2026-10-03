@@ -89,7 +89,7 @@ describe("connecting Google", () => {
     expect(options.queryParams.access_type).toBe("offline");
     expect(options.queryParams.prompt).toBeUndefined();
     expect(options.redirectTo).toBe(
-      "http://localhost:3000/auth/callback?next=%2Ftiles",
+      "http://localhost:3000/auth/callback?next=%2Ftiles&provider=google",
     );
   });
   it("links a Google account to an email account", async () => {

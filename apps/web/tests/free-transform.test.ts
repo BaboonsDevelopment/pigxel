@@ -3,8 +3,8 @@ import {
   cornersOf,
   identityTransform,
   transformFloating,
-} from "@/components/pixel-canvas/free-transform";
-import type { Floating } from "@/components/pixel-canvas/selection";
+} from "@/features/editor/pixel-canvas/free-transform";
+import type { Floating } from "@/features/editor/pixel-canvas/selection";
 
 function piece(rows: string[], x = 0, y = 0): Floating {
   const w = rows[0]!.length;

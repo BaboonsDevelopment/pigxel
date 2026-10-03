@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
+import {
+  outlined,
+  replacedColor,
+} from "@/features/editor/pixel-canvas/effects";
 import {
   blendInk,
   blurInk,
@@ -11,14 +14,14 @@ import {
   paintStamp,
   shadingInk,
   type PaintOptions,
-} from "@/components/pixel-canvas/paint";
+} from "@/features/editor/pixel-canvas/paint";
 import {
   brushTip,
   sprayDotCount,
   sprayDots,
   curvePoints,
-} from "@/components/pixel-canvas/pen";
-import { onionFrames } from "@/components/pixel-canvas/view";
+} from "@/features/editor/pixel-canvas/pen";
+import { onionFrames } from "@/features/editor/pixel-canvas/view";
 import { parsePaletteFile, toGpl } from "@/lib/palette/files";
 
 const size = { w: 3, h: 3 };
