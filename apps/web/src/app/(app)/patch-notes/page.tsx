@@ -4,6 +4,7 @@ import { Page } from "@pigxel/ui/components/page";
 import { PATCH_NOTES, patchDate } from "@/lib/patch-notes";
 import { VersionSelect } from "./version-select";
 import { ReleaseArt } from "./release-art";
+import { Eyebrow, Heading } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = { title: "Patch notes · Pigxel" };
 
@@ -45,12 +46,12 @@ export default async function PatchNotes({ searchParams }: Props) {
     <Page className="pb-16">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-1 font-mono text-[10px] uppercase tracking-[0.22em] text-primary-soft-foreground">
+          <Eyebrow className="mb-1 tracking-[0.22em] text-primary-soft-foreground">
             The Pigxel changelog
-          </p>
-          <h1 className="font-display text-3xl tracking-tight">
+          </Eyebrow>
+          <Heading size="page" className="text-3xl">
             Patch notes<span className="text-primary">.</span>
-          </h1>
+          </Heading>
         </div>
         <VersionSelect
           value={note.version}
@@ -80,10 +81,10 @@ export default async function PatchNotes({ searchParams }: Props) {
                   </span>
                 )}
               </div>
-              <h2 className="max-w-md font-display text-5xl leading-[1.05] tracking-tight sm:text-6xl">
+              <Heading as="h2" size="display" className="max-w-md text-inherit">
                 {note.title}
                 <span className="text-[#f39dad]">.</span>
-              </h2>
+              </Heading>
               <p className="mt-5 max-w-md text-sm leading-7 text-[#e1cedb]">
                 {note.summary}
               </p>
@@ -146,9 +147,13 @@ export default async function PatchNotes({ searchParams }: Props) {
                             {look.caption}
                           </p>
                         )}
-                        <h4 className="font-display text-2xl leading-tight">
+                        <Heading
+                          as="h4"
+                          size="title"
+                          className="leading-tight tracking-normal"
+                        >
                           {section.title}
-                        </h4>
+                        </Heading>
                       </div>
                     </div>
                     <span

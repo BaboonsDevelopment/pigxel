@@ -1,4 +1,7 @@
 import Image, { type StaticImageData } from "next/image";
+import { Badge } from "@pigxel/ui/components/badge";
+import { cardVariants } from "@pigxel/ui/components/card";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 import characters from "../../../public/art/templates/characters.png";
 import cozyRooms from "../../../public/art/templates/cozy-rooms.png";
 import fantasyBuildings from "../../../public/art/templates/fantasy-buildings.png";
@@ -27,18 +30,16 @@ export function PopularTemplates() {
   return (
     <section
       aria-labelledby="templates-heading"
-      className="flex min-h-0 flex-col rounded-3xl bg-[#e9e4f5] p-5"
+      className={cardVariants({
+        tone: "lavender",
+        className: "flex min-h-0 flex-col rounded-3xl",
+      })}
     >
       <div>
-        <h2
-          id="templates-heading"
-          className="font-display text-xl tracking-tight"
-        >
-          Popular templates
-        </h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
+        <Heading id="templates-heading">Popular templates</Heading>
+        <Text tone="muted" className="mt-0.5">
           Ready-to-use starting points
-        </p>
+        </Text>
       </div>
       <ul className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
         {TEMPLATES.map((template) => (
@@ -54,9 +55,9 @@ export function PopularTemplates() {
                 className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none"
               />
             </span>
-            <span className="absolute top-2.5 right-2.5 rounded-full bg-white/85 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
+            <Badge tone="overlay" className="absolute top-2.5 right-2.5">
               Soon
-            </span>
+            </Badge>
             <span className="block shrink-0 truncate px-3 py-2 font-mono text-sm">
               {template.name}
             </span>

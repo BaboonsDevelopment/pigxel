@@ -1,6 +1,7 @@
 import type { Area } from "@/components/pixel-canvas/constants";
 import type { ChatEntry, Placement } from "../constants";
 import { buttonVariants } from "@pigxel/ui/components/button";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 type Props = {
   messages: ChatEntry[];
@@ -84,11 +85,10 @@ export function ChatMessages({
             </button>
           )}
           {message.image && (
-            // eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimize
-            <img
+            <PixelImage
               src={message.image}
               alt="Generated picture"
-              className="mt-2 w-full rounded-md [image-rendering:pixelated]"
+              className="mt-2 w-full rounded-md"
             />
           )}
         </li>

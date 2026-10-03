@@ -58,3 +58,53 @@ export function Button({
     />
   );
 }
+
+export type IconButtonVariant = "ghost" | "secondary" | "overlay";
+export type IconButtonSize = "xs" | "sm" | "md";
+
+const iconVariants: Record<IconButtonVariant, string> = {
+  ghost:
+    "text-muted-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground",
+  secondary:
+    "border bg-background text-foreground hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground",
+  overlay: "border bg-white/80 text-foreground shadow-sm hover:bg-white",
+};
+
+const iconSizes: Record<IconButtonSize, string> = {
+  xs: "size-5 rounded text-sm",
+  sm: "size-8 rounded-md text-sm",
+  md: "size-10 rounded-lg",
+};
+
+export function IconButton({
+  label,
+  variant = "ghost",
+  size = "sm",
+  round = false,
+  className,
+  type = "button",
+  title,
+  ...props
+}: Omit<ComponentProps<"button">, "aria-label"> & {
+  label: string;
+  variant?: IconButtonVariant;
+  size?: IconButtonSize;
+  round?: boolean;
+}) {
+  return (
+    <button
+      data-slot="icon-button"
+      type={type}
+      aria-label={label}
+      title={title ?? label}
+      className={cn(
+        base,
+        iconVariants[variant],
+        iconSizes[size],
+        round && "rounded-full",
+        className,
+      )}
+      {...props}
+    />
+  );
+}

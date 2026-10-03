@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef, type RefObject } from "react";
 import { createRoot } from "react-dom/client";
 import { Button, type ButtonVariant } from "@pigxel/ui/components/button";
+import { Dialog, useDialog } from "@pigxel/ui/components/dialog";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 
 type ConfirmOptions = {
@@ -56,36 +57,36 @@ export function choiceDialog<T extends string>(
 }
 
 function ChoiceDialog<T extends string>({
+  onDone,
+  ...props
+}: ChoiceOptions<T> & { onDone: (answer: T | null) => void }) {
+  const answer = useRef<T | null>(null);
+  return (
+    <Dialog
+      size="sm"
+      onClose={() => onDone(answer.current)}
+      aria-describedby="confirm-dialog-message"
+    >
+      <ChoiceBody {...props} answerRef={answer} />
+    </Dialog>
+  );
+}
+
+function ChoiceBody<T extends string>({
   title,
   message,
   choices,
   cancelLabel = "Cancel",
-  onDone,
-}: ChoiceOptions<T> & { onDone: (answer: T | null) => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const answer = useRef<T | null>(null);
-
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
-
-  const close = (value: T | null) => {
-    answer.current = value;
-    dialog.current?.close();
+  answerRef,
+}: ChoiceOptions<T> & { answerRef: RefObject<T | null> }) {
+  const { close, titleId } = useDialog();
+  const choose = (value: T | null) => {
+    answerRef.current = value;
+    close();
   };
-
   return (
-    <dialog
-      ref={dialog}
-      onClose={() => onDone(answer.current)}
-      onClick={(e) => {
-        if (e.target === dialog.current) close(null);
-      }}
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-message"
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-xl border bg-background p-5 text-foreground shadow-2xl backdrop:bg-black/40"
-    >
-      <SectionTitle id="confirm-dialog-title">{title}</SectionTitle>
+    <div className="p-5">
+      <SectionTitle id={titleId}>{title}</SectionTitle>
       <Lead id="confirm-dialog-message" className="mt-2">
         {message}
       </Lead>
@@ -94,7 +95,7 @@ function ChoiceDialog<T extends string>({
           type="button"
           variant="secondary"
           autoFocus
-          onClick={() => close(null)}
+          onClick={() => choose(null)}
         >
           {cancelLabel}
         </Button>
@@ -103,12 +104,12 @@ function ChoiceDialog<T extends string>({
             key={choice.value}
             type="button"
             variant={choice.variant ?? "primary"}
-            onClick={() => close(choice.value)}
+            onClick={() => choose(choice.value)}
           >
             {choice.label}
           </Button>
         ))}
       </div>
-    </dialog>
+    </div>
   );
 }

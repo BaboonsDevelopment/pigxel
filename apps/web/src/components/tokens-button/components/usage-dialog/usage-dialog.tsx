@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import { SectionTitle } from "@pigxel/ui/components/typography";
+import { useEffect, useState } from "react";
+import { Dialog, DialogHeader } from "@pigxel/ui/components/dialog";
+import { Text } from "@pigxel/ui/components/typography";
 import { getAiBalance, listAiUsage } from "@/lib/ai/actions";
 import { groupActions, tokens, type UsageAction } from "./helpers";
 
@@ -12,12 +12,10 @@ type Usage = {
 };
 
 export function UsageDialog({ onClose }: { onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    dialog.current?.showModal();
     Promise.all([getAiBalance(), listAiUsage()])
       .then(([balance, rows]) =>
         setUsage({ balance, actions: groupActions(rows) }),
@@ -26,41 +24,29 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <dialog
-      ref={dialog}
+    <Dialog
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialog.current) dialog.current.close();
-      }}
-      aria-labelledby="usage-dialog-title"
-      className="m-auto max-h-[min(40rem,calc(100dvh-2rem))] w-[min(28rem,calc(100vw-2rem))] flex-col rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40 open:flex"
+      size="sm"
+      className="max-h-[min(40rem,calc(100dvh-2rem))]"
     >
-      <div className="flex items-center justify-between gap-4 px-5 pt-4">
-        <SectionTitle id="usage-dialog-title">AI tokens</SectionTitle>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
+      <DialogHeader title="AI tokens" />
       {error ? (
-        <p className="p-5 text-sm text-destructive">{error}</p>
+        <Text tone="error" className="p-5">
+          {error}
+        </Text>
       ) : !usage ? (
-        <p className="p-5 text-sm text-muted-foreground">Loading…</p>
+        <Text tone="muted" className="p-5">
+          Loading…
+        </Text>
       ) : (
         <>
           <Balance {...usage.balance} />
           <div className="min-h-0 flex-1 overflow-y-auto border-t px-5 py-3">
             {usage.actions.length === 0 ? (
-              <p className="py-2 text-sm text-muted-foreground">
+              <Text tone="muted" className="py-2">
                 Nothing spent yet: pictures, edits and animations will show up
                 here.
-              </p>
+              </Text>
             ) : (
               <ul className="divide-y">
                 {usage.actions.map((action) => (
@@ -70,9 +56,9 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
                   >
                     <span className="min-w-0">
                       <span className="block font-medium">{action.kind}</span>
-                      <span className="block text-xs text-muted-foreground">
+                      <Text as="span" size="xs" tone="muted" className="block">
                         {new Date(action.at).toLocaleString()}
-                      </span>
+                      </Text>
                     </span>
                     <span className="shrink-0 font-mono tabular-nums">
                       −{tokens(action.credits)}
@@ -84,7 +70,7 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
           </div>
         </>
       )}
-    </dialog>
+    </Dialog>
   );
 }
 

@@ -9,6 +9,8 @@ import { linkTitle } from "@/lib/profile/validation";
 import { TokensButton } from "@/components/tokens-button/tokens-button";
 import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
+import { Badge } from "@pigxel/ui/components/badge";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export function ProfileHeader({
   profile,
@@ -33,12 +35,12 @@ export function ProfileHeader({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <h1 className="font-display text-3xl tracking-tight break-words sm:text-4xl">
+              <Heading size="page" className="text-3xl sm:text-4xl">
                 {profile.name}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+              </Heading>
+              <Text tone="muted" className="mt-1">
                 @{profile.username}
-              </p>
+              </Text>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {premium && (
                   <li className="inline-flex items-center gap-1.5 rounded-full bg-linear-90 from-[#a47be0] to-[#e57fa6] px-3 py-1 text-xs font-semibold text-white shadow-sm">
@@ -46,8 +48,14 @@ export function ProfileHeader({
                   </li>
                 )}
                 {joined && (
-                  <li className="inline-flex items-center rounded-full bg-white/70 px-3 py-1 text-xs text-muted-foreground">
-                    {joined}
+                  <li>
+                    <Badge
+                      tone="overlay"
+                      size="md"
+                      className="px-3 py-1 font-normal"
+                    >
+                      {joined}
+                    </Badge>
                   </li>
                 )}
               </ul>

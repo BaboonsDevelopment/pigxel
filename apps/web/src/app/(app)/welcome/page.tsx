@@ -3,6 +3,7 @@ import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { Page } from "@pigxel/ui/components/page";
 import { PageTransition } from "@/components/page-transition";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {
   title: "Welcome · Pigxel",
@@ -13,12 +14,12 @@ export default function Welcome() {
   return (
     <PageTransition>
       <Page width="narrow" className="py-24 text-center md:pt-24">
-        <h1 className="font-display text-4xl tracking-tight sm:text-5xl">
+        <Heading size="page" className="sm:text-5xl">
           Thanks for subscribing
-        </h1>
-        <p className="mt-4 text-muted-foreground">
+        </Heading>
+        <Text size="md" tone="muted" className="mt-4">
           Your payment went through, and Paddle is emailing your receipt.
-        </p>
+        </Text>
         <Link
           href="/home"
           className={buttonVariants({ size: "lg", className: "mt-8" })}

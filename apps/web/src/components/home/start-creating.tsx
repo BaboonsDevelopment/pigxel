@@ -1,5 +1,7 @@
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
+import { Badge } from "@pigxel/ui/components/badge";
+import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import blankCanvas from "../../../public/art/start/blank-canvas.png";
 import generateAi from "../../../public/art/start/generate-ai.png";
@@ -19,26 +21,26 @@ const STARTS: Start[] = [
     title: "Blank canvas",
     description: "Start from scratch",
     image: blankCanvas,
-    tint: "bg-[#f8dde6]",
+    tint: "bg-pastel-pink",
     href: "/tiles/new",
   },
   {
     title: "Generate with AI",
     description: "Turn ideas into pixel art",
     image: generateAi,
-    tint: "bg-[#e6e2f5]",
+    tint: "bg-pastel-lavender",
   },
   {
     title: "Sprite animation",
     description: "Create and edit animations",
     image: spriteAnimation,
-    tint: "bg-[#f9e0d6]",
+    tint: "bg-pastel-peach",
   },
   {
     title: "Tileset",
     description: "Build custom tilesets",
     image: tileset,
-    tint: "bg-[#dfeae4]",
+    tint: "bg-pastel-mint",
   },
 ];
 
@@ -66,9 +68,9 @@ function StartCard({ start }: { start: Start }) {
       <span className="mt-auto flex items-end justify-between gap-3">
         <span>
           <span className="block text-sm font-semibold">{start.title}</span>
-          <span className="mt-0.5 block text-xs text-muted-foreground">
+          <Text as="span" size="xs" tone="muted" className="mt-0.5 block">
             {start.description}
-          </span>
+          </Text>
         </span>
         <span
           aria-hidden="true"
@@ -103,9 +105,9 @@ function StartCard({ start }: { start: Start }) {
     );
   return (
     <div aria-disabled="true" className={cn(className, "cursor-pointer")}>
-      <span className="absolute top-3 right-3 rounded-full bg-white/80 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
+      <Badge tone="overlay" className="absolute top-3 right-3">
         Soon
-      </span>
+      </Badge>
       {body}
     </div>
   );

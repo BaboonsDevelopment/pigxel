@@ -7,6 +7,7 @@ import { PricingPlans } from "@/components/pricing/pricing-plans";
 import { getUser } from "@/lib/auth/session";
 import { LEGAL } from "@/lib/legal";
 import { countryFromHeaders, paddleClientConfig } from "@/lib/paddle/config";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {
   title: "Pricing · Pigxel",
@@ -42,13 +43,20 @@ export default async function Pricing() {
           customer={customer}
           heading={
             <div>
-              <h1 className="font-display text-4xl tracking-tight lg:text-5xl lg:[@media(max-height:820px)]:text-4xl">
+              <Heading
+                size="page"
+                className="lg:text-5xl lg:[@media(max-height:820px)]:text-4xl"
+              >
                 Pick your plan
-              </h1>
-              <p className="mt-2 text-muted-foreground lg:[@media(max-height:740px)]:hidden">
+              </Heading>
+              <Text
+                size="md"
+                tone="muted"
+                className="mt-2 lg:[@media(max-height:740px)]:hidden"
+              >
                 Every drawing tool is free. Paid plans add more AI and more room
                 for your art.
-              </p>
+              </Text>
             </div>
           }
         />

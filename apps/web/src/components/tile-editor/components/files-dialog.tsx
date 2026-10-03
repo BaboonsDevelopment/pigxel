@@ -13,6 +13,7 @@ import {
   textLinkClassName,
 } from "@pigxel/ui/components/typography";
 import type { FileItem, Listing } from "../constants";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 export function FilesDialog({
   title,
@@ -118,11 +119,10 @@ export function FilesDialog({
               {item.thumbnail !== undefined && (
                 <span className="flex size-10 shrink-0 items-center justify-center rounded border bg-checker">
                   {item.thumbnail && (
-                    // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
-                    <img
+                    <PixelImage
                       src={item.thumbnail}
                       alt=""
-                      className="max-h-full max-w-full [image-rendering:pixelated]"
+                      className="max-h-full max-w-full"
                     />
                   )}
                 </span>

@@ -1,5 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cardVariants } from "@pigxel/ui/components/card";
+import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
 import { TUTORIALS } from "@/lib/tutorials/tutorials";
 import pigReading from "../../../public/art/pigxel-mascot-reading.png";
 
@@ -7,23 +9,24 @@ export function Tutorials() {
   return (
     <section
       aria-labelledby="tutorials-heading"
-      className="relative flex min-h-0 flex-col overflow-hidden rounded-3xl bg-[#f8dde6] p-5"
+      className={cardVariants({
+        tone: "pink",
+        className: "relative flex min-h-0 flex-col overflow-hidden rounded-3xl",
+      })}
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2
-            id="tutorials-heading"
-            className="font-display text-xl tracking-tight"
-          >
-            Learn &amp; Tutorials
-          </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <Heading id="tutorials-heading">Learn &amp; Tutorials</Heading>
+          <Text tone="muted" className="mt-0.5">
             Step-by-step guides to improve your skills
-          </p>
+          </Text>
         </div>
         <Link
           href="/tutorials"
-          className="relative z-10 text-xs font-medium text-[#9a78d0] hover:underline"
+          className={linkVariants({
+            variant: "accent",
+            className: "relative z-10",
+          })}
         >
           View all <span aria-hidden="true">→</span>
         </Link>
@@ -48,14 +51,14 @@ export function Tutorials() {
                 <span className="block truncate font-display text-base">
                   {tutorial.title}
                 </span>
-                <span className="block text-xs text-muted-foreground">
+                <Text as="span" size="xs" tone="muted" className="block">
                   {tutorial.minutes} min <span aria-hidden="true">·</span>{" "}
                   {tutorial.level}
-                </span>
+                </Text>
               </span>
               <span
                 aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#f8dde6] text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pastel-pink text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none"
               >
                 <svg viewBox="0 0 16 16" className="ml-0.5 size-3.5">
                   <path d="M4 2.5v11L13 8z" fill="currentColor" />

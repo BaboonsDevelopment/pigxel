@@ -9,6 +9,7 @@ import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { ProjectCard } from "./project-card/project-card";
 import { confirmRemoveLocalTile } from "./tile-actions";
 import { TileThumbnail } from "./tile-thumbnail";
+import { Heading } from "@pigxel/ui/components/typography";
 
 type LocalTile = Draft & { image: PigxelDocument };
 
@@ -48,12 +49,9 @@ function List({
 
   return (
     <section aria-labelledby="local-tiles-heading" className="mt-6">
-      <h2
-        id="local-tiles-heading"
-        className="mb-3 font-display text-xl tracking-tight"
-      >
+      <Heading id="local-tiles-heading" className="mb-3">
         In this browser
-      </h2>
+      </Heading>
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {tiles.map((tile) => (
           <ProjectCard

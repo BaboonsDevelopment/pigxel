@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Badge } from "@pigxel/ui/components/badge";
+import {
+  linkVariants,
+  SectionHeader,
+  Text,
+} from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Asset, AssetCategory } from "@/lib/assets/assets";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
 
 const TINTS: Record<AssetCategory, string> = {
-  characters: "bg-[#f8dde6]",
-  items: "bg-[#f9e0d6]",
-  nature: "bg-[#dfeae4]",
-  tiles: "bg-[#e6e2f5]",
+  characters: "bg-pastel-pink",
+  items: "bg-pastel-peach",
+  nature: "bg-pastel-mint",
+  tiles: "bg-pastel-lavender",
 };
 
 export type AssetSection = {
@@ -38,22 +44,20 @@ export function AssetLibrary({
             aria-labelledby={`assets-${category.id}`}
             className="mt-8"
           >
-            <div className="mb-3 flex items-end justify-between gap-4">
-              <h2
-                id={`assets-${category.id}`}
-                className="font-display text-xl tracking-tight"
-              >
-                {category.label}
-              </h2>
-              {total > assets.length && (
-                <Link
-                  href={`/assets?type=${category.id}`}
-                  className="text-xs font-medium text-[#9a78d0] hover:underline"
-                >
-                  See all {total} <span aria-hidden="true">→</span>
-                </Link>
-              )}
-            </div>
+            <SectionHeader
+              id={`assets-${category.id}`}
+              title={category.label}
+              actions={
+                total > assets.length && (
+                  <Link
+                    href={`/assets?type=${category.id}`}
+                    className={linkVariants({ variant: "accent" })}
+                  >
+                    See all {total} <span aria-hidden="true">→</span>
+                  </Link>
+                )
+              }
+            />
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
               {assets.map((asset) => (
                 <li key={asset.id}>
@@ -101,18 +105,23 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
           )}
         />
         {asset.frames > 1 && (
-          <span className="absolute top-2 right-2 rounded-full bg-white/85 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
+          <Badge tone="overlay" className="absolute top-2 right-2">
             Animated
-          </span>
+          </Badge>
         )}
       </span>
       <span className="mt-2 block truncate text-sm font-semibold">
         {asset.name}
       </span>
-      <span className="block font-mono text-xs text-muted-foreground tabular-nums">
+      <Text
+        as="span"
+        size="xs"
+        tone="muted"
+        className="block font-mono tabular-nums"
+      >
         {asset.width} × {asset.height}
         {asset.frames > 1 && ` · ${asset.frames} frames`}
-      </span>
+      </Text>
     </button>
   );
 }

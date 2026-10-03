@@ -13,6 +13,8 @@ import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
 import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "@/lib/pricing";
 import { annualComparison, type PriceQuote } from "@/lib/pricing-comparison";
+import { Badge } from "@pigxel/ui/components/badge";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 const CYCLES: { id: BillingCycle; label: string }[] = [
   { id: "month", label: "Monthly" },
@@ -126,11 +128,11 @@ export function PricingPlans({
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground md:text-right">
+          <Text size="xs" tone="muted" className="md:text-right">
             {cycle === "year"
               ? "One yearly payment. Compare it with 12 months of monthly billing."
               : "Billed monthly. Choose yearly to see your annual savings."}
-          </p>
+          </Text>
         </div>
       </div>
 
@@ -197,9 +199,9 @@ export function PricingPlans({
                         }
                       />
                     ) : failed ? (
-                      <span className="text-sm text-muted-foreground">
+                      <Text as="span" tone="muted">
                         Price unavailable
-                      </span>
+                      </Text>
                     ) : (
                       <Skeleton
                         aria-label="Loading price"
@@ -243,21 +245,23 @@ function Price({
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
-        <span className="font-display text-4xl tracking-tight break-words">
+        <Heading as="span" size="page">
           {amount}
-        </span>
-        <span className="text-sm text-muted-foreground">{period}</span>
+        </Heading>
+        <Text as="span" tone="muted">
+          {period}
+        </Text>
       </div>
       <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {comparison ? (
           <>
             <span className="sr-only">Twelve months at the monthly rate: </span>
             <s className="decoration-1">{comparison.regularPrice}</s>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+            <Badge tone="accent" size="md">
               {comparison.savingsPercent > 0
                 ? `Save ${comparison.savingsPercent}%`
                 : "Annual savings"}
-            </span>
+            </Badge>
           </>
         ) : (
           note
@@ -296,14 +300,18 @@ function PlanCard({
           <span aria-hidden="true">✦</span> Recommended
         </span>
       )}
-      <h2
-        className={cn("font-display text-2xl", highlighted && "text-primary")}
+      <Heading
+        size="title"
+        className={cn("tracking-normal", highlighted && "text-primary")}
       >
         {name}
-      </h2>
-      <p className="mt-1.5 min-h-10 text-sm leading-snug text-muted-foreground lg:[@media(max-height:740px)]:min-h-9 lg:[@media(max-height:740px)]:leading-tight">
+      </Heading>
+      <Text
+        tone="muted"
+        className="mt-1.5 min-h-10 leading-snug lg:[@media(max-height:740px)]:min-h-9 lg:[@media(max-height:740px)]:leading-tight"
+      >
         {description}
-      </p>
+      </Text>
       <div className="mt-3 min-h-16" aria-live="polite" aria-atomic="true">
         {price}
       </div>
