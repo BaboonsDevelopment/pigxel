@@ -2,10 +2,6 @@ import type { Bitmap } from "./bitmap";
 import { decodeImage } from "./decode";
 import { runSteps, type Step } from "./pipeline";
 
-/**
- * Turns a picture into `width × height` pixel art by running it through
- * `steps` (see pipeline.ts). Browser-only: decoding needs a canvas.
- */
 export async function imageToPixelArt(
   source: Blob,
   width: number,
@@ -16,11 +12,6 @@ export async function imageToPixelArt(
   return runSteps({ rgba, w, h }, { w: width, h: height }, steps);
 }
 
-/**
- * Fits a picture into a `width × height` tile, keeping its proportions and
- * centring it; the rest stays transparent. Smooth, not pixel art: for a
- * reference to trace over. Browser-only.
- */
 export async function fitImageToTile(
   source: Blob,
   width: number,

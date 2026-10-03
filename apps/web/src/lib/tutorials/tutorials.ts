@@ -4,39 +4,25 @@ import buildTileset from "../../../public/art/tutorials/build-tileset.png";
 import firstAnimation from "../../../public/art/tutorials/first-animation.png";
 import pixelArtBasics from "../../../public/art/tutorials/pixel-art-basics.png";
 
-/** What a guide sees of the editor, to tell when a step is done. */
 export type GuideState = {
   tool: ToolId;
-  /** The primary colour. */
   color: string;
   frames: number;
-  /** Opaque pixels in the frame on screen. */
   painted: number;
-  /** Whether any frame looks different from the first. */
   framesDiffer: boolean;
-  /** Onion skin frames each way; 0 is off. */
   onion: number;
-  /** The View › Grid size; 0 is none. */
   grid: number;
   playing: boolean;
   exporting: boolean;
-  /** Pixels are lifted or pasted and not put down yet. */
   floating: boolean;
-  /** How many assets were inserted since the editor opened. */
   inserted: number;
 };
 
 export type GuideStep = {
   title: string;
   body: string;
-  /** Keys to show; "Mod+" is Ctrl+, or ⌘ on a Mac. */
   keys?: string[];
-  /** A CSS selector for what to point at in the editor. */
   target?: string;
-  /**
-   * Whether the step is done, from the editor now and as it was when the
-   * step began. Steps without one are read, then moved past with Next.
-   */
   done?: (now: GuideState, from: GuideState) => boolean;
 };
 
@@ -47,21 +33,17 @@ export type Tutorial = {
   minutes: number;
   level: "Beginner" | "Intermediate";
   image: StaticImageData;
-  /** The video on YouTube, once it's up: the `v` in its link. */
   youtubeId?: string;
-  /** The tile the interactive guide opens: blank, or one of the assets. */
   practice: {
     name: string;
     width: number;
     height: number;
     asset?: string;
-    /** Keeps only the asset's first frames, e.g. 1 to animate it yourself. */
     frames?: number;
   };
   steps: GuideStep[];
 };
 
-/** The tool panel's button for the group holding a tool (see ToolBar). */
 const tool = (label: string) =>
   `[aria-label="Tools"] [data-tools*="|${label}|"]`;
 const menu = (label: string) => `[data-menu="${label}"]`;
@@ -282,7 +264,6 @@ export function findTutorial(slug: string | null | undefined) {
   return TUTORIALS.find((tutorial) => tutorial.slug === slug) ?? null;
 }
 
-/** The video embedded without YouTube's tracking cookies. */
 export function videoEmbedUrl(youtubeId: string) {
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeId)}?rel=0`;
 }

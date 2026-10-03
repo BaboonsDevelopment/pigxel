@@ -26,8 +26,6 @@ import {
 import type { AiProvider, ChatMessage, GeneratedImage } from "../types";
 import { recordUsage, type GeminiUsage } from "../usage";
 
-/** Google Gemini: the text models and the image models. */
-
 type GeminiPart = {
   text?: string;
   inlineData?: { mimeType?: string; data?: string };
@@ -45,15 +43,11 @@ type GeminiContent = {
 
 export function createGeminiProvider(
   apiKey: string,
-  /** Models to try in order, for text and for pictures. */
   models: { text: string[]; image: string[] },
 ): AiProvider {
-  /** Sends a request, moving on to the next model when one can't answer. */
   const request = (
-    /** Names the request in the usage log, e.g. "route". */
     step: string,
     candidates: string[],
-    /** The request, or one per model when models take different settings. */
     body: object | ((model: string) => object),
     { timeoutMs = TEXT_ATTEMPT_TIMEOUT_MS, delays = TEXT_RETRY_DELAYS_MS } = {},
   ) =>
@@ -86,7 +80,6 @@ export function createGeminiProvider(
       delays,
     );
 
-  /** A JSON answer to `prompt` about the pictures, shaped by `schema`. */
   const look = async (
     step: string,
     prompt: string,
@@ -283,7 +276,6 @@ export function createGeminiProvider(
   };
 }
 
-// Gemini's schema format: upper-case types, every listed property required.
 const STRING = { type: "STRING" };
 const INTEGER = { type: "INTEGER" };
 const BOOLEAN = { type: "BOOLEAN" };
@@ -294,7 +286,6 @@ const object = <P extends Record<string, object>>(properties: P) => ({
 });
 const RECT = object({ x: INTEGER, y: INTEGER, w: INTEGER, h: INTEGER });
 
-/** `body` with the model's thinking level from THINKING_LEVELS, if it has one. */
 function withThinking(model: string, body: { generationConfig?: object }) {
   const thinkingLevel = THINKING_LEVELS[model];
   if (!thinkingLevel) return body;
@@ -315,7 +306,6 @@ function firstImage(parts: GeminiPart[]): GeneratedImage {
   return { mimeType: image.mimeType ?? "image/png", base64: image.data };
 }
 
-/** A conversation in Gemini's shape: the model's turns are called "model". */
 const toContents = (messages: ChatMessage[]): GeminiContent[] =>
   messages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",

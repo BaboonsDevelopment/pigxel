@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { blankDocument } from "@/lib/pigxel-file/format";
 
-/** A tiny stand-in for the Supabase browser client: a tiles table and a bucket. */
 const fake = vi.hoisted(() => {
   const state = {
     rows: new Map<string, Record<string, unknown>>(),

@@ -1,7 +1,6 @@
 import Image from "next/image";
 import { videoEmbedUrl, type Tutorial } from "@/lib/tutorials/tutorials";
 
-/** The tutorial's YouTube video, or its picture until the video is up. */
 export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
   if (tutorial.youtubeId)
     return (

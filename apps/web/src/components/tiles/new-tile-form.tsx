@@ -54,23 +54,14 @@ const BACKGROUND_OPTIONS: {
 type FormProps = {
   userId: string;
   drive: DriveStatus;
-  /** Connecting Google Drive was cancelled or failed on the way back. */
   driveError?: boolean;
-  /** An asset to start from, from the Assets page; it sets the size. */
   asset?: Asset | null;
-  /** A palette to paint from instead of the default one. */
   paletteId?: string;
-  /** The draft whose editor sent here (its + tab): Cancel goes back to it, and the new tile opens next to it. */
   from?: string;
 };
 
-/**
- * The new-tile setup: name, size, background, and where the tile is stored;
- * or, starting from an asset, only the name and where.
- */
 export function NewTileForm({ asset, paletteId, ...props }: FormProps) {
   if (!useIsClient()) return <div className="min-h-96" />;
-  // A different asset or palette starts the form afresh.
   return (
     <Form
       key={`${asset?.id}:${paletteId}`}
@@ -115,7 +106,6 @@ function Form({
     setError(null);
     let image;
     try {
-      // An asset's file loads only now, when a tile is made from it.
       image = asset
         ? await loadAssetDocument(asset)
         : blankDocument(w, h, background);
@@ -152,7 +142,6 @@ function Form({
       setBusy(false);
       return;
     }
-    // Every new tile gets its own draft; other tiles are left as they are.
     await loadDrafts(userId);
     const draft = createDraft(userId, {
       name,
@@ -379,7 +368,6 @@ function Form({
   );
 }
 
-/** The asset a tile starts from: what it looks like, and its size. */
 function StartingAsset({ asset }: { asset: Asset }) {
   const { width: w, height: h, frames } = asset;
   return (

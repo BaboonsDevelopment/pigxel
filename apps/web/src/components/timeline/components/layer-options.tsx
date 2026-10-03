@@ -3,10 +3,6 @@
 import { BLEND_MODES, MAX_OPACITY } from "@/lib/layers/constants";
 import type { BlendMode, Layer } from "@/lib/layers/types";
 
-/**
- * Opacity and blend mode of the selected layer. The Background is always
- * opaque and normal, so it has none.
- */
 export function LayerOptions({
   layer,
   onChange,

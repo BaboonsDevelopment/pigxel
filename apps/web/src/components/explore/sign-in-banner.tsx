@@ -4,12 +4,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { buttonVariants } from "@pigxel/ui/components/button";
 
-/**
- * A bar at the bottom of the window asking a guest to sign in, like Reddit's
- * app does. The feed stops scrolling while it's open; closing it goes on.
- */
 export function SignInBanner({ onClose }: { onClose: () => void }) {
-  // On <body>, outside Explore's scaled page, so it sits on the window's edge.
   return createPortal(
     <div
       role="region"

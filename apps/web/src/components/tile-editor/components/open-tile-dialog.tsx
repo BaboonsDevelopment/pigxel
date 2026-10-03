@@ -8,7 +8,6 @@ import type { OpenSource } from "../constants";
 import type { TileFile } from "../use-tile-file";
 import { FilesDialog } from "./files-dialog";
 
-/** Picks a tile to open from Pigxel cloud or Google Drive. */
 export default function OpenTileDialog({
   source,
   drive,
@@ -18,7 +17,6 @@ export default function OpenTileDialog({
 }: {
   source: OpenSource;
   drive: DriveStatus;
-  /** The tile being edited, to come back to after connecting Google Drive. */
   draftId: string;
   file: TileFile;
   onClose: () => void;

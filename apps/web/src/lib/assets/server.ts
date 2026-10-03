@@ -8,7 +8,6 @@ import {
   type AssetRow,
 } from "./assets";
 
-/** Assets in a category (or all), first by their sort order then by name, with how many there are. */
 export async function listAssets(
   category: AssetCategory | null,
   limit: number,

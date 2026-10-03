@@ -12,11 +12,9 @@ import { getCurrentPlan } from "@/lib/billing/server";
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
 export const dynamic = "force-dynamic";
 
-/** "November 1, 2026". */
 const day = (iso: string) =>
   new Date(iso).toLocaleDateString("en-US", { dateStyle: "long" });
 
-/** The plan the Paddle webhook stored for this person; Free without one. */
 export default async function SubscriptionSettings() {
   const user = await requireUser();
   const plan = await getCurrentPlan(user.id);

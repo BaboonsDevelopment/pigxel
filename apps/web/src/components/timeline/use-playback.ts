@@ -3,10 +3,6 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
 
-/**
- * Plays the animation in the editor: each frame stays on screen for its own
- * duration, then the next one shows, looping back to the first.
- */
 export type Playback = ReturnType<typeof usePlayback>;
 
 export function usePlayback(sprite: SpriteApi) {

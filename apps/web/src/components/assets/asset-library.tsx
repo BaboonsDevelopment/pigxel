@@ -7,7 +7,6 @@ import type { Asset, AssetCategory } from "@/lib/assets/assets";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
 
-/** The pastel behind each kind of asset, as on Home's cards. */
 const TINTS: Record<AssetCategory, string> = {
   characters: "bg-[#f8dde6]",
   items: "bg-[#f9e0d6]",
@@ -18,17 +17,14 @@ const TINTS: Record<AssetCategory, string> = {
 export type AssetSection = {
   category: { id: AssetCategory; label: string };
   assets: Asset[];
-  /** How many the category has, which may be more than shown. */
   total: number;
 };
 
-/** The assets, a section per kind; a click opens one up close. */
 export function AssetLibrary({
   sections,
   canManage,
 }: {
   sections: AssetSection[];
-  /** Admins can take assets off the page. */
   canManage: boolean;
 }) {
   const [open, setOpen] = useState<Asset | null>(null);
@@ -99,8 +95,6 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
           repeat={tile}
           className={cn(
             "transition-transform duration-300 ease-out motion-reduce:transition-none",
-            // A tile fills the card next to copies of itself, to show it
-            // repeats without seams.
             tile
               ? "w-full group-hover:scale-105"
               : "w-3/5 group-hover:-translate-y-1 group-hover:-rotate-3",

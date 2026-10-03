@@ -1,10 +1,3 @@
-/*
- * The landing page. A quiet monochrome frame in the spirit of Mobbin, with
- * the art providing the colour and Pigxel pink as the one accent. Motion is
- * CSS: entrance animations, scroll-driven reveals where the browser supports
- * them, and marquees, all switched off for reduced motion.
- */
-
 .page {
   --sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --pixel: var(--font-geist-pixel), ui-monospace, monospace;
@@ -75,8 +68,6 @@
 .textLink:hover {
   text-decoration-color: currentColor;
 }
-
-/* Buttons */
 
 .button {
   display: inline-flex;
@@ -150,8 +141,6 @@
 .buttonGhost:hover {
   background: rgb(255 255 255 / 0.14);
 }
-
-/* Hero */
 
 .hero {
   display: flex;
@@ -280,8 +269,6 @@
   }
 }
 
-/* The art wall */
-
 .wall {
   position: relative;
   height: clamp(440px, 58vw, 760px);
@@ -367,8 +354,6 @@
   object-fit: contain;
 }
 
-/* "Made for" marquee */
-
 .strip {
   padding-top: clamp(40px, 6vw, 72px);
   text-align: center;
@@ -428,8 +413,6 @@
   }
 }
 
-/* Sections */
-
 .section {
   max-width: calc(var(--max) + 2 * var(--gutter));
   margin: 0 auto;
@@ -461,8 +444,6 @@
   justify-content: space-between;
   gap: 24px;
 }
-
-/* Feature tabs */
 
 .tabs {
   display: grid;
@@ -600,8 +581,6 @@
   }
 }
 
-/* Stats */
-
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -638,8 +617,6 @@
   font: 15px/1.45 var(--sans);
   color: var(--muted);
 }
-
-/* Inspiration bento */
 
 .bento {
   display: grid;
@@ -700,8 +677,6 @@
   font-weight: 400;
   color: var(--muted);
 }
-
-/* FAQ */
 
 .faq {
   display: grid;
@@ -804,8 +779,6 @@
     block-size: auto;
   }
 }
-
-/* Closing call to action */
 
 .cta {
   max-width: calc(var(--max) + 2 * var(--gutter));
@@ -993,8 +966,6 @@
   object-fit: contain;
 }
 
-/* Footer */
-
 .footer {
   max-width: calc(var(--max) + 2 * var(--gutter));
   margin: 0 auto;
@@ -1061,8 +1032,6 @@
   user-select: none;
 }
 
-/* Scroll reveals: driven by scroll position, no JavaScript. */
-
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
     .reveal {
@@ -1080,8 +1049,6 @@
     filter: blur(4px);
   }
 }
-
-/* Layout below desktop */
 
 @media (max-width: 960px) {
   .tabs {
@@ -1149,8 +1116,6 @@
     flex-direction: column;
   }
 }
-
-/* Reduced motion: everything rests in its final place. */
 
 @media (prefers-reduced-motion: reduce) {
   .rise,

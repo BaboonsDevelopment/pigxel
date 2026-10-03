@@ -1,7 +1,3 @@
-/**
- * Hue, saturation and value, as the colour picker shows them: hue 0–360,
- * saturation and value 0–1. Colours elsewhere are `#rrggbb`.
- */
 export type Hsv = { h: number; s: number; v: number };
 
 export function hexToHsv(hex: string): Hsv {
@@ -35,7 +31,6 @@ export function hsvToHex({ h, s, v }: Hsv): string {
     .join("")}`;
 }
 
-/** A typed colour as `#rrggbb` (with or without #, three or six digits), or null. */
 export function readHex(text: string): string | null {
   const v = text.trim().replace(/^#/, "").toLowerCase();
   if (/^[0-9a-f]{3}$/.test(v)) return `#${[...v].map((c) => c + c).join("")}`;

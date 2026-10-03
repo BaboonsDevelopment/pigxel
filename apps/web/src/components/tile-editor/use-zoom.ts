@@ -19,22 +19,12 @@ import {
   type ZoomAnchor,
 } from "@/components/pixel-canvas/wheel";
 
-/** Safari's pinch, which it reports as gesture events of its own. */
 type GestureEvent = UIEvent & {
   scale: number;
   clientX: number;
   clientY: number;
 };
 
-/**
- * The tile's zoom in the scrolling workspace, always around a point that
- * stays put: the cursor for the wheel and pinches, the middle of the view
- * for keys.
- *
- * A mouse wheel zooms a step per notch, and with Shift scrolls sideways. On
- * a touchpad, two fingers scroll the workspace and a pinch zooms smoothly;
- * Ctrl or ⌘ with the wheel zooms too.
- */
 export function useZoom({
   workspace,
   tileRect,
@@ -42,16 +32,13 @@ export function useZoom({
 }: {
   workspace: RefObject<HTMLElement | null>;
   tileRect: () => DOMRect | null;
-  /** The zoom to start at. */
   initial?: number;
 }) {
   const [scale, setScale] = useState(() => clampScale(initial));
   const anchor = useRef<ZoomAnchor>(null);
   const [isTouchpad] = useState(wheelSource);
-  // The zoom when a Safari pinch began; its scale is relative to that.
   const pinchFrom = useRef<number>(null);
 
-  /** Zooms to `next(scale)`, keeping the spot of the tile under (x, y) there. */
   const zoomTo = (next: (scale: number) => number, x?: number, y?: number) => {
     const tile = tileRect();
     const view = workspace.current?.getBoundingClientRect();
@@ -64,7 +51,6 @@ export function useZoom({
     setScale((s) => clampScale(next(s)));
   };
 
-  // Once the tile has its new size, scroll the anchored spot back under the point.
   const settle = useEffectEvent(() => {
     const at = anchor.current;
     anchor.current = null;
@@ -79,7 +65,6 @@ export function useZoom({
   const onWheel = useEffectEvent((e: WheelEvent) => {
     const touchpad = isTouchpad(e);
     if (e.ctrlKey || e.metaKey) {
-      // A pinch, or Ctrl+wheel: zoom the tile, never the page.
       e.preventDefault();
       if (pinchFrom.current !== null) return;
       zoomTo(
@@ -89,7 +74,6 @@ export function useZoom({
       );
       return;
     }
-    // Two fingers and Shift+wheel scroll the workspace, as the browser does.
     if (touchpad || e.shiftKey) return;
     e.preventDefault();
     zoomTo((s) => stepZoom(s, e.deltaY), e.clientX, e.clientY);

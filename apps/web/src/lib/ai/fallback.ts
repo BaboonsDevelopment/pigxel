@@ -2,11 +2,6 @@ import { AiError, canTryAnother } from "./errors";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Runs `attempt` with each model in turn, moving on when one is busy, too
- * slow or not available, and pausing between rounds when all of them are
- * (`delays` gives the pauses, so also the number of rounds).
- */
 export async function tryModels<T>(
   models: string[],
   attempt: (model: string) => Promise<T>,
@@ -29,7 +24,6 @@ export async function tryModels<T>(
   }
 }
 
-/** `fetch` with a time limit; network failures become AiErrors. */
 export async function fetchWithin(
   url: string,
   init: RequestInit,

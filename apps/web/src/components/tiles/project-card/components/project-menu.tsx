@@ -3,19 +3,17 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
-export type ProjectMenuItem = {
+type ProjectMenuItem = {
   label: string;
   onSelect: () => void;
   destructive?: boolean;
 };
 
-/** The "⋯" button on a project card and the short list of actions it opens. */
 export function ProjectMenu({
   label,
   items,
   disabled,
 }: {
-  /** Names the menu for screen readers, e.g. "More for house". */
   label: string;
   items: ProjectMenuItem[];
   disabled?: boolean;

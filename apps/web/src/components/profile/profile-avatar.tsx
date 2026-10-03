@@ -1,6 +1,5 @@
 import { cn } from "@pigxel/ui/lib/utils";
 
-/** A person's picture, or the first letter of their name on pink. */
 export function ProfileAvatar({
   name,
   url,
@@ -8,7 +7,6 @@ export function ProfileAvatar({
 }: {
   name: string;
   url: string | null;
-  /** Size and text size, e.g. "size-24 text-3xl". */
   className?: string;
 }) {
   if (url)

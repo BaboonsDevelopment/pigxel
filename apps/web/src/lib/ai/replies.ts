@@ -10,16 +10,9 @@ import type {
   Route,
 } from "./types";
 
-/**
- * The models' JSON answers, checked and filled in the same way whichever
- * provider sent them. A missing or broken answer throws; a wrong detail is
- * set to something safe.
- */
-
 export const INTENTS = ["generate", "edit", "animate", "undo", "chat"] as const;
 
-/** Most pictures one request may add at once. */
-export const MAX_COUNT = 12;
+const MAX_COUNT = 12;
 
 function parseJson<T>(text: string): Partial<T> | null {
   try {
@@ -32,11 +25,9 @@ function parseJson<T>(text: string): Partial<T> | null {
 const unusable = (what: string) =>
   new AiError("failed", `The model sent no usable ${what}.`);
 
-/** What the user wants; `latest` is their last message, for a missing subject. */
 export function readRoute(text: string, latest: string): Route {
   const route = parseJson<Route>(text);
   const intent = INTENTS.find((i) => i === route?.intent);
-  // Anything unexpected becomes plain chat: free, and changes nothing.
   if (!intent)
     return {
       intent: "chat",
@@ -110,7 +101,6 @@ export function readPlan(text: string): PlanReply {
   };
 }
 
-/** A broken answer counts as "fine": a check never blocks the result. */
 export function readEditReview(text: string): EditReview {
   const reply = parseJson<EditReview>(text);
   const instruction = String(reply?.instruction ?? "").trim();
@@ -121,7 +111,6 @@ export function readEditReview(text: string): EditReview {
   };
 }
 
-/** Checked in detail by clampAnimationPlan (helpers.ts). */
 export function readAnimation(text: string): AnimationReply {
   const reply = parseJson<AnimationReply>(text);
   if (!reply || !Array.isArray(reply.tracks)) throw unusable("animation plan");

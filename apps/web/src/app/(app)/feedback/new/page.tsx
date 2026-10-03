@@ -11,7 +11,6 @@ export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<{ kind?: string; from?: string }> };
 
-/** Writing a bug report or feature request for the board. */
 export default async function NewFeedback({ searchParams }: Props) {
   const [{ kind, from }, user] = await Promise.all([
     searchParams,

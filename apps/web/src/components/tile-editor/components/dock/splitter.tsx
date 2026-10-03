@@ -3,18 +3,11 @@
 import type { PointerEvent } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
-/**
- * A thin bar between two panels or stacks, dragged to share the space
- * between them. `onStart` is called on press with the bar itself (to
- * measure its neighbours) and returns what to do as the pointer moves,
- * given how far it has moved, in pixels.
- */
 export function Splitter({
   axis,
   onStart,
   className,
 }: {
-  /** "x": a vertical bar dragged sideways; "y": a horizontal bar dragged up and down. */
   axis: "x" | "y";
   onStart: (bar: HTMLElement) => (delta: number) => void;
   className?: string;
@@ -55,11 +48,6 @@ export function Splitter({
   );
 }
 
-/**
- * For a bar between two flex items sized by weight: the weights that make
- * the one before it `delta` pixels bigger (and the one after smaller), each
- * keeping at least `min` pixels.
- */
 export function shareBetween(
   bar: HTMLElement,
   axis: "x" | "y",

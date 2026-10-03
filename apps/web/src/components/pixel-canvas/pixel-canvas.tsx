@@ -104,33 +104,19 @@ import type { SpriteApi } from "./use-sprite";
 import { onionFrames, type CanvasView } from "./view";
 
 type Stroke = {
-  /** The tool that started the stroke: a freehand tool, the line or a shape. */
   tool: PaintTool;
-  /** Pixels the tip passes through; a line or shape keeps its start as the first one. */
   points: Point[];
-  /** Where a line or shape is dragged to. */
   end: Point;
   rgba: Rgba;
-  /** Started with the right button: the secondary colour, or shading backwards. */
   secondary: boolean;
-  /** The colour laid down, for the recent colours; null when erasing. */
   color: string | null;
-  /** The cel before the stroke, so each redraw starts from it. */
   before: Uint8ClampedArray;
-  /** Picks where the jumble takes each pixel from, new for every stroke. */
   seed?: number;
-  /** The curve's bend, set by the drags after the first. */
   curve?: CurveBend;
 };
 
-/**
- * A curve takes three drags: the first places its ends, the second bends it
- * (`c1` and `c2` together), the third moves `c2` alone. `held` is true while
- * one of them is being dragged.
- */
 type CurveBend = { c1: Point; c2: Point; stage: 0 | 1 | 2; held: boolean };
 
-/** What the canvas shows over an unfinished curve: its ends and bend handles. */
 type CurveGuide = {
   start: Point;
   end: Point;
@@ -139,21 +125,18 @@ type CurveGuide = {
   stage: number;
 };
 
-/** A selection being dragged out, or selected pixels being moved. */
 type SelectDrag =
   | {
       kind: "marquee";
       from: Point;
       to: Point;
       mode: SelectMode;
-      /** The elliptical marquee: the ellipse that fits the dragged box. */
       ellipse: boolean;
     }
   | { kind: "lasso"; points: Point[]; mode: SelectMode }
   | PolygonDrag
   | { kind: "move"; from: Point };
 
-/** The polygonal lasso: corners placed click by click, and where the pointer is. */
 type PolygonDrag = {
   kind: "polygon";
   points: Point[];
@@ -163,35 +146,20 @@ type PolygonDrag = {
 
 export type ColorSlot = "primary" | "secondary";
 
-/**
- * Lets the page work with the canvas from outside, e.g. the AI: what the
- * frame on screen shows, and choosing areas on it. Cels are changed through
- * the sprite instead.
- */
 export type PixelCanvasHandle = {
-  /** The RGBA of `area` on the whole tile, every layer combined. */
   readTile: (area: Area) => Uint8ClampedArray;
-  /** True when nothing is drawn on any layer but the Background. */
   isEmpty: () => boolean;
-  /** The biggest empty spot on the tile, or null when it is too full. */
   freeArea: () => Area | null;
-  /** The tile (or `area` of it) as an enlarged PNG data URL, for the AI. */
   snapshot: (area?: Area, background?: string) => string;
-  /** Lets the user drag out an area; null when they cancel. */
   selectArea: () => Promise<Area | null>;
-  /** Shows `area` as a frame the user can move and resize; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
-  /** Where the tile is on screen, e.g. to zoom around a point on it. */
   tileRect: () => DOMRect | null;
-  /** The tile pixel under a point on the screen, or null when it is off the tile. */
   tilePointAt: (clientX: number, clientY: number) => Point | null;
 };
 
-/** Why typed text draws nothing: the font has none of its letters. */
 const NO_GLYPHS =
   "This font has none of these letters. For Cyrillic, pick Tiny5, DotGothic16 or Press Start 2P.";
 
-/** Where copies of the tile sit around it in tiled mode, in rows. */
 function tiledCells(tiled: TiledMode): Point[] {
   const xs = tiled === "x" || tiled === "both" ? [-1, 0, 1] : [0];
   const ys = tiled === "y" || tiled === "both" ? [-1, 0, 1] : [0];
@@ -216,22 +184,15 @@ export function PixelCanvas({
 }: {
   tool: PaintTool;
   pen: PenSettings;
-  /** Screen pixels per tile pixel. */
   scale: number;
   sprite: SpriteApi;
   selection: SelectionApi;
   view: CanvasView;
-  /** A picture the pen and brush paint with instead of their tip. */
   stamp: Stamp | null;
-  /** An area to point out, e.g. where a picture would go. */
   highlight?: Area | null;
-  /** Called with the colour the pipette (or Alt+click) picked up. */
   onPickColor?: (color: string, slot: ColorSlot) => void;
-  /** Called with the colour of each finished stroke or fill. */
   onUseColor?: (color: string) => void;
-  /** Called when typed text is put on the tile as a floating piece, to move it. */
   onTextPlaced?: () => void;
-  /** The slice picked with the Slice tool, and picking another (null for none). */
   sliceId?: string | null;
   onSelectSlice?: (id: string | null) => void;
   ref?: Ref<PixelCanvasHandle>;
@@ -245,13 +206,11 @@ export function PixelCanvas({
   const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
   const [spraying, setSpraying] = useState(false);
   const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
-  // A slice being drawn, or the picked one being dragged by (dx, dy).
   const [sliceDrag, setSliceDrag] = useState<
     | { kind: "new"; from: Point; to: Point }
     | { kind: "move"; id: string; from: Point; dx: number; dy: number }
     | null
   >(null);
-  // The text tool's box: where its text goes, in which colour, and what is typed.
   const [textBox, setTextBox] = useState<{
     at: Point;
     rgba: Rgba;
@@ -260,12 +219,10 @@ export function PixelCanvas({
   const [textPreview, setTextPreview] = useState<Floating | null>(null);
   const textInput = useRef<HTMLInputElement>(null);
   const [textError, setTextError] = useState<string | null>(null);
-  // The corners of an unfinished polygon and where the pointer is, for the guides.
   const [paintPolygon, setPaintPolygon] = useState<{
     points: Point[];
     pointer: Point;
   } | null>(null);
-  // Picking another tool drops a polygon that isn't closed yet.
   const [polygonTool, setPolygonTool] = useState(tool);
   if (polygonTool !== tool) {
     setPolygonTool(tool);
@@ -275,7 +232,6 @@ export function PixelCanvas({
   const onionRef = useRef<HTMLCanvasElement>(null);
   const copies = useRef(new Set<HTMLCanvasElement>());
   const stroke = useRef<Stroke>(null);
-  // Where the last stroke ended; Shift+click draws a straight line from here.
   const lastPoint = useRef<Point>(null);
   const drag = useRef<ResizeDrag>(null);
   const aiFrom = useRef<Point>(null);
@@ -295,7 +251,6 @@ export function PixelCanvas({
     density: pen.density,
   };
 
-  // The tiled copies show what the tile shows.
   const paintCopy = (copy: HTMLCanvasElement) => {
     const ctx = copy.getContext("2d");
     if (!ctx || !screenRef.current) return;
@@ -303,8 +258,6 @@ export function PixelCanvas({
     ctx.drawImage(screenRef.current, 0, 0);
   };
 
-  // Onion skin: the frames around the active one, faint, red before and
-  // blue after, as in Aseprite. The Background and references are left out.
   const paintOnion = () => {
     const ctx = onionRef.current?.getContext("2d");
     if (!ctx) return;
@@ -317,7 +270,6 @@ export function PixelCanvas({
     );
     if (!around.length) return;
     const out = new Uint8ClampedArray(size.w * size.h * 4);
-    // Farthest first, so the nearest frames end up on top.
     for (const { index, before, strength } of around.reverse()) {
       const pixels = sprite.composite(
         ["reference", "background"],
@@ -338,9 +290,6 @@ export function PixelCanvas({
     );
   };
 
-  // The screen shows the active frame, every layer combined, references
-  // included. It repaints when a cel, a layer or the frame changes, not on
-  // every render.
   const paintScreen = useEffectEvent(() => {
     screenRef.current
       ?.getContext("2d")
@@ -383,7 +332,6 @@ export function PixelCanvas({
   }, []);
 
   useImperativeHandle(ref, () => {
-    // The tile as the AI sees it: no references, no Background.
     const content = () =>
       new ImageData(
         sprite.composite([
@@ -449,9 +397,6 @@ export function PixelCanvas({
   }, [frame, finishFrame]);
 
   const isSelectionTool = SELECTION_TOOLS.includes(tool);
-  // The brush and blur are round (and share a size); the pen, eraser, line
-  // and shapes have a square tip. The spray's "tip" is the circle it
-  // scatters dots in.
   const roundTip = (t: PaintTool) =>
     t === "brush" || t === "blur" || t === "jumble";
   const tipSize = (t: PaintTool) =>
@@ -470,7 +415,6 @@ export function PixelCanvas({
     tool === "pipette"
       ? 1
       : tipSize(tool);
-  // The brush can be a calligraphy line instead of round.
   const lineBrush = (t: PaintTool) =>
     t === "brush" && pen.brushShape === "line";
   const tipOf = (t: PaintTool, size: number) =>
@@ -478,14 +422,12 @@ export function PixelCanvas({
       ? lineTip(size, pen.brushAngle)
       : brushTip(size, roundTip(t) || t === "spray");
   const hoverTip = tipOf(tool, hoverSize);
-  // Tools that don't lay down the pen colour show only the outline of their tip.
   const hoverOutline =
     tool === "pipette" ||
     tool === "eraser" ||
     tool === "spray" ||
     tool === "blur" ||
     tool === "jumble";
-  // Selecting works on any layer; painting and moving need one that can change.
   const blocked =
     !sprite.canPaint &&
     tool !== "pipette" &&
@@ -498,8 +440,6 @@ export function PixelCanvas({
   const overSelection =
     !!hover && isSelected(mask, size, hover) && tool !== "wand";
 
-  // Redraws the whole stroke, so pixel-perfect can take back a corner it
-  // already painted, and a line or shape follows the pointer.
   const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
     const data = new Uint8ClampedArray(current.before);
     const tipPixels = tipSize(current.tool);
@@ -507,7 +447,6 @@ export function PixelCanvas({
     const origin = (p: Point) => brushOrigin(p, tipPixels);
     const start = current.points[0]!;
     const inkTool = current.tool === "pen" || current.tool === "brush";
-    // The tools with an Ink setting; the rest paint the plain colour.
     const inked =
       inkTool ||
       current.tool === "spray" ||
@@ -521,8 +460,7 @@ export function PixelCanvas({
           : !inked
             ? current.rgba
             : pen.ink === "shading"
-              ? // Moves pixels along the palette: forwards with the left button.
-                shadingInk(
+              ? shadingInk(
                   current.before,
                   sprite.palette,
                   current.secondary ? -1 : 1,
@@ -564,8 +502,6 @@ export function PixelCanvas({
     } else if (current.tool === "spray") {
       paint(current.points, true);
     } else if (current.tool === "contour" || current.tool === "polygon") {
-      // The outline drawn so far, closed back to its start and filled; an
-      // unfinished polygon reaches to the pointer.
       const inside = polygonMask(
         size,
         current.tool === "polygon"
@@ -578,8 +514,6 @@ export function PixelCanvas({
       });
       paint(points, true);
     } else if (current.tool === "gradient") {
-      // Until the line has a length there is no direction, so nothing changes.
-      // The right button runs the gradient the other way round.
       const primary = rgbaOf(pen.color);
       const secondary = rgbaOf(pen.secondary);
       if (start.x !== current.end.x || start.y !== current.end.y)
@@ -594,7 +528,6 @@ export function PixelCanvas({
           paintOptions,
         );
     } else if (inkTool && stamp) {
-      // A picture brush: its own colours, or a silhouette with the right button.
       paintStamp(
         data,
         current.points,
@@ -619,14 +552,11 @@ export function PixelCanvas({
     sprite.touched();
   };
 
-  // While the spray is held it keeps laying dots, even with the pointer still:
-  // `seconds` since the last frame decides how many.
   const sprayTick = useEffectEvent((seconds: number) => {
     const current = stroke.current;
     const ctx = sprite.context();
     if (current?.tool !== "spray" || !ctx) return;
     const count = sprayDotCount(pen.spraySpeed, seconds);
-    // The fraction left over becomes a dot now and then, so slow speeds still spray.
     const dots = Math.floor(count) + (Math.random() < count % 1 ? 1 : 0);
     if (!dots) return;
     current.points.push(...sprayDots(current.end, pen.sprayWidth, dots));
@@ -643,7 +573,6 @@ export function PixelCanvas({
     return () => cancelAnimationFrame(frame);
   }, [spraying]);
 
-  // The pipette picks what is seen, all layers combined.
   const pickColor = (point: Point, slot: ColorSlot) => {
     const at = wrapPixel(point.x, point.y, size, tiled);
     const pixel =
@@ -652,7 +581,6 @@ export function PixelCanvas({
     if (color) onPickColor?.(color, slot);
   };
 
-  // Repaints the area under `point` (and its mirror copies) with `rgba`.
   const fillAt = (
     ctx: CanvasRenderingContext2D,
     point: Point,
@@ -660,8 +588,6 @@ export function PixelCanvas({
     color: string | null,
   ) => {
     const image = ctx.getImageData(0, 0, size.w, size.h);
-    // With "All layers", what is seen (references aside) sets where the fill
-    // stops, e.g. outlines on a layer above; it still paints this layer.
     const allLayers = pen.fillFrom === "all";
     const bounds = allLayers
       ? new ImageData(
@@ -673,7 +599,6 @@ export function PixelCanvas({
     let changed = false;
     for (const copy of mirrored(point, size, symmetry)) {
       const at = wrapPixel(copy.x, copy.y, size, tiled);
-      // Inside a selection, only a click on it fills.
       if (!at || (mask && !isSelected(mask, size, at))) continue;
       const start = (at.y * size.w + at.x) * 4;
       if (!allLayers && rgba.every((v, c) => image.data[start + c] === v))
@@ -733,10 +658,6 @@ export function PixelCanvas({
     );
   };
 
-  /**
-   * Follows the pointer through `passed` pixels, the last being where it is
-   * now. Shift while dragging the elliptical marquee makes a circle.
-   */
   const moveSelect = (passed: Point[], shift: boolean) => {
     const p = passed.at(-1);
     if (!selectDrag || !p) return;
@@ -756,7 +677,6 @@ export function PixelCanvas({
     }
   };
 
-  // The polygon is closed by a click on its first corner, a double click or Enter.
   const addCorner = (current: PolygonDrag, p: Point) => {
     const [first] = current.points;
     const last = current.points.at(-1)!;
@@ -768,13 +688,10 @@ export function PixelCanvas({
 
   const closePolygon = (current: PolygonDrag) => {
     setSelectDrag(null);
-    // Fewer than three corners make no area: the polygon is just dropped.
     if (current.points.length >= 3)
       selection.select(polygonMask(size, current.points), current.mode);
   };
 
-  // Enter closes the polygon and Esc drops it, before the editor's own
-  // Enter (drop the selection) and Esc (deselect) see the key.
   const polygon = selectDrag?.kind === "polygon" ? selectDrag : null;
   const onPolygonKey = useEffectEvent((e: KeyboardEvent) => {
     if (!polygon || (e.key !== "Enter" && e.key !== "Escape")) return;
@@ -793,14 +710,12 @@ export function PixelCanvas({
 
   const endSelect = () => {
     const current = selectDrag;
-    // The polygon stays open between clicks.
     if (current?.kind === "polygon") return;
     setSelectDrag(null);
     if (!current) return;
     if (current.kind === "move") return selection.endMove();
     if (current.kind === "marquee") {
       const { from, to, mode, ellipse } = current;
-      // A click without a drag clears the selection, as in Aseprite.
       if (from.x === to.x && from.y === to.y && mode === "replace")
         return selection.deselect();
       return selection.select(
@@ -816,18 +731,15 @@ export function PixelCanvas({
   };
 
   const startPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // While a frame is being placed, clicks on the tile must not paint.
     if (frame || (e.button !== 0 && e.button !== 2)) return;
     const point = pixelAt(e);
     const slot: ColorSlot = e.button === 2 ? "secondary" : "primary";
-    // The second and third drags of a curve bend it.
     const unfinished = stroke.current;
     if (unfinished?.curve && !unfinished.curve.held) {
       e.currentTarget.setPointerCapture(e.pointerId);
       unfinished.curve.held = true;
       return bendCurve(unfinished, point);
     }
-    // Each further click on an unfinished polygon places a corner.
     if (unfinished?.tool === "polygon") {
       const last = unfinished.points.at(-1)!;
       return addShapeCorner(
@@ -835,24 +747,18 @@ export function PixelCanvas({
         e.shiftKey ? snapLine(last, point) : point,
       );
     }
-    // Alt+click picks a colour with the drawing tools, as in Aseprite
-    // (selection tools use Alt to take away from the selection).
     if (tool === "pipette" || (e.altKey && !isSelectionTool))
       return pickColor(point, slot);
     if (isSelectionTool) return startSelect(e, point);
     if (tool === "slice") return startSlice(e, point);
     if (blocked) return;
-    // A click opens the text box there, or moves it, keeping what is typed.
-    // Keeping the default stops the click taking focus from the box.
     if (tool === "text") {
       e.preventDefault();
       const rgba = rgbaOf(slot === "primary" ? pen.color : pen.secondary);
       setTextError(null);
       return setTextBox((box) => ({ at: point, rgba, text: box?.text ?? "" }));
     }
-    // Drawing puts lifted pixels down first.
     selection.drop();
-    // A layer with nothing in this frame yet gets its cel now.
     const ctx = sprite.context(true);
     if (!ctx) return;
     const erase = tool === "eraser";
@@ -887,7 +793,6 @@ export function PixelCanvas({
       end: point,
       rgba,
       secondary: slot === "secondary",
-      // Shading and picture brushes don't lay down one colour.
       color:
         shading ||
         (stamp && freehand && !erase) ||
@@ -900,7 +805,6 @@ export function PixelCanvas({
         ctx.getImageData(0, 0, size.w, size.h).data,
       ),
       seed: tool === "jumble" ? (Math.random() * 2 ** 31) | 0 : undefined,
-      // Straight until it is bent: the controls sit on the ends.
       curve:
         tool === "curve"
           ? { c1: point, c2: point, stage: 0, held: true }
@@ -915,7 +819,6 @@ export function PixelCanvas({
   const showPolygon = (current: Stroke) =>
     setPaintPolygon({ points: [...current.points], pointer: current.end });
 
-  // A click on the first corner closes the polygon; others add a corner.
   const addShapeCorner = (current: Stroke, point: Point) => {
     const first = current.points[0]!;
     const last = current.points.at(-1)!;
@@ -933,8 +836,6 @@ export function PixelCanvas({
     showPolygon(current);
   };
 
-  // Fills the polygon without the stretch to the pointer; with fewer than
-  // three corners there is no area, so it is dropped.
   const closeShape = (current: Stroke) => {
     if (current.points.length < 3) return cancelStroke(current);
     current.end = current.points.at(-1)!;
@@ -956,7 +857,6 @@ export function PixelCanvas({
         : null,
     );
 
-  // The second drag bends the curve with both controls, the third with the second alone.
   const bendCurve = (current: Stroke, point: Point) => {
     const ctx = sprite.context();
     if (!current.curve || !ctx) return;
@@ -981,7 +881,6 @@ export function PixelCanvas({
     if (current.color) onUseColor?.(current.color);
   };
 
-  // Esc puts the cel back as it was before the curve or polygon.
   const cancelStroke = (current: Stroke) => {
     stroke.current = null;
     setCurveGuide(null);
@@ -996,8 +895,6 @@ export function PixelCanvas({
     sprite.touched();
   };
 
-  // Enter finishes an unfinished curve or polygon as it is, Esc drops it,
-  // before the editor's own Enter and Esc see the key.
   const onShapeKey = useEffectEvent((e: KeyboardEvent) => {
     const current = stroke.current;
     const open = current?.curve || current?.tool === "polygon";
@@ -1016,8 +913,6 @@ export function PixelCanvas({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [shapeOpen]);
 
-  // Picking another tool, layer or frame keeps an unfinished curve or
-  // polygon as it is, so its next clicks can't land on another cel.
   const keepShape = useEffectEvent(() => {
     const current = stroke.current;
     if (current?.curve) finishStroke(current);
@@ -1025,10 +920,8 @@ export function PixelCanvas({
   });
   useEffect(() => keepShape(), [tool, sprite.layerId, sprite.frameId]);
 
-  // The text box shows only with the text tool; switching away drops it.
   const openText = tool === "text" ? textBox : null;
 
-  // The typed text, drawn as it will land on the tile.
   useEffect(() => {
     if (!openText) return;
     let live = true;
@@ -1047,12 +940,9 @@ export function PixelCanvas({
     };
   }, [openText, pen.textFont, pen.textScale]);
 
-  // Typing goes to the box wherever it was opened or moved to.
   const textAt = openText?.at;
   useEffect(() => textInput.current?.focus(), [textAt]);
 
-  // Enter puts the text on the tile as a floating piece, to move and drop
-  // like a paste; it stays inside the tile.
   const placeText = async () => {
     if (!openText) return;
     const piece = await textPiece(
@@ -1063,7 +953,6 @@ export function PixelCanvas({
       openText.at.x,
       openText.at.y,
     );
-    // The box stays open, saying why, when there is nothing to put down.
     if (!piece) return setTextError(NO_GLYPHS);
     if (!selection.paste(piece))
       return setTextError("Pick a visible, unlocked layer to put the text on.");
@@ -1072,7 +961,6 @@ export function PixelCanvas({
     onTextPlaced?.();
   };
 
-  // A press on a slice picks it and drags it; elsewhere it draws a new one.
   const startSlice = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
     if (e.button !== 0) return;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -1100,7 +988,6 @@ export function PixelCanvas({
       setSliceDrag({ ...sliceDrag, dx, dy });
   };
 
-  // A click on an empty spot leaves no slice picked.
   const endSlice = () => {
     const drag = sliceDrag;
     setSliceDrag(null);
@@ -1136,7 +1023,6 @@ export function PixelCanvas({
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Every pixel passed since the last event, so fast curves stay round.
     const passed = pixelsPassed(e.nativeEvent, e.currentTarget);
     const point = passed.at(-1);
     if (!point) return;
@@ -1147,12 +1033,10 @@ export function PixelCanvas({
     const current = stroke.current;
     const ctx = sprite.context();
     if (!current || !ctx) return;
-    // The spray lays its dots on a timer, around wherever the pointer is.
     if (current.tool === "spray") {
       current.end = point;
       return;
     }
-    // An unfinished polygon stretches from its last corner to the pointer.
     if (current.tool === "polygon") {
       const last = current.points.at(-1)!;
       const end = e.shiftKey ? snapLine(last, point) : point;
@@ -1161,7 +1045,6 @@ export function PixelCanvas({
       drawStroke(ctx, current);
       return showPolygon(current);
     }
-    // A curve bends only while its second or third drag is held.
     if (current.curve && current.curve.stage > 0) {
       if (current.curve.held) bendCurve(current, point);
       return;
@@ -1173,8 +1056,6 @@ export function PixelCanvas({
       current.tool === "rect" ||
       current.tool === "ellipse"
     ) {
-      // Lines, gradients and shapes are redrawn from their start; Shift keeps
-      // a line to 45° steps and makes a shape a square or circle.
       const from = current.points[0]!;
       const end =
         current.curve || current.tool === "line" || current.tool === "gradient"
@@ -1184,7 +1065,6 @@ export function PixelCanvas({
           : squareFrom(from, point, e.shiftKey);
       if (end.x === current.end.x && end.y === current.end.y) return;
       current.end = end;
-      // The first drag of a curve draws it straight, its controls on the ends.
       if (current.curve) {
         current.curve.c1 = from;
         current.curve.c2 = end;
@@ -1202,14 +1082,12 @@ export function PixelCanvas({
     if (selectDrag) return endSelect();
     if (sliceDrag) return endSlice();
     const current = stroke.current;
-    // A polygon stays open between clicks.
     if (!current || current.tool === "polygon") return;
     const curve = current.curve;
     if (curve) {
       curve.held = false;
       const start = current.points[0]!;
       const dot = start.x === current.end.x && start.y === current.end.y;
-      // A curve waits for its bending drags; a click without a drag is a dot.
       if (curve.stage < 2 && !(curve.stage === 0 && dot)) {
         curve.stage = curve.stage === 0 ? 1 : 2;
         return showCurve(current);
@@ -1273,7 +1151,6 @@ export function PixelCanvas({
           ? "cursor-text"
           : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
-  // Scale and rotate handles around the selection, with the Move tool.
   const selectionBox =
     tool === "move" && selection.mask && sprite.canPaint
       ? maskBounds(selection.mask, size)
@@ -1285,7 +1162,6 @@ export function PixelCanvas({
       w: selectionBox.w,
       h: selectionBox.h,
     });
-  // Wide or tall pixels: the whole stage is shown stretched (see below).
   const stretch = { x: sprite.pixelRatio.w, y: sprite.pixelRatio.h };
   const showTip =
     hover &&
@@ -1298,13 +1174,11 @@ export function PixelCanvas({
     tool !== "slice" &&
     !selectDrag;
   const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
-  // The corners of a polygonal lasso or of a polygon being drawn.
   const corners = polygon ?? paintPolygon;
   const lasso =
     selectDrag?.kind === "lasso"
       ? selectDrag.points
       : polygon && [...polygon.points, polygon.pointer];
-  // The ellipse may run off the tile, so its box isn't clamped to it.
   const marquee =
     selectDrag?.kind === "marquee"
       ? selectDrag.ellipse
@@ -1472,8 +1346,6 @@ export function PixelCanvas({
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {/* Once the ends are placed, the bend handles and the lines tying
-              them to the ends show where the next drag pulls. */}
           {curveGuide &&
             curveGuide.stage > 0 &&
             [
@@ -1501,7 +1373,6 @@ export function PixelCanvas({
               </g>
             ))}
           {corners?.points.map((p, i) => {
-            // The first corner fills in when a click on it would close the shape.
             const closes =
               i === 0 &&
               corners.points.length >= 3 &&
@@ -1705,7 +1576,6 @@ export function PixelCanvas({
     cells.length === 1 ? (
       tile
     ) : (
-      // Tiled mode: copies of the tile around it, which can be drawn on too.
       <div
         className="grid"
         style={{
@@ -1737,9 +1607,6 @@ export function PixelCanvas({
         )}
       </div>
     );
-  // Pixels that aren't square: everything is laid out with square pixels,
-  // then stretched as a whole, so the overlays line up with the pixels and
-  // pointer positions (read from the stretched canvas) stay right.
   const columns = new Set(cells.map((c) => c.x)).size;
   const rows = new Set(cells.map((c) => c.y)).size;
   return (

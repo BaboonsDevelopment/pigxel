@@ -3,11 +3,6 @@ import type { Layer } from "@/lib/layers/types";
 import type { Frame } from "@/lib/sprite/types";
 import { FRAME_COLUMN } from "../constants";
 
-/**
- * A layer's cels, one per frame: a dot where something is drawn, a ring
- * where the cel is empty. Clicking one picks that layer and frame to draw
- * on. Groups have no cels.
- */
 export function CelStrip({
   layer,
   frames,
@@ -19,7 +14,6 @@ export function CelStrip({
   layer: Layer;
   frames: Frame[];
   frameId: string;
-  /** Whether this row is the active layer. */
   activeLayer: boolean;
   hasCel: (frameId: string) => boolean;
   onSelect: (frameId: string) => void;
@@ -37,7 +31,6 @@ export function CelStrip({
           e.stopPropagation();
           onSelect(frame.id);
         }}
-        // The row opens the layer's menu for the cel's frame.
         onContextMenu={() => onSelect(frame.id)}
         className={cn(
           "flex shrink-0 items-center justify-center border-r",

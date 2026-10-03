@@ -4,10 +4,6 @@ import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { PanelId } from "@/lib/editor-layout/layout";
 
-/**
- * One block in a dock: a title bar to drag it by, fold it (▾) or close it
- * (×; Window brings it back), and its contents.
- */
 export function Panel({
   id,
   title,
@@ -23,9 +19,7 @@ export function Panel({
   id: PanelId;
   title: string;
   collapsed: boolean;
-  /** As tall as its contents, rather than a share of the stack. */
   fit?: boolean;
-  /** Its share of the stack's height while open. */
   weight: number;
   dragging: boolean;
   onDragStart: (id: PanelId, e: PointerEvent<HTMLElement>) => void;

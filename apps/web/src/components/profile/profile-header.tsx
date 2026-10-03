@@ -10,11 +10,6 @@ import { TokensButton } from "@/components/tokens-button/tokens-button";
 import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
 
-/**
- * The hero at the top of a profile: avatar, names, premium and joined
- * badges, bio and links, with Follow for visitors, or Edit and their AI
- * tokens for the owner.
- */
 export function ProfileHeader({
   profile,
   isOwner,
@@ -116,7 +111,6 @@ export function ProfileHeader({
   );
 }
 
-/** A few soft pixels in the hero's corners. */
 function HeroPixels() {
   const pixels: [string, string, number][] = [
     ["12%", "58%", 10],

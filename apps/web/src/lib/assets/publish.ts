@@ -17,16 +17,9 @@ import {
   type AssetRow,
 } from "./assets";
 
-/**
- * Asset lists for the browser, and putting assets on the Assets page, which
- * only admins may do (the database checks).
- */
-
 export const ASSET_NAME_MAX = 40;
-/** The most frames an asset can have, as the database allows. */
-export const ASSET_MAX_FRAMES = 64;
+const ASSET_MAX_FRAMES = 64;
 
-/** Every asset, for the editor's Insert asset. */
 export async function listAssetsInBrowser(): Promise<Asset[]> {
   const { data, error } = await createClient()
     .from("assets")
@@ -38,7 +31,6 @@ export async function listAssetsInBrowser(): Promise<Asset[]> {
   return data.map(toAsset);
 }
 
-/** Whether an asset with this id is on the page already. */
 export async function assetExists(id: string): Promise<boolean> {
   const { count, error } = await createClient()
     .from("assets")
@@ -48,7 +40,6 @@ export async function assetExists(id: string): Promise<boolean> {
   return (count ?? 0) > 0;
 }
 
-/** "Gold coin!" → "gold-coin": an asset's id and folder, from its name. */
 export function assetIdFor(name: string): string {
   return name
     .normalize("NFKD")
@@ -60,7 +51,6 @@ export function assetIdFor(name: string): string {
     .replace(/-+$/, "");
 }
 
-/** The tile's frames side by side, every layer but references combined. */
 export function sheetPixels(doc: PigxelDocument) {
   const { width: w, height: h, frames } = doc;
   const sheetW = w * frames.length;
@@ -76,7 +66,6 @@ export function sheetPixels(doc: PigxelDocument) {
   return { pixels, w: sheetW, h };
 }
 
-/** A short name for contents, so a file's name changes exactly when it does. */
 async function contentHash(data: BufferSource): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(digest).slice(0, 8)]
@@ -104,12 +93,6 @@ function pngOf({ pixels, w, h }: ReturnType<typeof sheetPixels>) {
   );
 }
 
-/**
- * Puts a tile on the Assets page as `id`, or replaces the asset with that
- * id: uploads its .pigxel file and sheet, records it, then removes the files
- * it replaced. Files are named after their contents, so they can be cached
- * for good.
- */
 export async function publishAsset({
   id,
   name,

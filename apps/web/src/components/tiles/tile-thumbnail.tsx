@@ -1,6 +1,5 @@
 import { flattenDocument, type PigxelDocument } from "@/lib/pigxel-file/format";
 
-/** The tile drawn at its own size and scaled up crisply, on a checkerboard. */
 export function TileThumbnail({ image }: { image: PigxelDocument }) {
   return (
     <canvas

@@ -37,7 +37,6 @@ function Check() {
   );
 }
 
-/** A line of words that rise into place one after another. */
 function Words({ text, start }: { text: string; start: number }) {
   return text.split(" ").map((word, index) => (
     <span key={index}>
@@ -128,12 +127,6 @@ const FAQ = [
   },
 ];
 
-/**
- * The public landing page, in the spirit of Mobbin: a quiet monochrome
- * frame, big type, and the art doing the talking. Motion is CSS-first:
- * entrance and scroll reveals, a drifting art wall and marquees, all of it
- * still for people who prefer reduced motion.
- */
 export function Landing() {
   return (
     <div className={`${geist.variable} ${geistPixel.variable} ${styles.page}`}>

@@ -7,7 +7,6 @@ import type { MenuItem, MenuSections } from "../constants";
 const ITEM =
   "flex w-full items-center justify-between gap-6 rounded-md px-3 py-2 text-left text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-40";
 
-/** The items of a menu, group by group; picking one calls `onDone` first. */
 export function MenuList({
   sections,
   onDone,
@@ -52,12 +51,6 @@ export function MenuList({
     ));
 }
 
-/**
- * An item that opens more items beside it, on hover, a click or →; ← or
- * Escape closes it. It is placed on the page (fixed), so a menu that
- * scrolls doesn't cut it off, and turns to the left or moves up where the
- * window ends.
- */
 function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
@@ -78,7 +71,6 @@ function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
     timer.current = window.setTimeout(() => setOpen(false), 150);
   };
 
-  // Placed beside the item, kept inside the window.
   useLayoutEffect(() => {
     if (!open || !button.current || !list.current) return;
     const from = button.current.getBoundingClientRect();

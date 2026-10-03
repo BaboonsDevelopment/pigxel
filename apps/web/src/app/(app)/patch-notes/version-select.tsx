@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 
-/** Picks which release the page shows, as ?v= in the address. */
 export function VersionSelect({
   versions,
   value,

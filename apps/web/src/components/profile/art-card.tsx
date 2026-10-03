@@ -3,7 +3,6 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ProfileTile } from "@/lib/profile/profile";
 
-/** One art on a profile; its owner can publish and pin it from here. */
 export function ArtCard({
   tile,
   isOwner,
@@ -13,7 +12,6 @@ export function ArtCard({
 }: {
   tile: ProfileTile;
   isOwner: boolean;
-  /** Why the last change to this art didn't go through. */
   error?: string;
   onTogglePublic: () => void;
   onTogglePin: () => void;

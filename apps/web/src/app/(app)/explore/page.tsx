@@ -9,7 +9,6 @@ export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<{ period?: string }> };
 
-/** Everyone's arts published in the period chosen, most liked first; more load on scroll. */
 export default async function Explore({ searchParams }: Props) {
   const user = await getUser();
   const params = await searchParams;

@@ -8,12 +8,6 @@ import {
 } from "@/lib/google-drive/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Sends the person to Google, then back to `next` through /auth/callback:
- * - signed out: "Sign in with Google", which also connects Drive;
- * - signed in with email: links a Google account (and connects Drive, when available);
- * - signed in with Google: asks again for Drive access (e.g. after disconnecting).
- */
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
   if (!isGoogleSignInAvailable())
@@ -24,7 +18,6 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   const redirectTo = authUrl(`/auth/callback?next=${encodeURIComponent(next)}`);
-  // "offline" returns a refresh token, so Drive keeps working after the hour-long access token.
   const options = {
     redirectTo,
     scopes: DRIVE_SCOPE,
@@ -39,7 +32,6 @@ export async function GET(request: NextRequest) {
     });
     url = data.url ?? undefined;
   } else if (!isDriveAvailable()) {
-    // Without Drive, linking only adds Google as a way to sign in.
     if (user.identities?.some((i) => i.provider === "google"))
       return NextResponse.redirect(authUrl(next));
     const { data } = await supabase.auth.linkIdentity({
@@ -48,7 +40,6 @@ export async function GET(request: NextRequest) {
     });
     url = data?.url ?? undefined;
   } else {
-    // "consent" makes Google send a new refresh token even if access was granted before.
     const connect = {
       ...options,
       queryParams: { ...options.queryParams, prompt: "consent" },

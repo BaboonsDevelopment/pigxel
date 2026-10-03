@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { textPiece } from "@/components/pixel-canvas/text";
 
-// The web fonts load through Next.js; the 3 × 5 font needs none of them.
 vi.mock("@/lib/pixel-fonts", () => ({
   tiny5: { style: { fontFamily: "Tiny5" } },
   dotGothic16: { style: { fontFamily: "DotGothic16" } },
@@ -11,7 +10,6 @@ vi.mock("@/lib/pixel-fonts", () => ({
 
 const RED = [255, 0, 0, 255] as const;
 
-/** The piece as rows of "#" (drawn) and "." for easy reading. */
 const rows = (piece: { w: number; h: number; pixels: Uint8ClampedArray }) =>
   Array.from({ length: piece.h }, (_, y) =>
     Array.from({ length: piece.w }, (_, x) =>

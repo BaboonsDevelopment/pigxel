@@ -19,18 +19,11 @@ import { isAdmin, requireUser } from "@/lib/auth/session";
 export const metadata: Metadata = { title: "Assets · Pigxel" };
 export const dynamic = "force-dynamic";
 
-/** How many of each kind "All" shows before "See all". */
 const PREVIEW = 12;
-/** How many one kind's tab shows. */
 const FULL = 240;
 
 type Props = { searchParams: Promise<{ type?: string }> };
 
-/**
- * Ready-made sprites, tiles and palettes to start a tile from or add to one.
- * Only the rows come from the database here; each card's picture is its
- * small sheet, cached by the browser.
- */
 export default async function Assets({ searchParams }: Props) {
   const [{ type }, user] = await Promise.all([searchParams, requireUser()]);
   const tab: AssetTab =

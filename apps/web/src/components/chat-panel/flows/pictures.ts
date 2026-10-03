@@ -11,11 +11,6 @@ import {
   REFERENCE_SIDE,
 } from "../constants";
 
-/**
- * A picture the user attached, shrunk to at most REFERENCE_SIDE a side (it
- * only shows the AI what to draw) as a data URL; null when it can't be read.
- * Browser only.
- */
 export async function toReference(file: File): Promise<string | null> {
   const image = await createImageBitmap(file).catch(() => null);
   if (!image) return null;
@@ -25,15 +20,9 @@ export async function toReference(file: File): Promise<string | null> {
   canvas.height = Math.max(1, Math.round(image.height * k));
   canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
   image.close();
-  // WebP keeps transparency and stays small; browsers without it give PNG.
   return canvas.toDataURL("image/webp", REFERENCE_QUALITY);
 }
 
-/**
- * A picture from the AI (a data URL), turned into pixel art at the area's
- * size: a new picture (cropped to its subject) or a redraw (kept as framed).
- * Browser only.
- */
 export async function toArt(
   dataUrl: string,
   area: Size,
@@ -43,11 +32,6 @@ export async function toArt(
   return imageToPixelArt(image, area.w, area.h, steps);
 }
 
-/**
- * The `box` of each cel side by side as a sprite sheet laid out by
- * `layout`, enlarged crisply, on the magenta the image model keys out: what
- * is sent to have every frame changed at once. A PNG data URL. Browser only.
- */
 export function framesSheet(
   cels: Uint8ClampedArray[],
   size: Size,

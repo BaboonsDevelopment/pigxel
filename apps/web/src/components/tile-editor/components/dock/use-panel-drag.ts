@@ -9,30 +9,17 @@ import type {
 
 export type PanelDrag = ReturnType<typeof usePanelDrag>;
 
-/** A drop place with the screen area it would take, to show while dragging. */
-export type DropPreview = {
+type DropPreview = {
   target: PanelTarget;
   area: { left: number; top: number; width: number; height: number };
 };
 
-/** How far the pointer moves before a press on a title bar becomes a drag. */
 const DRAG_START = 4;
-/** The share of a panel's width at each side that drops beside it. */
 const SIDE_ZONE = 0.25;
-/** How wide the strip is that shows a drop beside a column. */
 const BESIDE = 8;
-/** The share of the canvas's width at each side that drops a panel beside it. */
 const CANVAS_ZONE = 0.2;
-/** How wide the lit area is for a drop beside the canvas. */
 const CANVAS_PANEL = 240;
 
-/**
- * Where a panel dropped at (x, y) lands, as Visual Studio shows it: on
- * another panel, its outer quarters put it beside (a new stack left or
- * right), its top and bottom halves above or below it; on the canvas's left
- * or right fifth, beside the canvas only; on an empty dock's strip, into
- * that dock.
- */
 function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
   const under = document.elementFromPoint(x, y);
   const panel = under?.closest<HTMLElement>("[data-panel]");
@@ -50,8 +37,6 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
             ? "above"
             : "below";
     const half = { width: r.width / 2, height: r.height / 2 };
-    // Beside: a new column at the edge of the whole column, so a strip
-    // along that edge shows it, not a part of the panel.
     const column = (
       panel.closest("[data-stack]") ?? panel
     ).getBoundingClientRect();
@@ -73,8 +58,6 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
             };
     return { target: { kind: "panel", anchor, where }, area };
   }
-  // On the canvas's edge: beside the canvas only, above the bottom dock, so
-  // the timeline keeps its width.
   const canvas = under?.closest<HTMLElement>("[data-canvas-drop]");
   if (canvas) {
     const r = canvas.getBoundingClientRect();
@@ -86,7 +69,6 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
       target: {
         kind: "dock",
         dock: left ? "innerLeft" : "innerRight",
-        // Next to the canvas.
         where: left ? "end" : "start",
       },
       area: {
@@ -112,10 +94,6 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
   return null;
 }
 
-/**
- * Dragging panels by their title bar: a card with the panel's name follows
- * the pointer, and the place it would land is lit up until it is dropped.
- */
 export function usePanelDrag(
   onDrop: (id: PanelId, target: PanelTarget) => void,
 ) {

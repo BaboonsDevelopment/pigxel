@@ -6,18 +6,11 @@ import type { ToolId } from "../constants";
 import { toolTitle } from "../helpers";
 import { TOOL_GROUPS, toolById } from "../tools";
 
-/** How long a press on a group's button takes to open its flyout. */
 const HOLD_MS = 400;
 type Beside = { top: number; left?: number; right?: number };
 
-/**
- * Where something shown next to a button goes: to its right, or to its left
- * when the tool panel sits in the right dock. Placed on the page (fixed), so
- * the dock's scrolling doesn't cut it off.
- */
 function beside(button: HTMLElement): Beside {
   const box = button.getBoundingClientRect();
-  // Past the tool panel's edge, so it never covers the other buttons.
   const panel =
     button.closest("[aria-label='Tools']")?.getBoundingClientRect() ?? box;
   return panel.left > window.innerWidth / 2
@@ -25,12 +18,6 @@ function beside(button: HTMLElement): Beside {
     : { top: box.top, left: panel.right + 6 };
 }
 
-/**
- * The tools, one button per group (as in Aseprite): it shows the group's
- * active or last used tool. A click picks that tool; holding it, a
- * right-click or the corner mark opens the rest of the group. Tools left
- * out in Customize tools aren't shown, but their shortcuts still work.
- */
 export function ToolBar({
   tool,
   onSelect,
@@ -40,16 +27,12 @@ export function ToolBar({
   tool: ToolId;
   onSelect: (tool: ToolId) => void;
   hiddenTools: string[];
-  /** The tool each group last showed, by group id. */
   groupTools: Record<string, string>;
 }) {
   const [open, setOpen] = useState<{ group: string; at: Beside } | null>(null);
-  // The tooltip of the button under the pointer: shown at once, unlike the
-  // browser's title tooltip.
   const [tip, setTip] = useState<{ text: string; at: Beside } | null>(null);
   const hold = useRef<number | null>(null);
   const held = useRef(false);
-  // Closes the flyout on a click anywhere else or Escape.
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
@@ -89,8 +72,6 @@ export function ToolBar({
   return (
     <nav
       aria-label="Tools"
-      // As many columns as the panel's width holds; the panel is as tall as
-      // the rows they make.
       className="grid grid-cols-[repeat(auto-fill,2.5rem)] content-start justify-center gap-1 p-2"
     >
       {groups.map((group) => {
@@ -105,7 +86,6 @@ export function ToolBar({
               more ? `${entry.label} (${group.label} tools)` : entry.label
             }
             aria-pressed={active}
-            // Every tool of the group, for guides that point at one.
             data-tools={`|${group.tools.map((id) => toolById(id).label).join("|")}|`}
             aria-haspopup={more ? "menu" : undefined}
             onPointerDown={(e) => {
@@ -134,7 +114,6 @@ export function ToolBar({
               setTip(null);
             }}
             onClick={() => {
-              // A hold opened the flyout instead.
               if (held.current) return;
               onSelect(group.shown);
             }}

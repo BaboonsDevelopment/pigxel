@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Slice } from "@/lib/slices/slices";
 import { transformPixels, transformSlices } from "@/lib/sprite/transform";
 
-/** A picture of letters, one byte per pixel in the red channel, for easy reading. */
 function picture(rows: string[]) {
   const w = rows[0]!.length;
   const rgba = new Uint8ClampedArray(w * rows.length * 4);
@@ -49,7 +48,6 @@ describe("rotate and flip the whole tile", () => {
       center: { x: 1, y: 0, w: 2, h: 1 },
       pivot: { x: 0, y: 1 },
     };
-    // A 8 × 6 tile turned right: the slice at the top-left goes to the top-right.
     expect(transformSlices([door], 8, 6, "rotateRight")).toEqual([
       {
         ...door,

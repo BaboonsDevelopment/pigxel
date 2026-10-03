@@ -3,26 +3,15 @@ import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { createFrame } from "@/lib/sprite/frames";
 import type { AssetCategory } from "./assets";
 
-/**
- * The starter set: the first sprites and seamless tiles on the Assets page,
- * drawn as rows of letters, one letter per pixel; `colors` says what each
- * letter paints and "." is transparent. Assets live in Supabase; this is
- * only loaded when an admin imports the set (see ImportStarterSet), and can
- * go once it's in.
- */
-export type StarterAsset = {
+type StarterAsset = {
   id: string;
   name: string;
   category: AssetCategory;
-  /** What each letter paints, as `#rrggbb`. */
   colors: Record<string, string>;
-  /** Each frame as rows of letters, top to bottom, all rows the same length. */
   frames: string[][];
-  /** How long each frame shows, in milliseconds; only for animations. */
   duration?: number;
 };
 
-/** A drawing written as an indented block of rows. */
 const art = (text: string) =>
   text
     .trim()
@@ -30,7 +19,6 @@ const art = (text: string) =>
     .map((row) => row.trim());
 
 export const STARTER_ASSETS: StarterAsset[] = [
-  // Characters
   {
     id: "slime",
     name: "Slime",
@@ -201,7 +189,6 @@ export const STARTER_ASSETS: StarterAsset[] = [
     ],
   },
 
-  // Items
   {
     id: "coin",
     name: "Coin",
@@ -487,7 +474,6 @@ export const STARTER_ASSETS: StarterAsset[] = [
     ],
   },
 
-  // Nature
   {
     id: "tree",
     name: "Tree",
@@ -622,7 +608,6 @@ export const STARTER_ASSETS: StarterAsset[] = [
     ],
   },
 
-  // Tiles: each one meets its own copy seamlessly on every side.
   {
     id: "grass",
     name: "Grass",
@@ -831,7 +816,6 @@ export const STARTER_ASSETS: StarterAsset[] = [
 const channels = (color: string) =>
   [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
 
-/** One frame of a starter asset as RGBA pixels, row by row from the top-left. */
 export function starterPixels(asset: StarterAsset, frame = 0) {
   const rows = asset.frames[frame]!;
   const w = rows[0]!.length;
@@ -845,7 +829,6 @@ export function starterPixels(asset: StarterAsset, frame = 0) {
   return pixels;
 }
 
-/** A starter asset as a tile: one layer holding its frames, its colours as the palette. */
 export function starterDocument(asset: StarterAsset): PigxelDocument {
   const rows = asset.frames[0]!;
   const layer = createLayer("normal", asset.name);

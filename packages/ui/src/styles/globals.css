@@ -3,23 +3,16 @@
 @source "../**/*.{ts,tsx}";
 @source "../../../../apps/web/src/**/*.{ts,tsx}";
 
-/*
- * Pigxel's palette. Pages use the semantic names (bg-primary, text-muted-
- * foreground, border…) rather than raw colours, so the look changes here.
- */
 :root {
   --background: #ffffff;
-  /* The warm plum ink used for text and headings. */
   --foreground: #3b2a33;
   --card: #ffffff;
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  /* Pigxel pink: main actions, selection, focus. */
   --primary: #c65a7e;
   --primary-hover: #b24c6f;
   --primary-foreground: #ffffff;
-  /* Pale pink for avatars, badges and highlights, with text that reads on it. */
   --primary-soft: #e9c2d2;
   --primary-soft-foreground: #8a3d5c;
   --secondary: #f9f1f4;
@@ -33,11 +26,9 @@
   --border: #ecdfe5;
   --input: #e4d3db;
   --ring: var(--primary);
-  /* The sidebar's pink gradient and its selected item. */
   --sidebar: #f8eef3;
   --sidebar-end: #f4e6ed;
   --sidebar-accent: #f6dbe5;
-  /* The tinted page behind signed-in screens. */
   --canvas: #fcf6f9;
   --radius: 0.625rem;
 }
@@ -73,7 +64,6 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  /* Loaded with next/font in the app's root layout. */
   --font-sans: var(--font-poppins), Arial, Helvetica, sans-serif;
   --font-display: var(--font-fredoka), var(--font-poppins), sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
@@ -91,14 +81,12 @@
   }
 }
 
-/* The checkerboard shown through transparent pixels of a tile. */
 @utility bg-checker {
   background-color: #ffffff;
   background-image: repeating-conic-gradient(#e7e1e4 0 25%, transparent 0 50%);
   background-size: 12px 12px;
 }
 
-/* A slow bob for the decorative pixels behind Home. */
 @keyframes pixel-drift {
   0%,
   100% {
@@ -109,17 +97,12 @@
   }
 }
 
-/*
- * Plays a sprite sheet: the frames sit side by side in a picture as wide as
- * all of them, which steps left a frame at a time, as steps(frame count).
- */
 @keyframes sprite-sheet {
   to {
     transform: translateX(-100%);
   }
 }
 
-/* The dashes around a selection on the canvas crawl, as in Aseprite. */
 @keyframes marching-ants {
   to {
     stroke-dashoffset: -8;

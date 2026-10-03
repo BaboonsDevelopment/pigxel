@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => ({
     linkIdentity: vi.fn(),
     exchangeCodeForSession: vi.fn(),
   },
-  /** The google_drive_connections table, keyed by user id. */
   rows: new Map<string, Record<string, unknown>>(),
   fetch: vi.fn(),
 }));
@@ -88,7 +87,6 @@ describe("connecting Google", () => {
     const { options } = mocks.auth.signInWithOAuth.mock.calls[0]![0];
     expect(options.scopes).toBe(DRIVE_SCOPE);
     expect(options.queryParams.access_type).toBe("offline");
-    // A plain sign-in doesn't force Google's consent screen every time.
     expect(options.queryParams.prompt).toBeUndefined();
     expect(options.redirectTo).toBe(
       "http://localhost:3000/auth/callback?next=%2Ftiles",

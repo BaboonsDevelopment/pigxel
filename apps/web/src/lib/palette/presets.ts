@@ -1,16 +1,9 @@
-/**
- * Palettes: lists of `#rrggbb` colours saved with a tile, to paint from. The
- * presets are well-known pixel art palettes, credited to their authors on
- * Lospec (lospec.com/palette-list), where each one lives under its id.
- */
-
 export const MAX_PALETTE = 256;
 
 export type PalettePreset = {
   id: string;
   name: string;
   colors: string[];
-  /** Who made it, as Lospec credits them. */
   author?: string;
 };
 
@@ -156,19 +149,16 @@ export const PALETTE_PRESETS: PalettePreset[] = [
   },
 ];
 
-/** What a new tile starts with. */
 export const DEFAULT_PALETTE = PALETTE_PRESETS[0]!.colors;
 
 const HEX = /^#[0-9a-f]{6}$/;
 
-/** A colour as `#rrggbb` in lowercase, or null when it isn't one. */
 export function normalizeColor(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const color = value.trim().toLowerCase();
   return HEX.test(color) ? color : null;
 }
 
-/** A list of colours checked one by one: bad entries dropped, repeats kept once, at most MAX_PALETTE. */
 export function readPalette(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   const colors = new Set<string>();
@@ -180,7 +170,6 @@ export function readPalette(value: unknown): string[] | null {
   return [...colors];
 }
 
-/** The opaque colours of `pixels` (RGBA), most used first, at most `max`. */
 export function colorsOf(pixels: Uint8ClampedArray, max = MAX_PALETTE) {
   const counts = new Map<number, number>();
   for (let i = 0; i < pixels.length; i += 4) {
@@ -194,7 +183,6 @@ export function colorsOf(pixels: Uint8ClampedArray, max = MAX_PALETTE) {
     .map(([key]) => `#${key.toString(16).padStart(6, "0")}`);
 }
 
-/** Most recently used first, without repeats, at most `max`. */
 export function pushRecent(recent: string[], color: string, max = 12) {
   return [color, ...recent.filter((c) => c !== color)].slice(0, max);
 }

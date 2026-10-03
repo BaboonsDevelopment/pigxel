@@ -33,10 +33,6 @@ type Props = {
   }>;
 };
 
-/**
- * The feedback board, like issues on GitHub: feature requests and bugs,
- * open or closed, most voted or newest first, and searchable by title.
- */
 export default async function Feedback({ searchParams }: Props) {
   const params = await searchParams;
   const query: BoardQuery = {

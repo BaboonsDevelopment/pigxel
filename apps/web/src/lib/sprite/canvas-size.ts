@@ -1,11 +1,5 @@
 import { clipToTile, type Slice } from "@/lib/slices/slices";
 
-/**
- * Canvas size, as Aseprite's Sprite › Canvas Size: the tile grows or shrinks
- * by adding or cutting away space on any side, without scaling the drawing.
- */
-
-/** Pixels added on each side; negative cuts that many away. */
 export type Borders = {
   left: number;
   top: number;
@@ -13,10 +7,8 @@ export type Borders = {
   bottom: number;
 };
 
-/** Which part of the tile stays put, as a fraction across and down: 0, ½ or 1. */
 export type Anchor = { x: 0 | 0.5 | 1; y: 0 | 0.5 | 1 };
 
-/** The 3 × 3 anchors, row by row from the top-left. */
 export const ANCHORS: Anchor[] = [0, 0.5, 1].flatMap((y) =>
   [0, 0.5, 1].map((x) => ({ x, y }) as Anchor),
 );
@@ -25,10 +17,6 @@ export const sameAnchor = (a: Anchor, b: Anchor) => a.x === b.x && a.y === b.y;
 
 export const NO_BORDERS: Borders = { left: 0, top: 0, right: 0, bottom: 0 };
 
-/**
- * The borders that make a `w × h` tile `next`, with the drawing kept at
- * `anchor`: centred, an odd pixel goes to the right and the bottom.
- */
 export function bordersFor(
   size: { w: number; h: number },
   next: { w: number; h: number },
@@ -41,7 +29,6 @@ export function bordersFor(
   return { left, top, right: dw - left, bottom: dh - top };
 }
 
-/** The size of a `w × h` tile with `borders` added. */
 export function sizeWith(
   size: { w: number; h: number },
   borders: Borders,
@@ -52,7 +39,6 @@ export function sizeWith(
   };
 }
 
-/** Slices moved with the drawing by (`dx`, `dy`) and cut to a `w × h` tile; ones left outside go. */
 export function movedSlices(
   slices: Slice[],
   dx: number,
@@ -68,7 +54,6 @@ export function movedSlices(
     };
     const bounds = clipToTile(moved, w, h);
     if (!bounds) return [];
-    // The centre and pivot are relative to the bounds, whose corner may have moved in.
     const cutX = bounds.x - moved.x;
     const cutY = bounds.y - moved.y;
     const center =
@@ -92,12 +77,6 @@ export function movedSlices(
   });
 }
 
-/**
- * The smallest rectangle holding everything drawn in any of `pictures`
- * (frames of a `w × h` tile), for Trim; null when nothing is drawn. Clear
- * pixels count as empty, and so does `background` (an [r, g, b] colour),
- * the Background layer's fill.
- */
 export function drawnBounds(
   pictures: Uint8ClampedArray[],
   w: number,

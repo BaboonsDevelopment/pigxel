@@ -1,6 +1,3 @@
-/* The landing's try-it canvas, drawn as a small app window. Colours and
-   fonts come from the landing page's custom properties. */
-
 .playground {
   width: min(100%, 440px);
   overflow: hidden;

@@ -32,10 +32,8 @@ type Project =
       tile: CloudTileSummary;
     };
 
-/** Local tiles and cloud tiles in one row, most recently changed first. */
 function merge(userId: string, cloudTiles: CloudTileSummary[]): Project[] {
   const local = listDrafts(userId).flatMap((draft): Project[] => {
-    // A cloud tile open here is listed once, as the cloud tile.
     if (draft.location?.kind === "cloud") return [];
     try {
       const image = parsePigxel(draft.file);
@@ -63,13 +61,11 @@ function merge(userId: string, cloudTiles: CloudTileSummary[]): Project[] {
   return [...local, ...cloud].sort((a, b) => b.at - a.at);
 }
 
-/** Home's "Recent projects": the latest few tiles, then a "New project" card. */
 export function RecentProjects(props: {
   userId: string;
   cloudTiles: CloudTileSummary[];
   limit: number;
 }) {
-  // Local tiles live in this browser's storage, so the row waits for the client.
   if (!useDraftsLoaded(props.userId)) return <div className="min-h-44" />;
   return <Row {...props} />;
 }
@@ -84,7 +80,6 @@ function Row({
   limit: number;
 }) {
   const cloud = useCloudTileActions(userId);
-  // Local tiles are read from storage each render; this re-renders after removing one.
   const [, refresh] = useReducer((n: number) => n + 1, 0);
   const projects = merge(userId, cloudTiles)
     .filter((p) => !(p.kind === "cloud" && cloud.removed.has(p.id)))

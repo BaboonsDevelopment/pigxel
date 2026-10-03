@@ -7,7 +7,6 @@ import {
   sheetGridProblem,
 } from "@/lib/pigxel-file/import-sheet";
 
-/** A sheet of w × h: each pixel's red is its column, green its row; transparent where `empty` says. */
 const sheet = (
   w: number,
   h: number,
@@ -22,7 +21,6 @@ const sheet = (
 
 describe("importing a sprite sheet", () => {
   it("guesses frames in a row or a column by how alike neighbours look", () => {
-    // 20 frames of 64 × 48: a box hopping a little, as an animation does.
     const w = 64 * 20;
     const row = sheet(w, 48, (x, y) => {
       const f = Math.floor(x / 64);
@@ -38,7 +36,6 @@ describe("importing a sprite sheet", () => {
     });
   });
   it("guesses frames in a grid", () => {
-    // 5 × 4 frames of 64 × 48, like a sheet exported with the Grid layout.
     const grid = sheet(64 * 5, 48 * 4, (x, y) => {
       const f = Math.floor(x / 64) + Math.floor(y / 48) * 5;
       const left = 20 + (f % 3);
@@ -78,7 +75,6 @@ describe("importing a sprite sheet", () => {
       gapX: 1,
       gapY: 2,
     };
-    // 1 + 4 + 1 + 4 = 10 wide: two across; 1 + 4 + 2 + 4 = 11 tall: two down.
     expect(sheetCells(grid, 11, 11).map((c) => [c.x, c.y])).toEqual([
       [1, 1],
       [6, 1],
@@ -97,7 +93,6 @@ describe("importing a sprite sheet", () => {
     const cut = cutSheet(pic, grid);
     expect(cut.frames).toHaveLength(3);
     expect([cut.w, cut.h]).toEqual([4, 2]);
-    // The second frame starts at column 4 of the sheet.
     expect(cut.frames[1]!.rgba[0]).toBe(4);
     expect(cut.frames[2]!.rgba[1]).toBe(2);
     expect(cut.frames.every((f) => f.duration === 60)).toBe(true);

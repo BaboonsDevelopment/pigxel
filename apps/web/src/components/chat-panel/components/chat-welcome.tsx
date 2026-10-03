@@ -1,6 +1,5 @@
 import { SUGGESTIONS } from "../constants";
 
-/** Shown while the conversation is empty. */
 export function ChatWelcome() {
   return (
     <div className="text-sm leading-relaxed">

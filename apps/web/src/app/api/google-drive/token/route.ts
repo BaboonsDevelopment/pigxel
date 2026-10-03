@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/server";
 
 const noStore = { "Cache-Control": "private, no-store" };
 
-/** A short-lived Google Drive access token for the signed-in person. */
 export async function POST() {
   if (!isDriveAvailable())
     return NextResponse.json(

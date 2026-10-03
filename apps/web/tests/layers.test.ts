@@ -22,7 +22,6 @@ const named = (kind: Layer["kind"], name: string) => ({
   id: name,
 });
 
-/** Background, A, Group(B, C), D — bottom to top. */
 function sample(): Layer[] {
   const group = {
     ...(named("group", "G") as GroupLayer),
@@ -145,7 +144,6 @@ describe("blending and compositing", () => {
     ).toBeCloseTo(0.3);
     expect(blend("addition", [0.8, 0, 0], [0.5, 0, 0])).toEqual([1, 0, 0]);
     expect(blend("subtract", [0.8, 0, 0], [0.5, 0, 0])[0]).toBeCloseTo(0.3);
-    // Luminosity keeps the backdrop's hue: grey stays grey.
     const grey = blend("luminosity", [0.5, 0.5, 0.5], [1, 0, 0]);
     expect(grey[0]).toBeCloseTo(grey[1]!);
   });

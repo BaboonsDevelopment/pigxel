@@ -9,10 +9,8 @@ import { scrollParent } from "@/lib/scroll-parent";
 import { ProjectCard } from "./project-card/project-card";
 import { useCloudTileActions } from "./tile-actions";
 
-/** How far below the visible part the next tiles start loading, so scrolling never waits. */
 const PRELOAD = "1500px";
 
-/** The person's Pigxel cloud tiles, loading more as they scroll; each opens in its own editor draft. */
 export function CloudTiles({
   userId,
   initial,
@@ -22,7 +20,6 @@ export function CloudTiles({
 }) {
   const { busy, error, removed, open, remove } = useCloudTileActions(userId);
   const [tiles, setTiles] = useState(initial);
-  // How many have been fetched; ahead of tiles.length when an edit reordered them.
   const [offset, setOffset] = useState(initial.length);
   const [done, setDone] = useState(initial.length < PAGE_SIZE);
   const loading = useRef(false);

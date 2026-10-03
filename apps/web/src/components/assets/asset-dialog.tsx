@@ -16,11 +16,6 @@ import {
 import { downloadBlob } from "@/lib/download";
 import { AssetImage } from "./asset-image";
 
-/**
- * One asset up close, with the ways to use it: start a tile from it, copy it
- * to paste into a tile, or download it. Each fetches only the file it needs.
- * Admins can take it off the page.
- */
 export function AssetDialog({
   asset,
   canRemove,
@@ -50,7 +45,6 @@ export function AssetDialog({
       });
       return;
     }
-    // The picture is handed over as a promise, so Safari keeps the click.
     navigator.clipboard
       .write([new ClipboardItem({ "image/png": assetFramePng(asset) })])
       .then(
@@ -80,13 +74,11 @@ export function AssetDialog({
     else dialog.current?.close();
   };
 
-  // On <body>, outside the scaled page, so it fits the window.
   return createPortal(
     <dialog
       ref={dialog}
       onClose={onClose}
       onClick={(e) => {
-        // A click on the dimmed backdrop closes it.
         if (e.target === dialog.current) dialog.current.close();
       }}
       aria-labelledby="asset-dialog-title"

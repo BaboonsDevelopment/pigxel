@@ -1,12 +1,9 @@
 import type { UsageRow } from "@/lib/ai/actions";
 
-/** One thing the person asked for, and the tokens it took. */
 export type UsageAction = { kind: string; at: string; credits: number };
 
-/** A longer pause than this starts a new action even without a new message. */
 const GAP_MS = 10 * 60_000;
 
-/** What the requests did, from the steps they took. */
 function kindOf(rows: UsageRow[]): string {
   const steps = new Set(rows.map((r) => r.step));
   if (steps.has("animate")) return "Animation";
@@ -15,10 +12,6 @@ function kindOf(rows: UsageRow[]): string {
   return "Chat";
 }
 
-/**
- * Requests (newest first) grouped into actions, newest first: each message
- * starts with routing it, and what follows until the next belongs to it.
- */
 export function groupActions(rows: UsageRow[]): UsageAction[] {
   const groups: UsageRow[][] = [];
   let last = 0;
@@ -37,6 +30,5 @@ export function groupActions(rows: UsageRow[]): UsageAction[] {
   }));
 }
 
-/** "4 913": whole tokens, grouped by thousands. */
 export const tokens = (credits: number) =>
   Math.round(credits).toLocaleString("en-US").replace(/,/g, " ");

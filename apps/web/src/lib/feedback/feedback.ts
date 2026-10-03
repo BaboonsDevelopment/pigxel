@@ -1,9 +1,3 @@
-/**
- * The feedback board: bug reports and feature requests everyone signed in
- * can see and vote for, like issues on GitHub. The team moves each one on
- * from "open"; until then, it counts towards its author's limit.
- */
-
 export const FEEDBACK_KINDS = {
   bug: { label: "Bugs", one: "bug report", new: "Report a bug" },
   feature: {
@@ -24,13 +18,11 @@ export const FEEDBACK_STATUSES = {
 } as const;
 export type FeedbackStatus = keyof typeof FEEDBACK_STATUSES;
 
-/** Still being worked out: shown under Open, and open to votes. */
 export const ACTIVE_STATUSES: FeedbackStatus[] = [
   "open",
   "approved",
   "in_development",
 ];
-/** Done with, one way or another: shown under Closed. */
 export const FINISHED_STATUSES: FeedbackStatus[] = [
   "implemented",
   "declined",
@@ -39,7 +31,6 @@ export const FINISHED_STATUSES: FeedbackStatus[] = [
 
 export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 300;
-/** Open reports of each kind one person can have before the team moves one on. */
 export const OPEN_LIMIT = 3;
 
 export type FeedbackInput = {
@@ -52,19 +43,15 @@ export type FeedbackItem = FeedbackInput & {
   id: number;
   status: FeedbackStatus;
   votes: number;
-  /** "3 days ago". */
   ago: string;
   createdAt: string;
-  /** Who sent it; null when their profile is private. */
   author: { name: string; username: string } | null;
-  /** Whether the person looking voted for it. */
   voted: boolean;
 };
 
 const isKind = (value: string): value is FeedbackKind =>
   Object.hasOwn(FEEDBACK_KINDS, value);
 
-/** `value` as a kind, or the default when it isn't one. */
 export function kindOf(
   value: string | null | undefined,
   fallback: FeedbackKind = "feature",
@@ -72,7 +59,6 @@ export function kindOf(
   return value && isKind(value) ? value : fallback;
 }
 
-/** The report as typed, checked; or what's wrong and in which field. */
 export function readFeedback(raw: {
   kind: string;
   title: string;
@@ -88,7 +74,6 @@ export function readFeedback(raw: {
       field: "title",
       error: `Give it a title of 1–${TITLE_MAX} characters.`,
     };
-  // Line breaks are kept; it's plain text.
   const description = raw.description.replace(/\r\n/g, "\n").trim();
   if (!description)
     return {
@@ -106,16 +91,11 @@ export function readFeedback(raw: {
   return { value: { kind: raw.kind, title, description } };
 }
 
-/**
- * The page a report was sent from, from the link that opened the form: a
- * path on this site, or nothing.
- */
 export function pageFrom(from: string | null | undefined): string | null {
   if (!from || !from.startsWith("/") || from.startsWith("//")) return null;
   return from.slice(0, 300);
 }
 
-/** Text to look for in titles, as a LIKE pattern matching it literally. */
 export function titlePattern(search: string): string | null {
   const text = search.trim().slice(0, TITLE_MAX);
   return text ? `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;

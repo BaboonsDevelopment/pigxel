@@ -2,11 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/**
- * A number that counts up from `from` the first time it scrolls into view.
- * The server renders the final value, so it reads right without JavaScript;
- * it only resets while still below the fold, where nobody sees the jump.
- */
 export function CountUp({
   to,
   from = 0,

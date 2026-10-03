@@ -12,20 +12,9 @@ const LINKS = [
   { href: "/pricing", label: "Pricing" },
 ];
 
-/**
- * The header of every page open to everyone (the landing; Explore and
- * Pricing for guests; the policies), as a floating pill like Mobbin's: the
- * mascot on the left, a few links on the right, and "Join for free" sliding in
- * once the page's opening section has scrolled up behind the bar: the
- * element marked `data-header-reveal`, or else the first thing in <main>.
- * Signed-in visitors get "Open Pigxel" instead of Log in, from the start.
- * Page transitions keep the header still (it's named "site-header", see
- * app/transitions.css).
- */
 export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
   const pathname = usePathname();
   const bar = useRef<HTMLDivElement>(null);
-  // Remembers which page it measured, so a new page starts with the bar short.
   const [reveal, setReveal] = useState({ path: "", past: false });
   const joinShown = reveal.path === pathname && reveal.past;
 
@@ -48,14 +37,11 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
-    // Pages scroll the window or, in the app's layout, a container; scroll
-    // events don't bubble, so catch them on the way down instead.
     document.addEventListener("scroll", schedule, {
       capture: true,
       passive: true,
     });
     window.addEventListener("resize", schedule);
-    // A page can open part-way down, and every new page needs measuring.
     schedule();
     return () => {
       document.removeEventListener("scroll", schedule, { capture: true });
@@ -66,8 +52,6 @@ export function PublicHeader({ signedIn = false }: { signedIn?: boolean }) {
 
   return (
     <header className={`${geist.variable} ${styles.header}`}>
-      {/* Named here rather than on <header>: a named element is a backdrop
-          root, and on the wrapper it would leave the pill nothing to blur. */}
       <div
         ref={bar}
         className={styles.bar}

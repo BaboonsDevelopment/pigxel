@@ -13,7 +13,6 @@ import { createClient } from "@/lib/supabase/server";
 
 const ACCOUNT_PATH = "/settings/account";
 
-/** Stops Pigxel using this person's Google Drive and revokes its access at Google. */
 export async function disconnectDrive() {
   const user = await requireUser();
   if (isDriveAvailable())
@@ -22,10 +21,6 @@ export async function disconnectDrive() {
   redirect(`${ACCOUNT_PATH}?drive=disconnected`);
 }
 
-/**
- * Starts an email change. Supabase emails a link to both the old and the new
- * address; the email changes once both are opened.
- */
 export async function changeEmail(
   _state: AuthState,
   formData: FormData,
@@ -61,7 +56,6 @@ export async function changeEmail(
   };
 }
 
-/** Removes Google or Apple sign-in; the last way to sign in can't be removed. */
 export async function unlinkProvider(
   provider: "google" | "apple",
 ): Promise<{ error?: string }> {
@@ -81,7 +75,6 @@ export async function unlinkProvider(
       };
     const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity);
     if (unlinkError) return { error: "Couldn’t disconnect. Try again." };
-    // Drive access came with the Google account.
     if (provider === "google" && isDriveAvailable())
       await deleteDriveConnection(user.id, { revoke: true });
   } catch {

@@ -17,10 +17,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: `${tutorial?.title ?? "Tutorial"} · Pigxel` };
 }
 
-/**
- * One tutorial: its video, the interactive guide to start in the editor, and
- * the guide's steps written out.
- */
 export default async function TutorialPage({ params }: Props) {
   const tutorial = findTutorial((await params).slug);
   if (!tutorial) notFound();

@@ -10,32 +10,23 @@ import { ICONS } from "../icons";
 type Props = {
   row: PanelRow;
   active: boolean;
-  /** The drop zone shown while a layer is dragged over this row. */
   drop: DropZone | null;
-  /** Whether the name is being edited in place. */
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
   onSelect: () => void;
   onChange: (patch: LayerPatch) => void;
-  /** Right-click: the layer's menu. */
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent<HTMLLIElement>) => void;
   onDragLeave: () => void;
   onDrop: () => void;
   onDragEnd: () => void;
-  /** The layer's cels, one per frame, right of its name. */
   children: ReactNode;
 };
 
 const toggle =
   "flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground";
 
-/**
- * One layer of the timeline: visibility and lock toggles, the group arrow and
- * the name (double-click to rename) in a column that stays put, then its
- * cels. Every layer but the Background can be dragged by its name.
- */
 export function LayerRow({
   row,
   active,
@@ -68,7 +59,6 @@ export function LayerRow({
       onContextMenu={onContextMenu}
       className={cn(
         "group/row relative flex h-8 cursor-default border-b text-sm select-none",
-        // Opaque, so frames scrolling under the name column stay hidden.
         active
           ? "bg-[color-mix(in_oklab,var(--color-primary)_10%,var(--color-background))]"
           : "bg-background hover:bg-muted",

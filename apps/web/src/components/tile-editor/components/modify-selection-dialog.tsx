@@ -38,7 +38,6 @@ const TEXT: Record<
   },
 };
 
-/** Asks how far to expand, contract or border the selection, and how to measure it. */
 export default function ModifySelectionDialog({
   kind,
   onApply,

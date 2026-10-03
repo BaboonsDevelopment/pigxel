@@ -21,7 +21,6 @@ import { SidebarScene } from "./sidebar-scene";
 type NavItem = {
   label: string;
   icon: ReactNode;
-  /** Pages that highlight this item; a missing href means it's coming soon. */
   href?: string;
   match?: (path: string) => boolean;
 };
@@ -59,16 +58,11 @@ const MAIN: NavItem[] = [
   },
 ];
 
-/**
- * The app’s navigation: logo, pages, a pixel landscape, the latest patch
- * notes and the account (Profile, Settings, Sign out).
- */
 export function Sidebar({
   profile,
   onNavigate,
 }: {
   profile: Profile;
-  /** Called when a link is followed, e.g. to close the mobile menu. */
   onNavigate?: () => void;
 }) {
   const path = usePathname();

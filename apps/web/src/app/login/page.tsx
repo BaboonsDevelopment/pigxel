@@ -107,11 +107,6 @@ export default async function Login({
 const providerClassName =
   "inline-flex h-11 items-center justify-center gap-2.5 rounded-full bg-zinc-100 text-sm font-medium text-foreground transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50";
 
-/**
- * A quiet sign-in button: the provider's logo and name. Without an `href`
- * the provider isn't set up (no client ID in the environment), so it shows
- * dimmed and can't be pressed; hovering says why.
- */
 function ProviderButton({
   href,
   logo,

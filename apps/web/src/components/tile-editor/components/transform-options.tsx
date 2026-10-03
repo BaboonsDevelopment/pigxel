@@ -32,11 +32,6 @@ const FIELDS: {
   },
 ];
 
-/**
- * Exact numbers for scaling, turning and slanting the selection with the
- * Move tool (the handles on the canvas do the same by hand), how pixels are
- * picked, and Apply, which puts the result down.
- */
 export function TransformOptions({ selection }: { selection: SelectionApi }) {
   const current = selection.freeTransform?.t;
   const values = {

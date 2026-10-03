@@ -40,12 +40,10 @@ import {
 } from "@/lib/pigxel-file/import-image";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 
-export type FileStatus = {
+type FileStatus = {
   tone: "info" | "error";
   text: string;
-  /** Label of a button that saves to the tile's location again. */
   retry?: string;
-  /** The Google account must be connected again before Drive saves work. */
   connect?: boolean;
 };
 
@@ -53,7 +51,6 @@ export type TileFile = ReturnType<typeof useTileFile>;
 
 type Sync = "idle" | "saving" | "saved" | "failed";
 
-/** How long editing must pause before the tile autosaves to its location. */
 const AUTOSAVE_DELAY = 1500;
 
 const isKnownError = (error: unknown): error is Error =>
@@ -61,13 +58,6 @@ const isKnownError = (error: unknown): error is Error =>
   error instanceof DriveError ||
   error instanceof CloudError;
 
-/**
- * Saving the tile being edited and opening others: on the computer, in Pigxel
- * cloud or in Google Drive. Every change is kept in this tile's browser draft,
- * and a tile that lives in Pigxel cloud or Google Drive autosaves there too.
- * Opening a file never replaces this tile: it gets its own draft, which
- * `onOpen` shows.
- */
 export function useTileFile({
   tile,
   fileInput,
@@ -77,16 +67,12 @@ export function useTileFile({
   notice,
   onOpen,
 }: {
-  /** The tile being edited, read for the draft and for saving. */
   tile: RefObject<{ document: () => PigxelDocument } | null>;
   fileInput: RefObject<HTMLInputElement | null>;
   userId: string;
-  /** The draft restored when the editor opened. */
   initial: Draft;
   drive: DriveStatus;
-  /** A message to show when the editor opens. */
   notice?: FileStatus;
-  /** Shows another tile's draft after opening it. */
   onOpen: (draftId: string) => void;
 }) {
   const [name, setName] = useState(initial.name);
@@ -94,7 +80,6 @@ export function useTileFile({
     initial.location,
   );
   const [dirty, setDirty] = useState(initial.dirty);
-  // Bumped on every change, so the draft and the saved copy are updated again.
   const [revision, setRevision] = useState(0);
   const latestRevision = useRef(revision);
   const [sync, setSync] = useState<Sync>(
@@ -125,10 +110,6 @@ export function useTileFile({
     return doc;
   };
 
-  /**
-   * Saves a tile (this one, unless `image` and `tileName` say another) to
-   * `target` (the same place, or a new one) and returns where it now lives.
-   */
   const saveTo = async (
     target: TileLocation["kind"],
     current: TileLocation | null,
@@ -162,12 +143,9 @@ export function useTileFile({
     setLocation(next);
     setSyncError(null);
     setSync("saved");
-    // Edits made while saving stay unsaved for the next round.
     if (latestRevision.current === savedRevision) setDirty(false);
   };
 
-  // A tile in Pigxel cloud or Google Drive saves itself once editing pauses.
-  // After a failure it waits for "Try again" (or "Connect Google Drive").
   useEffect(() => {
     if (!location || !dirty || sync === "saving" || sync === "failed") return;
     if (location.kind === "drive" && !drive.available) return;
@@ -186,7 +164,6 @@ export function useTileFile({
       }
     }, AUTOSAVE_DELAY);
     return () => clearTimeout(timer);
-    // The save helpers read the canvas and name at save time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, dirty, name, revision, sync, drive.available]);
 
@@ -214,25 +191,15 @@ export function useTileFile({
 
   const openFromComputer = () => fileInput.current?.click();
 
-  /**
-   * Opens a tile made here (from a picture or a sprite sheet)
-   * as a new tile called `tileName`. It's saved where this tile lives, so a
-   * Pigxel cloud tile's imports land in Pigxel cloud too; if that fails, or
-   * this tile lives only here, the new one is kept in this browser.
-   */
   const openNew = async (doc: PigxelDocument, tileName: string) => {
     let home: TileLocation | null = null;
     if (location && (location.kind === "cloud" || drive.available))
       try {
         home = await saveTo(location.kind, null, doc, tileName);
-      } catch {
-        // It can be saved there from the new tile's editor.
-      }
+      } catch {}
     onOpen(await draftFromDocument(userId, doc, tileName, home));
   };
 
-  // A picture (PNG, GIF, JPEG, …) opens as a new tile; anything else is read
-  // as a .pigxel file.
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
     void run(async () =>
@@ -244,7 +211,6 @@ export function useTileFile({
     );
   };
 
-  /** Opens numbered picture files (walk_01.png … walk_08.png) as the frames of a new tile. */
   const openFrames = (files: File[]) => {
     if (!files.length) return;
     void run(async () =>
@@ -255,7 +221,6 @@ export function useTileFile({
     );
   };
 
-  /** Opens a tile made here (e.g. from a sprite sheet) as a new tile called `tileName`. */
   const openDocument = (doc: PigxelDocument, tileName: string) =>
     void run(() => openNew(doc, tileName));
 
@@ -272,7 +237,6 @@ export function useTileFile({
       setStatus({ tone: "info", text: `Downloaded ${pigxelFileName(name)}` });
     });
 
-  /** Saves now to `target`, moving the tile there if it lived elsewhere. */
   const saveNow = (target: TileLocation["kind"]) =>
     void run(async () => {
       const savedRevision = latestRevision.current;
@@ -285,10 +249,8 @@ export function useTileFile({
       }
     });
 
-  /** Ctrl/⌘+S saves back to where the tile lives. */
   const save = () => (location ? saveNow(location.kind) : download());
 
-  // A tile with a home shows its autosave state; otherwise the last action.
   const place = location ? LOCATION_LABELS[location.kind] : null;
   const locationStatus: FileStatus | null = !place
     ? null
@@ -310,7 +272,6 @@ export function useTileFile({
 
   return {
     name,
-    /** Bumped by every change to the tile. */
     revision,
     rename: (next: string) => {
       setName(next);

@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { setTileLiked } from "@/app/(app)/explore/actions";
 
-/** A heart and how many like the art; a click likes it or takes it back. */
 export function LikeButton({
   tileId,
   count,
@@ -14,7 +13,6 @@ export function LikeButton({
   count: number;
   liked: boolean;
 }) {
-  // Kept here: the feed holds the arts it loaded and doesn't refetch them.
   const [state, setState] = useState({ liked, count });
   const [pending, startTransition] = useTransition();
 

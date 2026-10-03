@@ -20,7 +20,6 @@ type SubscriptionRow = {
   event_at: string;
 };
 
-/** The signed-in person's plan; Free when nothing is stored or it fails. */
 export const getCurrentPlan = cache(
   async (userId: string): Promise<CurrentPlan> => {
     if (!isSupabaseConfigured()) return { name: "Free" };
@@ -51,7 +50,6 @@ export const getCurrentPlan = cache(
   },
 );
 
-/** Stores a subscription from the Paddle webhook, unless a newer event won. */
 export async function saveSubscription(record: SubscriptionRecord) {
   const { error } = await createAdminClient().rpc("apply_paddle_subscription", {
     p_id: record.id,

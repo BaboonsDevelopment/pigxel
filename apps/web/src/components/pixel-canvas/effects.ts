@@ -1,15 +1,6 @@
 import type { Size } from "./constants";
 import type { Rgba } from "./paint";
 
-/**
- * Whole-cel changes from the Edit menu. Each takes the cel's RGBA and
- * returns a changed copy, touching only pixels in `mask` when there is one.
- */
-
-/**
- * Draws a 1px outline in `rgba` around everything drawn: every transparent
- * pixel next to a drawn one (sideways, or also diagonally with `corners`).
- */
 export function outlined(
   pixels: Uint8ClampedArray,
   size: Size,
@@ -42,7 +33,6 @@ export function outlined(
   return out;
 }
 
-/** Repaints every pixel of colour `from` (alpha ignored when both are opaque) in `to`. */
 export function replacedColor(
   pixels: Uint8ClampedArray,
   from: Rgba,
@@ -64,7 +54,6 @@ export function replacedColor(
   return out;
 }
 
-/** `rgba` with every pixel in `mask` set to `color`, for Edit › Fill and Stroke. */
 export function filledMask(
   rgba: Uint8ClampedArray,
   mask: Uint8Array,

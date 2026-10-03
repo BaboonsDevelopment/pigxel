@@ -23,7 +23,6 @@ type FeedbackRow = {
   votes: number;
   created_at: string;
   author: ProfileRow | null;
-  /** The viewer's own vote, if any: they can only see their own. */
   my_vote: { user_id: string }[];
 };
 
@@ -36,7 +35,6 @@ export type BoardQuery = {
 
 const SHOWN = 50;
 
-/** One page of the board: a kind, open or closed, sorted, maybe searched. */
 export async function listFeedback(query: BoardQuery): Promise<FeedbackItem[]> {
   try {
     const supabase = await createClient();
@@ -80,7 +78,6 @@ export async function listFeedback(query: BoardQuery): Promise<FeedbackItem[]> {
   }
 }
 
-/** How many reports of a kind are open and closed, for the tabs. */
 export async function countFeedback(
   kind: FeedbackKind,
 ): Promise<{ open: number; closed: number }> {
@@ -104,7 +101,6 @@ export async function countFeedback(
   }
 }
 
-/** How many of the person's reports of each kind still wait for the team. */
 export async function countOwnOpen(
   userId: string,
 ): Promise<Record<FeedbackKind, number>> {

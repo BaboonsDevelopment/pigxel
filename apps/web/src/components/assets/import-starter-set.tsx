@@ -5,12 +5,6 @@ import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 
-/**
- * For admins: puts the starter set (the first sprites and tiles, drawn in
- * code) on the Assets page through the same publishing as the editor. The
- * drawings load only on click, so nobody else downloads them; importing
- * again replaces those assets.
- */
 export function ImportStarterSet() {
   const router = useRouter();
   const [progress, setProgress] = useState<string | null>(null);

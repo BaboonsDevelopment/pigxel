@@ -8,7 +8,6 @@ import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import type { AppNotification } from "@/lib/notifications/server";
 import { BellIcon } from "./icons";
 
-/** The bell with an unread count, opening the latest notifications. */
 export function NotificationBell({
   unread: initialUnread,
 }: {

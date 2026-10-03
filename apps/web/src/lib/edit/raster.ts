@@ -7,7 +7,6 @@ export const TRANSPARENT: RGBA = { r: 0, g: 0, b: 0, a: 0 };
 export const sameRect = (a: Rect, b: Rect) =>
   a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
-/** The box around every given rectangle, or null when there are none. */
 export function unionOf(rects: (Rect | undefined)[]): Rect | null {
   const found = rects.filter((r): r is Rect => !!r);
   if (!found.length) return null;
@@ -29,7 +28,6 @@ export function hexToRgba(hex: string): RGBA {
   };
 }
 
-/** Every pixel on the straight line from `a` to `b`, both ends included (Bresenham). */
 export function linePoints(a: Point, b: Point): Point[] {
   const points: Point[] = [];
   const dx = Math.abs(b.x - a.x);
@@ -82,7 +80,6 @@ export function ellipsePoints(r: Rect, filled: boolean): Point[] {
   return points;
 }
 
-/** The connected same-coloured pixels around `start`, staying inside `bounds`. */
 export function floodPoints(
   pixels: Uint8ClampedArray,
   width: number,
@@ -113,10 +110,6 @@ export function floodPoints(
   return out;
 }
 
-/**
- * The part of `area` that has something drawn, grown by `margin` pixels and
- * kept inside `area`; `area` itself when nothing is drawn there.
- */
 export function paintedBounds(
   pixels: Uint8ClampedArray,
   width: number,

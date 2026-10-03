@@ -9,11 +9,6 @@ import {
 const colorKey = (image: Bitmap, i: number) =>
   image.rgba.subarray(i * 4, i * 4 + 4).join(",");
 
-/**
- * Shrinking leaves lone pixels behind: a speck with no opaque neighbour is
- * removed, and a pixel unlike all four neighbours takes their most common
- * colour. Works on a copy so each decision sees the original pixels.
- */
 export function removeStrayPixels(source: Bitmap): Bitmap {
   const image = copyBitmap(source);
   for (let i = 0; i < source.w * source.h; i++) {
@@ -35,7 +30,6 @@ export function removeStrayPixels(source: Bitmap): Bitmap {
       counts.set(key, entry);
     }
     const best = [...counts.values()].reduce((a, b) => (b.n > a.n ? b : a));
-    // Only when two or more neighbours agree, so real 1-pixel details stay.
     if (best.n >= 2) {
       image.rgba.set(source.rgba.subarray(best.at * 4, best.at * 4 + 4), i * 4);
     }

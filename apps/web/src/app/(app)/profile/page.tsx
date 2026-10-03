@@ -4,7 +4,6 @@ import { getOwnProfile } from "@/lib/profile/server";
 
 export const dynamic = "force-dynamic";
 
-/** A stable link to your own profile, wherever your username changes to. */
 export default async function OwnProfile() {
   const user = await requireUser();
   const profile = await getOwnProfile(user.id);

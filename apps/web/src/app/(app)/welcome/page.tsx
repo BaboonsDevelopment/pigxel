@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-/** Where Paddle Checkout sends people after a successful payment. */
 export default function Welcome() {
   return (
     <PageTransition>

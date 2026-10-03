@@ -1,27 +1,12 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 
-/**
- * Waits between rounds: each round tries every model once, so a busy model is
- * skipped right away and the pause only comes when all of them are busy.
- */
 export const TEXT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
-/** Fewer rounds for pictures: each attempt can take a long time. */
 export const IMAGE_RETRY_DELAYS_MS = [2_000];
-/** Longest wait for one attempt, so a hung request fails fast. */
 export const TEXT_ATTEMPT_TIMEOUT_MS = 20_000;
 export const IMAGE_ATTEMPT_TIMEOUT_MS = 40_000;
 
 export const GEMINI_BASE_URL =
   "https://generativelanguage.googleapis.com/v1beta";
-/**
- * Text models (paid, see pricing.ts), tried in order after `AI_MODEL`. Google
- * often answers 503 for one model while another is fine, so there are several.
- */
-/**
- * How much text models think before answering, the least each allows. Thinking
- * is billed as output and was most of what routing and placing cost; these
- * answers are short classifications and boxes that need little of it.
- */
 export const THINKING_LEVELS: Record<string, string> = {
   "gemini-3.7-flash": "low",
   "gemini-3.6-flash": "minimal",
@@ -32,38 +17,18 @@ export const TEXT_MODELS = [
   "gemini-3.7-flash",
   "gemini-3.1-flash-lite",
 ];
-/**
- * Paid image models, tried in order after `AI_IMAGE_MODEL`, cheapest first:
- * a 1K picture is $0.034, $0.039 and $0.067 (see pricing.ts).
- */
 export const IMAGE_MODELS = [
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
   "gemini-3.1-flash-image",
 ];
-/**
- * Image models that draw at a chosen size, and the size for a single picture:
- * it is shrunk to a tile anyway, and a smaller picture costs less. Sprite
- * sheets hold several poses, so they keep the default size.
- */
 export const SIZED_IMAGE_MODELS = ["gemini-3.1-flash-image"];
 export const SMALL_IMAGE_SIZE = "512";
-/**
- * The largest tile area (longest side) drawn at SMALL_IMAGE_SIZE. A bigger
- * area needs the default size: at 512 the model's own pixels are too few
- * and too fine to give it back cleanly, and the art comes out smeared.
- */
 export const SMALL_IMAGE_MAX_SIDE = 64;
 
-/** How many recent messages the AI sees, so it follows the conversation. */
 export const MAX_HISTORY = 12;
-/** How many of them the placement planner sees, to know what was drawn. */
 export const PLACEMENT_HISTORY = 6;
 
-/**
- * Pictures the user attaches to a message, to draw from: how many at most,
- * and how the router hears of them (it gets only text).
- */
 export const MAX_REFERENCES = 3;
 export const REFERENCES_NOTE = "[reference pictures attached]";
 
@@ -112,13 +77,10 @@ A message ending in ${REFERENCES_NOTE} came with pictures to draw from
 them is generate, and subject says what to take from them ("the fox from the
 reference picture", "a knight in the style of the reference picture").`;
 
-/** For plain conversation, so the model answers in words, not fake tool calls. */
 export const CHAT_PROMPT =
   "You are the assistant of Pigxel, a pixel art editor. Answer briefly in plain " +
   "text, in the user's language. Never write JSON or pretend to call tools.";
 
-/** Appended to every generation prompt so the model draws a clean sprite. */
-/** Keeps the background cut-out-able; shared by new pictures and redraws. */
 export const IMAGE_BACKGROUND_RULES = [
   `The background is one solid flat ${CHROMA_KEY_HEX} magenta colour — no gradient, no pattern, no checkerboard.`,
   `The subject itself contains no ${CHROMA_KEY_HEX} magenta.`,
@@ -127,7 +89,6 @@ export const IMAGE_BACKGROUND_RULES = [
   "No text, no watermark, no border, no extra objects.",
 ];
 
-/** Added to a generation prompt when the user attached pictures to draw from. */
 export const REFERENCE_RULES =
   "Use the attached picture(s) as reference for what the subject looks like " +
   "(design, shapes, colours, proportions), redrawn in the pixel art style " +
@@ -142,7 +103,6 @@ export const IMAGE_STYLE_RULES = [
   ...IMAGE_BACKGROUND_RULES,
 ];
 
-/** Frame shapes the image model accepts, as width:height. */
 export const ASPECT_RATIOS = [
   "1:1",
   "2:3",
@@ -155,8 +115,6 @@ export const ASPECT_RATIOS = [
   "16:9",
   "21:9",
 ];
-
-// ── Precise edits: the model answers with operations (see lib/edit) ─────────
 
 export const EDIT_CRAFT_RULES = `Palette: 3-4 steps per material (outline darkest, shadow, base, highlight);
 shift hue too, shadows toward blue/purple, highlights toward yellow/orange.
@@ -171,8 +129,6 @@ export const EDIT_RESPONSE_RULES = [
   "Stay inside SIZE. Check the rulers before writing coordinates.",
   "Write summary as one short sentence in the language of the request.",
 ];
-
-// ── Planning an edit ────────────────────────────────────────────────────────
 
 export const PLAN_RULES = `Decide how to carry out the edit.
 
@@ -212,8 +168,6 @@ request, used when the target differs from the object: say what you are
 about to do (e.g. shrink the beaver to about half) and ask them to move or
 resize the highlighted frame on the tile if needed, then press "Generate here".`;
 
-// ── Placing new pictures on a tile that has drawings ───────────────────────
-
 export const PLACEMENT_RULES = `Decide where the new picture(s) go on the tile.
 
 copyOf: when the user asks for more of something already drawn ("5 more
@@ -236,12 +190,8 @@ user chooses; otherwise false.
 question: when ask is true, one short sentence in the language of the request
 asking how to add it; otherwise empty.`;
 
-// ── Animations ──────────────────────────────────────────────────────────────
-
-/** Most different things one message may ask to draw at once (one picture). */
 export const MAX_SET_ITEMS = 6;
 
-/** Most frames an animation may have. */
 export const MAX_FRAMES = 12;
 
 export const ANIMATION_RULES = `Plan a short pixel art animation for the request.
@@ -285,10 +235,6 @@ ends where it can start again.
 
 summary: one or two short sentences for the user, in the language of the
 request, saying what the animation will show.`;
-
-// ── Checks ─────────────────────────────────────────────────────────────────
-// A finished edit is looked at once (text model) before it is applied; what
-// is found is fixed once, and the fix is not checked again.
 
 export const EDIT_REVIEW_RULES = `Picture 1 is a pixel art layer before an edit,
 picture 2 the same area after it (enlarged; light grey means empty).

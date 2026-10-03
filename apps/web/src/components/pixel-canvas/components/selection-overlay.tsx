@@ -1,4 +1,3 @@
-/** Dims the page while the user picks an area on the canvas. */
 export function SelectionOverlay({ onCancel }: { onCancel: () => void }) {
   return (
     <div

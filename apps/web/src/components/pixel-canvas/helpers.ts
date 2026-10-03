@@ -20,13 +20,11 @@ export function sameSize(a: Size, b: Size) {
   return a.w === b.w && a.h === b.h;
 }
 
-/** The tile pixel under the pointer, whatever the zoom. */
 export function pixelAt(e: PointerEvent<HTMLCanvasElement>): Point {
   return pixelUnder(e.currentTarget, e.clientX, e.clientY);
 }
 
-/** The pixel of `canvas` at a point on screen; outside it, past its edges. */
-export function pixelUnder(
+function pixelUnder(
   canvas: HTMLCanvasElement,
   clientX: number,
   clientY: number,
@@ -38,11 +36,6 @@ export function pixelUnder(
   };
 }
 
-/**
- * The pixels a pointer passed through since its last event, oldest first:
- * the browser batches fast movements into one event, and a curve drawn
- * through all of them stays round instead of turning into straight cuts.
- */
 export function pixelsPassed(
   e: globalThis.PointerEvent,
   canvas: HTMLCanvasElement,
@@ -53,7 +46,6 @@ export function pixelsPassed(
   );
 }
 
-/** The tile size a resize handle points at after moving to the pointer. */
 export function resizeTo(
   drag: ResizeDrag,
   e: PointerEvent<HTMLElement>,
@@ -76,7 +68,6 @@ export function resizeTo(
   };
 }
 
-/** The rectangle spanned by two corner pixels, clipped to the tile. */
 export function areaBetween(a: Point, b: Point, size: Size): Area {
   const clampX = (v: number) => Math.max(0, Math.min(size.w - 1, v));
   const clampY = (v: number) => Math.max(0, Math.min(size.h - 1, v));
@@ -87,7 +78,6 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
-/** The box with corners `a` and `b`, not clamped to the tile. */
 export function boxBetween(a: Point, b: Point): Area {
   return {
     x: Math.min(a.x, b.x),
@@ -97,7 +87,6 @@ export function boxBetween(a: Point, b: Point): Area {
   };
 }
 
-/** True when every pixel is transparent. */
 export function isBlank(image: ImageData): boolean {
   for (let i = 3; i < image.data.length; i += 4) {
     if (image.data[i] !== 0) return false;
@@ -105,13 +94,8 @@ export function isBlank(image: ImageData): boolean {
   return true;
 }
 
-/**
- * The fully transparent rectangle with the biggest square inside it, or null
- * when none is at least `MIN_PLACEMENT_SIDE` on both sides.
- */
 export function largestEmptyArea(image: ImageData): Area | null {
   const { width: w, height: h, data } = image;
-  // Per column: how many transparent pixels are stacked up to the current row.
   const heights = new Array<number>(w + 1).fill(0);
   let best: Area | null = null;
   const score = (a: Area) => Math.min(a.w, a.h) * 1e6 + a.w * a.h;
@@ -120,7 +104,6 @@ export function largestEmptyArea(image: ImageData): Area | null {
     for (let x = 0; x < w; x++) {
       heights[x] = data[(y * w + x) * 4 + 3] === 0 ? (heights[x] ?? 0) + 1 : 0;
     }
-    // Largest rectangles under the histogram of `heights`.
     const stack: number[] = [];
     for (let x = 0; x <= w; x++) {
       const current = heights[x] ?? 0;
@@ -140,11 +123,6 @@ export function largestEmptyArea(image: ImageData): Area | null {
     : null;
 }
 
-/**
- * A canvas showing `pixels` (RGBA of `size`). Its context is set up for
- * frequent reads, since layers are read back by tools and the AI all the time;
- * the first `getContext` call decides that, so every caller asks the same way.
- */
 export function canvasOf(pixels: Uint8ClampedArray, size: Size) {
   const canvas = document.createElement("canvas");
   canvas.width = size.w;
@@ -159,14 +137,9 @@ export function canvasOf(pixels: Uint8ClampedArray, size: Size) {
   return canvas;
 }
 
-/**
- * An enlarged PNG of the tile (or an `area` of it) on a flat background, for
- * the AI to look at or redraw.
- */
 export function tileSnapshot(
   canvas: HTMLCanvasElement,
   area: Area = { x: 0, y: 0, w: canvas.width, h: canvas.height },
-  /** Null keeps the background transparent. */
   background: string | null = SNAPSHOT_BACKGROUND,
 ): string {
   const k = Math.max(1, Math.floor(SNAPSHOT_SIDE / Math.max(area.w, area.h)));
@@ -194,10 +167,6 @@ export function tileSnapshot(
   return out.toDataURL("image/png");
 }
 
-/**
- * Grows `area` around its centre to at least `MIN_PLACEMENT_SIDE` a side
- * (or the whole tile, if that is smaller), keeping it inside the tile.
- */
 export function atLeastPlacementSize(area: Area, tile: Size): Area {
   const grow = (pos: number, len: number, max: number) => {
     const next = Math.min(max, Math.max(len, MIN_PLACEMENT_SIDE));
@@ -209,10 +178,6 @@ export function atLeastPlacementSize(area: Area, tile: Size): Area {
   return { x, y, w, h };
 }
 
-/**
- * `start` with the dragged `edges` moved by `dx × dy` tile pixels, kept inside
- * the tile and no smaller than `minSide` (or the tile).
- */
 export function adjustFrame(
   start: Area,
   edges: FrameEdges,

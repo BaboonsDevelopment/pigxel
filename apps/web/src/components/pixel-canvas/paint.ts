@@ -1,32 +1,22 @@
 import type { Size } from "./constants";
 import type { Point, TipRect } from "./pen";
 
-/** Which mirror copies a stroke also paints, across the tile's middle. */
 export type Symmetry = "none" | "horizontal" | "vertical" | "both";
 
-/** Which edges the tile wraps around, so it repeats seamlessly (Aseprite's tiled mode). */
 export type TiledMode = "none" | "x" | "y" | "both";
 
-/** An RGBA colour; alpha 0 erases to transparency. */
 export type Rgba = readonly [number, number, number, number];
 
-/**
- * What a painted pixel becomes: a colour, or a colour worked out from the
- * pixel (by its index on the tile), e.g. shading; null leaves it alone.
- */
 export type Ink = Rgba | ((index: number) => Rgba | null);
 
 export type PaintOptions = {
   size: Size;
   symmetry: Symmetry;
   tiled: TiledMode;
-  /** One byte per tile pixel; when given, only pixels set here change. */
   mask: Uint8Array | null;
-  /** How much of the area is painted, in % (100 when missing); less makes an ordered dither. */
   density?: number;
 };
 
-/** The 4×4 ordered (Bayer) dither: a pixel is painted when its value is under density × 16. */
 const BAYER = [
   [0, 8, 2, 10],
   [12, 4, 14, 6],
@@ -34,18 +24,14 @@ const BAYER = [
   [15, 7, 13, 5],
 ];
 
-/** Whether a dither of `density` % paints the tile pixel (x, y). */
 export function inPattern(x: number, y: number, density = 100) {
   return density >= 100 || BAYER[y & 3]![x & 3]! < (density / 100) * 16;
 }
 
-/** How the gradient tool spreads its colours: along the line, or out from its start. */
 export type GradientShape = "linear" | "radial";
 
-/** How the gradient tool blends: mixed colours, or an ordered dither of the two. */
 export type GradientDither = "none" | "bayer4" | "bayer8";
 
-/** The 8×8 Bayer matrix, built from the 4×4 one: values 0–63. */
 function bayer8(x: number, y: number) {
   const corner = [
     [0, 2],
@@ -54,7 +40,6 @@ function bayer8(x: number, y: number) {
   return 4 * BAYER[y & 3]![x & 3]! + corner;
 }
 
-/** How far (0–1) the pixel (x, y) is along a gradient dragged from `from` to `to`. */
 export function gradientAt(
   x: number,
   y: number,
@@ -73,11 +58,6 @@ export function gradientAt(
   return length ? clamp(((x - from.x) * dx + (y - from.y) * dy) / length) : 0;
 }
 
-/**
- * Fills `data` (RGBA of the whole tile), or the masked part of it, with a
- * gradient from `start` at `from` to `end` at `to`. A dither keeps to the
- * two colours; without one they are mixed, which makes new shades.
- */
 export function paintGradient(
   data: Uint8ClampedArray,
   from: Point,
@@ -111,10 +91,6 @@ export function paintGradient(
 
 const mod = (value: number, n: number) => ((value % n) + n) % n;
 
-/**
- * Where a tile pixel lands, or null when it falls off the tile: off-tile
- * pixels wrap around in tiled mode and are dropped otherwise.
- */
 export function wrapPixel(
   x: number,
   y: number,
@@ -129,7 +105,6 @@ export function wrapPixel(
   return { x: px, y: py };
 }
 
-/** `point` and its mirror copies for `symmetry`, around the tile's middle. */
 export function mirrored(point: Point, size: Size, symmetry: Symmetry) {
   const out = [point];
   const mx = size.w - 1 - point.x;
@@ -142,11 +117,7 @@ export function mirrored(point: Point, size: Size, symmetry: Symmetry) {
   return out;
 }
 
-/**
- * Sets one pixel of `data` (RGBA of the whole tile) and its mirror copies,
- * wrapping or clipping at the edges and skipping pixels outside the mask.
- */
-export function plot(
+function plot(
   data: Uint8ClampedArray,
   point: Point,
   ink: Ink,
@@ -163,10 +134,6 @@ export function plot(
   }
 }
 
-/**
- * Stamps a brush tip (see brushTip) at every point. `origin` turns a point
- * into the tip's top-left pixel, e.g. centring a square tip on it.
- */
 export function paintPoints(
   data: Uint8ClampedArray,
   points: Point[],
@@ -184,13 +151,8 @@ export function paintPoints(
   }
 }
 
-/** A picture used as the brush: RGBA of w × h, painted where it isn't transparent. */
 export type Stamp = { w: number; h: number; pixels: Uint8ClampedArray };
 
-/**
- * Stamps a picture brush centred on every point: in its own colours, or
- * as a silhouette in `solid`.
- */
 export function paintStamp(
   data: Uint8ClampedArray,
   points: Point[],
@@ -215,10 +177,8 @@ export function paintStamp(
       }
 }
 
-/** How a colour meets the pixel under it (Aseprite's inks, shading aside). */
 export type BlendMode = "simple" | "alpha" | "copy" | "lockAlpha";
 
-/** `top` laid over `under` as glass: the usual "source over" blend. */
 function over(top: Rgba, under: Rgba): Rgba {
   const a = top[3] / 255;
   const b = (under[3] / 255) * (1 - a);
@@ -228,14 +188,6 @@ function over(top: Rgba, under: Rgba): Rgba {
   return [mix(0), mix(1), mix(2), Math.round(out * 255)];
 }
 
-/**
- * Paints `rgba` (alpha is the stroke's opacity) by `mode`, reading each pixel
- * from `before`, so a stroke changes a pixel once however often it passes:
- * "simple" lays a see-through colour over drawn pixels but puts it as it is
- * on empty ones; "alpha" always lays it over; "copy" puts it as it is,
- * transparency included; "lockAlpha" colours only drawn pixels, keeping how
- * opaque each is.
- */
 export function blendInk(
   before: Uint8ClampedArray,
   rgba: Rgba,
@@ -259,12 +211,6 @@ export function blendInk(
   };
 }
 
-/**
- * Blur ink: each pixel becomes the average of itself and its neighbours
- * (3×3, inside the tile) in `before`, so a stroke blurs each pixel once.
- * Colours are weighted by alpha, so transparent pixels soften an edge's
- * opacity without darkening its colour. Fully transparent areas stay as they are.
- */
 export function blurInk(before: Uint8ClampedArray, size: Size): Ink {
   return (i) => {
     const x = i % size.w;
@@ -293,12 +239,6 @@ export function blurInk(before: Uint8ClampedArray, size: Size): Ink {
   };
 }
 
-/**
- * Jumble ink: each pixel takes the colour `before` had at a random spot up
- * to 2 pixels away (inside the tile), so edges get ragged without any new
- * colours. The spot is fixed by `seed` and the pixel, so redrawing the stroke
- * picks the same one; a new stroke with a new seed jumbles further.
- */
 export function jumbleInk(
   before: Uint8ClampedArray,
   size: Size,
@@ -319,12 +259,6 @@ export function jumbleInk(
   };
 }
 
-/**
- * Shading ink (as in Aseprite): each pixel whose colour is in the palette
- * moves one step along it (`step` +1 towards the end, −1 towards the start);
- * other pixels stay as they are. Reads `before`, so a pixel shades once per
- * stroke however often the stroke passes over it.
- */
 export function shadingInk(
   before: Uint8ClampedArray,
   palette: string[],
@@ -344,7 +278,6 @@ export function shadingInk(
   };
 }
 
-/** `#rrggbb` as an opaque RGBA colour. */
 export function rgbaOf(hex: string): Rgba {
   const v = hex.replace("#", "");
   return [

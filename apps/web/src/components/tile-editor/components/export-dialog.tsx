@@ -35,7 +35,6 @@ import { isSquare, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import { saveExport } from "@/lib/export/save";
 import { frameIndex } from "@/lib/sprite/frames";
 
-/** Saves the tile as a PNG, JPEG, GIF or sprite sheet, at a chosen scale. */
 export default function ExportDialog({
   source: tile,
   pixelRatio,
@@ -44,9 +43,7 @@ export default function ExportDialog({
   onClose,
 }: {
   source: ExportSource;
-  /** The shape of the tile's pixels; wide or tall ones can be stretched. */
   pixelRatio?: PixelRatio;
-  /** Kept by the editor, so the dialog opens with the last choices. */
   settings: ExportSettings;
   onChange: (settings: ExportSettings) => void;
   onClose: () => void;
@@ -73,7 +70,6 @@ export default function ExportDialog({
   const run = async () => {
     setBusy(true);
     setError(null);
-    // Lets "Exporting…" show before a big GIF keeps the page busy.
     await new Promise((resolve) => setTimeout(resolve));
     try {
       await saveExport(exportFiles(source, settings));

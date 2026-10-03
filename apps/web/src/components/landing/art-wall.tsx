@@ -3,7 +3,6 @@ import type { CSSProperties } from "react";
 import { WALL_COLUMNS, type Art } from "./art";
 import styles from "./landing.module.css";
 
-/** Seconds each column takes to loop once; uneven so the wall never syncs. */
 const SPEEDS = [46, 58, 40, 52, 44, 62];
 
 function WallCard({ art }: { art: Art }) {
@@ -21,11 +20,6 @@ function WallCard({ art }: { art: Art }) {
   );
 }
 
-/**
- * The hero's tilted wall of art: columns drifting up and down at their own
- * pace, the way Mobbin shows its library. Pure CSS: it pauses on hover and
- * holds still for people who prefer reduced motion. Decorative only.
- */
 export function ArtWall() {
   return (
     <div className={styles.wall} aria-hidden="true">
@@ -37,7 +31,6 @@ export function ArtWall() {
             data-direction={index % 2 ? "down" : "up"}
             style={{ "--speed": `${SPEEDS[index]}s` } as CSSProperties}
           >
-            {/* Two copies, so the loop joins without a seam. */}
             {[...column, ...column].map((art, card) => (
               <WallCard key={card} art={art} />
             ))}

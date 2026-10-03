@@ -19,33 +19,20 @@ import {
 import { encodeGif } from "./gif";
 import { buildSheet, sheetData, sheetSize } from "./sheet";
 
-/** What an export is made from: the tile as the editor has it. */
 export type ExportSource = {
-  /** The tile's name, which the files are named after. */
   name: string;
   size: Size;
   frames: Frame[];
-  /** The frame on screen, which PNG and JPEG export. */
   frameId: string;
   background: Background;
-  /** A frame's layers combined as they are exported, i.e. without references. */
   picture: (frameId: string) => Uint8ClampedArray;
-  /** Named parts of the tile: exported one by one, and listed in sheet data. */
   slices: Slice[];
 };
 
-/**
- * A file to save. A picture still has to be encoded as `mime` (PNG or JPEG),
- * which takes a browser; the rest are ready.
- */
 export type ExportFile = { name: string; mime: string } & (
   { image: Bitmap } | { data: Uint8Array<ArrayBuffer> | string }
 );
 
-/**
- * The tile with its pixels stretched to `ratio`: 2:1 pixels become two
- * square ones side by side, so the files look as the editor shows them.
- */
 export function stretchedSource(
   source: ExportSource,
   ratio: PixelRatio,
@@ -71,7 +58,6 @@ export const clampScale = (scale: number) =>
     Math.max(MIN_EXPORT_SCALE, Math.round(scale) || MIN_EXPORT_SCALE),
   );
 
-/** The parts of the tile each slice covers, those off the tile left out. */
 function slicesOnTile(slices: Slice[], tile: Size) {
   return slices.flatMap((slice) => {
     const area = clipToTile(slice.bounds, tile.w, tile.h);
@@ -79,10 +65,6 @@ function slicesOnTile(slices: Slice[], tile: Size) {
   });
 }
 
-/**
- * The size of the picture an export makes: one frame, the whole sheet, or
- * the biggest slice.
- */
 export function exportSize(
   settings: ExportSettings,
   tile: Size,
@@ -103,11 +85,9 @@ export function exportSize(
   return frame;
 }
 
-/** Whether a browser can draw a picture this big. */
 export const fitsCanvas = ({ w, h }: Size) =>
   w <= MAX_EXPORT_SIDE && h <= MAX_EXPORT_SIDE;
 
-/** `rgba` flattened onto a solid `#rrggbb` colour, for formats without transparency. */
 export function onColor(rgba: Uint8ClampedArray, hex: string) {
   const bg = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16));
   const out = new Uint8ClampedArray(rgba.length);
@@ -120,7 +100,6 @@ export function onColor(rgba: Uint8ClampedArray, hex: string) {
   return out;
 }
 
-/** The files an export saves: the picture, and for a sheet its JSON if asked. */
 export function exportFiles(
   source: ExportSource,
   settings: ExportSettings,
@@ -161,7 +140,6 @@ export function exportFiles(
         const from = ((area.y + y) * tile.w + area.x) * 4;
         rgba.set(picture.subarray(from, from + area.w * 4), y * area.w * 4);
       }
-      // Slices with the same name get a number, so no file replaces another.
       const own = safeFileBase(slice.name);
       let name = own;
       for (let n = 2; used.has(name.toLowerCase()); n++) name = `${own} ${n}`;

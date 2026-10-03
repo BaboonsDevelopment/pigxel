@@ -6,10 +6,6 @@ import { Checkbox } from "@pigxel/ui/components/choice";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import { TOOL_GROUPS, toolById } from "../tools";
 
-/**
- * Which tools the tool panel shows, by group. A tool left out keeps its
- * shortcut; a group with none left disappears from the panel.
- */
 export default function CustomizeToolsDialog({
   hiddenTools,
   onChange,

@@ -7,11 +7,6 @@ import type { PenSettings } from "@/components/pixel-canvas/pen";
 import { ColorPicker } from "./color-picker";
 import { swatchProps, withColor } from "./helpers";
 
-/**
- * The colours to paint with: the primary and secondary colour (left and
- * right button) with a swap, a picker always open for the one picked
- * (click a colour square to edit it), and the colours used lately.
- */
 export function ColorsPanel({
   pen,
   onChange,
@@ -91,7 +86,6 @@ function ColorWell({
 }: {
   label: string;
   color: string;
-  /** The picker edits this colour. */
   active: boolean;
   onClick: () => void;
   className: string;

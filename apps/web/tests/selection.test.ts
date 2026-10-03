@@ -32,7 +32,6 @@ import {
 const size = { w: 4, h: 3 };
 const RED = [255, 0, 0, 255] as const;
 
-/** The mask as rows of "#" (selected) and "." for easy reading. */
 const rows = (mask: Uint8Array | null, w = size.w) =>
   mask
     ? Array.from({ length: mask.length / w }, (_, y) =>
@@ -40,7 +39,6 @@ const rows = (mask: Uint8Array | null, w = size.w) =>
       )
     : null;
 
-/** Which pixels of an RGBA buffer are painted, as rows. */
 const painted = (data: Uint8ClampedArray, w = size.w) =>
   Array.from({ length: data.length / 4 / w }, (_, y) =>
     Array.from({ length: w }, (_, x) =>
@@ -185,7 +183,6 @@ describe("selections", () => {
 });
 
 describe("floating pixels", () => {
-  // A 3×2 cel: a red pixel at (0, 0) and (1, 0).
   const small = { w: 3, h: 2 };
   const cel = new Uint8ClampedArray(small.w * small.h * 4);
   cel.set(RED, 0);
@@ -219,7 +216,6 @@ describe("floating pixels", () => {
       2, 0, 0, 255, 1, 0, 0, 255,
     ]);
     const turned = rotateFloating(piece, true);
-    // Standing up around its middle, it reaches one pixel higher.
     expect(turned).toMatchObject({ w: 1, h: 2, x: 0, y: -1 });
     expect([...turned.pixels]).toEqual([1, 0, 0, 255, 2, 0, 0, 255]);
     expect([...rotateFloating(piece, false).pixels]).toEqual([

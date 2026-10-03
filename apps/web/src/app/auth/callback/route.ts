@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
       if (!error && data.session) {
         const next = safeNext(request.nextUrl.searchParams.get("next"));
         const refreshToken = data.session.provider_refresh_token;
-        // Google sign-in or linking: keep Drive access for this person.
         if (refreshToken && !viaApple && isDriveAvailable()) {
           const google = data.session.user.identities?.find(
             (identity) => identity.provider === "google",
@@ -45,11 +44,8 @@ export async function GET(request: NextRequest) {
           headers: { "Cache-Control": "private, no-store" },
         });
       }
-    } catch {
-      /* Verification failures return to login without exposing tokens. */
-    }
+    } catch {}
   }
-  // Google or Apple sign-in or linking that was cancelled or refused there.
   if (request.nextUrl.searchParams.has("error") && isSupabaseConfigured()) {
     const supabase = await createClient();
     const {

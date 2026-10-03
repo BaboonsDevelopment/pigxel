@@ -21,7 +21,6 @@ import { NumberField } from "./number-field";
 
 type Size = { w: number; h: number };
 
-/** The largest the preview is drawn, in screen pixels. */
 const PREVIEW = { w: 320, h: 160 };
 
 const METHOD_HINTS: Record<ScaleMethod, string> = {
@@ -31,11 +30,6 @@ const METHOD_HINTS: Record<ScaleMethod, string> = {
     "Keeps pixel art crisp at any size, smoothing jagged diagonals. Best for 1.5× and the like.",
 };
 
-/**
- * Sprite size, as Aseprite's: scales the whole tile (every layer and frame)
- * to a new size, in pixels or percent, by the method picked. Unlike Canvas
- * size, the drawing itself gets bigger or smaller.
- */
 export default function SpriteSizeDialog({
   size,
   picture,
@@ -43,7 +37,6 @@ export default function SpriteSizeDialog({
   onClose,
 }: {
   size: Size;
-  /** The current frame, for the preview. */
   picture: Uint8ClampedArray;
   onApply: (next: Size, method: ScaleMethod) => void;
   onClose: () => void;

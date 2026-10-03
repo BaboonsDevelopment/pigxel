@@ -17,12 +17,6 @@ import {
   UserIcon,
 } from "./icons";
 
-/**
- * The account at the bottom of the sidebar. A click opens a card with who
- * is signed in and Profile, Settings, Upgrade plan, Bugs & feature requests
- * and Sign out: beside the sidebar on wide screens, above the account in the
- * phone menu.
- */
 export function AccountMenu({
   profile,
   onNavigate,

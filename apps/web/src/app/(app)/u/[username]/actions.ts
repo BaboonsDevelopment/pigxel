@@ -13,7 +13,6 @@ const done = (): Result => {
   return {};
 };
 
-/** Publishes one of your own tiles on your profile, or makes it private again. */
 export async function setTileVisibility(
   tileId: string,
   visibility: Visibility,
@@ -35,7 +34,6 @@ export async function setTileVisibility(
   return done();
 }
 
-/** Pins a tile after the others already pinned, or unpins it. */
 export async function setTilePinned(
   tileId: string,
   pinned: boolean,
@@ -74,7 +72,6 @@ export async function setTilePinned(
   return done();
 }
 
-/** Follows an artist, or stops following them. */
 export async function setFollowing(
   profileId: string,
   following: boolean,

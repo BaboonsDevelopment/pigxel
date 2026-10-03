@@ -1,6 +1,5 @@
 import { TIERS, type BillingCycle, type Tier } from "@/lib/pricing";
 
-/** A Paddle subscription as the webhook stores it (see the migration). */
 export type SubscriptionRecord = {
   id: string;
   userId: string;
@@ -12,7 +11,6 @@ export type SubscriptionRecord = {
   eventAt: string;
 };
 
-/** The parts of a Paddle subscription event the webhook reads. */
 export type SubscriptionEvent = {
   occurredAt: string;
   data: {
@@ -28,11 +26,6 @@ export type SubscriptionEvent = {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/**
- * The row to store for a Paddle subscription event, or null when it can't
- * be tied to a Pigxel account: checkout passes `customData.userId` only for
- * signed-in buyers.
- */
 export function subscriptionRecord(
   event: SubscriptionEvent,
 ): SubscriptionRecord | null {
@@ -55,7 +48,6 @@ export function subscriptionRecord(
   };
 }
 
-/** Statuses that keep a paid plan; past due keeps it while Paddle retries. */
 const PAID = new Set<SubscriptionRecord["status"]>([
   "active",
   "trialing",
@@ -72,7 +64,6 @@ export type CurrentPlan =
       cancelsAt: string | null;
     };
 
-/** The plan a person is on, from their subscriptions; Free without a paid one. */
 export function currentPlan(subscriptions: SubscriptionRecord[]): CurrentPlan {
   const latest = subscriptions
     .filter((sub) => PAID.has(sub.status))

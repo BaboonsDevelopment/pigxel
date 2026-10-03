@@ -1,12 +1,3 @@
-/**
- * Colour modes, as Aseprite's Sprite › Color Mode:
- * - rgb: any colour.
- * - indexed: only the palette's colours. Every pixel is one of them, so
- *   changing a palette colour changes it everywhere on the tile.
- * - grayscale: only greys.
- * Pixels are kept as colours either way; in indexed and grayscale modes
- * anything drawn is brought into the mode when the change finishes.
- */
 export type ColorMode = "rgb" | "indexed" | "grayscale";
 
 export const COLOR_MODES: { value: ColorMode; label: string }[] = [
@@ -30,13 +21,6 @@ const rgbOf = (hex: string): Rgb => {
   ];
 };
 
-/**
- * `rgba` with every pixel brought into `mode`, or null when nothing changes.
- * Indexed: each pixel becomes the nearest palette colour (fully opaque, or
- * clear when more than half see-through); `recolor` first turns given
- * colours into others, e.g. a palette colour that was changed. Grayscale:
- * each pixel becomes the grey of its brightness.
- */
 export function inColorMode(
   rgba: Uint8ClampedArray,
   mode: ColorMode,
@@ -73,7 +57,6 @@ export function inColorMode(
   const swaps = new Map(
     [...(recolor ?? [])].map(([from, to]) => [packed(rgbOf(from)), rgbOf(to)]),
   );
-  // Many pixels share a colour: each is matched once.
   const nearest = new Map<number, Rgb>();
   for (let i = 0; i < out.length; i += 4) {
     if (out[i + 3]! < 128) {
@@ -97,7 +80,6 @@ function nearestColor(c: Rgb, colors: Rgb[]): Rgb {
   let best = colors[0]!;
   let bestDistance = Infinity;
   for (const p of colors) {
-    // Weighted by how strongly the eye sees each channel.
     const d =
       2 * (c[0] - p[0]) ** 2 + 4 * (c[1] - p[1]) ** 2 + 3 * (c[2] - p[2]) ** 2;
     if (d < bestDistance) {
@@ -108,11 +90,6 @@ function nearestColor(c: Rgb, colors: Rgb[]): Rgb {
   return best;
 }
 
-/**
- * For a palette loaded over another on an indexed tile: each old colour
- * turns into the new colour in its place, as Aseprite does, so a night
- * palette of the same layout turns a day tile into night.
- */
 export function recolorByPlace(
   before: string[],
   after: string[],

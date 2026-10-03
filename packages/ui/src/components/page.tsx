@@ -1,11 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
-/**
- * The <main> of a signed-in page, with the shared width and padding (little
- * at the top on wide screens, where it sits right under the top bar):
- * "wide" for galleries and lists, "narrow" for forms and settings.
- */
 export function Page({
   width = "wide",
   className,

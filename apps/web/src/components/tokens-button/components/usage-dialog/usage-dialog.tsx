@@ -11,7 +11,6 @@ type Usage = {
   actions: UsageAction[];
 };
 
-/** The AI tokens left, and what each action took. */
 export function UsageDialog({ onClose }: { onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -31,7 +30,6 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
       ref={dialog}
       onClose={onClose}
       onClick={(e) => {
-        // A click on the dimmed backdrop closes it.
         if (e.target === dialog.current) dialog.current.close();
       }}
       aria-labelledby="usage-dialog-title"
@@ -90,7 +88,6 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** What is left of the allowance: the number, and a bar. */
 function Balance({ limit, left }: { limit: number; left: number }) {
   const share = limit ? left / limit : 0;
   return (

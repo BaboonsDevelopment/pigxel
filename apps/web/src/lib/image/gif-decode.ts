@@ -1,16 +1,9 @@
-/** One picture of an animation: the whole frame as RGBA, and how long it shows. */
 export type DecodedFrame = { rgba: Uint8ClampedArray; duration: number };
 
 export type DecodedAnimation = { w: number; h: number; frames: DecodedFrame[] };
 
-/** What browsers show a frame for when the file asks for less than 20 ms. */
 const SHORT_DELAY_MS = 100;
 
-/**
- * Reads every frame of a GIF, each drawn over the ones before as the file
- * says (its disposal method), so each is the full picture a viewer shows.
- * Throws on a file that isn't a GIF.
- */
 export function decodeGif(bytes: Uint8Array): DecodedAnimation {
   let pos = 0;
   const u8 = () => {
@@ -45,7 +38,7 @@ export function decodeGif(bytes: Uint8Array): DecodedAnimation {
   const w = u16();
   const h = u16();
   const packed = u8();
-  pos += 2; // background colour, pixel aspect ratio
+  pos += 2;
   const global = packed & 0x80 ? colorTable(2 << (packed & 7)) : null;
 
   const screen = new Uint8ClampedArray(w * h * 4);
@@ -60,11 +53,11 @@ export function decodeGif(bytes: Uint8Array): DecodedAnimation {
     if (kind === 0x21) {
       const label = u8();
       if (label === 0xf9) {
-        u8(); // block size
+        u8();
         const flags = u8();
         delay = u16();
         const index = u8();
-        u8(); // terminator
+        u8();
         disposal = (flags >> 2) & 7;
         transparent = flags & 1 ? index : -1;
       } else subBlocks();
@@ -83,7 +76,6 @@ export function decodeGif(bytes: Uint8Array): DecodedAnimation {
     const minCode = u8();
     const indices = lzw(subBlocks(), minCode, fw * fh);
 
-    // "Restore to previous" puts back what was there before this frame.
     const previous = disposal === 3 ? new Uint8ClampedArray(screen) : null;
     const rows = interlaced ? interlacedRows(fh) : null;
     for (let i = 0; i < fw * fh; i++) {
@@ -120,7 +112,6 @@ export function decodeGif(bytes: Uint8Array): DecodedAnimation {
   return { w, h, frames };
 }
 
-/** Which picture row each stored row of an interlaced GIF is. */
 function interlacedRows(h: number) {
   const rows: number[] = [];
   for (const [start, step] of [
@@ -133,7 +124,6 @@ function interlacedRows(h: number) {
   return rows;
 }
 
-/** GIF's variable-width LZW: the colour index of each pixel, `count` of them. */
 function lzw(data: Uint8Array, minCode: number, count: number): Uint8Array {
   const out = new Uint8Array(count);
   const clear = 1 << minCode;
@@ -163,7 +153,6 @@ function lzw(data: Uint8Array, minCode: number, count: number): Uint8Array {
       continue;
     }
     if (code === end) break;
-    // A code not in the table yet is the previous string plus its own first byte.
     const known = code < next;
     const entry = known ? code : prev;
     if (entry < 0) break;
@@ -177,7 +166,6 @@ function lzw(data: Uint8Array, minCode: number, count: number): Uint8Array {
       if (written < count) out[written] = first;
       written++;
     }
-    // Each code after the first adds the previous string plus this one's first byte.
     if (prev >= 0 && next < 4096) {
       prefix[next] = prev;
       suffix[next] = first;

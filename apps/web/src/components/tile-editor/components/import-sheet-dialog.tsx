@@ -17,7 +17,6 @@ import {
 } from "@/lib/pigxel-file/import-sheet";
 import { MAX_FRAME_DURATION, MIN_FRAME_DURATION } from "@/lib/sprite/constants";
 
-/** The largest the preview of the sheet is drawn, in screen pixels. */
 const PREVIEW = { w: 480, h: 240 };
 
 const FIELDS: { key: keyof SheetGrid; label: string; min: number }[] = [
@@ -29,10 +28,6 @@ const FIELDS: { key: keyof SheetGrid; label: string; min: number }[] = [
   { key: "gapY", label: "Gap Y", min: 0 },
 ];
 
-/**
- * Cuts a sprite sheet into the frames of a new tile: the grid (frame size,
- * offset, gaps) is guessed, shown over the picture and can be changed.
- */
 export default function ImportSheetDialog({
   name,
   picture,
@@ -40,10 +35,8 @@ export default function ImportSheetDialog({
   onImport,
   onClose,
 }: {
-  /** The sheet's file name, without its extension. */
   name: string;
   picture: Picture;
-  /** How much the file was enlarged; the picture is already back at its own size. */
   scale: number;
   onImport: (frames: DecodedAnimation) => void;
   onClose: () => void;
@@ -60,7 +53,6 @@ export default function ImportSheetDialog({
     (cut.frames.length
       ? null
       : "Every frame is empty. Untick “Skip empty frames” to keep them.");
-  // Whole screen pixels per sheet pixel when it fits, smaller for big sheets.
   const fit = Math.min(PREVIEW.w / picture.w, PREVIEW.h / picture.h);
   const zoom = fit >= 1 ? Math.floor(fit) : fit;
 

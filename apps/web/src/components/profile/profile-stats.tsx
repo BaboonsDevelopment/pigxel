@@ -4,7 +4,6 @@ import type { ProfileActivity } from "@/lib/profile/server";
 const DAY = 86_400_000;
 const WEEKS = 53;
 
-/** Background for 0, 1, 2, 3–4 and 5+ arts in a day. */
 const LEVELS = [
   "bg-[#f3e8ee]",
   "bg-[#f6c9d8]",
@@ -24,7 +23,6 @@ const shortDate = (time: number) =>
     timeZone: "UTC",
   });
 
-/** The row under the pinned arts: the activity heatmap and the arts count. */
 export function ProfileStats({
   activity,
   artCount,
@@ -32,7 +30,6 @@ export function ProfileStats({
 }: {
   activity: ProfileActivity;
   artCount: number;
-  /** Shown to the owner, whose count includes private arts. */
   publishedCount?: number;
 }) {
   return (
@@ -72,7 +69,6 @@ function ActivityCard({
 }: {
   activity: ProfileActivity;
 }) {
-  // Columns are weeks from Sunday; the last one ends today.
   const start = today - ((WEEKS - 1) * 7 + new Date(today).getUTCDay()) * DAY;
   const weeks = Array.from({ length: WEEKS }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => start + (w * 7 + d) * DAY),
@@ -85,7 +81,6 @@ function ActivityCard({
     total += arts;
     if (arts > 0) activeDays++;
   }
-  // A streak still counts when today has nothing yet.
   let streak = 0;
   for (
     let t = activity.has(iso(today)) ? today : today - DAY;
@@ -115,7 +110,6 @@ function ActivityCard({
         </p>
       </div>
 
-      {/* Scrolls on narrow screens, starting at the latest weeks. */}
       <div className="mt-5 overflow-x-auto pb-1 [direction:rtl]">
         <div
           role="img"

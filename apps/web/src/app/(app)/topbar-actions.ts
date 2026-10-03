@@ -8,7 +8,6 @@ import {
 } from "@/lib/notifications/server";
 import { search, type SearchResults } from "@/lib/search/server";
 
-/** The bell's list; opening it marks everything as seen. */
 export async function openNotifications(): Promise<AppNotification[]> {
   const user = await requireUser();
   const items = await listNotifications(user.id);

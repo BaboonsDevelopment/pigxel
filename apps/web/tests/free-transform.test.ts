@@ -6,7 +6,6 @@ import {
 } from "@/components/pixel-canvas/free-transform";
 import type { Floating } from "@/components/pixel-canvas/selection";
 
-/** A piece from rows of letters (stored in the red channel) and "." for unselected. */
 function piece(rows: string[], x = 0, y = 0): Floating {
   const w = rows[0]!.length;
   const h = rows.length;
@@ -70,7 +69,6 @@ describe("free transform", () => {
     expect(out.h).toBe(6);
     for (let i = 0; i < out.mask.length; i++)
       if (out.mask[i]) expect(out.pixels[i * 4]).toBe("a".charCodeAt(0));
-    // The corners of a turned square are empty.
     expect(out.mask[0]).toBe(0);
   });
   it("finds where the corners go", () => {

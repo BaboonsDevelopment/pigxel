@@ -1,11 +1,6 @@
 import Image from "next/image";
 import landscape from "../../../public/art/sidebar-landscape.webp";
 
-/**
- * The pixel landscape between the navigation and the footer: the Pigxel pig
- * on a cliff above pink mountains. It's anchored to the bottom so the pig
- * stays in view at any height, and its sky fades into the sidebar at the top.
- */
 export function SidebarScene() {
   return (
     <div

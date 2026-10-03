@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { HoverOverlay } from "@/components/tiles/hover-overlay";
 import { ProjectMenu } from "./components/project-menu";
 
-/** A project on Home and My projects: its picture opens it, "⋯" has the rest. */
 export function ProjectCard({
   name,
   thumbnail,

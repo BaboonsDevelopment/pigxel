@@ -3,10 +3,6 @@
 import { useState, type ReactNode } from "react";
 import { ICONS } from "../icons";
 
-/**
- * A labelled set of timeline controls (for layers, or for frames). Clicking
- * the label folds the controls away to save room, and brings them back.
- */
 export function ControlGroup({
   label,
   children,

@@ -14,7 +14,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ProfileFormState = {
   error?: string;
-  /** The field the error is about, so it can be shown next to it. */
   field?: "name" | "username" | "bio" | "links";
   message?: string;
 };
@@ -38,7 +37,6 @@ export async function updateProfile(
   const username = normalizeUsername(text(formData, "username"));
   const badUsername = usernameError(username);
   if (badUsername) return { field: "username", error: badUsername };
-  // Line breaks are kept; everything else is plain text.
   const bio = text(formData, "bio").replace(/\r\n/g, "\n").trim();
   if (bio.length > BIO_MAX)
     return {
@@ -67,7 +65,6 @@ export async function updateProfile(
   return { message: "Profile saved." };
 }
 
-/** Whether the signed-in person can take `raw`, with the reason when not. */
 export async function checkUsername(
   raw: string,
 ): Promise<{ available: boolean; error?: string }> {
@@ -89,10 +86,6 @@ export async function checkUsername(
   }
 }
 
-/**
- * Switches the picture: none, the sign-in provider's, or a file the browser
- * just uploaded to the person's own folder. The previous upload is removed.
- */
 export async function setAvatar(
   kind: AvatarKind,
   path?: string,

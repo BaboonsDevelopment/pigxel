@@ -1,11 +1,5 @@
 import { REDRAW_KEEP_DISTANCE } from "./constants";
 
-/**
- * Combines an area before and after the AI redrew it: pixels the AI left
- * (almost) the same keep their exact original colour, so re-quantising the
- * picture does not repaint the whole area; real changes come through,
- * including pixels the AI erased.
- */
 export function mergeRedraw(
   before: Uint8ClampedArray,
   after: Uint8ClampedArray,

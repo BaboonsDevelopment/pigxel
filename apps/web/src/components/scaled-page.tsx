@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 import { Page } from "@pigxel/ui/components/page";
 
-/**
- * Home's width, scaled to the window by the same rule as Home, so tile cards
- * come out the same size everywhere. The page scrolls past the window's height.
- */
 export function ScaledPage({ children }: { children: ReactNode }) {
   return (
     <div className="lg:h-full lg:[container-type:size]">

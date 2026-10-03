@@ -1,4 +1,3 @@
-/** A tiny, hand-drawn pixel garden. SVG keeps every pixel sharp at any size. */
 export function ReleaseArt() {
   return (
     <svg

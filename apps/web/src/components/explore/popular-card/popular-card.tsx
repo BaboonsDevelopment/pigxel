@@ -8,7 +8,6 @@ import { HoverOverlay } from "@/components/tiles/hover-overlay";
 import { LikeButton } from "./components/like-button";
 import { PreviewDialog } from "./components/preview-dialog";
 
-/** A published art on Explore: the picture (it opens the preview), then its name, likes and artist. */
 export function PopularCard({ tile }: { tile: PublicTile }) {
   const { author } = tile;
   const [previewing, setPreviewing] = useState(false);

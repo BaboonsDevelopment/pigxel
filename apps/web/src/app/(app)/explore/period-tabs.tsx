@@ -5,10 +5,6 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { PERIODS, type Period } from "./constants";
 
-/**
- * The span of time popular arts are drawn from, as one bordered group of
- * tabs; a highlight slides to the one chosen.
- */
 export function PeriodTabs({ active }: { active: Period }) {
   const tabs = useRef<(HTMLAnchorElement | null)[]>([]);
   const [highlight, setHighlight] = useState<{
@@ -23,7 +19,6 @@ export function PeriodTabs({ active }: { active: Period }) {
     const measure = () =>
       setHighlight({ left: tab.offsetLeft, width: tab.offsetWidth });
     measure();
-    // The tab grows once its font has loaded; the highlight follows.
     const observer = new ResizeObserver(measure);
     observer.observe(tab);
     return () => observer.disconnect();

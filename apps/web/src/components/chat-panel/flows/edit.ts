@@ -26,23 +26,10 @@ import {
 import { framesSheet, toArt } from "./pictures";
 import { checkEdit } from "./review";
 
-/** New cels by frame id, written back as one undo step. */
 type Cels = Map<string, Uint8ClampedArray>;
 
-/**
- * One frame's part of an edit: where it happens there. The plan was made on
- * the frame on screen; in other frames the drawing may sit elsewhere, so
- * there the edit covers all of it and follows the planned move or resize.
- */
 type Step = { frame: string; source: Area; target: Area; keep: Area[] };
 
-/**
- * Any change to what is drawn. The planner looks at the tile and decides what
- * changes, where the result goes and how; the change happens on the layer of
- * what it changes, in every frame that layer has something in. A move or
- * resize is shown as a frame first, so the user confirms it; redrawing more
- * than one frame (paid per frame) waits for a click.
- */
 export async function edit(chat: Chat, action: TileAction) {
   const { canvas } = chat;
   if (chat.selectArea) chat.say(ASK_SELECT);
@@ -98,13 +85,11 @@ export async function edit(chat: Chat, action: TileAction) {
     };
   });
 
-  /** Writes the new cels back and says what was done; false when it failed. */
   const done = ({ cels, image, fixed }: Made) => {
     if (!cels) return false;
     const same = [...cels].every(([frame, cel]) =>
       samePixels(cel, canvas.readCel(layerId, frame)),
     );
-    // Say so honestly rather than report an edit nobody can see.
     if (same) {
       chat.say(
         "Nothing on the tile changed. Try saying exactly what to change.",
@@ -121,7 +106,6 @@ export async function edit(chat: Chat, action: TileAction) {
     return true;
   };
 
-  /** The edit made with `instruction` in every frame. */
   const make = async (instruction: string): Promise<Made> => {
     const edit = { ...plan.value, instruction };
     if (edit.mode === "ops")
@@ -130,12 +114,6 @@ export async function edit(chat: Chat, action: TileAction) {
     return (await redraw(chat, layerId, edit, steps)) ?? { cels: null };
   };
 
-  /**
-   * Makes the edit, has the frame on screen checked and, when the check
-   * finds a problem, makes it once more with a better instruction (that one
-   * is not checked again). A move copies pixels exactly, and a redraw of
-   * several frames is paid per frame, so neither is made twice.
-   */
   const run = async () => {
     chat.setPending(true);
     const made = await make(plan.value.instruction);
@@ -165,8 +143,6 @@ export async function edit(chat: Chat, action: TileAction) {
     );
   };
 
-  // Frames redrawn one picture each (only when the drawing moves or
-  // resizes) cost one picture per frame, so that waits for a click.
   if (
     plan.value.mode === "redraw" &&
     steps.length > 1 &&
@@ -185,10 +161,8 @@ export async function edit(chat: Chat, action: TileAction) {
   await run();
 }
 
-/** An edit made in every frame (null cels when it failed). */
 type Made = { cels: Cels | null; image?: string; fixed?: string };
 
-/** Exact pixel operations in each frame (free); null when one failed. */
 async function editPixels(
   chat: Chat,
   layerId: string,
@@ -226,7 +200,6 @@ async function editPixels(
   return cels;
 }
 
-/** The drawing moved pixel for pixel in each frame (free). */
 function move(chat: Chat, layerId: string, steps: Step[]): Cels {
   const { canvas } = chat;
   const size = canvas.size();
@@ -243,19 +216,9 @@ function move(chat: Chat, layerId: string, steps: Step[]): Cels {
   );
 }
 
-/**
- * Whether every frame is redrawn in one picture: when there are several and
- * the drawing stays where it is in each.
- */
 const redrawnTogether = (steps: Step[]) =>
   steps.length > 1 && steps.every((s) => sameRect(s.source, s.target));
 
-/**
- * The image model redraws the edited part (paid): every frame in one picture
- * when it can (see redrawnTogether), so the change looks the same in all of
- * them; else each frame's part, all at once. The new cels and the first
- * picture, or null when it failed.
- */
 async function redraw(
   chat: Chat,
   layerId: string,
@@ -298,11 +261,6 @@ async function redraw(
   return { cels, image: pictures[0]! };
 }
 
-/**
- * Every frame's part sent as one sprite sheet and redrawn as one picture
- * (paid once), then cut back into frames: the changed thing looks the same
- * in all of them. The new cels and the picture, or null when it failed.
- */
 async function redrawFramesTogether(
   chat: Chat,
   layerId: string,
@@ -311,7 +269,6 @@ async function redrawFramesTogether(
 ): Promise<{ cels: Cels; image: string } | null> {
   const { canvas } = chat;
   const size = canvas.size();
-  // One box for all frames, so they share a cell size and stay in place.
   const box = unionOf(steps.map((s) => s.source))!;
   const before = steps.map((s) => canvas.readCel(layerId, s.frame));
   const result = await redrawFrames({
@@ -336,7 +293,6 @@ async function redrawFramesTogether(
     layout,
     steps.length,
     box,
-    // Whole frames, so the redrawn parts stay where they were.
     "cells",
   );
   if (!frames.every(Boolean)) {

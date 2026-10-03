@@ -3,17 +3,10 @@ import type { Area, Size } from "./constants";
 import type { Rgba } from "./paint";
 import { fillPoints, type Point } from "./pen";
 
-/**
- * Selections are masks: one byte per tile pixel, set where the pixel is
- * selected. Moving or transforming the selected pixels lifts them into a
- * floating piece (as in Aseprite) that is stamped back onto the cel.
- */
 export type Mask = Uint8Array;
 
-/** How a new selection combines with the current one. */
 export type SelectMode = "replace" | "add" | "subtract" | "intersect";
 
-/** Shift adds, Alt subtracts, both intersect, as in Aseprite. */
 export function selectModeOf(e: { shiftKey: boolean; altKey: boolean }) {
   if (e.shiftKey && e.altKey) return "intersect";
   if (e.shiftKey) return "add";
@@ -32,7 +25,6 @@ export function rectMask(size: Size, area: Area): Mask {
   return mask;
 }
 
-/** The pixels of the filled ellipse that fits `area`; parts off the tile are left out. */
 export function ellipseMask(size: Size, area: Area): Mask {
   const mask = new Uint8Array(size.w * size.h);
   for (const { x, y } of ellipsePoints(area, true))
@@ -40,7 +32,6 @@ export function ellipseMask(size: Size, area: Area): Mask {
   return mask;
 }
 
-/** The pixels inside a freehand outline (by their centres), and the outline itself. */
 export function polygonMask(size: Size, points: Point[]): Mask {
   const mask = new Uint8Array(size.w * size.h);
   const set = (x: number, y: number) => {
@@ -48,7 +39,6 @@ export function polygonMask(size: Size, points: Point[]): Mask {
   };
   for (let y = 0; y < size.h; y++) {
     const cy = y + 0.5;
-    // Where the outline crosses this row, left to right (even–odd rule).
     const crossings: number[] = [];
     for (let i = 0; i < points.length; i++) {
       const a = points[i]!;
@@ -73,7 +63,6 @@ export function polygonMask(size: Size, points: Point[]): Mask {
   return mask;
 }
 
-/** The pixels of `pixels` (RGBA of the tile) the magic wand picks with a click at `start`; see fillPoints. */
 export function wandMask(
   pixels: Uint8ClampedArray,
   size: Size,
@@ -90,7 +79,6 @@ export function wandMask(
   return mask;
 }
 
-/** `next` combined with `base`; null when nothing ends up selected. */
 export function combineMasks(
   base: Mask | null,
   next: Mask,
@@ -119,7 +107,6 @@ export function invertMask(mask: Mask | null, size: Size): Mask | null {
   return out.some(Boolean) ? out : null;
 }
 
-/** The smallest rectangle holding every selected pixel, or null for none. */
 export function maskBounds(mask: Mask, size: Size): Area | null {
   let x0 = size.w;
   let y0 = size.h;
@@ -144,16 +131,10 @@ export const isSelected = (mask: Mask | null, size: Size, p: Point) =>
   p.y < size.h &&
   !!mask[p.y * size.w + p.x];
 
-/**
- * The border of the selected pixels as an SVG path in tile pixels: edge
- * segments between selected and unselected pixels, joined along each row
- * and column.
- */
 export function maskOutline(mask: Mask, size: Size): string {
   const on = (x: number, y: number) =>
     x >= 0 && y >= 0 && x < size.w && y < size.h && !!mask[y * size.w + x];
   const parts: string[] = [];
-  // Horizontal edges: above row y, between pixel rows y - 1 and y.
   for (let y = 0; y <= size.h; y++) {
     let start = -1;
     for (let x = 0; x <= size.w; x++) {
@@ -165,7 +146,6 @@ export function maskOutline(mask: Mask, size: Size): string {
       }
     }
   }
-  // Vertical edges: left of column x.
   for (let x = 0; x <= size.w; x++) {
     let start = -1;
     for (let y = 0; y <= size.h; y++) {
@@ -180,22 +160,15 @@ export function maskOutline(mask: Mask, size: Size): string {
   return parts.join("");
 }
 
-/** Selected pixels lifted off a cel, placed at `x, y` on the tile. */
 export type Floating = {
   x: number;
   y: number;
   w: number;
   h: number;
-  /** RGBA, w × h. */
   pixels: Uint8ClampedArray;
-  /** w × h; which of the piece's pixels were selected. */
   mask: Mask;
 };
 
-/**
- * Lifts the selected pixels of `cel` into a floating piece. `under` is the
- * cel with them gone: transparent, or `fill` (the Background's colour).
- */
 export function liftPixels(
   cel: Uint8ClampedArray,
   size: Size,
@@ -220,7 +193,6 @@ export function liftPixels(
   return { floating: { ...bounds, pixels, mask: piece }, under };
 }
 
-/** `under` with the floating piece's visible pixels on top; parts off the tile are dropped. */
 export function stampFloating(
   under: Uint8ClampedArray,
   size: Size,
@@ -239,7 +211,6 @@ export function stampFloating(
   return out;
 }
 
-/** The tile pixels a floating piece covers, as a selection. */
 export function floatingMask(f: Floating, size: Size): Mask | null {
   const mask = new Uint8Array(size.w * size.h);
   for (let y = 0; y < f.h; y++)
@@ -252,7 +223,6 @@ export function floatingMask(f: Floating, size: Size): Mask | null {
   return mask.some(Boolean) ? mask : null;
 }
 
-/** Rebuilds a piece of `w × h` whose pixel (x, y) comes from `from(x, y)` of `f`. */
 function remap(
   f: Floating,
   w: number,
@@ -270,7 +240,6 @@ function remap(
   return { w, h, pixels, mask };
 }
 
-/** Mirrors the piece in place: "horizontal" swaps left and right. */
 export function flipFloating(
   f: Floating,
   axis: "horizontal" | "vertical",
@@ -283,7 +252,6 @@ export function flipFloating(
   };
 }
 
-/** Turns the piece a quarter turn around its middle. */
 export function rotateFloating(f: Floating, clockwise: boolean): Floating {
   const w = f.h;
   const h = f.w;
@@ -296,17 +264,10 @@ export function rotateFloating(f: Floating, clockwise: boolean): Floating {
   };
 }
 
-/** How Expand, Contract and Border measure: round reaches N px straight across, square diagonally too. */
 export type ModifyShape = "round" | "square";
 
-/** Largest step Expand, Contract and Border take, in pixels. */
 export const MAX_MODIFY = 32;
 
-/**
- * The selection grown by `by` px all round, as Aseprite's Select › Modify ›
- * Expand. Round counts distance as the crow flies (1 px adds the four
- * neighbours: a clean pixel-art outline); square counts diagonals as 1 too.
- */
 export function expandMask(
   mask: Mask,
   size: Size,
@@ -328,10 +289,6 @@ export function expandMask(
   return out;
 }
 
-/**
- * The selection shrunk by `by` px all round, as Select › Modify › Contract;
- * the tile's edge counts as outside, so a whole-tile selection shrinks too.
- */
 export function contractMask(
   mask: Mask,
   size: Size,
@@ -346,7 +303,6 @@ export function contractMask(
       if (mask[y * w + x] || !nextToSelected(mask, w, h, x, y)) continue;
       clear(x, y);
     }
-  // The tile's edge: as if unselected pixels ran all round it.
   for (let x = -1; x <= w; x++) {
     clear(x, -1);
     clear(x, h);
@@ -366,7 +322,6 @@ export function contractMask(
   }
 }
 
-/** A band `by` px wide just inside the selection's edge, as Select › Modify › Border. */
 export function borderMask(
   mask: Mask,
   size: Size,
@@ -377,7 +332,6 @@ export function borderMask(
   return mask.map((m, i) => (m && !inner[i] ? 1 : 0));
 }
 
-/** Every step within `by` px, but not the pixel itself. */
 function reach(by: number, shape: ModifyShape): [number, number][] {
   const offsets: [number, number][] = [];
   for (let dy = -by; dy <= by; dy++)
@@ -387,7 +341,6 @@ function reach(by: number, shape: ModifyShape): [number, number][] {
   return offsets;
 }
 
-/** Whether a selected pixel has an unselected (or off-tile) neighbour. */
 function onEdge(mask: Mask, w: number, h: number, x: number, y: number) {
   for (const [dx, dy] of NEIGHBOURS) {
     const tx = x + dx;
@@ -398,7 +351,6 @@ function onEdge(mask: Mask, w: number, h: number, x: number, y: number) {
   return false;
 }
 
-/** Whether an unselected pixel touches a selected one. */
 function nextToSelected(
   mask: Mask,
   w: number,

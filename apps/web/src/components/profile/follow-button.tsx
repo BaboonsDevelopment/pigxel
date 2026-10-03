@@ -5,7 +5,6 @@ import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { setFollowing } from "@/app/(app)/u/[username]/actions";
 
-/** Follow / Following on someone else's profile, with the follower count. */
 export function FollowButton({
   profileId,
   name,

@@ -34,20 +34,13 @@ const KIND_TEXT: Record<
   },
 };
 
-/**
- * A new report for the board: bug or feature, a title and a short
- * description. Someone with all their open reports of a kind waiting for
- * the team can't send another of it.
- */
 export function NewFeedbackForm({
   initialKind,
   open,
   page,
 }: {
   initialKind: FeedbackKind;
-  /** The person's reports of each kind still waiting for the team. */
   open: Record<FeedbackKind, number>;
-  /** The page the form was opened from, sent along. */
   page: string | null;
 }) {
   const [state, action, pending] = useActionState(

@@ -5,7 +5,6 @@ import { buttonVariants } from "@pigxel/ui/components/button";
 import { MenuList } from "./components/menu-list";
 import type { MenuSections } from "./constants";
 
-/** A small dropdown built on <details>, closed on selection or an outside click. */
 export function Menu({
   label,
   sections,

@@ -19,7 +19,6 @@ import { NumberField } from "./number-field";
 
 type Size = { w: number; h: number };
 
-/** The largest the preview is drawn, in screen pixels. */
 const PREVIEW = { w: 320, h: 180 };
 
 const BORDER_FIELDS: { key: keyof Borders; label: string }[] = [
@@ -29,7 +28,6 @@ const BORDER_FIELDS: { key: keyof Borders; label: string }[] = [
   { key: "bottom", label: "Bottom" },
 ];
 
-/** The arrow a cell of the anchor grid shows, pointing away from the anchor. */
 const ARROWS: Record<string, string> = {
   "-1,-1": "↖",
   "0,-1": "↑",
@@ -41,12 +39,6 @@ const ARROWS: Record<string, string> = {
   "1,1": "↘",
 };
 
-/**
- * Canvas size, as Aseprite's: makes the tile bigger or smaller by adding or
- * cutting away space on any side, without scaling the drawing. The anchor
- * says which part stays put when the width and height change; the borders
- * say exactly how much each side gets (negative cuts it).
- */
 export default function CanvasSizeDialog({
   size,
   picture,
@@ -54,9 +46,7 @@ export default function CanvasSizeDialog({
   onClose,
 }: {
   size: Size;
-  /** The current frame, for the preview. */
   picture: Uint8ClampedArray;
-  /** The new size, and where the drawing's top-left goes on it. */
   onApply: (next: Size, offset: { x: number; y: number }) => void;
   onClose: () => void;
 }) {
@@ -79,7 +69,6 @@ export default function CanvasSizeDialog({
     borders.right === 0 &&
     borders.bottom === 0;
 
-  /** A new width or height, the space added or cut around the anchor. */
   const resizeTo = (w: number, h: number) => {
     const around = bordersFor(size, { w, h }, anchor);
     setBorders((b) => ({
@@ -90,10 +79,6 @@ export default function CanvasSizeDialog({
     }));
   };
 
-  /**
-   * The side the drawing is kept at stays as it is, so its field is locked;
-   * with the drawing in the middle, both sides of that axis change together.
-   */
   const locked = (key: keyof Borders) =>
     (key === "left" && anchor.x === 0) ||
     (key === "right" && anchor.x === 1) ||
@@ -106,9 +91,6 @@ export default function CanvasSizeDialog({
       return across ? { ...b, left: n, right: n } : { ...b, top: n, bottom: n };
     });
 
-  // The tile as it will be: the new canvas outlined, what gets cut dimmed.
-  // In the old tile's pixels: the new canvas starts at (-left, -top), and
-  // the preview spans both.
   const newAt = { x: -borders.left, y: -borders.top };
   const from = { x: Math.min(0, newAt.x), y: Math.min(0, newAt.y) };
   const span = {
@@ -133,7 +115,6 @@ export default function CanvasSizeDialog({
         0,
         0,
       );
-    // Where the old tile and the new canvas sit, in preview pixels.
     const oldX = -from.x * zoom;
     const oldY = -from.y * zoom;
     const newX = (newAt.x - from.x) * zoom;
@@ -141,7 +122,6 @@ export default function CanvasSizeDialog({
     const fill = getComputedStyle(ctx.canvas).color;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(source, oldX, oldY, size.w * zoom, size.h * zoom);
-    // Dim everything, then show the new canvas clearly.
     ctx.save();
     ctx.globalAlpha = 0.65;
     ctx.fillStyle = "#fff";
@@ -154,7 +134,6 @@ export default function CanvasSizeDialog({
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 3]);
     ctx.strokeRect(newX + 1, newY + 1, next.w * zoom - 2, next.h * zoom - 2);
-    // The positions all follow from the size, the borders and the zoom.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picture, size, borders, zoom]);
 
@@ -300,7 +279,6 @@ export default function CanvasSizeDialog({
   );
 }
 
-/** What the borders do, e.g. "adds 16 px on top, cuts 8 px on the right". */
 function describeBorders(borders: Borders) {
   return BORDER_FIELDS.flatMap(({ key }) => {
     const n = borders[key];

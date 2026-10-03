@@ -6,7 +6,6 @@ import type { AnimationReply } from "@/lib/ai/types";
 import type { Bitmap } from "@/lib/image/bitmap";
 import { posesToFrames, splitSheet } from "@/lib/image/sheet";
 
-/** A `w × h` bitmap with an opaque `color` rectangle at `x`, `y`. */
 function drawing(
   w: number,
   h: number,
@@ -107,8 +106,6 @@ describe("animation plan", () => {
 
 describe("sprite sheet to frames", () => {
   it("reads poses as drawn, even on another grid than asked for", () => {
-    // Asked for 3×2, drawn 2×3: poses of widths 10..15, each with a small
-    // separate part (a carrot) close to it.
     const rects = [0, 1, 2, 3, 4, 5].flatMap((i) => {
       const x = (i % 2) * 50 + 5;
       const y = Math.floor(i / 2) * 50 + 5;
@@ -121,7 +118,6 @@ describe("sprite sheet to frames", () => {
     expect(poses.map((p) => p?.w)).toEqual([15, 16, 17, 18, 19, 20]);
   });
   it("gives each cell its own pose, even one reaching past the cell", () => {
-    // Three cells of about 13px; the second pose reaches into the first, the third is empty.
     const sheet = drawing(40, 20, [
       { x: 4, y: 6, w: 8, h: 10 },
       { x: 18, y: 2, w: 12, h: 14 },
@@ -143,7 +139,6 @@ describe("sprite sheet to frames", () => {
     expect(frames[1]).toBeNull();
     const box = (f: Bitmap) => drawnBox(f.rgba, f);
     expect(box(frames[0]!)).toEqual({ x: 0, y: 0, w: 10, h: 10 });
-    // Shrunk by the same half as the first (8px to 4px), centred, on the bottom.
     expect(box(frames[2]!)).toEqual({ x: 3, y: 6, w: 4, h: 4 });
   });
 });
@@ -161,7 +156,6 @@ describe("edits across frames", () => {
       w: 20,
       h: 20,
     });
-    // Kept inside the tile.
     expect(
       follow({ x: 50, y: 50, w: 10, h: 10 }, source, target, size),
     ).toEqual({

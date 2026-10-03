@@ -4,11 +4,6 @@ import { useOptimistic, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { setVote } from "./actions";
 
-/**
- * A report's votes, and the person's own: a click votes or takes it back,
- * shown at once and put right if the server says no. Finished reports show
- * their count only.
- */
 export function VoteButton({
   id,
   title,
@@ -20,7 +15,6 @@ export function VoteButton({
   title: string;
   votes: number;
   voted: boolean;
-  /** Still being worked out, so it can be voted for. */
   open: boolean;
 }) {
   const [shown, show] = useOptimistic({ votes, voted });

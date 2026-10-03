@@ -20,7 +20,6 @@ import { forgetTile } from "../kept-tiles";
 
 type Picture = { rgba: Uint8ClampedArray; w: number; h: number };
 
-/** What a tab shows: the tile's name, where it lives, whether it has unsaved changes. */
 type TabTile = {
   id: string;
   name: string;
@@ -28,7 +27,6 @@ type TabTile = {
   location: TileLocation | null;
 };
 
-/** Thumbnails of the other tabs' tiles, read from their drafts once per change. */
 const pictures = new Map<
   string,
   { savedAt: number; picture: Picture | null }
@@ -43,19 +41,11 @@ function draftPicture(userId: string, id: string): Picture | null {
   try {
     const doc = parsePigxel(draft.file);
     picture = { rgba: flattenDocument(doc), w: doc.width, h: doc.height };
-  } catch {
-    // An unreadable tile shows no thumbnail.
-  }
+  } catch {}
   pictures.set(id, { savedAt: draft.savedAt, picture });
   return picture;
 }
 
-/**
- * The tiles open in the editor, as tabs over the canvas: click one to switch
- * to it, middle-click or × to close it (its draft stays in My projects), drag
- * to reorder, + for a new tile. A tile opened from the editor opens next to
- * the one it was opened from.
- */
 export function TileTabs({
   userId,
   current,
@@ -63,15 +53,11 @@ export function TileTabs({
   picture,
 }: {
   userId: string;
-  /** The tile being edited, with its name and state as they are now. */
   current: TabTile;
-  /** Bumped by every change to the current tile, to redraw its thumbnail. */
   revision: number;
-  /** The current tile's first frame, for its thumbnail. */
   picture: () => Picture;
 }) {
   const router = useRouter();
-  // Tiles deleted elsewhere drop out.
   const [tabs, setTabs] = useState(() =>
     withTab(
       readTabs(userId).filter(
@@ -82,8 +68,6 @@ export function TileTabs({
   );
   const [dragging, setDragging] = useState<string | null>(null);
   const activeTab = useRef<HTMLDivElement>(null);
-  // In a block: newer browsers return a promise from scrollIntoView, which
-  // React would take for a cleanup function.
   useEffect(() => {
     activeTab.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, []);
@@ -91,7 +75,6 @@ export function TileTabs({
     if (!dragging) writeTabs(userId, tabs);
   }, [userId, tabs, dragging]);
 
-  // The last tab stays: the editor always shows a tile.
   const closable = tabs.length > 1;
   const close = (id: string) => {
     if (!closable) return;
@@ -103,7 +86,6 @@ export function TileTabs({
     router.push(after ? editorUrl(after) : "/tiles");
   };
 
-  // The current tile's thumbnail, redrawn after each change to it.
   const [shown, setShown] = useState(() => ({ revision, picture: picture() }));
   if (shown.revision !== revision) setShown({ revision, picture: picture() });
 
@@ -170,7 +152,6 @@ export function TileTabs({
                 if (active) e.preventDefault();
               }}
               onMouseDown={(e) => {
-                // A middle click closes the tab instead of scrolling.
                 if (e.button === 1) e.preventDefault();
               }}
               onAuxClick={(e) => {
@@ -216,7 +197,6 @@ export function TileTabs({
                 )}
               </button>
             ) : (
-              // The only tab can't close; it still shows unsaved changes.
               <span className="mr-1 grid size-5 shrink-0 place-items-center text-muted-foreground">
                 {tile.dirty && (
                   <span
@@ -241,7 +221,6 @@ export function TileTabs({
   );
 }
 
-/** A tile's first frame, tiny and crisp, on a checkerboard; redrawn when it changes. */
 const Thumbnail = memo(function Thumbnail({
   picture,
 }: {

@@ -18,17 +18,11 @@ import {
 import { copyObject, emptyCel, paint } from "../helpers";
 import { toArt } from "./pictures";
 
-/** The name for a new picture's layer: the router's, or the subject's start. */
 const layerName = (action: TileAction) =>
   action.name?.trim() ||
   action.request.split(/[,.]/)[0]!.trim().slice(0, 30) ||
   "Picture";
 
-/**
- * Draws `subject` once, puts it into every area (only on empty pixels) of a
- * new layer called `name`, and says so. With `replace`, the other drawing
- * layers are hidden, so it takes their place. False when it failed.
- */
 export async function drawOnNewLayer(
   chat: Chat,
   subject: string,
@@ -70,7 +64,6 @@ export async function drawOnNewLayer(
   return result.ok;
 }
 
-/** The tile has art on it: offer the whole tile, free space, or blending in. */
 async function offerPlacements(chat: Chat, action: TileAction) {
   const { canvas } = chat;
   chat.setPending(true);
@@ -109,12 +102,6 @@ async function offerPlacements(chat: Chat, action: TileAction) {
   });
 }
 
-/**
- * New pictures, each request on a layer of its own. On a tile with drawings
- * the placement planner finds free spots that follow what the user said (or
- * copies an existing object on its own layer when they asked for more of
- * it); the user chooses only when there is no room without covering art.
- */
 export async function generate(chat: Chat, action: TileAction) {
   const { canvas } = chat;
   const { request: subject, where = "", count = 1 } = action;
@@ -159,7 +146,6 @@ export async function generate(chat: Chat, action: TileAction) {
     if (plan.ok && plan.value.question) chat.say(plan.value.question);
     await offerPlacements(chat, action);
   } else if (original) {
-    // More of something drawn: copies go on the layer of the original.
     const frame = canvas.frameId();
     const cel = canvas.readCel(original.layerId, frame);
     const copied = copyObject(cel, size, original.area, plan.value.areas);
@@ -170,12 +156,6 @@ export async function generate(chat: Chat, action: TileAction) {
   }
 }
 
-/**
- * Several different things asked for at once: drawn in one picture (paid
- * once, one style and scale), then each on a layer of its own, spread over
- * the free part of the tile (the whole tile when it is empty), one cell of
- * a grid each. False when it failed.
- */
 async function drawSet(chat: Chat, items: SetItem[]) {
   const { canvas } = chat;
   const size = canvas.size();
@@ -205,7 +185,6 @@ async function drawSet(chat: Chat, items: SetItem[]) {
     return false;
   }
   const { image, layout } = result.value;
-  // By pose: each thing as drawn, all shrunk alike, so their sizes compare.
   const pictures = await sheetToFrames(
     await (await fetch(image)).blob(),
     layout,
@@ -223,7 +202,6 @@ async function drawSet(chat: Chat, items: SetItem[]) {
     const name = item.name || item.subject.split(/[,.]/)[0]!.slice(0, 30);
     return [{ name, pixels: paint(emptyCel(size), size, art.rgba, area) }];
   });
-  // All at once: added one by one, each would replace the one before.
   if (layers.length) canvas.addLayers(layers);
   const added = layers.map((l) => l.name);
   chat.setPending(false);
