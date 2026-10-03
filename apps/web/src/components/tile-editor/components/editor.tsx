@@ -54,6 +54,7 @@ import {
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
+import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import {
@@ -203,6 +204,7 @@ export function Editor({
           palette: now.palette,
           slices: now.slices,
           colorMode: now.colorMode,
+          pixelRatio: now.pixelRatio,
         },
         scale: latestScale.current,
         savedAt: saved.savedAt,
@@ -462,6 +464,10 @@ export function Editor({
     sprite.transformAll(t);
   };
   const tileMenu: MenuSections = [
+    PIXEL_RATIOS.map(({ ratio, label }) => ({
+      label: check(sameRatio(sprite.pixelRatio, ratio), label),
+      onSelect: () => sprite.setPixelRatio(ratio),
+    })),
     // Indexed: only palette colours; Grayscale: only greys.
     COLOR_MODES.map(({ value, label }) => ({
       label: check(sprite.colorMode === value, label),
@@ -933,6 +939,7 @@ export function Editor({
             picture: (id) => sprite.composite(["reference"], id),
             slices: sprite.slices,
           }}
+          pixelRatio={sprite.pixelRatio}
           settings={exportSettings}
           onChange={setExportSettings}
           onClose={() => setExporting(false)}

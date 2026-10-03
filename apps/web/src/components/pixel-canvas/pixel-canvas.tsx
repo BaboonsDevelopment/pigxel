@@ -1229,7 +1229,7 @@ export function PixelCanvas({
   };
 
   const moveResize = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (drag.current) setPending(resizeTo(drag.current, e, scale));
+    if (drag.current) setPending(resizeTo(drag.current, e, scale, stretch));
   };
 
   const endResize = () => {
@@ -1259,6 +1259,8 @@ export function PixelCanvas({
           ? "cursor-text"
           : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
+  // Wide or tall pixels: the whole stage is shown stretched (see below).
+  const stretch = { x: sprite.pixelRatio.w, y: sprite.pixelRatio.h };
   const showTip =
     hover &&
     !pending &&
@@ -1512,6 +1514,7 @@ export function PixelCanvas({
           slices={sprite.slices}
           size={size}
           scale={scale}
+          stretch={stretch}
           pickedId={sliceId}
           drag={sliceDrag}
           onResize={(bounds) =>
@@ -1625,6 +1628,7 @@ export function PixelCanvas({
           frame={frame}
           tile={size}
           scale={scale}
+          stretch={stretch}
           onChange={setFrame}
           onConfirm={() => finishFrame(frame)}
           onCancel={() => finishFrame(null)}
@@ -1661,42 +1665,69 @@ export function PixelCanvas({
   );
 
   const cells = tiledCells(tiled);
+  const stage =
+    cells.length === 1 ? (
+      tile
+    ) : (
+      // Tiled mode: copies of the tile around it, which can be drawn on too.
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `repeat(${tiled === "y" ? 1 : 3}, auto)`,
+        }}
+      >
+        {cells.map((cell) =>
+          cell.x === 0 && cell.y === 0 ? (
+            <div key="tile" className="relative z-10">
+              {tile}
+            </div>
+          ) : (
+            <canvas
+              key={`${cell.x},${cell.y}`}
+              width={size.w}
+              height={size.h}
+              aria-hidden="true"
+              ref={(copy) => {
+                if (!copy) return;
+                copies.current.add(copy);
+                paintCopy(copy);
+                return () => void copies.current.delete(copy);
+              }}
+              className={`block touch-none opacity-75 [image-rendering:pixelated] ${cursor}`}
+              style={{ ...tileStyle, ...CHECKER_STYLE }}
+              {...pointerHandlers}
+            />
+          ),
+        )}
+      </div>
+    );
+  // Pixels that aren't square: everything is laid out with square pixels,
+  // then stretched as a whole, so the overlays line up with the pixels and
+  // pointer positions (read from the stretched canvas) stay right.
+  const columns = new Set(cells.map((c) => c.x)).size;
+  const rows = new Set(cells.map((c) => c.y)).size;
   return (
     <>
       {selecting && <SelectionOverlay onCancel={() => finishAiArea(null)} />}
-      {cells.length === 1 ? (
-        tile
+      {stretch.x === 1 && stretch.y === 1 ? (
+        stage
       ) : (
-        // Tiled mode: copies of the tile around it, which can be drawn on too.
         <div
-          className="grid"
+          className={selecting ? "relative z-50" : undefined}
           style={{
-            gridTemplateColumns: `repeat(${tiled === "y" ? 1 : 3}, auto)`,
+            width: columns * size.w * scale * stretch.x,
+            height: rows * size.h * scale * stretch.y,
           }}
         >
-          {cells.map((cell) =>
-            cell.x === 0 && cell.y === 0 ? (
-              <div key="tile" className="relative z-10">
-                {tile}
-              </div>
-            ) : (
-              <canvas
-                key={`${cell.x},${cell.y}`}
-                width={size.w}
-                height={size.h}
-                aria-hidden="true"
-                ref={(copy) => {
-                  if (!copy) return;
-                  copies.current.add(copy);
-                  paintCopy(copy);
-                  return () => void copies.current.delete(copy);
-                }}
-                className={`block touch-none opacity-75 [image-rendering:pixelated] ${cursor}`}
-                style={{ ...tileStyle, ...CHECKER_STYLE }}
-                {...pointerHandlers}
-              />
-            ),
-          )}
+          <div
+            style={{
+              width: columns * size.w * scale,
+              transform: `scale(${stretch.x}, ${stretch.y})`,
+              transformOrigin: "0 0",
+            }}
+          >
+            {stage}
+          </div>
         </div>
       )}
     </>

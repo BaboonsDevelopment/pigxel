@@ -28,19 +28,24 @@ import {
   exportFiles,
   exportSize,
   fitsCanvas,
+  stretchedSource,
   type ExportSource,
 } from "@/lib/export/export";
+import { isSquare, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import { saveExport } from "@/lib/export/save";
 import { frameIndex } from "@/lib/sprite/frames";
 
 /** Saves the tile as a PNG, JPEG, GIF or sprite sheet, at a chosen scale. */
 export default function ExportDialog({
-  source,
+  source: tile,
+  pixelRatio,
   settings,
   onChange,
   onClose,
 }: {
   source: ExportSource;
+  /** The shape of the tile's pixels; wide or tall ones can be stretched. */
+  pixelRatio?: PixelRatio;
   /** Kept by the editor, so the dialog opens with the last choices. */
   settings: ExportSettings;
   onChange: (settings: ExportSettings) => void;
@@ -57,6 +62,8 @@ export default function ExportDialog({
     onChange({ ...settings, ...patch });
   };
 
+  const stretch = !isSquare(pixelRatio) && settings.applyRatio;
+  const source = stretch ? stretchedSource(tile, pixelRatio!) : tile;
   const { size, frames } = source;
   const animated = settings.format === "gif" || settings.format === "sheet";
   const output = exportSize(settings, size, frames.length, source.slices);
@@ -169,6 +176,16 @@ export default function ExportDialog({
               format)
             </label>
           </fieldset>
+        )}
+
+        {!isSquare(pixelRatio) && (
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={settings.applyRatio}
+              onChange={(e) => set({ applyRatio: e.target.checked })}
+            />
+            Stretch {pixelRatio!.w}:{pixelRatio!.h} pixels to their shape
+          </label>
         )}
 
         <div className="space-y-1.5">

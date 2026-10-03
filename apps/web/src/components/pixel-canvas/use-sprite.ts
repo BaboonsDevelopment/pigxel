@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
+import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
@@ -72,6 +73,7 @@ type Snapshot = {
   palette: string[];
   slices: Slice[];
   colorMode: ColorMode;
+  pixelRatio: PixelRatio;
 };
 
 /**
@@ -112,6 +114,9 @@ export function useSprite(
   const [colorMode, setColorModeState] = useState<ColorMode>(
     initial.colorMode ?? "rgb",
   );
+  const [pixelRatio, setPixelRatioState] = useState<PixelRatio>(
+    initial.pixelRatio ?? SQUARE,
+  );
   const [layerId, setLayerIdState] = useState(() =>
     kept && layerTree.findLayer(initial.layers, kept.layerId)
       ? kept.layerId
@@ -149,6 +154,7 @@ export function useSprite(
         palette: initial.palette,
         slices: initial.slices,
         colorMode: initial.colorMode ?? "rgb",
+        pixelRatio: initial.pixelRatio ?? SQUARE,
       }),
   );
 
@@ -212,6 +218,7 @@ export function useSprite(
       palette?: string[];
       slices?: Slice[];
       colorMode?: ColorMode;
+      pixelRatio?: PixelRatio;
       /** Colours to turn into others first, on an indexed tile (see inColorMode). */
       recolor?: ReadonlyMap<string, string>;
     } = {},
@@ -245,6 +252,7 @@ export function useSprite(
       palette: next.palette ?? palette,
       slices: next.slices ?? slices,
       colorMode: mode,
+      pixelRatio: next.pixelRatio ?? pixelRatio,
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
@@ -360,6 +368,7 @@ export function useSprite(
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
     setColorModeState(snapshot.colorMode);
+    setPixelRatioState(snapshot.pixelRatio);
     if (!layerTree.findLayer(snapshot.tree, layerId))
       setLayerIdState(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
     if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
@@ -685,6 +694,13 @@ export function useSprite(
     finish({ palette: next, recolor });
   };
 
+  /** Changes the shape of the pixels, as one undo step; no pixel changes. */
+  const setPixelRatio = (next: PixelRatio) => {
+    if (next.w === pixelRatio.w && next.h === pixelRatio.h) return;
+    setPixelRatioState(next);
+    finish({ pixelRatio: next });
+  };
+
   /**
    * Switches the colour mode, as one undo step. To indexed, every pixel
    * becomes the nearest palette colour; to grayscale, its grey. Back to RGB
@@ -708,6 +724,8 @@ export function useSprite(
     setPalette,
     colorMode,
     setColorMode,
+    pixelRatio,
+    setPixelRatio,
     slices,
     setSlices,
     layerId,
@@ -776,6 +794,7 @@ export function useSprite(
       palette,
       slices,
       colorMode,
+      pixelRatio,
       layers: tree,
       frames,
       cels: new Map(

@@ -3,6 +3,11 @@ import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
 import { readColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { readSlices, type Slice } from "@/lib/slices/slices";
+import {
+  isSquare,
+  readPixelRatio,
+  type PixelRatio,
+} from "@/lib/sprite/pixel-ratio";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
@@ -32,7 +37,8 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  *   "palette": ["#1d2b53", …],
  *   "slices": [{ "id": "…", "name": "door", "bounds": { "x": 0, "y": 0, "w": 8, "h": 8 },
  *     "center": { "x": 2, "y": 2, "w": 4, "h": 4 } | null, "pivot": { "x": 4, "y": 7 } | null }],
- *   "colorMode": "indexed"
+ *   "colorMode": "indexed",
+ *   "pixelRatio": { "w": 2, "h": 1 }
  * }
  *
  * `frames` are the animation in playing order, each shown for `duration`
@@ -50,6 +56,8 @@ import type { Cels, Frame } from "@/lib/sprite/types";
  * their `bounds`. `colorMode` (optional, "rgb" when missing) is "indexed"
  * when every pixel is a palette colour, or "grayscale"; pixels are stored as
  * colours in every mode, so an older reader that ignores it opens the tile.
+ * `pixelRatio` (optional, square when missing) is the shape of the pixels:
+ * 2:1 or 1:2, shown stretched; the pixels themselves are stored one for one.
  *
  * Version 5 was the same without slices.
  * Version 4 was the same without a palette (a tile gets the default one).
@@ -98,6 +106,8 @@ export type PigxelDocument = {
   slices: Slice[];
   /** Which colours the pixels may have; RGB (any) when missing. */
   colorMode?: ColorMode;
+  /** The shape of the pixels; square when missing. */
+  pixelRatio?: PixelRatio;
 };
 
 /**
@@ -207,6 +217,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     slices: doc.slices,
     ...(doc.colorMode &&
       doc.colorMode !== "rgb" && { colorMode: doc.colorMode }),
+    ...(!isSquare(doc.pixelRatio) && { pixelRatio: doc.pixelRatio }),
   });
 }
 
@@ -291,6 +302,7 @@ export function parsePigxel(text: string): PigxelDocument {
     palette,
     slices,
     colorMode: readColorMode(file.colorMode),
+    pixelRatio: readPixelRatio(file.pixelRatio),
   };
 }
 

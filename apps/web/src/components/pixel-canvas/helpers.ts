@@ -38,16 +38,21 @@ export function resizeTo(
   drag: ResizeDrag,
   e: PointerEvent<HTMLElement>,
   scale: number,
+  stretch = { x: 1, y: 1 },
 ): Size {
   return {
     w:
       drag.edge === "s"
         ? drag.w
-        : clampSize(drag.w + Math.round((e.clientX - drag.x) / scale)),
+        : clampSize(
+            drag.w + Math.round((e.clientX - drag.x) / (scale * stretch.x)),
+          ),
     h:
       drag.edge === "e"
         ? drag.h
-        : clampSize(drag.h + Math.round((e.clientY - drag.y) / scale)),
+        : clampSize(
+            drag.h + Math.round((e.clientY - drag.y) / (scale * stretch.y)),
+          ),
   };
 }
 
