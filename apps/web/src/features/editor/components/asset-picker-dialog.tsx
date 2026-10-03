@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionTitle } from "@pigxel/ui/components/typography";
-import { AssetImage } from "@/components/assets/asset-image";
-import { ASSET_CATEGORIES, type Asset } from "@/lib/assets/assets";
-import { listAssetsInBrowser } from "@/lib/assets/publish";
+import { AssetImage } from "@/features/assets/components/asset-image";
+import { ASSET_CATEGORIES, type Asset } from "@/features/assets/assets";
+import { listAssetsInBrowser } from "@/features/assets/publish";
 
 type Listing =
   | { state: "loading" }

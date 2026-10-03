@@ -14,10 +14,7 @@ export function ImportStarterSet() {
     setError(null);
     try {
       const [{ STARTER_ASSETS, starterDocument }, { publishAsset }] =
-        await Promise.all([
-          import("@/lib/assets/starter"),
-          import("@/lib/assets/publish"),
-        ]);
+        await Promise.all([import("../starter"), import("../publish")]);
       for (const [i, asset] of STARTER_ASSETS.entries()) {
         setProgress(`Importing ${i + 1} of ${STARTER_ASSETS.length}…`);
         await publishAsset({

@@ -10,7 +10,7 @@ import {
   InputGroupText,
   Textarea,
 } from "@pigxel/ui/components/input";
-import type { ArtistProfile } from "@/lib/profile/profile";
+import type { ArtistProfile } from "@/features/profile/profile";
 import {
   BIO_MAX,
   LINK_LABEL_MAX,
@@ -18,7 +18,7 @@ import {
   NAME_MAX,
   USERNAME_MAX,
   normalizeUsername,
-} from "@/lib/profile/validation";
+} from "@/features/profile/validation";
 import { checkUsername, updateProfile, type ProfileFormState } from "./actions";
 
 type Availability = { username: string; available: boolean; error?: string };

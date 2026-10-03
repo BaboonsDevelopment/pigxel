@@ -1,4 +1,4 @@
-import { fourConnected } from "@/components/pixel-canvas/pen";
+import { fourConnected } from "../../pixel-canvas/pen";
 import { FreehandStroke } from "../shared/freehand";
 import { penInk } from "../shared/stroke";
 import type { ToolCanvasProps } from "../types";

@@ -3,7 +3,7 @@ import {
   lineTip,
   type PenSettings,
   type TipRect,
-} from "@/components/pixel-canvas/pen";
+} from "../../pixel-canvas/pen";
 import type { SizeKey, ToolTip } from "../types";
 
 export const squareTip =

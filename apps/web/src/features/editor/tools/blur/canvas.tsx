@@ -1,4 +1,4 @@
-import { blurInk } from "@/components/pixel-canvas/paint";
+import { blurInk } from "../../pixel-canvas/paint";
 import { FreehandStroke } from "../shared/freehand";
 import type { ToolCanvasProps } from "../types";
 

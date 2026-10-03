@@ -12,7 +12,7 @@ import {
   snapLine,
   strokePixels,
   type Point,
-} from "@/components/pixel-canvas/pen";
+} from "../../pixel-canvas/pen";
 import { GUIDE, ToolSvg } from "../shared/overlays";
 import {
   cancelStroke,

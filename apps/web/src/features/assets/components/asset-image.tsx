@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { Asset } from "@/lib/assets/assets";
+import type { Asset } from "../assets";
 import { PixelImage } from "@/components/ui/pixel-image";
 
 export function AssetImage({

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useImperativeHandle, useRef } from "react";
-import { extendStroke, linePoints } from "@/components/pixel-canvas/pen";
+import { extendStroke, linePoints } from "../../pixel-canvas/pen";
 import type { ToolCanvasProps } from "../types";
 import {
   colorInk,

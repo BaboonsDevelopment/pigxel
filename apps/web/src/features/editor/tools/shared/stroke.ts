@@ -7,16 +7,16 @@ import {
   type Ink,
   type Rgba,
   type Stamp,
-} from "@/components/pixel-canvas/paint";
+} from "../../pixel-canvas/paint";
 import {
   brushOrigin,
   brushTip,
   clampOpacity,
   type ColorSlot,
   type Point,
-} from "@/components/pixel-canvas/pen";
-import { polygonMask } from "@/components/pixel-canvas/selection";
-import type { Size } from "@/components/pixel-canvas/constants";
+} from "../../pixel-canvas/pen";
+import { polygonMask } from "../../pixel-canvas/selection";
+import type { Size } from "../../pixel-canvas/constants";
 import type { CanvasPointer, ToolContext } from "../types";
 import { tipRects } from "./tips";
 

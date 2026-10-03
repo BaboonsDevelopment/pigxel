@@ -4,17 +4,17 @@ import { PageHeader } from "@pigxel/ui/components/typography";
 import {
   AssetLibrary,
   type AssetSection,
-} from "@/components/assets/asset-library";
+} from "@/features/assets/components/asset-library";
 import {
   ASSET_TABS,
   AssetTabs,
   type AssetTab,
-} from "@/components/assets/asset-tabs";
-import { ImportStarterSet } from "@/components/assets/import-starter-set";
-import { PaletteList } from "@/components/assets/palette-list";
-import { ScaledPage } from "@/components/scaled-page";
-import { ASSET_CATEGORIES } from "@/lib/assets/assets";
-import { listAssets } from "@/lib/assets/server";
+} from "@/features/assets/components/asset-tabs";
+import { ImportStarterSet } from "@/features/assets/components/import-starter-set";
+import { PaletteList } from "@/features/assets/components/palette-list";
+import { ScaledPage } from "@/components/layout/scaled-page";
+import { ASSET_CATEGORIES } from "@/features/assets/assets";
+import { listAssets } from "@/features/assets/server";
 import { isAdmin, requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Assets · Pigxel" };

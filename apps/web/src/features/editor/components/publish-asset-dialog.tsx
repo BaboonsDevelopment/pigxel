@@ -10,13 +10,13 @@ import {
   ASSET_CATEGORIES,
   isAssetCategory,
   type AssetCategory,
-} from "@/lib/assets/assets";
+} from "@/features/assets/assets";
 import {
   ASSET_NAME_MAX,
   assetIdFor,
   assetExists,
   publishAsset,
-} from "@/lib/assets/publish";
+} from "@/features/assets/publish";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 
 type Status =

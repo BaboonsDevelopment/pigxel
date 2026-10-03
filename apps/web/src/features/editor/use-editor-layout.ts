@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  DEFAULT_LAYOUT,
-  readLayout,
-  type Layout,
-} from "@/lib/editor-layout/layout";
+import { DEFAULT_LAYOUT, readLayout, type Layout } from "./layout";
 
 const layoutKey = (userId: string) => `pigxel:layout:v2:${userId}`;
 const oldKey = (userId: string) => `pigxel:layout:v1:${userId}`;

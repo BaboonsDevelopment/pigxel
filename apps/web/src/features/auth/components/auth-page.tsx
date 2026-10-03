@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandMascot } from "@/components/brand";
-import { PageTransition } from "@/components/page-transition";
-import { geist } from "@/lib/fonts";
+import { BrandMascot } from "@/components/ui/brand";
+import { PageTransition } from "@/components/layout/page-transition";
+import { geist } from "@/lib/fonts/geist";
 import { AuthArt } from "./auth-art";
 import styles from "./auth-page.module.css";
 

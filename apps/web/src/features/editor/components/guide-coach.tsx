@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useEffect, useEffectEvent, useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
-import type { GuideState, Tutorial } from "@/lib/tutorials/tutorials";
-import { useModifierLabel } from "../use-modifier-label";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
+import type { GuideState, Tutorial } from "@/features/tutorials/tutorials";
+import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 
 const ADVANCE_MS = 900;
 

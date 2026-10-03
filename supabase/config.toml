@@ -22,7 +22,9 @@ port = 54324
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://localhost:3000/auth/confirm", "http://localhost:3000/auth/callback?next=/auth/update-password", "http://localhost:3000/auth/callback?next=/settings/account", "http://localhost:3000/auth/callback?next=/settings/account&provider=apple"]
+# Restrict returns to the app's auth endpoints, including callback query
+# parameters for both providers, recovery, linking, and editor continuation.
+additional_redirect_urls = ["http://localhost:3000/auth/confirm", "http://localhost:3000/auth/callback", "http://localhost:3000/auth/callback?**"]
 jwt_expiry = 3600
 enable_signup = true
 # Lets people who signed up with email link a Google account for Drive.

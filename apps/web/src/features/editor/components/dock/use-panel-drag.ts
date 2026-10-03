@@ -1,11 +1,7 @@
 "use client";
 
 import { useState, type PointerEvent } from "react";
-import type {
-  DockSide,
-  PanelId,
-  PanelTarget,
-} from "@/lib/editor-layout/layout";
+import type { DockSide, PanelId, PanelTarget } from "../../layout";
 
 export type PanelDrag = ReturnType<typeof usePanelDrag>;
 

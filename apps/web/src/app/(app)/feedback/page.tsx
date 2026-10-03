@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Badge, type BadgeTone } from "@pigxel/ui/components/badge";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Input } from "@pigxel/ui/components/input";
@@ -12,21 +11,18 @@ import {
 } from "@pigxel/ui/components/typography";
 import { TabLinks } from "@/components/ui/tab-links";
 import {
-  ACTIVE_STATUSES,
+  boardUrl,
   FEEDBACK_KINDS,
-  FEEDBACK_STATUSES,
   kindOf,
   pageFrom,
-  type FeedbackItem,
   type FeedbackKind,
-  type FeedbackStatus,
-} from "@/lib/feedback/feedback";
+} from "@/features/feedback/feedback";
 import {
   countFeedback,
   listFeedback,
   type BoardQuery,
-} from "@/lib/feedback/server";
-import { VoteButton } from "./vote-button";
+} from "@/features/feedback/server";
+import { BoardItem } from "@/features/feedback/components/board-item";
 
 export const metadata: Metadata = { title: "Feedback · Pigxel" };
 export const dynamic = "force-dynamic";
@@ -164,66 +160,5 @@ export default async function Feedback({ searchParams }: Props) {
         )}
       </section>
     </Page>
-  );
-}
-
-function boardUrl(query: BoardQuery) {
-  const params = new URLSearchParams({ kind: query.kind });
-  if (query.state === "closed") params.set("state", "closed");
-  if (query.sort === "newest") params.set("sort", "newest");
-  if (query.search) params.set("q", query.search);
-  return `/feedback?${params}`;
-}
-
-function BoardItem({ item }: { item: FeedbackItem }) {
-  return (
-    <li id={`feedback-${item.id}`} className="flex gap-4 px-4 py-4">
-      <VoteButton
-        id={item.id}
-        title={item.title}
-        votes={item.votes}
-        voted={item.voted}
-        open={ACTIVE_STATUSES.includes(item.status)}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-          <h3 className="min-w-0 font-semibold break-words">{item.title}</h3>
-          <StatusBadge status={item.status} />
-        </div>
-        <p className="mt-1 text-sm break-words whitespace-pre-line text-foreground/80">
-          {item.description}
-        </p>
-        <Text size="xs" tone="muted" className="mt-2">
-          #{item.id} opened <time dateTime={item.createdAt}>{item.ago}</time> by{" "}
-          {item.author ? (
-            <Link
-              href={`/u/${item.author.username}`}
-              className="font-medium text-foreground hover:underline"
-            >
-              @{item.author.username}
-            </Link>
-          ) : (
-            "a Pigxel artist"
-          )}
-        </Text>
-      </div>
-    </li>
-  );
-}
-
-const STATUS_TONES: Record<FeedbackStatus, BadgeTone> = {
-  open: "open",
-  approved: "lavender",
-  in_development: "pink",
-  implemented: "success",
-  declined: "muted",
-  closed: "muted",
-};
-
-function StatusBadge({ status }: { status: FeedbackStatus }) {
-  return (
-    <Badge tone={STATUS_TONES[status]} size="md">
-      {FEEDBACK_STATUSES[status]}
-    </Badge>
   );
 }

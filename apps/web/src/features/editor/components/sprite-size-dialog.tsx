@@ -10,7 +10,7 @@ import {
 } from "@pigxel/ui/components/choice";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
-import { MAX_SIZE, MIN_SIZE } from "@/components/pixel-canvas/constants";
+import { MAX_SIZE, MIN_SIZE } from "../pixel-canvas/constants";
 import {
   SCALE_METHODS,
   scalePicture,

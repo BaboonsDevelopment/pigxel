@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useImperativeHandle, useRef } from "react";
-import { snapLine, squareFrom } from "@/components/pixel-canvas/pen";
+import { snapLine, squareFrom } from "../../pixel-canvas/pen";
 import type { ToolCanvasProps } from "../types";
 import {
   colorInk,

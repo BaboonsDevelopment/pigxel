@@ -1,5 +1,5 @@
 import Image from "next/image";
-import landscape from "../../../public/art/sidebar-landscape.webp";
+import landscape from "../../../../public/art/sidebar-landscape.webp";
 
 export function SidebarScene() {
   return (

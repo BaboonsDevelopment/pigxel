@@ -7,29 +7,21 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Page } from "@pigxel/ui/components/page";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
-import { ProfileGallery } from "@/components/profile/profile-gallery";
-import { ProfileHeader } from "@/components/profile/profile-header";
-import { ProfileStats } from "@/components/profile/profile-stats";
+import { ProfileGallery } from "@/features/profile/components/profile-gallery";
+import { ProfileHeader } from "@/features/profile/components/profile-header";
+import { ProfileStats } from "@/features/profile/components/profile-stats";
 import { requireUser } from "@/lib/auth/session";
 import {
   findProfile,
   getFollowStats,
   getProfileActivity,
   listProfileTiles,
-} from "@/lib/profile/server";
-import { normalizeUsername, usernameError } from "@/lib/profile/validation";
+} from "@/features/profile/server";
+import { usernameError, usernameIn } from "@/features/profile/validation";
 
 export const dynamic = "force-dynamic";
 
 type Props = { params: Promise<{ username: string }> };
-
-function usernameIn(segment: string) {
-  try {
-    return normalizeUsername(decodeURIComponent(segment));
-  } catch {
-    return "";
-  }
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;

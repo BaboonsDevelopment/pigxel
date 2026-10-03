@@ -5,7 +5,7 @@ import { Button } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { Textarea } from "@pigxel/ui/components/input";
-import { MAX_REFERENCES } from "@/lib/ai/constants";
+import { MAX_REFERENCES } from "../../../constants";
 import { toReference } from "../flows/pictures";
 import { ICONS } from "../icons";
 

@@ -3,7 +3,7 @@ import {
   pressStart2P,
   silkscreen,
   tiny5,
-} from "@/lib/pixel-fonts";
+} from "@/lib/fonts/pixel";
 import type { Rgba } from "./paint";
 import type { Floating } from "./selection";
 import { TEXT_SCALES, type TextFont } from "./text-fonts";

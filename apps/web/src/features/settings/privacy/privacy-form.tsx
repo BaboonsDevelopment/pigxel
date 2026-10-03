@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { ChoiceCard, ChoiceText, Radio } from "@pigxel/ui/components/choice";
 import { FormMessage } from "@pigxel/ui/components/field";
-import type { Visibility } from "@/lib/profile/profile";
+import type { Visibility } from "@/features/profile/profile";
 import { setProfileVisibility, type PrivacyState } from "./actions";
 
 const OPTIONS: { value: Visibility; title: string; text: string }[] = [

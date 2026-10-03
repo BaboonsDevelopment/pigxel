@@ -9,16 +9,16 @@ import {
 } from "@pigxel/ui/components/button";
 import { Dialog, useDialog } from "@pigxel/ui/components/dialog";
 import { Heading, Text } from "@pigxel/ui/components/typography";
-import { removeAsset } from "@/app/(app)/assets/actions";
-import { confirmDialog } from "@/components/confirm-dialog/confirm-dialog";
-import { useModifierLabel } from "@/components/tile-editor/use-modifier-label";
+import { removeAsset } from "../actions";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import {
   ASSET_CATEGORIES,
   assetBlob,
   assetFramePng,
   type Asset,
-} from "@/lib/assets/assets";
-import { downloadBlob } from "@/lib/download";
+} from "../assets";
+import { downloadBlob } from "@/lib/utils/download";
 import { AssetImage } from "./asset-image";
 
 export function AssetDialog({

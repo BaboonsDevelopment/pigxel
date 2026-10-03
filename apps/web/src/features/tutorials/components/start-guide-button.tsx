@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { loadAssetDocument, type Asset } from "@/lib/assets/assets";
+import { loadAssetDocument, type Asset } from "@/features/assets/assets";
 import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { blankDocument, serializePigxel } from "@/lib/pigxel-file/format";
 import { guideUrl } from "@/lib/pigxel-file/open-tile";
-import { findTutorial } from "@/lib/tutorials/tutorials";
+import { findTutorial } from "../tutorials";
 
 export function StartGuideButton({
   userId,

@@ -9,7 +9,7 @@ import {
   Text,
 } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { Asset, AssetCategory } from "@/lib/assets/assets";
+import type { Asset, AssetCategory } from "../assets";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
 

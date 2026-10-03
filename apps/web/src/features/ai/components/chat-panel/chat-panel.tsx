@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { sendMessage } from "@/lib/ai/actions";
-import { REFERENCES_NOTE } from "@/lib/ai/constants";
-import { notifyAiSpent } from "@/lib/ai/spent-event";
-import { loadChat, saveChat } from "@/lib/chat/history";
-import { findPicture, keepPicture } from "@/lib/chat/pictures";
+import { sendMessage } from "../../actions";
+import { REFERENCES_NOTE } from "../../constants";
+import { notifyAiSpent } from "../../spent-event";
+import { loadChat, saveChat } from "../../chat/history";
+import { findPicture, keepPicture } from "../../chat/pictures";
 import { ChatComposer } from "./components/chat-composer";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";

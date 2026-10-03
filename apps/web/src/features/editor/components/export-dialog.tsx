@@ -22,7 +22,7 @@ import {
   MIN_EXPORT_SCALE,
   SHEET_LAYOUTS,
   type ExportSettings,
-} from "@/lib/export/constants";
+} from "../export/constants";
 import {
   clampScale,
   exportFiles,
@@ -30,9 +30,9 @@ import {
   fitsCanvas,
   stretchedSource,
   type ExportSource,
-} from "@/lib/export/export";
+} from "../export/export";
 import { isSquare, type PixelRatio } from "@/lib/sprite/pixel-ratio";
-import { saveExport } from "@/lib/export/save";
+import { saveExport } from "../export/save";
 import { frameIndex } from "@/lib/sprite/frames";
 
 export default function ExportDialog({

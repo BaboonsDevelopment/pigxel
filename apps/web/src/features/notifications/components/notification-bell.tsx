@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { openNotifications } from "@/app/(app)/topbar-actions";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
-import type { AppNotification } from "@/lib/notifications/server";
-import { BellIcon } from "./icons";
+import { openNotifications } from "../actions";
+import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
+import type { AppNotification } from "../server";
+import { BellIcon } from "@/components/ui/icons";
 
 export function NotificationBell({
   unread: initialUnread,

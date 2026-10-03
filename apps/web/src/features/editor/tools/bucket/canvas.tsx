@@ -6,13 +6,9 @@ import {
   mirrored,
   wrapPixel,
   type Rgba,
-} from "@/components/pixel-canvas/paint";
-import {
-  clampTolerance,
-  fillPoints,
-  type Point,
-} from "@/components/pixel-canvas/pen";
-import { isSelected } from "@/components/pixel-canvas/selection";
+} from "../../pixel-canvas/paint";
+import { clampTolerance, fillPoints, type Point } from "../../pixel-canvas/pen";
+import { isSelected } from "../../pixel-canvas/selection";
 import { inkColor, slotOf } from "../shared/stroke";
 import type { ToolCanvasProps, ToolContext } from "../types";
 

@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { CSSProperties, SVGProps } from "react";
-import mascot from "../../../public/art/pigxel-mascot-sitting.png";
+import mascot from "../../../../public/art/pigxel-mascot-sitting.png";
 
 export function PixelSprite({
   rows,

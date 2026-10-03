@@ -1,4 +1,4 @@
-import type { KeptSprite } from "@/components/pixel-canvas/use-sprite";
+import type { KeptSprite } from "./pixel-canvas/use-sprite";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 
 export type KeptTile = {

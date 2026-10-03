@@ -3,7 +3,7 @@ import {
   DEFAULT_SCALE,
   MAX_SCALE,
   MIN_SCALE,
-} from "@/components/pixel-canvas/constants";
+} from "@/features/editor/pixel-canvas/constants";
 import {
   fromTouchpad,
   pinchZoom,
@@ -11,7 +11,7 @@ import {
   stepZoom,
   wheelSource,
   zoomAnchor,
-} from "@/components/pixel-canvas/wheel";
+} from "@/features/editor/pixel-canvas/wheel";
 
 const rect = (left: number, top: number, width: number, height: number) =>
   ({ left, top, width, height }) as DOMRect;

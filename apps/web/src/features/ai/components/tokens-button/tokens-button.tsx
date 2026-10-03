@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { getAiBalance } from "@/lib/ai/actions";
-import { AI_SPENT_EVENT } from "@/lib/ai/spent-event";
+import { getAiBalance } from "../../actions";
+import { AI_SPENT_EVENT } from "../../spent-event";
 import { UsageDialog } from "./components/usage-dialog/usage-dialog";
 import { tokens } from "./components/usage-dialog/helpers";
 

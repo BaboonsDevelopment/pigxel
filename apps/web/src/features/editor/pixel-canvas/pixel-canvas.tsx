@@ -12,8 +12,8 @@ import {
   type Ref,
 } from "react";
 import { frameIndex } from "@/lib/sprite/frames";
-import { tipRects } from "@/components/tile-editor/tools/shared/tips";
-import type { Tool, ToolHandlers } from "@/components/tile-editor/tools";
+import { tipRects } from "../tools/shared/tips";
+import type { Tool, ToolHandlers } from "../tools";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
 import {

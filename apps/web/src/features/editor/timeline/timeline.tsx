@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ContextMenu } from "@/components/menu/context-menu";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import { ContextMenu } from "../components/menu/context-menu";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { panelRows } from "@/lib/layers/tree";
 import { frameActions, layerActions } from "./actions";
 import { CelStrip } from "./components/cel-strip";

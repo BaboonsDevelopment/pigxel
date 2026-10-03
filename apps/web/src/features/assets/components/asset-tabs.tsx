@@ -1,5 +1,5 @@
 import { TabLinks } from "@/components/ui/tab-links";
-import { ASSET_CATEGORIES } from "@/lib/assets/assets";
+import { ASSET_CATEGORIES } from "../assets";
 
 export const ASSET_TABS = [
   { value: "all", label: "All" },

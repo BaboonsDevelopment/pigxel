@@ -3,10 +3,10 @@ import Link from "next/link";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import blankCanvas from "../../../public/art/start/blank-canvas.png";
-import generateAi from "../../../public/art/start/generate-ai.png";
-import spriteAnimation from "../../../public/art/start/sprite-animation.png";
-import tileset from "../../../public/art/start/tileset.png";
+import blankCanvas from "../../../../public/art/start/blank-canvas.png";
+import generateAi from "../../../../public/art/start/generate-ai.png";
+import spriteAnimation from "../../../../public/art/start/sprite-animation.png";
+import tileset from "../../../../public/art/start/tileset.png";
 
 type Start = {
   title: string;

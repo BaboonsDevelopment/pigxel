@@ -1,6 +1,6 @@
 "use client";
 
-import { PANEL_LABELS } from "@/lib/editor-layout/layout";
+import { PANEL_LABELS } from "../../layout";
 import type { PanelDrag } from "./use-panel-drag";
 
 export function DragOverlay({ drag }: { drag: PanelDrag }) {

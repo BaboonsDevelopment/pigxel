@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
-import { ScaledPage } from "@/components/scaled-page";
-import { CloudTiles } from "@/components/tiles/cloud-tiles";
-import { LocalTiles } from "@/components/tiles/local-tiles";
+import { ScaledPage } from "@/components/layout/scaled-page";
+import { CloudTiles } from "@/features/tiles/components/cloud-tiles";
+import { LocalTiles } from "@/features/tiles/components/local-tiles";
 import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
-import { PAGE_SIZE } from "./constants";
+import { PAGE_SIZE } from "@/features/tiles/constants";
 import { PageHeader } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = { title: "My projects · Pigxel" };

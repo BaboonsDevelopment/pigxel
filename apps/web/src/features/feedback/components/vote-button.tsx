@@ -2,7 +2,7 @@
 
 import { useOptimistic, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { setVote } from "./actions";
+import { setVote } from "../actions";
 
 export function VoteButton({
   id,

@@ -1,5 +1,5 @@
-import type { MenuSections } from "@/components/menu/constants";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import type { MenuSections } from "../components/menu/constants";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { fitImageToTile } from "@/lib/image/helpers";
 import { placeOutside } from "@/lib/layers/tree";
 import { frameIndex } from "@/lib/sprite/frames";

@@ -1,6 +1,6 @@
-import { boxBetween } from "@/components/pixel-canvas/helpers";
-import type { Area } from "@/components/pixel-canvas/constants";
-import type { Point } from "@/components/pixel-canvas/pen";
+import { boxBetween } from "../../pixel-canvas/helpers";
+import type { Area } from "../../pixel-canvas/constants";
+import type { Point } from "../../pixel-canvas/pen";
 import type { StrokeCanvas } from "./stroke";
 
 export function paintShape(

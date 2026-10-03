@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
-import { PATCH_NOTES, patchDate } from "@/lib/patch-notes";
-import { ChevronRightIcon, SparklesIcon } from "./icons";
+import { PATCH_NOTES, patchDate } from "../patch-notes";
+import { ChevronRightIcon, SparklesIcon } from "@/components/ui/icons";
 
 export function PatchNotesCard({
   active,

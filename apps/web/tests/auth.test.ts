@@ -51,8 +51,7 @@ vi.mock("next/font/google", () => ({
   Geist_Pixel: () => ({ variable: "" }),
 }));
 
-import { authenticate, signOut } from "@/app/login/actions";
-import { updatePassword } from "@/app/auth/update-password/actions";
+import { authenticate, signOut, updatePassword } from "@/features/auth/actions";
 import { GET as callback } from "@/app/auth/callback/route";
 import { GET as confirm } from "@/app/auth/confirm/route";
 import AccountSettings from "@/app/(app)/settings/account/page";

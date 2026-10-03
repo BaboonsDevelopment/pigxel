@@ -1,13 +1,13 @@
 import { Button, IconButton } from "@pigxel/ui/components/button";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { Text } from "@pigxel/ui/components/typography";
-import type { Stamp } from "@/components/pixel-canvas/paint";
+import type { Stamp } from "../../pixel-canvas/paint";
 import {
   clampOpacity,
   clampPenSize,
   clampTolerance,
-} from "@/components/pixel-canvas/pen";
-import type { Transform } from "@/components/pixel-canvas/use-selection";
+} from "../../pixel-canvas/pen";
+import type { Transform } from "../../pixel-canvas/use-selection";
 import type { ToolOptionProps } from "../types";
 import { NumberOption, OptionSelect, SizeField } from "./fields";
 

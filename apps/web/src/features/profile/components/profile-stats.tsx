@@ -1,5 +1,5 @@
 import { cn } from "@pigxel/ui/lib/utils";
-import type { ProfileActivity } from "@/lib/profile/server";
+import type { ProfileActivity } from "../server";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 

@@ -4,8 +4,8 @@ import { useOptimistic, useRef, useState, useTransition } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
-import { AVATAR_BUCKET, type ArtistProfile } from "@/lib/profile/profile";
+import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
+import { AVATAR_BUCKET, type ArtistProfile } from "@/features/profile/profile";
 import { createClient } from "@/lib/supabase/client";
 import { setAvatar } from "./actions";
 

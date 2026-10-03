@@ -2,9 +2,9 @@ import Image, { type StaticImageData } from "next/image";
 import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, Text } from "@pigxel/ui/components/typography";
-import characters from "../../../public/art/templates/characters.png";
-import cozyRooms from "../../../public/art/templates/cozy-rooms.png";
-import fantasyBuildings from "../../../public/art/templates/fantasy-buildings.png";
+import characters from "../../../../public/art/templates/characters.png";
+import cozyRooms from "../../../../public/art/templates/cozy-rooms.png";
+import fantasyBuildings from "../../../../public/art/templates/fantasy-buildings.png";
 
 type Template = { name: string; image: StaticImageData; alt: string };
 

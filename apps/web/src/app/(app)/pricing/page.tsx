@@ -2,11 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Page } from "@pigxel/ui/components/page";
-import { PageTransition } from "@/components/page-transition";
-import { PricingPlans } from "@/components/pricing/pricing-plans";
+import { PageTransition } from "@/components/layout/page-transition";
+import { PricingPlans } from "@/features/billing/components/pricing-plans";
 import { getUser } from "@/lib/auth/session";
-import { LEGAL } from "@/lib/legal";
-import { countryFromHeaders, paddleClientConfig } from "@/lib/paddle/config";
+import { LEGAL } from "@/features/legal/legal";
+import {
+  countryFromHeaders,
+  paddleClientConfig,
+} from "@/features/billing/paddle";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {

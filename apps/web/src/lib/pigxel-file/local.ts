@@ -1,4 +1,4 @@
-import { downloadBlob } from "@/lib/download";
+import { downloadBlob } from "@/lib/utils/download";
 import { PIGXEL_MIME_TYPE, pigxelFileName } from "./format";
 
 export function downloadPigxel(name: string, contents: string) {

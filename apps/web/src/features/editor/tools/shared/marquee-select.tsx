@@ -1,15 +1,15 @@
 "use client";
 
 import { useImperativeHandle, useState } from "react";
-import { areaBetween, boxBetween } from "@/components/pixel-canvas/helpers";
-import { squareFrom, type Point } from "@/components/pixel-canvas/pen";
+import { areaBetween, boxBetween } from "../../pixel-canvas/helpers";
+import { squareFrom, type Point } from "../../pixel-canvas/pen";
 import {
   ellipseMask,
   isSelected,
   rectMask,
   selectModeOf,
   type SelectMode,
-} from "@/components/pixel-canvas/selection";
+} from "../../pixel-canvas/selection";
 import type { ToolCanvasProps } from "../types";
 import { GUIDE, SizeLabel, ToolSvg } from "./overlays";
 import { useSelectionMove } from "./use-selection-move";

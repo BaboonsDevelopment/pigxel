@@ -5,14 +5,10 @@ import type {
   Ref,
   RefObject,
 } from "react";
-import type { PaintOptions, Stamp } from "@/components/pixel-canvas/paint";
-import type {
-  ColorSlot,
-  PenSettings,
-  Point,
-} from "@/components/pixel-canvas/pen";
-import type { SelectionApi } from "@/components/pixel-canvas/use-selection";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import type { PaintOptions, Stamp } from "../pixel-canvas/paint";
+import type { ColorSlot, PenSettings, Point } from "../pixel-canvas/pen";
+import type { SelectionApi } from "../pixel-canvas/use-selection";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import type { Slice } from "@/lib/slices/slices";
 
 export type ToolGroupId =

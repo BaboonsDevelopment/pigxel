@@ -1,7 +1,7 @@
-import type { Area } from "@/components/pixel-canvas/constants";
-import { editTile, planEdit, redrawArea, redrawFrames } from "@/lib/ai/actions";
-import { sheetLayout } from "@/lib/ai/helpers";
-import type { EditPlan, TileAction } from "@/lib/ai/types";
+import type { Area } from "@/features/editor/pixel-canvas/constants";
+import { editTile, planEdit, redrawArea, redrawFrames } from "../../../actions";
+import { sheetLayout } from "../../../helpers";
+import type { EditPlan, TileAction } from "../../../types";
 import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";

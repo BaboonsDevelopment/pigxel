@@ -1,12 +1,12 @@
-import type { Area } from "@/components/pixel-canvas/constants";
-import { atLeastPlacementSize } from "@/components/pixel-canvas/helpers";
+import type { Area } from "@/features/editor/pixel-canvas/constants";
+import { atLeastPlacementSize } from "@/features/editor/pixel-canvas/helpers";
 import {
   generateImage,
   generateSet,
   planPlacement,
   suggestComposition,
-} from "@/lib/ai/actions";
-import type { SetItem, TileAction } from "@/lib/ai/types";
+} from "../../../actions";
+import type { SetItem, TileAction } from "../../../types";
 import { resizeNearest } from "@/lib/image/bitmap";
 import { sheetToFrames } from "@/lib/image/sheet";
 import {

@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { sprayDotCount, sprayDots } from "@/components/pixel-canvas/pen";
+import { sprayDotCount, sprayDots } from "../../pixel-canvas/pen";
 import {
   drawStroke,
   finishStroke,

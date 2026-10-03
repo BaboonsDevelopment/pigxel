@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Notice } from "@pigxel/ui/components/notice";
-import { LEGAL, legalDate } from "@/lib/legal";
+import { LEGAL, legalDate } from "../legal";
 
 export function LegalPage({
   title,

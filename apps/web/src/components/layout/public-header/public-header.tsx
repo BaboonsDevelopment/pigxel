@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { BrandMascot } from "@/components/brand";
-import { geist } from "@/lib/fonts";
+import { BrandMascot } from "@/components/ui/brand";
+import { geist } from "@/lib/fonts/geist";
 import styles from "./public-header.module.css";
 
 const LINKS = [

@@ -14,7 +14,7 @@ import {
   strokePixels,
   DEFAULT_PEN,
   type Point,
-} from "@/components/pixel-canvas/pen";
+} from "@/features/editor/pixel-canvas/pen";
 
 const p = (x: number, y: number): Point => ({ x, y });
 

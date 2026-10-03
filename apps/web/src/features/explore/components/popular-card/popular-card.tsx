@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import type { PublicTile } from "@/lib/profile/profile";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
-import { HoverOverlay } from "@/components/tiles/hover-overlay";
+import type { PublicTile } from "@/features/profile/profile";
+import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
+import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { LikeButton } from "./components/like-button";
 import { PreviewDialog } from "./components/preview-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";

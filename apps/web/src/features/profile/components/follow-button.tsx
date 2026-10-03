@@ -3,7 +3,7 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { setFollowing } from "@/app/(app)/u/[username]/actions";
+import { setFollowing } from "../actions";
 
 export function FollowButton({
   profileId,

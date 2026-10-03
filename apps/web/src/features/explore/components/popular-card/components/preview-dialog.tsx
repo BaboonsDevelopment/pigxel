@@ -7,7 +7,7 @@ import { Text } from "@pigxel/ui/components/typography";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
-import type { PublicTile } from "@/lib/profile/profile";
+import type { PublicTile } from "@/features/profile/profile";
 import { samePixels, zoomDialog } from "../helpers";
 
 type Picture = {

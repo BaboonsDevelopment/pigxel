@@ -1,4 +1,4 @@
-import { paintGradient, rgbaOf } from "@/components/pixel-canvas/paint";
+import { paintGradient, rgbaOf } from "../../pixel-canvas/paint";
 import { DragStroke } from "../shared/drag-stroke";
 import type { ToolCanvasProps } from "../types";
 

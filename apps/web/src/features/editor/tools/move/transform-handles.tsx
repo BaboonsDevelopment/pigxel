@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import type { FreeTransform } from "@/components/pixel-canvas/free-transform";
+import type { FreeTransform } from "../../pixel-canvas/free-transform";
 
 type Box = { t: FreeTransform; w: number; h: number };
 

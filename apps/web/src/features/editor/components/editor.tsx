@@ -10,29 +10,22 @@ import {
   useState,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { choiceDialog } from "@/components/confirm-dialog/confirm-dialog";
-import type { Area } from "@/components/pixel-canvas/constants";
-import {
-  filledMask,
-  outlined,
-  replacedColor,
-} from "@/components/pixel-canvas/effects";
-import { rgbaOf, type Stamp } from "@/components/pixel-canvas/paint";
-import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
+import { choiceDialog } from "@/components/ui/confirm-dialog";
+import type { Area } from "../pixel-canvas/constants";
+import { filledMask, outlined, replacedColor } from "../pixel-canvas/effects";
+import { rgbaOf, type Stamp } from "../pixel-canvas/paint";
+import { clampPenSize, type PenSettings } from "../pixel-canvas/pen";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
-} from "@/components/pixel-canvas/pixel-canvas";
+} from "../pixel-canvas/pixel-canvas";
 import {
   borderMask,
   contractMask,
   expandMask,
   maskBounds,
-} from "@/components/pixel-canvas/selection";
-import {
-  pasteSource,
-  useSelection,
-} from "@/components/pixel-canvas/use-selection";
+} from "../pixel-canvas/selection";
+import { pasteSource, useSelection } from "../pixel-canvas/use-selection";
 import {
   DEFAULT_VIEW,
   GRID_SIZES,
@@ -40,16 +33,13 @@ import {
   SYMMETRY_OPTIONS,
   TILED_OPTIONS,
   type CanvasView,
-} from "@/components/pixel-canvas/view";
-import type { MenuSections } from "@/components/menu/constants";
-import {
-  useSprite,
-  type SpriteApi,
-} from "@/components/pixel-canvas/use-sprite";
-import { Timeline } from "@/components/timeline/timeline";
-import { usePlayback } from "@/components/timeline/use-playback";
-import { loadAssetFrame, type Asset } from "@/lib/assets/assets";
-import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
+} from "../pixel-canvas/view";
+import type { MenuSections } from "./menu/constants";
+import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
+import { Timeline } from "../timeline/timeline";
+import { usePlayback } from "../timeline/use-playback";
+import { loadAssetFrame, type Asset } from "@/features/assets/assets";
+import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
@@ -78,7 +68,7 @@ import {
 } from "@/lib/pigxel-file/import-image";
 import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
 import type { Slice } from "@/lib/slices/slices";
-import { findTutorial } from "@/lib/tutorials/tutorials";
+import { findTutorial } from "@/features/tutorials/tutorials";
 import {
   DEFAULT_LAYOUT,
   PANELS,
@@ -87,11 +77,11 @@ import {
   setPanelShown,
   setToolShown,
   type PanelId,
-} from "@/lib/editor-layout/layout";
+} from "../layout";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
 import { keepTile, type KeptTile } from "../kept-tiles";
-import { useModifierLabel } from "../use-modifier-label";
+import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
 import { useTileFile } from "../use-tile-file";

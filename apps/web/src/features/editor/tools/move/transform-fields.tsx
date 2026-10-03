@@ -2,8 +2,8 @@
 
 import { Button } from "@pigxel/ui/components/button";
 import { Input } from "@pigxel/ui/components/input";
-import type { FreeTransform } from "@/components/pixel-canvas/free-transform";
-import type { SelectionApi } from "@/components/pixel-canvas/use-selection";
+import type { FreeTransform } from "../../pixel-canvas/free-transform";
+import type { SelectionApi } from "../../pixel-canvas/use-selection";
 
 const FIELDS: {
   key: "width" | "height" | "angle" | "skew";

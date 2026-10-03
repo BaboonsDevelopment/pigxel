@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { LayerPatch } from "@/components/pixel-canvas/use-sprite";
+import type { LayerPatch } from "../../pixel-canvas/use-sprite";
 import type { PanelRow } from "@/lib/layers/tree";
 import { LAYER_COLUMN, type DropZone } from "../constants";
 import { ICONS } from "../icons";

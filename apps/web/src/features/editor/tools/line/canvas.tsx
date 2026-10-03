@@ -1,4 +1,4 @@
-import { linePoints } from "@/components/pixel-canvas/pen";
+import { linePoints } from "../../pixel-canvas/pen";
 import { DragStroke } from "../shared/drag-stroke";
 import type { ToolCanvasProps } from "../types";
 

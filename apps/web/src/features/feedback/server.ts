@@ -1,10 +1,10 @@
 import "server-only";
-import { timeAgo } from "@/lib/notifications/server";
+import { timeAgo } from "@/features/notifications/server";
 import {
   PROFILE_COLUMNS,
   toArtistProfile,
   type ProfileRow,
-} from "@/lib/profile/profile";
+} from "@/features/profile/profile";
 import { createClient } from "@/lib/supabase/server";
 import {
   ACTIVE_STATUSES,

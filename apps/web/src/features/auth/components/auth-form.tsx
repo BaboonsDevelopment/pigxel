@@ -7,7 +7,7 @@ import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { Notice } from "@pigxel/ui/components/notice";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
-import { authenticate } from "./actions";
+import { authenticate } from "../actions";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
 
 const labels: Record<AuthMode, string> = {

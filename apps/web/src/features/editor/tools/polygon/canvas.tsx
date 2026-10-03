@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { snapLine, type Point } from "@/components/pixel-canvas/pen";
+import { snapLine, type Point } from "../../pixel-canvas/pen";
 import { Corners, ToolSvg } from "../shared/overlays";
 import {
   cancelStroke,

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { profileOf, type Profile } from "@/lib/auth/session";
-import { getCurrentPlan } from "@/lib/billing/server";
+import { getCurrentPlan } from "@/features/billing/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {

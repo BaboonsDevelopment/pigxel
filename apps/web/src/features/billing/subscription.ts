@@ -1,4 +1,4 @@
-import { TIERS, type BillingCycle, type Tier } from "@/lib/pricing";
+import { TIERS, type BillingCycle, type Tier } from "./pricing";
 
 export type SubscriptionRecord = {
   id: string;

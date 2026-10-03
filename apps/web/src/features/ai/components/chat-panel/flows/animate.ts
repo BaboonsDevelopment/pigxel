@@ -1,6 +1,6 @@
-import type { AnimationSpec } from "@/components/pixel-canvas/use-sprite";
-import { generateSheet, planAnimation } from "@/lib/ai/actions";
-import type { AnimationPlan, SheetTrack, TileAction } from "@/lib/ai/types";
+import type { AnimationSpec } from "@/features/editor/pixel-canvas/use-sprite";
+import { generateSheet, planAnimation } from "../../../actions";
+import type { AnimationPlan, SheetTrack, TileAction } from "../../../types";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import { sheetToFrames } from "@/lib/image/sheet";
 import { UNREACHABLE, type Chat, type LayerInfo } from "../constants";

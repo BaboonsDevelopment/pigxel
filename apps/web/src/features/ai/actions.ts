@@ -7,9 +7,9 @@ import {
   MAX_SET_ITEMS,
   PLACEMENT_HISTORY,
   SMALL_IMAGE_MAX_SIDE,
-} from "@/lib/ai/constants";
-import { creditBalance, creditsOf } from "@/lib/ai/credits";
-import { AiError, toUserMessage } from "@/lib/ai/errors";
+} from "./constants";
+import { creditBalance, creditsOf } from "./credits";
+import { AiError, toUserMessage } from "./errors";
 import {
   buildAnimationPrompt,
   buildComposePrompt,
@@ -28,8 +28,8 @@ import {
   closestAspectRatio,
   sheetLayout,
   type SheetLayout,
-} from "@/lib/ai/helpers";
-import { getAiProvider } from "@/lib/ai/provider";
+} from "./helpers";
+import { getAiProvider } from "./provider";
 import type {
   AiResult,
   AnimationPlan,
@@ -39,7 +39,7 @@ import type {
   EditReview,
   PlacementPlan,
   Rect,
-} from "@/lib/ai/types";
+} from "./types";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";

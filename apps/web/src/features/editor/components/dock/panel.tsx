@@ -2,7 +2,7 @@
 
 import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { PanelId } from "@/lib/editor-layout/layout";
+import type { PanelId } from "../../layout";
 
 export function Panel({
   id,

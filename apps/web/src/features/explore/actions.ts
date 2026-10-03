@@ -1,8 +1,8 @@
 "use server";
 
 import { getUser, requireUser } from "@/lib/auth/session";
-import type { PublicTile } from "@/lib/profile/profile";
-import { listPublicTiles } from "@/lib/profile/server";
+import type { PublicTile } from "@/features/profile/profile";
+import { listPublicTiles } from "@/features/profile/server";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE, PERIODS, type Period } from "./constants";
 

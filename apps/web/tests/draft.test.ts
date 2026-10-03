@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PEN } from "@/components/pixel-canvas/pen";
+import { DEFAULT_PEN } from "@/features/editor/pixel-canvas/pen";
 import {
   canStoreDrafts,
   createDraft,

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Profile } from "@/lib/auth/session";
-import pig from "../../../public/art/pigxel-mascot-sitting.png";
+import pig from "../../../../public/art/pigxel-mascot-sitting.png";
 import { AccountMenu } from "./account-menu";
 import {
   BookIcon,
@@ -14,8 +14,8 @@ import {
   FolderIcon,
   HomeIcon,
   TelescopeIcon,
-} from "./icons";
-import { PatchNotesCard } from "./patch-notes-card";
+} from "@/components/ui/icons";
+import { PatchNotesCard } from "@/features/patch-notes/components/patch-notes-card";
 import { SidebarScene } from "./sidebar-scene";
 
 type NavItem = {

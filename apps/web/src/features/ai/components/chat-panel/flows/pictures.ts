@@ -1,9 +1,9 @@
 import type { Bitmap, Size } from "@/lib/image/bitmap";
 import { imageToPixelArt } from "@/lib/image/helpers";
 import { GENERATED_PICTURE_STEPS, type Step } from "@/lib/image/pipeline";
-import type { Area } from "@/components/pixel-canvas/constants";
-import { canvasOf } from "@/components/pixel-canvas/helpers";
-import type { SheetLayout } from "@/lib/ai/helpers";
+import type { Area } from "@/features/editor/pixel-canvas/constants";
+import { canvasOf } from "@/features/editor/pixel-canvas/helpers";
+import type { SheetLayout } from "../../../helpers";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import {
   FRAMES_SHEET_SIDE,

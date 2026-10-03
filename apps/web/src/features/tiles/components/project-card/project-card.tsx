@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { HoverOverlay } from "@/components/tiles/hover-overlay";
+import { HoverOverlay } from "../hover-overlay";
 import { ProjectMenu } from "./components/project-menu";
 
 export function ProjectCard({

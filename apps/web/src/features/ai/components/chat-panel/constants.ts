@@ -1,6 +1,6 @@
-import type { Area, Size } from "@/components/pixel-canvas/constants";
-import type { AnimationSpec } from "@/components/pixel-canvas/use-sprite";
-import type { ChatMessage } from "@/lib/ai/types";
+import type { Area, Size } from "@/features/editor/pixel-canvas/constants";
+import type { AnimationSpec } from "@/features/editor/pixel-canvas/use-sprite";
+import type { ChatMessage } from "../../types";
 
 export const SUGGESTIONS = [
   "make the eyes red",

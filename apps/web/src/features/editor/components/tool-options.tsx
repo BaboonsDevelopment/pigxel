@@ -1,6 +1,6 @@
-import type { Stamp } from "@/components/pixel-canvas/paint";
-import type { PenSettings } from "@/components/pixel-canvas/pen";
-import type { SelectionApi } from "@/components/pixel-canvas/use-selection";
+import type { Stamp } from "../pixel-canvas/paint";
+import type { PenSettings } from "../pixel-canvas/pen";
+import type { SelectionApi } from "../pixel-canvas/use-selection";
 import type { Slice } from "@/lib/slices/slices";
 import type { Tool } from "../tools";
 import { SelectionActions } from "../tools/shared/options";

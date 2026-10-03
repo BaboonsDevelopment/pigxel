@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeGif } from "@/lib/export/gif";
+import { encodeGif } from "@/features/editor/export/gif";
 import { decodeGif } from "@/lib/image/gif-decode";
 import {
   documentFromFrames,

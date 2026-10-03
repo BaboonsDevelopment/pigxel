@@ -1,7 +1,4 @@
-import {
-  MAX_SPRAY_SPEED,
-  MIN_SPRAY_SPEED,
-} from "@/components/pixel-canvas/pen";
+import { MAX_SPRAY_SPEED, MIN_SPRAY_SPEED } from "../../pixel-canvas/pen";
 import type { ToolOptionProps } from "../types";
 import { NumberOption } from "../shared/fields";
 

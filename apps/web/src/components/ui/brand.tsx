@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import mascot from "../../public/art/pigxel-mascot-sitting.png";
+import mascot from "../../../public/art/pigxel-mascot-sitting.png";
 
 export function BrandMascot({
   className,

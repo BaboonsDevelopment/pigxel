@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { setTileLiked } from "@/app/(app)/explore/actions";
+import { setTileLiked } from "../../../actions";
 
 export function LikeButton({
   tileId,

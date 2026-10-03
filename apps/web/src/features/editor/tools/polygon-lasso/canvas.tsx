@@ -1,13 +1,13 @@
 "use client";
 
 import { useImperativeHandle, useState } from "react";
-import type { Point } from "@/components/pixel-canvas/pen";
+import type { Point } from "../../pixel-canvas/pen";
 import {
   isSelected,
   polygonMask,
   selectModeOf,
   type SelectMode,
-} from "@/components/pixel-canvas/selection";
+} from "../../pixel-canvas/selection";
 import { Corners, PathGuide, ToolSvg } from "../shared/overlays";
 import { useSelectionMove } from "../shared/use-selection-move";
 import { useShapeKeys } from "../shared/use-shape-keys";

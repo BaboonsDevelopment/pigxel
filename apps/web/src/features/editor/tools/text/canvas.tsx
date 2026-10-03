@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import { rgbaOf, type Rgba } from "@/components/pixel-canvas/paint";
-import type { Point } from "@/components/pixel-canvas/pen";
-import type { Floating } from "@/components/pixel-canvas/selection";
-import { textPiece } from "@/components/pixel-canvas/text";
+import { rgbaOf, type Rgba } from "../../pixel-canvas/paint";
+import type { Point } from "../../pixel-canvas/pen";
+import type { Floating } from "../../pixel-canvas/selection";
+import { textPiece } from "../../pixel-canvas/text";
 import { slotOf } from "../shared/stroke";
 import type { ToolCanvasProps } from "../types";
 

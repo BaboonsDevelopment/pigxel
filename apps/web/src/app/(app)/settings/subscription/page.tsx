@@ -8,7 +8,7 @@ import {
   textLinkClassName,
 } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
-import { getCurrentPlan } from "@/lib/billing/server";
+import { getCurrentPlan } from "@/features/billing/server";
 
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
 export const dynamic = "force-dynamic";

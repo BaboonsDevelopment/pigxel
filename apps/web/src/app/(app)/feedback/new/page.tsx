@@ -4,9 +4,9 @@ import { cardVariants } from "@pigxel/ui/components/card";
 import { Page } from "@pigxel/ui/components/page";
 import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
-import { kindOf, pageFrom } from "@/lib/feedback/feedback";
-import { countOwnOpen } from "@/lib/feedback/server";
-import { NewFeedbackForm } from "./new-feedback-form";
+import { kindOf, pageFrom } from "@/features/feedback/feedback";
+import { countOwnOpen } from "@/features/feedback/server";
+import { NewFeedbackForm } from "@/features/feedback/components/new-feedback-form";
 
 export const metadata: Metadata = { title: "New feedback · Pigxel" };
 export const dynamic = "force-dynamic";

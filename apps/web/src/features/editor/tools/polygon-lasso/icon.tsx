@@ -1,4 +1,4 @@
-import { pixelIcon } from "@/components/pixel-icon";
+import { pixelIcon } from "@/components/ui/pixel-icon";
 
 export const icon = pixelIcon([
   "................",

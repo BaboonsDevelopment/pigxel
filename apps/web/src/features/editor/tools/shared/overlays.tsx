@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import type { Area, Size } from "@/components/pixel-canvas/constants";
-import type { Point } from "@/components/pixel-canvas/pen";
+import type { Area, Size } from "../../pixel-canvas/constants";
+import type { Point } from "../../pixel-canvas/pen";
 
 export const GUIDE = {
   fill: "rgb(59 130 246 / 0.12)",

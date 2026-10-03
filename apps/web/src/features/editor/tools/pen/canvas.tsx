@@ -1,4 +1,4 @@
-import { strokePixels } from "@/components/pixel-canvas/pen";
+import { strokePixels } from "../../pixel-canvas/pen";
 import { FreehandStroke } from "../shared/freehand";
 import { penInk } from "../shared/stroke";
 import type { ToolCanvasProps } from "../types";

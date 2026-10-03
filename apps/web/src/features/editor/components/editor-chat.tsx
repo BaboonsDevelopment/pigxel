@@ -1,19 +1,19 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { ChatPanel } from "@/components/chat-panel/chat-panel";
+import { ChatPanel } from "@/features/ai/components/chat-panel/chat-panel";
 import {
   MAX_OVERLAP,
   type CanvasBridge,
   type LayerInfo,
   type TileObject,
-} from "@/components/chat-panel/constants";
-import { drawnBox } from "@/components/chat-panel/helpers";
-import type { Area } from "@/components/pixel-canvas/constants";
-import { canvasOf, tileSnapshot } from "@/components/pixel-canvas/helpers";
-import type { PixelCanvasHandle } from "@/components/pixel-canvas/pixel-canvas";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
-import type { Playback } from "@/components/timeline/use-playback";
+} from "@/features/ai/components/chat-panel/constants";
+import { drawnBox } from "@/features/ai/components/chat-panel/helpers";
+import type { Area } from "../pixel-canvas/constants";
+import { canvasOf, tileSnapshot } from "../pixel-canvas/helpers";
+import type { PixelCanvasHandle } from "../pixel-canvas/pixel-canvas";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
+import type { Playback } from "../timeline/use-playback";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { findObjects } from "@/lib/edit/objects";
 import { allLayers, canPaint, isShown } from "@/lib/layers/tree";

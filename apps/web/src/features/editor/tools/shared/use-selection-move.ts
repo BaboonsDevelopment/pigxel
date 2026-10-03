@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef } from "react";
-import type { Point } from "@/components/pixel-canvas/pen";
+import type { Point } from "../../pixel-canvas/pen";
 import type { CanvasPointer, ToolContext } from "../types";
 
 export function useSelectionMove({ sprite, selection }: ToolContext) {

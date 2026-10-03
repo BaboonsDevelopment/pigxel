@@ -1,12 +1,8 @@
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
-import {
-  joinedLabel,
-  monthLabel,
-  type ArtistProfile,
-} from "@/lib/profile/profile";
-import { linkTitle } from "@/lib/profile/validation";
-import { TokensButton } from "@/components/tokens-button/tokens-button";
+import { joinedLabel, monthLabel, type ArtistProfile } from "../profile";
+import { linkTitle } from "../validation";
+import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
 import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
 import { Badge } from "@pigxel/ui/components/badge";

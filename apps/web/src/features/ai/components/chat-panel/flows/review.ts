@@ -1,10 +1,10 @@
 import {
   SNAPSHOT_BACKGROUND,
   type Area,
-} from "@/components/pixel-canvas/constants";
-import { canvasOf, tileSnapshot } from "@/components/pixel-canvas/helpers";
-import { reviewEdit } from "@/lib/ai/actions";
-import type { EditReview } from "@/lib/ai/types";
+} from "@/features/editor/pixel-canvas/constants";
+import { canvasOf, tileSnapshot } from "@/features/editor/pixel-canvas/helpers";
+import { reviewEdit } from "../../../actions";
+import type { EditReview } from "../../../types";
 import { unionOf } from "@/lib/edit/raster";
 import { REVIEW_MARGIN, type Chat } from "../constants";
 import { grown } from "../helpers";

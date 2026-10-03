@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { loadCloudTiles } from "@/app/(app)/tiles/actions";
-import { PAGE_SIZE } from "@/app/(app)/tiles/constants";
+import { loadCloudTiles } from "../actions";
+import { PAGE_SIZE } from "../constants";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
-import { scrollParent } from "@/lib/scroll-parent";
+import { scrollParent } from "@/lib/utils/scroll-parent";
 import { ProjectCard } from "./project-card/project-card";
-import { useCloudTileActions } from "./tile-actions";
+import { useCloudTileActions } from "../tile-actions";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { Heading } from "@pigxel/ui/components/typography";
 

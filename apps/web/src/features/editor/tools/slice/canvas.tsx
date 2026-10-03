@@ -1,8 +1,8 @@
 "use client";
 
 import { useImperativeHandle, useState } from "react";
-import { areaBetween } from "@/components/pixel-canvas/helpers";
-import type { Point } from "@/components/pixel-canvas/pen";
+import { areaBetween } from "../../pixel-canvas/helpers";
+import type { Point } from "../../pixel-canvas/pen";
 import {
   nextSliceName,
   resizedSlice,

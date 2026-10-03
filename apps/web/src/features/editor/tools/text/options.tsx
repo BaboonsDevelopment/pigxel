@@ -1,4 +1,4 @@
-import { TEXT_FONTS, TEXT_SCALES } from "@/components/pixel-canvas/text-fonts";
+import { TEXT_FONTS, TEXT_SCALES } from "../../pixel-canvas/text-fonts";
 import type { ToolOptionProps } from "../types";
 import { OptionSelect } from "../shared/fields";
 

@@ -6,10 +6,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@pigxel/ui/lib/utils";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Profile } from "@/lib/auth/session";
-import pig from "../../../public/art/pigxel-mascot-sitting.png";
-import { CloseIcon, MenuIcon } from "./icons";
-import { NotificationBell } from "./notification-bell";
-import { SearchButton } from "./search-dialog";
+import pig from "../../../../public/art/pigxel-mascot-sitting.png";
+import { CloseIcon, MenuIcon } from "@/components/ui/icons";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
+import { SearchButton } from "@/features/search/components/search-dialog";
 import { Sidebar } from "./sidebar";
 
 export function AppShell({

@@ -11,9 +11,9 @@ import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import {
   confirmRemoveLocalTile,
   useCloudTileActions,
-} from "@/components/tiles/tile-actions";
-import { ProjectCard } from "@/components/tiles/project-card/project-card";
-import { TileThumbnail } from "@/components/tiles/tile-thumbnail";
+} from "@/features/tiles/tile-actions";
+import { ProjectCard } from "@/features/tiles/components/project-card/project-card";
+import { TileThumbnail } from "@/features/tiles/components/tile-thumbnail";
 import { PixelImage } from "@/components/ui/pixel-image";
 
 type Project =

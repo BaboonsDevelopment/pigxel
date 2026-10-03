@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { ColorSlot } from "@/components/pixel-canvas/pen";
-import type { PenSettings } from "@/components/pixel-canvas/pen";
+import type { ColorSlot } from "../../pixel-canvas/pen";
+import type { PenSettings } from "../../pixel-canvas/pen";
 import { ColorPicker } from "./color-picker";
 import { swatchProps, withColor } from "./helpers";
 

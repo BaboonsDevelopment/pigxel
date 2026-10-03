@@ -1,6 +1,6 @@
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import type { ProfileTile } from "@/lib/profile/profile";
+import type { ProfileTile } from "../profile";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";

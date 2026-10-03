@@ -1,4 +1,4 @@
-import { jumbleInk } from "@/components/pixel-canvas/paint";
+import { jumbleInk } from "../../pixel-canvas/paint";
 import { FreehandStroke } from "../shared/freehand";
 import type { ToolCanvasProps } from "../types";
 

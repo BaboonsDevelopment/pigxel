@@ -1,8 +1,8 @@
 "use client";
 
 import { useImperativeHandle } from "react";
-import { identityTransform } from "@/components/pixel-canvas/free-transform";
-import { maskBounds } from "@/components/pixel-canvas/selection";
+import { identityTransform } from "../../pixel-canvas/free-transform";
+import { maskBounds } from "../../pixel-canvas/selection";
 import { useSelectionMove } from "../shared/use-selection-move";
 import type { ToolCanvasProps } from "../types";
 import { TransformHandles } from "./transform-handles";

@@ -11,8 +11,8 @@ import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
-import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "@/lib/pricing";
-import { annualComparison, type PriceQuote } from "@/lib/pricing-comparison";
+import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "../pricing";
+import { annualComparison, type PriceQuote } from "../pricing-comparison";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 

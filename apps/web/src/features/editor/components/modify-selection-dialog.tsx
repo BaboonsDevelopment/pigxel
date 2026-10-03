@@ -4,10 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Radio } from "@pigxel/ui/components/choice";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
-import {
-  MAX_MODIFY,
-  type ModifyShape,
-} from "@/components/pixel-canvas/selection";
+import { MAX_MODIFY, type ModifyShape } from "../pixel-canvas/selection";
 import { NumberField } from "./number-field";
 
 export type ModifyKind = "expand" | "contract" | "border" | "stroke";

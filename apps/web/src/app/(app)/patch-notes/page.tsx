@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Page } from "@pigxel/ui/components/page";
-import { PATCH_NOTES, patchDate } from "@/lib/patch-notes";
-import { VersionSelect } from "./version-select";
-import { ReleaseArt } from "./release-art";
+import { PATCH_NOTES, patchDate } from "@/features/patch-notes/patch-notes";
+import { VersionSelect } from "@/features/patch-notes/components/version-select";
+import { ReleaseArt } from "@/features/patch-notes/components/release-art";
 import { Eyebrow, Heading } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = { title: "Patch notes · Pigxel" };

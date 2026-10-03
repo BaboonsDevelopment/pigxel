@@ -5,7 +5,7 @@ import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { MAX_SIZE, MIN_SIZE } from "@/components/pixel-canvas/constants";
+import { MAX_SIZE, MIN_SIZE } from "../pixel-canvas/constants";
 import {
   ANCHORS,
   NO_BORDERS,

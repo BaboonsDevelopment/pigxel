@@ -1,6 +1,6 @@
 "use client";
 
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import type { SpriteApi } from "../../pixel-canvas/use-sprite";
 import { ACTION } from "../constants";
 import { ICONS } from "../icons";
 import type { Playback } from "../use-playback";

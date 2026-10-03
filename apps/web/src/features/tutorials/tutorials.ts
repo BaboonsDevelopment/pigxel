@@ -1,5 +1,5 @@
 import type { StaticImageData } from "next/image";
-import type { ToolId } from "@/components/tile-editor/constants";
+import type { ToolId } from "@/features/editor/constants";
 import buildTileset from "../../../public/art/tutorials/build-tileset.png";
 import firstAnimation from "../../../public/art/tutorials/first-animation.png";
 import pixelArtBasics from "../../../public/art/tutorials/pixel-art-basics.png";

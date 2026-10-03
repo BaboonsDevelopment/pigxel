@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { Page } from "@pigxel/ui/components/page";
-import { PageTransition } from "@/components/page-transition";
+import { PageTransition } from "@/components/layout/page-transition";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {

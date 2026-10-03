@@ -124,3 +124,11 @@ export function readLinks(value: unknown): ProfileLink[] {
         : { url: link.url },
     );
 }
+
+export function usernameIn(segment: string) {
+  try {
+    return normalizeUsername(decodeURIComponent(segment));
+  } catch {
+    return "";
+  }
+}

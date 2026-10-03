@@ -5,8 +5,8 @@ import {
   PROFILE_COLUMNS,
   toArtistProfile,
   type ProfileRow,
-} from "@/lib/profile/profile";
-import { USERNAME_MAX, normalizeUsername } from "@/lib/profile/validation";
+} from "@/features/profile/profile";
+import { USERNAME_MAX, normalizeUsername } from "@/features/profile/validation";
 
 export type ArtistResult = {
   id: string;

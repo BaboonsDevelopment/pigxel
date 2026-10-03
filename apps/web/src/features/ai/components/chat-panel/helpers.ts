@@ -1,4 +1,4 @@
-import type { Area, Size } from "@/components/pixel-canvas/constants";
+import type { Area, Size } from "@/features/editor/pixel-canvas/constants";
 import {
   drawOnEmpty,
   keepMasked,

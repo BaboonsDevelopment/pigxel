@@ -10,9 +10,9 @@ import {
   pageFrom,
   readFeedback,
   type FeedbackInput,
-} from "@/lib/feedback/feedback";
-import { countOwnOpen } from "@/lib/feedback/server";
-import { PATCH_NOTES } from "@/lib/patch-notes";
+} from "./feedback";
+import { countOwnOpen } from "./server";
+import { PATCH_NOTES } from "@/features/patch-notes/patch-notes";
 import { createClient } from "@/lib/supabase/server";
 
 export type FeedbackFormState = {

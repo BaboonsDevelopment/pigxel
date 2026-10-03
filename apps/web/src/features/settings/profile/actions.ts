@@ -2,14 +2,14 @@
 
 import { refresh } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
-import { AVATAR_BUCKET, type AvatarKind } from "@/lib/profile/profile";
+import { AVATAR_BUCKET, type AvatarKind } from "@/features/profile/profile";
 import {
   BIO_MAX,
   NAME_MAX,
   normalizeUsername,
   parseLinks,
   usernameError,
-} from "@/lib/profile/validation";
+} from "@/features/profile/validation";
 import { createClient } from "@/lib/supabase/server";
 
 export type ProfileFormState = {

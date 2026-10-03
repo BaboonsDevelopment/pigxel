@@ -3,8 +3,8 @@ import {
   ContactDetails,
   LegalPage,
   LegalSection,
-} from "@/components/legal/legal-page";
-import { LEGAL } from "@/lib/legal";
+} from "@/features/legal/components/legal-page";
+import { LEGAL } from "@/features/legal/legal";
 
 export const metadata: Metadata = { title: "Privacy Policy · Pigxel" };
 

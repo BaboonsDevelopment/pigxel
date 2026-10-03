@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { isAdmin, requireUser } from "@/lib/auth/session";
-import { ASSET_BUCKET, type AssetRow } from "@/lib/assets/assets";
+import { ASSET_BUCKET, type AssetRow } from "./assets";
 import { createClient } from "@/lib/supabase/server";
 
 export async function removeAsset(id: string): Promise<{ error?: string }> {

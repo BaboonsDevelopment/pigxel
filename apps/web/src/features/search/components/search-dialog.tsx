@@ -10,14 +10,14 @@ import {
   type KeyboardEvent,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { searchAll } from "@/app/(app)/topbar-actions";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
-import { useCloudTileActions } from "@/components/tiles/tile-actions";
+import { searchAll } from "../actions";
+import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
+import { useCloudTileActions } from "@/features/tiles/tile-actions";
 import { listDrafts } from "@/lib/pigxel-file/draft";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
-import type { SearchResults } from "@/lib/search/server";
-import { SearchIcon } from "./icons";
+import type { SearchResults } from "../server";
+import { SearchIcon } from "@/components/ui/icons";
 import { PixelImage } from "@/components/ui/pixel-image";
 
 type Result = {

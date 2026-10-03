@@ -6,9 +6,9 @@ import {
   FRAME_HANDLES,
   type FrameEdges,
   type Size,
-} from "@/components/pixel-canvas/constants";
-import { adjustFrame, areaBetween } from "@/components/pixel-canvas/helpers";
-import type { Point } from "@/components/pixel-canvas/pen";
+} from "../../pixel-canvas/constants";
+import { adjustFrame, areaBetween } from "../../pixel-canvas/helpers";
+import type { Point } from "../../pixel-canvas/pen";
 
 type SliceDrag =
   | { kind: "new"; from: Point; to: Point }

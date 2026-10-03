@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
-import { TUTORIALS } from "@/lib/tutorials/tutorials";
-import pigReading from "../../../public/art/pigxel-mascot-reading.png";
+import { TUTORIALS } from "@/features/tutorials/tutorials";
+import pigReading from "../../../../public/art/pigxel-mascot-reading.png";
 
 export function Tutorials() {
   return (

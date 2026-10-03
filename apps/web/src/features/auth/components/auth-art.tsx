@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { WALL_COLUMNS } from "@/components/landing/art";
+import { WALL_COLUMNS } from "@/features/landing/art";
 import styles from "./auth-page.module.css";
 
 const SPEEDS = [70, 88, 62, 80, 74, 94, 66, 84, 78];

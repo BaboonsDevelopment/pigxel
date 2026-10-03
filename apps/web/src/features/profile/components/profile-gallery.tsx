@@ -2,11 +2,8 @@
 
 import { useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { Heading } from "@pigxel/ui/components/typography";
-import {
-  setTilePinned,
-  setTileVisibility,
-} from "@/app/(app)/u/[username]/actions";
-import { MAX_PINS, type ProfileTile } from "@/lib/profile/profile";
+import { setTilePinned, setTileVisibility } from "../actions";
+import { MAX_PINS, type ProfileTile } from "../profile";
 import { ArtCard } from "./art-card";
 
 type Change = Pick<ProfileTile, "id"> &

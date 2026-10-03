@@ -1,4 +1,4 @@
-import type { UsageRow } from "@/lib/ai/actions";
+import type { UsageRow } from "../../../../actions";
 
 export type UsageAction = { kind: string; at: string; credits: number };
 

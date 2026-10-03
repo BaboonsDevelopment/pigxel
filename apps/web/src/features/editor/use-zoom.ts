@@ -8,7 +8,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import { DEFAULT_SCALE } from "@/components/pixel-canvas/constants";
+import { DEFAULT_SCALE } from "./pixel-canvas/constants";
 import {
   clampScale,
   pinchZoom,
@@ -17,7 +17,7 @@ import {
   wheelSource,
   zoomAnchor,
   type ZoomAnchor,
-} from "@/components/pixel-canvas/wheel";
+} from "./pixel-canvas/wheel";
 
 type GestureEvent = UIEvent & {
   scale: number;

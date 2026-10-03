@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent, useState } from "react";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
 
 export type Playback = ReturnType<typeof usePlayback>;
 

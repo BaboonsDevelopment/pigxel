@@ -7,7 +7,7 @@ import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { ProjectCard } from "./project-card/project-card";
-import { confirmRemoveLocalTile } from "./tile-actions";
+import { confirmRemoveLocalTile } from "../tile-actions";
 import { TileThumbnail } from "./tile-thumbnail";
 import { Heading } from "@pigxel/ui/components/typography";
 

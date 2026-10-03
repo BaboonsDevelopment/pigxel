@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, PageHeader, Text } from "@pigxel/ui/components/typography";
-import { ScaledPage } from "@/components/scaled-page";
-import { TUTORIALS } from "@/lib/tutorials/tutorials";
+import { ScaledPage } from "@/components/layout/scaled-page";
+import { TUTORIALS } from "@/features/tutorials/tutorials";
 
 export const metadata: Metadata = { title: "Tutorials · Pigxel" };
 

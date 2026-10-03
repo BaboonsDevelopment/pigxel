@@ -1,13 +1,13 @@
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TOOL_GROUPS, TOOLS } from "@/components/tile-editor/tools";
+import { TOOL_GROUPS, TOOLS } from "@/features/editor/tools";
 import {
   SizeOption,
   StampOption,
-} from "@/components/tile-editor/tools/shared/options";
+} from "@/features/editor/tools/shared/options";
 
-const folder = join(__dirname, "../src/components/tile-editor/tools");
+const folder = join(__dirname, "../src/features/editor/tools");
 const kebab = (id: string) =>
   id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 

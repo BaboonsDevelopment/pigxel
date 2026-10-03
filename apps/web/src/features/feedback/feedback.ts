@@ -1,3 +1,5 @@
+import type { BoardQuery } from "./server";
+
 export const FEEDBACK_KINDS = {
   bug: { label: "Bugs", one: "bug report", new: "Report a bug" },
   feature: {
@@ -99,4 +101,12 @@ export function pageFrom(from: string | null | undefined): string | null {
 export function titlePattern(search: string): string | null {
   const text = search.trim().slice(0, TITLE_MAX);
   return text ? `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+}
+
+export function boardUrl(query: BoardQuery) {
+  const params = new URLSearchParams({ kind: query.kind });
+  if (query.state === "closed") params.set("state", "closed");
+  if (query.sort === "newest") params.set("sort", "newest");
+  if (query.search) params.set("q", query.search);
+  return `/feedback?${params}`;
 }

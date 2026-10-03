@@ -13,7 +13,7 @@ import {
   OPEN_LIMIT,
   TITLE_MAX,
   type FeedbackKind,
-} from "@/lib/feedback/feedback";
+} from "../feedback";
 import { createFeedback, type FeedbackFormState } from "../actions";
 
 const KIND_TEXT: Record<

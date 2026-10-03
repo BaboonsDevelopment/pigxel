@@ -15,7 +15,7 @@ import {
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { PigxelFileError } from "@/lib/pigxel-file/format";
-import { confirmDialog } from "@/components/confirm-dialog/confirm-dialog";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { draftForCloudTile, editorUrl } from "@/lib/pigxel-file/open-tile";
 
 export function useCloudTileActions(userId: string) {

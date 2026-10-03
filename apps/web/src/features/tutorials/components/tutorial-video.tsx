@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Badge } from "@pigxel/ui/components/badge";
-import { videoEmbedUrl, type Tutorial } from "@/lib/tutorials/tutorials";
+import { videoEmbedUrl, type Tutorial } from "../tutorials";
 
 export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
   if (tutorial.youtubeId)

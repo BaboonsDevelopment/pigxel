@@ -14,8 +14,8 @@ import {
 } from "@pigxel/ui/components/input";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { AssetImage } from "@/components/assets/asset-image";
-import { loadAssetDocument, type Asset } from "@/lib/assets/assets";
+import { AssetImage } from "@/features/assets/components/asset-image";
+import { loadAssetDocument, type Asset } from "@/features/assets/assets";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
@@ -32,7 +32,7 @@ import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
 import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
 import type { TileLocation } from "@/lib/pigxel-file/location";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
-import { useIsClient } from "@/lib/use-is-client";
+import { useIsClient } from "@/lib/utils/use-is-client";
 
 type Storage = "cloud" | "drive" | "none";
 

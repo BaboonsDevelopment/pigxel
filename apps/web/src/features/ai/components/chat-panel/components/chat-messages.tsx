@@ -1,4 +1,4 @@
-import type { Area } from "@/components/pixel-canvas/constants";
+import type { Area } from "@/features/editor/pixel-canvas/constants";
 import type { ChatEntry, Placement } from "../constants";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { PixelImage } from "@/components/ui/pixel-image";

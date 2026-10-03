@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
-import { updatePassword } from "./actions";
+import { updatePassword } from "../actions";
 import type { AuthState } from "@/lib/auth/types";
 
 export function PasswordForm() {

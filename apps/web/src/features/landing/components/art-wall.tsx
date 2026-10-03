@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { WALL_COLUMNS, type Art } from "./art";
+import { WALL_COLUMNS, type Art } from "../art";
 import styles from "./landing.module.css";
 
 const SPEEDS = [46, 58, 40, 52, 44, 62];

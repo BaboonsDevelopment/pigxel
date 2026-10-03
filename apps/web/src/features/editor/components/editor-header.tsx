@@ -15,14 +15,14 @@ import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
 import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
-import { useModifierLabel } from "../use-modifier-label";
+import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import type { TileFile } from "../use-tile-file";
-import { Menu } from "@/components/menu/menu";
-import { TokensButton } from "@/components/tokens-button/tokens-button";
-import type { MenuSections } from "@/components/menu/constants";
-import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
-import { frameActions, layerActions } from "@/components/timeline/actions";
-import type { Playback } from "@/components/timeline/use-playback";
+import { Menu } from "./menu/menu";
+import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
+import type { MenuSections } from "./menu/constants";
+import type { SpriteApi } from "../pixel-canvas/use-sprite";
+import { frameActions, layerActions } from "../timeline/actions";
+import type { Playback } from "../timeline/use-playback";
 
 export function EditorHeader({
   draftId,

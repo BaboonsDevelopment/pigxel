@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Dialog, DialogHeader } from "@pigxel/ui/components/dialog";
 import { Text } from "@pigxel/ui/components/typography";
-import { getAiBalance, listAiUsage } from "@/lib/ai/actions";
+import { getAiBalance, listAiUsage } from "../../../../actions";
 import { groupActions, tokens, type UsageAction } from "./helpers";
 
 type Usage = {

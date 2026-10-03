@@ -1,4 +1,7 @@
-import { DEFAULT_PEN, type PenSettings } from "@/components/pixel-canvas/pen";
+import {
+  DEFAULT_PEN,
+  type PenSettings,
+} from "@/features/editor/pixel-canvas/pen";
 import type { DriveFile } from "./google-drive";
 import type { TileLocation } from "./location";
 

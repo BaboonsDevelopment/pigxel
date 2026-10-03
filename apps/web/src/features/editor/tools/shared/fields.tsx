@@ -1,7 +1,7 @@
 import { IconButton } from "@pigxel/ui/components/button";
 import { Input, Select } from "@pigxel/ui/components/input";
 import { Text } from "@pigxel/ui/components/typography";
-import { MAX_PEN_SIZE, MIN_PEN_SIZE } from "@/components/pixel-canvas/pen";
+import { MAX_PEN_SIZE, MIN_PEN_SIZE } from "../../pixel-canvas/pen";
 
 export function OptionSelect<T extends string>({
   label,

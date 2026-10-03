@@ -8,12 +8,12 @@ import {
   linkVariants,
   Text,
 } from "@pigxel/ui/components/typography";
-import { ScaledPage } from "@/components/scaled-page";
-import { StartGuideButton } from "@/components/tutorials/start-guide-button";
-import { TutorialVideo } from "@/components/tutorials/tutorial-video";
-import { findAsset } from "@/lib/assets/server";
+import { ScaledPage } from "@/components/layout/scaled-page";
+import { StartGuideButton } from "@/features/tutorials/components/start-guide-button";
+import { TutorialVideo } from "@/features/tutorials/components/tutorial-video";
+import { findAsset } from "@/features/assets/server";
 import { requireUser } from "@/lib/auth/session";
-import { findTutorial } from "@/lib/tutorials/tutorials";
+import { findTutorial } from "@/features/tutorials/tutorials";
 
 export const dynamic = "force-dynamic";
 

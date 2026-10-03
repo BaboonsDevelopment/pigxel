@@ -9,7 +9,7 @@ import {
   SectionHeader,
   Text,
 } from "@pigxel/ui/components/typography";
-import { downloadBlob } from "@/lib/download";
+import { downloadBlob } from "@/lib/utils/download";
 import { toGpl } from "@/lib/palette/files";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 

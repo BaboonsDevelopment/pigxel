@@ -1,8 +1,8 @@
 "use client";
 
 import { useImperativeHandle } from "react";
-import { clampTolerance } from "@/components/pixel-canvas/pen";
-import { selectModeOf, wandMask } from "@/components/pixel-canvas/selection";
+import { clampTolerance } from "../../pixel-canvas/pen";
+import { selectModeOf, wandMask } from "../../pixel-canvas/selection";
 import type { ToolCanvasProps } from "../types";
 
 export function WandCanvas({ ref, pen, sprite, selection }: ToolCanvasProps) {

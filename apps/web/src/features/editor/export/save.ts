@@ -1,4 +1,4 @@
-import { downloadBlob } from "@/lib/download";
+import { downloadBlob } from "@/lib/utils/download";
 import type { ExportFile } from "./export";
 
 const JPEG_QUALITY = 1;

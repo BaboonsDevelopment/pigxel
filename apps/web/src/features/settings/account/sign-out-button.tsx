@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { signOut } from "@/app/login/actions";
+import { signOut } from "@/features/auth/actions";
 import type { AuthState } from "@/lib/auth/types";
 
 export function SignOutButton() {

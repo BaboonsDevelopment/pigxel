@@ -14,7 +14,7 @@ import {
   type DockSide,
   type Layout,
   type PanelId,
-} from "@/lib/editor-layout/layout";
+} from "../../layout";
 import { Panel } from "./panel";
 import { Splitter, shareBetween } from "./splitter";
 import type { PanelDrag } from "./use-panel-drag";

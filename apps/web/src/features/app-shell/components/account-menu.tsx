@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { signOut } from "@/app/login/actions";
+import { signOut } from "@/features/auth/actions";
 import type { Profile } from "@/lib/auth/session";
 import type { AuthState } from "@/lib/auth/types";
-import { ProfileAvatar } from "@/components/profile/profile-avatar";
+import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import {
   BugIcon,
   ChevronRightIcon,
@@ -15,7 +15,7 @@ import {
   SettingsIcon,
   SignOutIcon,
   UserIcon,
-} from "./icons";
+} from "@/components/ui/icons";
 
 export function AccountMenu({
   profile,
