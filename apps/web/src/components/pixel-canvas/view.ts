@@ -21,6 +21,22 @@ export const DEFAULT_VIEW: CanvasView = {
 };
 
 export const GRID_SIZES = [8, 16, 32];
+
+/** The View › Mirror choices: mirror copies across the middle of the tile. */
+export const SYMMETRY_OPTIONS: [Symmetry, string][] = [
+  ["none", "Off"],
+  ["horizontal", "Left ↔ right"],
+  ["vertical", "Top ↕ bottom"],
+  ["both", "Both"],
+];
+
+/** The View › Tiled choices: the tile repeated around itself. */
+export const TILED_OPTIONS: [TiledMode, string][] = [
+  ["none", "Off"],
+  ["x", "Across"],
+  ["y", "Down"],
+  ["both", "Both"],
+];
 export const ONION_FRAMES = [1, 2, 3];
 
 /**

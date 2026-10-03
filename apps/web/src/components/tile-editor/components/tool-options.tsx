@@ -16,7 +16,6 @@ import type {
   SelectionApi,
   Transform,
 } from "@/components/pixel-canvas/use-selection";
-import type { CanvasView } from "@/components/pixel-canvas/view";
 import { TEXT_FONTS, TEXT_SCALES } from "@/components/pixel-canvas/text";
 import type { Slice } from "@/lib/slices/slices";
 import type { ToolId } from "../constants";
@@ -30,8 +29,6 @@ export function ToolOptions({
   pen,
   onChange,
   selection,
-  view,
-  onViewChange,
   stamp,
   onClearStamp,
   onUseAsBrush,
@@ -43,8 +40,6 @@ export function ToolOptions({
   pen: PenSettings;
   onChange: (pen: PenSettings) => void;
   selection: SelectionApi;
-  view: CanvasView;
-  onViewChange: (view: CanvasView) => void;
   /** The picture brush, when one is in use. */
   stamp: Stamp | null;
   onClearStamp: () => void;
@@ -419,36 +414,22 @@ export function ToolOptions({
         <TransformOptions selection={selection} />
       )}
 
-      <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-        {HINTS[tool]}
-      </p>
-
-      <div className="flex items-center gap-4">
-        <OptionSelect
-          label="Mirror"
-          title="Draws mirror copies across the middle of the tile"
-          value={view.symmetry}
-          options={[
-            ["none", "Off"],
-            ["horizontal", "Left ↔ right"],
-            ["vertical", "Top ↕ bottom"],
-            ["both", "Both"],
-          ]}
-          onChange={(symmetry) => onViewChange({ ...view, symmetry })}
-        />
-        <OptionSelect
-          label="Tiled"
-          title="Repeats the tile around itself; strokes wrap across the edges"
-          value={view.tiled}
-          options={[
-            ["none", "Off"],
-            ["x", "Across"],
-            ["y", "Down"],
-            ["both", "Both"],
-          ]}
-          onChange={(tiled) => onViewChange({ ...view, tiled })}
-        />
-      </div>
+      {/* How the tool works, shown on hover so the bar stays one row. */}
+      <span className="group relative ml-auto">
+        <span
+          tabIndex={0}
+          aria-label={HINTS[tool]}
+          className="grid size-6 cursor-help place-items-center rounded-full border text-xs text-muted-foreground hover:text-foreground"
+        >
+          i
+        </span>
+        <span
+          aria-hidden="true"
+          className="pointer-events-none invisible absolute top-full right-0 z-50 mt-2 w-72 rounded-md bg-foreground px-3 py-2 text-xs text-background shadow-md group-focus-within:visible group-hover:visible"
+        >
+          {HINTS[tool]}
+        </span>
+      </span>
     </div>
   );
 }

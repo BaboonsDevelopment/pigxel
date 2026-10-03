@@ -40,6 +40,7 @@ export function EditorHeader({
   onExport,
   onImportSheet,
   menus,
+  afterMenus = [],
 }: {
   /** The tile's draft, for New tile to come back to on Cancel. */
   draftId: string;
@@ -55,6 +56,8 @@ export function EditorHeader({
   onImportSheet: () => void;
   /** More menus after File, e.g. Edit, Tile and View. */
   menus: { label: string; sections: MenuSections }[];
+  /** Menus after Layer and Frame, e.g. Window. */
+  afterMenus?: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
   const framesInput = useRef<HTMLInputElement>(null);
@@ -88,14 +91,6 @@ export function EditorHeader({
               onSelect: file.openFromComputer,
             },
             {
-              label: "Open pictures as frames…",
-              onSelect: () => framesInput.current?.click(),
-            },
-            {
-              label: "Import sprite sheet…",
-              onSelect: onImportSheet,
-            },
-            {
               label: "Open from Pigxel cloud…",
               onSelect: () => onOpenFrom("cloud"),
             },
@@ -106,6 +101,19 @@ export function EditorHeader({
               onSelect: () =>
                 drive.connected ? onOpenFrom("drive") : onConnectDrive(),
               hidden: !drive.available,
+            },
+            {
+              // Pictures turned into a new tile's frames.
+              label: "Import",
+              submenu: [
+                [
+                  {
+                    label: "Pictures as frames…",
+                    onSelect: () => framesInput.current?.click(),
+                  },
+                  { label: "Sprite sheet…", onSelect: onImportSheet },
+                ],
+              ],
             },
           ],
           [
@@ -147,6 +155,9 @@ export function EditorHeader({
       ))}
       <Menu label="Layer" sections={layerActions(sprite)} />
       <Menu label="Frame" sections={frameActions(sprite, playback)} />
+      {afterMenus.map((menu) => (
+        <Menu key={menu.label} label={menu.label} sections={menu.sections} />
+      ))}
       <InputGroup className="ml-2 h-8 w-auto">
         <InputGroupInput
           aria-label="File name"

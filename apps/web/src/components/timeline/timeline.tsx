@@ -3,23 +3,21 @@
 import { useCallback, useState } from "react";
 import { ContextMenu } from "@/components/menu/context-menu";
 import type { SpriteApi } from "@/components/pixel-canvas/use-sprite";
-import { ResizeHandle } from "@/components/resize-handle";
 import { panelRows } from "@/lib/layers/tree";
 import { frameActions, layerActions } from "./actions";
 import { CelStrip } from "./components/cel-strip";
 import { FrameHeader } from "./components/frame-header";
 import { LayerRow } from "./components/layer-row";
 import { TimelineToolbar } from "./components/timeline-toolbar";
-import { PANEL_HEIGHT, type DropZone } from "./constants";
+import type { DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
-import { ICONS } from "./icons";
 import type { Playback } from "./use-playback";
 
 /** An open right-click menu: whose actions, and where. */
 type OpenMenu = { of: "layer" | "frame"; x: number; y: number };
 
 /**
- * The timeline under the canvas, as in Aseprite: a row per layer (top layer
+ * The timeline, a panel (under the canvas at first), as in Aseprite: a row per layer (top layer
  * first) and a column per frame, each cell being that layer's cel in that
  * frame. Layers are shown, locked, renamed and dragged into order or into
  * groups; frames are played, timed and dragged into order. A right-click on
@@ -36,8 +34,6 @@ export function Timeline({
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
-  const [height, setHeight] = useState(PANEL_HEIGHT.initial);
-  const [collapsed, setCollapsed] = useState(false);
   const closeMenu = useCallback(() => setMenu(null), []);
   const rows = panelRows(sprite.tree);
   const { layerId, frameId, frames } = sprite;
@@ -52,40 +48,13 @@ export function Timeline({
     setOver(null);
   };
 
-  // Folded into a small tab at the bottom left, over the workspace.
-  if (collapsed)
-    return (
-      <section aria-label="Timeline" className="relative h-0">
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          title="Show the timeline"
-          className="absolute bottom-0 left-0 z-10 flex items-center gap-2 rounded-tr-md border-t border-r bg-background px-3 py-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase shadow-sm hover:text-foreground"
-        >
-          {ICONS.expand}
-          Timeline
-        </button>
-      </section>
-    );
-
+  // A panel in a dock, which titles, folds and sizes it.
   return (
     <section
       aria-label="Timeline"
-      style={{ height }}
-      className="relative flex shrink-0 flex-col border-t bg-background"
+      className="relative flex min-h-0 flex-1 flex-col bg-background"
     >
-      <ResizeHandle
-        edge="top"
-        size={height}
-        min={PANEL_HEIGHT.min}
-        max={PANEL_HEIGHT.max}
-        onResize={setHeight}
-      />
-      <TimelineToolbar
-        sprite={sprite}
-        playback={playback}
-        onCollapse={() => setCollapsed(true)}
-      />
+      <TimelineToolbar sprite={sprite} playback={playback} />
 
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="w-max min-w-full">

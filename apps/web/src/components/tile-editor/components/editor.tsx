@@ -38,6 +38,8 @@ import {
   DEFAULT_VIEW,
   GRID_SIZES,
   ONION_FRAMES,
+  SYMMETRY_OPTIONS,
+  TILED_OPTIONS,
   type CanvasView,
 } from "@/components/pixel-canvas/view";
 import type { MenuSections } from "@/components/menu/constants";
@@ -78,14 +80,29 @@ import {
 import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
 import type { Slice } from "@/lib/slices/slices";
 import { findTutorial } from "@/lib/tutorials/tutorials";
+import {
+  DEFAULT_LAYOUT,
+  PANELS,
+  PANEL_LABELS,
+  movePanel,
+  setPanelShown,
+  setToolShown,
+  type PanelId,
+} from "@/lib/editor-layout/layout";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
 import { isTyping, shortcutFor, sizeKey } from "../helpers";
 import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
+import { useEditorLayout } from "../use-editor-layout";
 import { useTileFile } from "../use-tile-file";
+import { groupOf } from "../tools";
 import { ChatPlaceholder } from "./chat-placeholder";
-import { ColorPanel } from "./color-panel";
+import { ColorsPanel } from "./colors/colors-panel";
+import { PalettePanel } from "./colors/palette-panel";
+import { Dock, type PanelContent } from "./dock/dock";
+import { DragOverlay } from "./dock/drag-overlay";
+import { usePanelDrag } from "./dock/use-panel-drag";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
 import { TileTabs } from "./tile-tabs";
@@ -114,6 +131,9 @@ const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
   ssr: false,
 });
 const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
+  ssr: false,
+});
+const CustomizeToolsDialog = dynamic(() => import("./customize-tools-dialog"), {
   ssr: false,
 });
 const ModifySelectionDialog = dynamic(
@@ -161,6 +181,19 @@ export function Editor({
   const [exportSettings, setExportSettings] =
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
+  // Which panels are where, folded or closed; kept in this browser.
+  const [layout, setLayout] = useEditorLayout(userId);
+  const panelDrag = usePanelDrag((id, target) =>
+    setLayout((l) => movePanel(l, id, target)),
+  );
+  const [customizing, setCustomizing] = useState(false);
+  // Each tool group's button shows the tool used last in it.
+  const toolGroup = groupOf(tool)?.id;
+  if (toolGroup && layout.groupTools[toolGroup] !== tool)
+    setLayout((l) => ({
+      ...l,
+      groupTools: { ...l.groupTools, [toolGroup]: tool },
+    }));
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [scale, setScale] = useState(kept?.scale ?? DEFAULT_SCALE);
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
@@ -404,6 +437,93 @@ export function Editor({
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
       {
+        // The selection, or the active layer when nothing is selected.
+        label: "Transform",
+        submenu: [
+          [
+            {
+              label: "Flip horizontally",
+              shortcut: "Shift+H",
+              onSelect: commands.flipHorizontal,
+            },
+            {
+              label: "Flip vertically",
+              shortcut: "Shift+V",
+              onSelect: commands.flipVertical,
+            },
+          ],
+          [
+            { label: "Rotate 90° right", onSelect: commands.rotateRight },
+            {
+              label: "Rotate 90° left",
+              onSelect: () => selection.transform("rotateLeft"),
+            },
+          ],
+        ],
+      },
+      {
+        label: "Paint",
+        submenu: [
+          [
+            {
+              label: "Fill selection with primary colour",
+              onSelect: () =>
+                applyEffect((pixels, mask) =>
+                  mask ? filledMask(pixels, mask, rgbaOf(pen.color)) : pixels,
+                ),
+              disabled: !selection.mask || !sprite.canPaint,
+            },
+            {
+              label: "Stroke selection…",
+              onSelect: () => setModifying("stroke"),
+              disabled: !selection.mask || !sprite.canPaint,
+            },
+          ],
+          [
+            {
+              label: "Outline in primary colour",
+              onSelect: () =>
+                applyEffect((pixels, mask) =>
+                  outlined(pixels, sprite.size, rgbaOf(pen.color), mask),
+                ),
+            },
+            {
+              label: "Replace primary colour with secondary",
+              onSelect: () =>
+                applyEffect((pixels, mask) =>
+                  replacedColor(
+                    pixels,
+                    rgbaOf(pen.color),
+                    rgbaOf(pen.secondary),
+                    mask,
+                  ),
+                ),
+            },
+          ],
+        ],
+      },
+      {
+        label: "Brush",
+        submenu: [
+          [
+            {
+              label: "Use selection as brush",
+              onSelect: useAsBrush,
+              disabled: !selection.mask,
+            },
+            {
+              label: "Back to the normal brush",
+              onSelect: () => setStamp(null),
+              disabled: !stamp,
+            },
+          ],
+        ],
+      },
+    ],
+  ];
+  const selectMenu: MenuSections = [
+    [
+      {
         label: "Select all",
         shortcut: `${mod}A`,
         onSelect: commands.selectAll,
@@ -415,7 +535,7 @@ export function Editor({
         disabled: !selection.mask,
       },
       {
-        label: "Invert selection",
+        label: "Invert",
         shortcut: `${mod}Shift+I`,
         onSelect: commands.invertSelection,
       },
@@ -424,6 +544,19 @@ export function Editor({
         shortcut: `${mod}Shift+D`,
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
+      },
+    ],
+    [
+      {
+        label: "Modify",
+        disabled: !selection.mask,
+        submenu: [
+          [
+            { label: "Expand…", onSelect: () => setModifying("expand") },
+            { label: "Contract…", onSelect: () => setModifying("contract") },
+            { label: "Border…", onSelect: () => setModifying("border") },
+          ],
+        ],
       },
     ],
     [
@@ -438,91 +571,6 @@ export function Editor({
         disabled: !selection.hasSaved,
       },
     ],
-    [
-      {
-        label: "Expand selection…",
-        onSelect: () => setModifying("expand"),
-        disabled: !selection.mask,
-      },
-      {
-        label: "Contract selection…",
-        onSelect: () => setModifying("contract"),
-        disabled: !selection.mask,
-      },
-      {
-        label: "Border…",
-        onSelect: () => setModifying("border"),
-        disabled: !selection.mask,
-      },
-    ],
-    [
-      {
-        label: "Fill with primary colour",
-        onSelect: () =>
-          applyEffect((pixels, mask) =>
-            mask ? filledMask(pixels, mask, rgbaOf(pen.color)) : pixels,
-          ),
-        disabled: !selection.mask || !sprite.canPaint,
-      },
-      {
-        label: "Stroke…",
-        onSelect: () => setModifying("stroke"),
-        disabled: !selection.mask || !sprite.canPaint,
-      },
-    ],
-    [
-      {
-        label: "Flip horizontally",
-        shortcut: "Shift+H",
-        onSelect: commands.flipHorizontal,
-      },
-      {
-        label: "Flip vertically",
-        shortcut: "Shift+V",
-        onSelect: commands.flipVertical,
-      },
-      {
-        label: "Rotate 90° right",
-        onSelect: commands.rotateRight,
-      },
-      {
-        label: "Rotate 90° left",
-        onSelect: () => selection.transform("rotateLeft"),
-      },
-    ],
-    [
-      {
-        label: "Outline in primary colour",
-        onSelect: () =>
-          applyEffect((pixels, mask) =>
-            outlined(pixels, sprite.size, rgbaOf(pen.color), mask),
-          ),
-      },
-      {
-        label: "Replace primary colour with secondary",
-        onSelect: () =>
-          applyEffect((pixels, mask) =>
-            replacedColor(
-              pixels,
-              rgbaOf(pen.color),
-              rgbaOf(pen.secondary),
-              mask,
-            ),
-          ),
-      },
-    ],
-    [
-      {
-        label: "Use selection as brush",
-        onSelect: useAsBrush,
-        disabled: !selection.mask,
-      },
-      {
-        label: "Back to the normal brush",
-        onSelect: () => setStamp(null),
-        hidden: !stamp,
-      },
-    ],
   ];
   /** The whole tile at once, every layer and frame: Aseprite's Sprite menu. */
   const transformTile = (t: TileTransform) => {
@@ -530,18 +578,6 @@ export function Editor({
     sprite.transformAll(t);
   };
   const tileMenu: MenuSections = [
-    PIXEL_RATIOS.map(({ ratio, label }) => ({
-      label: check(sameRatio(sprite.pixelRatio, ratio), label),
-      onSelect: () => sprite.setPixelRatio(ratio),
-    })),
-    // Indexed: only palette colours; Grayscale: only greys.
-    COLOR_MODES.map(({ value, label }) => ({
-      label: check(sprite.colorMode === value, label),
-      onSelect: () => {
-        selection.deselect();
-        sprite.setColorMode(value);
-      },
-    })),
     [
       { label: "Canvas size…", onSelect: () => setResizing(true) },
       { label: "Sprite size…", onSelect: () => setScaling(true) },
@@ -556,23 +592,56 @@ export function Editor({
     ],
     [
       {
-        label: "Rotate 90° right",
-        onSelect: () => transformTile("rotateRight"),
+        label: "Rotate",
+        submenu: [
+          [
+            {
+              label: "90° right",
+              onSelect: () => transformTile("rotateRight"),
+            },
+            { label: "90° left", onSelect: () => transformTile("rotateLeft") },
+            { label: "180°", onSelect: () => transformTile("rotate180") },
+          ],
+        ],
       },
       {
-        label: "Rotate 90° left",
-        onSelect: () => transformTile("rotateLeft"),
+        label: "Flip",
+        submenu: [
+          [
+            {
+              label: "Horizontally",
+              onSelect: () => transformTile("flipHorizontal"),
+            },
+            {
+              label: "Vertically",
+              onSelect: () => transformTile("flipVertical"),
+            },
+          ],
+        ],
       },
-      { label: "Rotate 180°", onSelect: () => transformTile("rotate180") },
     ],
     [
       {
-        label: "Flip horizontally",
-        onSelect: () => transformTile("flipHorizontal"),
+        // Indexed: only palette colours; Grayscale: only greys.
+        label: "Colour mode",
+        submenu: [
+          COLOR_MODES.map(({ value, label }) => ({
+            label: check(sprite.colorMode === value, label),
+            onSelect: () => {
+              selection.deselect();
+              sprite.setColorMode(value);
+            },
+          })),
+        ],
       },
       {
-        label: "Flip vertically",
-        onSelect: () => transformTile("flipVertical"),
+        label: "Pixel ratio",
+        submenu: [
+          PIXEL_RATIOS.map(({ ratio, label }) => ({
+            label: check(sameRatio(sprite.pixelRatio, ratio), label),
+            onSelect: () => sprite.setPixelRatio(ratio),
+          })),
+        ],
       },
     ],
   ];
@@ -583,13 +652,18 @@ export function Editor({
         shortcut: "F3",
         onSelect: commands.toggleOnion,
       },
-      ...ONION_FRAMES.map((count) => ({
-        label: check(
-          view.onion === count,
-          `Show ${count} frame${count > 1 ? "s" : ""} each way`,
-        ),
-        onSelect: () => setView((v) => ({ ...v, onion: count })),
-      })),
+      {
+        label: "Onion frames",
+        submenu: [
+          ONION_FRAMES.map((count) => ({
+            label: check(
+              view.onion === count,
+              `${count} frame${count > 1 ? "s" : ""} each way`,
+            ),
+            onSelect: () => setView((v) => ({ ...v, onion: count })),
+          })),
+        ],
+      },
     ],
     [
       {
@@ -597,13 +671,53 @@ export function Editor({
         onSelect: () => setView((v) => ({ ...v, pixelGrid: !v.pixelGrid })),
       },
       {
-        label: check(view.gridSize === 0, "No grid"),
-        onSelect: () => setView((v) => ({ ...v, gridSize: 0 })),
+        label: "Grid",
+        submenu: [
+          [
+            {
+              label: check(view.gridSize === 0, "No grid"),
+              onSelect: () => setView((v) => ({ ...v, gridSize: 0 })),
+            },
+            ...GRID_SIZES.map((n) => ({
+              label: check(view.gridSize === n, `${n} × ${n}`),
+              onSelect: () => setView((v) => ({ ...v, gridSize: n })),
+            })),
+          ],
+        ],
       },
-      ...GRID_SIZES.map((n) => ({
-        label: check(view.gridSize === n, `Grid ${n} × ${n}`),
-        onSelect: () => setView((v) => ({ ...v, gridSize: n })),
-      })),
+    ],
+    [
+      {
+        // Draws mirror copies across the middle of the tile.
+        label: "Mirror",
+        submenu: [
+          SYMMETRY_OPTIONS.map(([value, label]) => ({
+            label: check(view.symmetry === value, label),
+            onSelect: () => setView((v) => ({ ...v, symmetry: value })),
+          })),
+        ],
+      },
+      {
+        // Repeats the tile around itself; strokes wrap across the edges.
+        label: "Tiled",
+        submenu: [
+          TILED_OPTIONS.map(([value, label]) => ({
+            label: check(view.tiled === value, label),
+            onSelect: () => setView((v) => ({ ...v, tiled: value })),
+          })),
+        ],
+      },
+    ],
+  ];
+  const windowMenu: MenuSections = [
+    PANELS.map((id) => ({
+      label: check(!layout.hidden.includes(id), PANEL_LABELS[id]),
+      onSelect: () =>
+        setLayout((l) => setPanelShown(l, id, l.hidden.includes(id))),
+    })),
+    [
+      { label: "Customize tools…", onSelect: () => setCustomizing(true) },
+      { label: "Reset layout", onSelect: () => setLayout(DEFAULT_LAYOUT) },
     ],
   ];
 
@@ -741,9 +855,68 @@ export function Editor({
     return () => area.removeEventListener("wheel", onWheel);
   }, []);
 
+  // The panels beside the canvas, placed in the docks by the layout.
+  const panels: Record<PanelId, PanelContent> = {
+    tools: {
+      fit: true,
+      body: (
+        <ToolBar
+          tool={tool}
+          onSelect={setTool}
+          hiddenTools={layout.hiddenTools}
+          groupTools={layout.groupTools}
+        />
+      ),
+    },
+    colors: { body: <ColorsPanel pen={pen} onChange={setPen} /> },
+    palette: {
+      body: (
+        <PalettePanel
+          pen={pen}
+          onChange={setPen}
+          palette={sprite.palette}
+          colorMode={sprite.colorMode}
+          onPaletteChange={(next, change) => {
+            const edited = change?.edited;
+            sprite.setPalette(
+              next,
+              edited
+                ? new Map([[edited.from, edited.to]])
+                : change?.loaded
+                  ? recolorByPlace(sprite.palette, next)
+                  : undefined,
+            );
+            // The pen keeps painting with the colour it had, now changed.
+            if (edited)
+              setPen((p) => ({
+                ...p,
+                color: p.color === edited.from ? edited.to : p.color,
+                secondary:
+                  p.secondary === edited.from ? edited.to : p.secondary,
+              }));
+          }}
+          frameColors={() => colorsOf(sprite.composite(["reference"]))}
+          fileName={file.name}
+        />
+      ),
+    },
+    timeline: { body: <Timeline sprite={sprite} playback={playback} /> },
+    assistant: {
+      body: (
+        <EditorChat
+          canvas={canvas}
+          sprite={sprite}
+          playback={playback}
+          onHighlight={setHighlight}
+        />
+      ),
+    },
+  };
+  const dockProps = { layout, panels, drag: panelDrag, setLayout };
+
   return (
     <div
-      className="relative grid h-dvh grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto_minmax(0,1fr)]"
+      className="relative flex h-dvh flex-col"
       onDragEnter={(e) => {
         if (!hasFiles(e)) return;
         e.preventDefault();
@@ -788,18 +961,18 @@ export function Editor({
         onImportSheet={() => sheetInput.current?.click()}
         menus={[
           { label: "Edit", sections: editMenu },
+          { label: "Select", sections: selectMenu },
           { label: "Tile", sections: tileMenu },
           { label: "View", sections: viewMenu },
         ]}
+        afterMenus={[{ label: "Window", sections: windowMenu }]}
       />
-      <div className="col-span-3 flex min-h-12 items-center border-b bg-background px-4 py-2">
+      <div className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2">
         <ToolOptions
           tool={tool}
           pen={pen}
           onChange={setPen}
           selection={selection}
-          view={view}
-          onViewChange={setView}
           stamp={stamp}
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
@@ -808,100 +981,81 @@ export function Editor({
           onSliceDelete={deleteSlice}
         />
       </div>
-      <aside className="flex min-h-0 w-[6.5rem] flex-col border-r bg-background">
-        <ToolBar tool={tool} onSelect={setTool} />
-        <ColorPanel
-          pen={pen}
-          onChange={setPen}
-          palette={sprite.palette}
-          colorMode={sprite.colorMode}
-          onPaletteChange={(next, change) => {
-            const edited = change?.edited;
-            sprite.setPalette(
-              next,
-              edited
-                ? new Map([[edited.from, edited.to]])
-                : change?.loaded
-                  ? recolorByPlace(sprite.palette, next)
-                  : undefined,
-            );
-            // The pen keeps painting with the colour it had, now changed.
-            if (edited)
-              setPen((p) => ({
-                ...p,
-                color: p.color === edited.from ? edited.to : p.color,
-                secondary:
-                  p.secondary === edited.from ? edited.to : p.secondary,
-              }));
-          }}
-          frameColors={() => colorsOf(sprite.composite(["reference"]))}
-          fileName={file.name}
-        />
-      </aside>
-      <div className="flex min-h-0 flex-col">
-        <TileTabs
-          userId={userId}
-          current={{
-            id: draft.id,
-            name: file.name,
-            dirty: file.dirty,
-            location: file.location,
-          }}
-          revision={file.revision}
-          picture={() => ({
-            rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
-            w: sprite.size.w,
-            h: sprite.size.h,
-          })}
-        />
-        <main
-          ref={workspace}
-          data-guide="canvas"
-          {...pan.handlers}
-          className={cn(
-            "flex min-h-0 flex-1 overflow-auto bg-muted p-12",
-            pan.panning && "cursor-grab [&_*]:cursor-grab!",
-          )}
-        >
-          <div className="m-auto">
-            <PixelCanvas
-              ref={canvas}
-              tool={tool}
-              pen={pen}
-              scale={scale}
-              sprite={sprite}
-              selection={selection}
-              view={view}
-              stamp={stamp}
-              highlight={highlight}
-              onTextPlaced={() => setTool("move")}
-              sliceId={sliceId}
-              onSelectSlice={setSliceId}
-              onPickColor={(color, slot) =>
-                setPen((p) =>
-                  slot === "primary"
-                    ? { ...p, color }
-                    : { ...p, secondary: color },
-                )
-              }
-              onUseColor={(color) =>
-                setPen((p) =>
-                  p.recent[0] === color
-                    ? p
-                    : { ...p, recent: pushRecent(p.recent, color) },
-                )
-              }
-            />
+      <div className="flex min-h-0 flex-1">
+        <Dock side="left" {...dockProps} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <TileTabs
+            userId={userId}
+            current={{
+              id: draft.id,
+              name: file.name,
+              dirty: file.dirty,
+              location: file.location,
+            }}
+            revision={file.revision}
+            picture={() => ({
+              rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
+              w: sprite.size.w,
+              h: sprite.size.h,
+            })}
+          />
+          <div className="flex min-h-0 flex-1">
+            <Dock side="innerLeft" {...dockProps} />
+            <main
+              ref={workspace}
+              data-guide="canvas"
+              data-canvas-drop
+              {...pan.handlers}
+              className={cn(
+                "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
+                pan.panning && "cursor-grab [&_*]:cursor-grab!",
+              )}
+            >
+              <div className="m-auto">
+                <PixelCanvas
+                  ref={canvas}
+                  tool={tool}
+                  pen={pen}
+                  scale={scale}
+                  sprite={sprite}
+                  selection={selection}
+                  view={view}
+                  stamp={stamp}
+                  highlight={highlight}
+                  onTextPlaced={() => setTool("move")}
+                  sliceId={sliceId}
+                  onSelectSlice={setSliceId}
+                  onPickColor={(color, slot) =>
+                    setPen((p) =>
+                      slot === "primary"
+                        ? { ...p, color }
+                        : { ...p, secondary: color },
+                    )
+                  }
+                  onUseColor={(color) =>
+                    setPen((p) =>
+                      p.recent[0] === color
+                        ? p
+                        : { ...p, recent: pushRecent(p.recent, color) },
+                    )
+                  }
+                />
+              </div>
+            </main>
+            <Dock side="innerRight" {...dockProps} />
           </div>
-        </main>
-        <Timeline sprite={sprite} playback={playback} />
+          <Dock side="bottom" {...dockProps} />
+        </div>
+        <Dock side="right" {...dockProps} />
       </div>
-      <EditorChat
-        canvas={canvas}
-        sprite={sprite}
-        playback={playback}
-        onHighlight={setHighlight}
-      />
+      <DragOverlay drag={panelDrag} />
+      {customizing && (
+        <CustomizeToolsDialog
+          hiddenTools={layout.hiddenTools}
+          onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
+          onClose={() => setCustomizing(false)}
+        />
+      )}
       {opening && (
         <OpenTileDialog
           source={opening}

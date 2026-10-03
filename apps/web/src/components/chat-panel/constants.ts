@@ -153,6 +153,3 @@ export const FRAMES_SHEET_SIDE = 1024;
 
 /** Tile pixels shown around an edit to the AI that checks it, so it sees what the edit touches. */
 export const REVIEW_MARGIN = 4;
-
-/** The panel's width in pixels, changed by dragging its left edge. */
-export const PANEL_WIDTH = { initial: 340, min: 260, max: 640 };
