@@ -1,42 +1,10 @@
 import { linePoints, type Point } from "@/lib/edit/raster";
 import type { BlendMode, GradientDither, GradientShape } from "./paint";
-import type { TextFont } from "./text";
+import type { TextFont } from "./text-fonts";
 
 export { linePoints, type Point };
 
-export type PaintTool =
-  | "pen"
-  | "brush"
-  | "spray"
-  | "blur"
-  | "jumble"
-  | "eraser"
-  | "line"
-  | "curve"
-  | "contour"
-  | "polygon"
-  | "rect"
-  | "ellipse"
-  | "bucket"
-  | "gradient"
-  | "text"
-  | "slice"
-  | "pipette"
-  | "marquee"
-  | "ellipseMarquee"
-  | "lasso"
-  | "polygonLasso"
-  | "wand"
-  | "move";
-
-export const SELECTION_TOOLS: readonly PaintTool[] = [
-  "marquee",
-  "ellipseMarquee",
-  "lasso",
-  "polygonLasso",
-  "wand",
-  "move",
-];
+export type ColorSlot = "primary" | "secondary";
 
 export type PenSettings = {
   color: string;

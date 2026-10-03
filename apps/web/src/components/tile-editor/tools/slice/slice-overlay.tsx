@@ -2,9 +2,13 @@
 
 import { useRef, useState } from "react";
 import { resizedSlice, type Rect, type Slice } from "@/lib/slices/slices";
-import { FRAME_HANDLES, type FrameEdges, type Size } from "../constants";
-import { adjustFrame, areaBetween } from "../helpers";
-import type { Point } from "../pen";
+import {
+  FRAME_HANDLES,
+  type FrameEdges,
+  type Size,
+} from "@/components/pixel-canvas/constants";
+import { adjustFrame, areaBetween } from "@/components/pixel-canvas/helpers";
+import type { Point } from "@/components/pixel-canvas/pen";
 
 type SliceDrag =
   | { kind: "new"; from: Point; to: Point }

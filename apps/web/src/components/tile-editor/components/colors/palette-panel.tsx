@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { ColorSlot } from "@/components/pixel-canvas/pixel-canvas";
+import type { ColorSlot } from "@/components/pixel-canvas/pen";
 import type { PenSettings } from "@/components/pixel-canvas/pen";
 import { downloadBlob } from "@/lib/download";
 import type { ColorMode } from "@/lib/palette/color-mode";

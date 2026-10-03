@@ -1,5 +1,6 @@
 import type { Command, Shortcut, ToolId } from "./constants";
-import { TOOLS } from "./tools";
+import { TOOLS, toolById } from "./tools";
+import type { SizeKey } from "./tools/types";
 
 export function isTyping(target: EventTarget | null) {
   return (
@@ -9,20 +10,8 @@ export function isTyping(target: EventTarget | null) {
   );
 }
 
-export function sizeKey(
-  tool: ToolId,
-): "size" | "brushSize" | "eraserSize" | "sprayWidth" | null {
-  if (tool === "brush" || tool === "blur" || tool === "jumble")
-    return "brushSize";
-  if (tool === "eraser") return "eraserSize";
-  if (tool === "spray") return "sprayWidth";
-  return tool === "pen" ||
-    tool === "line" ||
-    tool === "curve" ||
-    tool === "rect" ||
-    tool === "ellipse"
-    ? "size"
-    : null;
+export function sizeKey(tool: ToolId): SizeKey | null {
+  return toolById(tool).size?.key ?? null;
 }
 
 export function toolTitle(tool: {
