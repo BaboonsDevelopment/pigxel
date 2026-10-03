@@ -85,6 +85,7 @@ import {
 import {
   ellipseMask,
   isSelected,
+  maskBounds,
   maskOutline,
   polygonMask,
   rectMask,
@@ -94,6 +95,8 @@ import {
   type SelectMode,
 } from "./selection";
 import { SliceOverlay } from "./components/slice-overlay";
+import { TransformHandles } from "./components/transform-handles";
+import { identityTransform } from "./free-transform";
 import { textPiece } from "./text";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
@@ -1259,6 +1262,18 @@ export function PixelCanvas({
           ? "cursor-text"
           : "cursor-crosshair";
   const tileStyle = { width: size.w * scale, height: size.h * scale };
+  // Scale and rotate handles around the selection, with the Move tool.
+  const selectionBox =
+    tool === "move" && selection.mask && sprite.canPaint
+      ? maskBounds(selection.mask, size)
+      : null;
+  const transformBox =
+    selection.freeTransform ??
+    (selectionBox && {
+      t: identityTransform(selectionBox),
+      w: selectionBox.w,
+      h: selectionBox.h,
+    });
   // Wide or tall pixels: the whole stage is shown stretched (see below).
   const stretch = { x: sprite.pixelRatio.w, y: sprite.pixelRatio.h };
   const showTip =
@@ -1507,6 +1522,16 @@ export function PixelCanvas({
         >
           {marquee.w} × {marquee.h}
         </span>
+      )}
+
+      {tool === "move" && transformBox && !selecting && !frame && (
+        <TransformHandles
+          box={transformBox}
+          scale={scale}
+          size={size}
+          begin={selection.beginTransform}
+          onChange={selection.setTransform}
+        />
       )}
 
       {tool === "slice" && (

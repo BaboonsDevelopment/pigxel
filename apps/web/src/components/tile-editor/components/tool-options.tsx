@@ -22,6 +22,7 @@ import type { Slice } from "@/lib/slices/slices";
 import type { ToolId } from "../constants";
 import { sizeKey } from "../helpers";
 import { SliceOptions } from "./slice-options";
+import { TransformOptions } from "./transform-options";
 
 /** The settings of the selected tool, shown above the canvas, and the canvas-wide modes. */
 export function ToolOptions({
@@ -414,6 +415,10 @@ export function ToolOptions({
         </div>
       )}
 
+      {tool === "move" && selection.mask && (
+        <TransformOptions selection={selection} />
+      )}
+
       <p className="min-w-0 flex-1 text-xs text-muted-foreground">
         {HINTS[tool]}
       </p>
@@ -558,7 +563,7 @@ const HINTS: Record<ToolId, string> = {
   polygonLasso:
     "Click to place corners · Click the first one, double-click or Enter closes · Esc cancels · Shift adds · Alt takes away",
   wand: "Click selects a colour area · Shift adds · Alt takes away",
-  move: "Drag moves the selection, or the whole layer · Arrow keys nudge · Enter drops",
+  move: "Drag moves the selection, or the whole layer · Handles scale it, the knob turns it (Shift snaps) · Arrow keys nudge · Enter puts it down, Esc cancels",
 };
 
 function OptionSelect<T extends string>({

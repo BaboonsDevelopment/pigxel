@@ -1,6 +1,11 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import {
+  identityTransform,
+  transformFloating,
+  type FreeTransform,
+} from "./free-transform";
 import { rgbaOf } from "./paint";
 import {
   combineMasks,
@@ -32,6 +37,11 @@ type Lifted = {
   maskBefore: Mask | null;
   /** Whether the cel shows a change yet; a lift alone changes nothing. */
   shown?: boolean;
+  /**
+   * While scaling or turning: the piece as lifted and how it is transformed;
+   * `piece` is always worked out from these, so it never blurs.
+   */
+  source?: { piece: Floating; t: FreeTransform };
 };
 
 // Kept for the whole visit, so a copy can be pasted into another tile.
@@ -89,7 +99,12 @@ export function useSelection(sprite: SpriteApi) {
   const { size } = sprite;
   const [ownMask, setMask] = useState<Mask | null>(null);
   const [lifted, setLifted] = useState<Lifted | null>(null);
-  const dragFrom = useRef<{ x: number; y: number; whole: boolean }>(null);
+  const dragFrom = useRef<{
+    x: number;
+    y: number;
+    whole: boolean;
+    t?: FreeTransform;
+  }>(null);
 
   const fitting = (mask: Mask | null) =>
     mask && mask.length === size.w * size.h ? mask : null;
@@ -160,6 +175,16 @@ export function useSelection(sprite: SpriteApi) {
     )?.floating ??
     null;
 
+  /** Shows `current`'s piece as lifted, transformed by `t`. */
+  const transformTo = (current: Lifted, t: FreeTransform) => {
+    const source = current.source?.piece ?? current.piece;
+    place({
+      ...current,
+      source: { piece: source, t },
+      piece: transformFloating(source, t),
+    });
+  };
+
   const select = (next: Mask | null, mode: SelectMode = "replace") => {
     drop();
     setMask(next ? combineMasks(mask, next, mode) : null);
@@ -195,7 +220,12 @@ export function useSelection(sprite: SpriteApi) {
     beginMove(whole: boolean) {
       const current = lift(whole);
       if (!current) return false;
-      dragFrom.current = { x: current.piece.x, y: current.piece.y, whole };
+      dragFrom.current = {
+        x: current.piece.x,
+        y: current.piece.y,
+        whole,
+        t: current.source?.t,
+      };
       setLifted(current);
       return true;
     },
@@ -205,6 +235,13 @@ export function useSelection(sprite: SpriteApi) {
       if (!from || !lifted) return;
       const { piece } = lifted;
       if (piece.x === from.x + dx && piece.y === from.y + dy) return;
+      // Moving a transformed piece moves its centre, the rest stays.
+      if (lifted.source && from.t)
+        return transformTo(lifted, {
+          ...from.t,
+          cx: from.t.cx + dx,
+          cy: from.t.cy + dy,
+        });
       place({ ...lifted, piece: { ...piece, x: from.x + dx, y: from.y + dy } });
     },
     /** Ends a drag; moving a whole cel drops it at once and selects nothing. */
@@ -222,11 +259,18 @@ export function useSelection(sprite: SpriteApi) {
       if (!mask) return false;
       const current = lift();
       if (!current) return false;
-      const { piece } = current;
-      place({
-        ...current,
-        piece: { ...piece, x: piece.x + dx, y: piece.y + dy },
-      });
+      const { piece, source } = current;
+      if (source)
+        transformTo(current, {
+          ...source.t,
+          cx: source.t.cx + dx,
+          cy: source.t.cy + dy,
+        });
+      else
+        place({
+          ...current,
+          piece: { ...piece, x: piece.x + dx, y: piece.y + dy },
+        });
       return true;
     },
 
@@ -241,10 +285,46 @@ export function useSelection(sprite: SpriteApi) {
           : kind === "flipVertical"
             ? flipFloating(current.piece, "vertical")
             : rotateFloating(current.piece, kind === "rotateRight");
-      if (!whole) return place({ ...current, piece });
+      // A flip or quarter turn bakes in any scaling or turning so far.
+      if (!whole) return place({ ...current, piece, source: undefined });
       show(stampFloating(current.under, size, piece));
       sprite.commit();
       setLifted(null);
+    },
+
+    /**
+     * The scale, turn and slant of the selected pixels, with the size they
+     * were lifted at; null while nothing is transformed yet.
+     */
+    freeTransform: lifted?.source
+      ? {
+          t: lifted.source.t,
+          w: lifted.source.piece.w,
+          h: lifted.source.piece.h,
+        }
+      : null,
+
+    /**
+     * Starts scaling or turning the selected pixels: lifts them and returns
+     * the transform so far, with their lifted size; null when nothing can be.
+     */
+    beginTransform() {
+      if (!mask) return null;
+      const current = lift();
+      if (!current) return null;
+      if (!lifted) setLifted(current);
+      const piece = current.source?.piece ?? current.piece;
+      return {
+        t: current.source?.t ?? identityTransform(piece),
+        w: piece.w,
+        h: piece.h,
+      };
+    },
+
+    /** Scales, turns or slants the selected pixels to `t` (see beginTransform). */
+    setTransform(t: FreeTransform) {
+      const current = lift();
+      if (current) transformTo(current, t);
     },
 
     /** Removes the selected pixels, leaving the selection. */
