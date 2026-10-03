@@ -9,6 +9,7 @@ const protectedPaths = [
   "/patch-notes",
   "/assets",
   "/tutorials",
+  "/feedback",
   "/u",
   "/auth/update-password",
 ];

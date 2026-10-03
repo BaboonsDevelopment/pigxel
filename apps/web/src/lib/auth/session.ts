@@ -19,6 +19,15 @@ export const getUser = cache(async (): Promise<User | null> => {
   return error ? null : user;
 });
 
+/**
+ * Whether the user may change shared content such as assets: "role": "admin"
+ * in their app_metadata, which only the dashboard or the service role sets.
+ * The database checks the same.
+ */
+export function isAdmin(user: Pick<User, "app_metadata"> | null) {
+  return user?.app_metadata?.role === "admin";
+}
+
 /** Returns the verified user, or sends signed-out visitors to the login page. */
 export const requireUser = cache(async () => {
   const user = await getUser();

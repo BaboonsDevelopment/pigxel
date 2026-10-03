@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
-  ASSETS,
-  assetDocument,
-  assetPalette,
-  assetPixels,
-  assetRuns,
-  assetSize,
-  findAsset,
+  assetFileUrl,
+  keepFrames,
+  toAsset,
+  type AssetRow,
 } from "@/lib/assets/assets";
+import { assetIdFor, sheetPixels } from "@/lib/assets/publish";
+import {
+  STARTER_ASSETS,
+  starterDocument,
+  starterPixels,
+} from "@/lib/assets/starter";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
   flattenDocument,
@@ -21,16 +24,19 @@ import {
   type GuideState,
 } from "@/lib/tutorials/tutorials";
 
-describe("assets", () => {
-  it("have unique ids", () => {
-    const ids = ASSETS.map((a) => a.id);
+describe("the starter set", () => {
+  it("has unique ids that work as asset ids", () => {
+    const ids = STARTER_ASSETS.map((a) => a.id);
     expect(new Set(ids).size).toBe(ids.length);
+    for (const asset of STARTER_ASSETS)
+      expect(assetIdFor(asset.id)).toBe(asset.id);
   });
 
-  it.each(ASSETS)(
+  it.each(STARTER_ASSETS)(
     "$id is drawn on an even grid with known colours",
     (asset) => {
-      const { w, h } = assetSize(asset);
+      const w = asset.frames[0]![0]!.length;
+      const h = asset.frames[0]!.length;
       for (const frame of asset.frames) {
         expect(frame).toHaveLength(h);
         for (const row of frame) {
@@ -45,50 +51,82 @@ describe("assets", () => {
   );
 
   it("tiles are fully opaque, so they meet without gaps", () => {
-    for (const asset of ASSETS.filter((a) => a.category === "tiles"))
+    for (const asset of STARTER_ASSETS.filter((a) => a.category === "tiles"))
       for (const row of asset.frames.flat()) expect(row).not.toContain(".");
   });
 
-  it("turns letters into pixels, with dots left transparent", () => {
-    const heart = findAsset("heart")!;
-    const pixels = assetPixels(heart);
-    const { w } = assetSize(heart);
-    // Row 2 starts "..kk": transparent, then the outline colour.
-    expect([...pixels.subarray((2 * w + 1) * 4, (2 * w + 2) * 4)]).toEqual([
-      0, 0, 0, 0,
-    ]);
-    expect([...pixels.subarray((2 * w + 2) * 4, (2 * w + 3) * 4)]).toEqual([
-      0x3e, 0x27, 0x31, 255,
-    ]);
-  });
-
-  it("runs cover every painted pixel exactly once", () => {
-    for (const asset of ASSETS) {
-      const painted = asset.frames[0]!.join("").replaceAll(".", "").length;
-      const covered = assetRuns(asset).reduce((sum, run) => sum + run.w, 0);
-      expect(covered).toBe(painted);
-    }
-  });
-
   it("becomes a tile that saves and opens with every frame", () => {
-    const coin = findAsset("coin")!;
-    const doc = parsePigxel(serializePigxel(assetDocument(coin)));
+    const coin = STARTER_ASSETS.find((a) => a.id === "coin")!;
+    const doc = parsePigxel(serializePigxel(starterDocument(coin)));
     expect(doc.width).toBe(16);
     expect(doc.frames).toHaveLength(4);
     expect(doc.frames[0]!.duration).toBe(coin.duration);
-    expect(doc.palette).toEqual(assetPalette(coin));
     doc.frames.forEach((frame, i) =>
       expect(celOf(doc.cels, frame.id, doc.layers[0]!.id)).toEqual(
-        assetPixels(coin, i),
+        starterPixels(coin, i),
       ),
     );
   });
+});
 
-  it("can keep only its first frames", () => {
-    const slime = findAsset("slime")!;
-    const doc = assetDocument(slime, { frames: 1 });
+describe("assets from the database", () => {
+  const row: AssetRow = {
+    id: "coin",
+    name: "Coin",
+    category: "items",
+    width: 16,
+    height: 16,
+    frame_count: 4,
+    frame_ms: 120,
+    colors: ["#f5b41a"],
+    file_path: "coin/1a2b.pigxel",
+    sheet_path: "coin/3c4d.png",
+    sort: 0,
+  };
+
+  it("read their files from the public bucket", () => {
+    const asset = toAsset(row);
+    expect(asset.fileUrl).toBe(assetFileUrl("coin/1a2b.pigxel"));
+    expect(asset.sheetUrl).toMatch(
+      /\/storage\/v1\/object\/public\/assets\/coin\/3c4d\.png$/,
+    );
+    expect(asset.frames).toBe(4);
+  });
+
+  it("can start a tile from their first frames only", () => {
+    const slime = STARTER_ASSETS.find((a) => a.id === "slime")!;
+    const doc = keepFrames(starterDocument(slime), 1);
     expect(doc.frames).toHaveLength(1);
-    expect(flattenDocument(doc)).toEqual(assetPixels(slime));
+    expect(doc.cels.size).toBe(1);
+    expect(flattenDocument(doc)).toEqual(starterPixels(slime));
+  });
+});
+
+describe("publishing", () => {
+  it("makes ids from names", () => {
+    expect(assetIdFor("Gold coin!")).toBe("gold-coin");
+    expect(assetIdFor("  Évil  Bat ")).toBe("evil-bat");
+    expect(assetIdFor("!!!")).toBe("");
+    // At most 40 characters, never ending in a dash.
+    expect(assetIdFor("a".repeat(30) + " " + "b".repeat(30))).toHaveLength(40);
+    expect(assetIdFor("a".repeat(39) + " b")).toBe("a".repeat(39));
+  });
+
+  it("lays the frames side by side on the sheet", () => {
+    const coin = STARTER_ASSETS.find((a) => a.id === "coin")!;
+    const doc = starterDocument(coin);
+    const sheet = sheetPixels(doc);
+    expect(sheet).toMatchObject({ w: 64, h: 16 });
+    // Row 5 of frame 3 sits 32 pixels in.
+    const row = (
+      pixels: Uint8ClampedArray,
+      w: number,
+      x: number,
+      y: number,
+    ) => [...pixels.subarray((y * w + x) * 4, (y * w + x + 16) * 4)];
+    expect(row(sheet.pixels, 64, 32, 5)).toEqual(
+      row(starterPixels(coin, 2), 16, 0, 5),
+    );
   });
 });
 
@@ -124,7 +162,9 @@ describe("tutorials", () => {
     const slugs = TUTORIALS.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
     for (const { practice } of TUTORIALS)
-      if (practice.asset) expect(findAsset(practice.asset)).not.toBeNull();
+      // Practice assets come with the starter set.
+      if (practice.asset)
+        expect(STARTER_ASSETS.map((a) => a.id)).toContain(practice.asset);
   });
 
   it("steps that wait for a change aren't done when nothing changed", () => {

@@ -1,9 +1,14 @@
-import { createLayer } from "@/lib/layers/tree";
-import type { PigxelDocument } from "@/lib/pigxel-file/format";
-import { createFrame } from "@/lib/sprite/frames";
-import { ASSETS, type Asset, type AssetCategory } from "./sprites";
+import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 
-export { ASSETS, type Asset, type AssetCategory };
+/**
+ * Assets: sprites and tiles the team makes for everyone to start a tile from
+ * or drop into one. Each is a row in the `assets` table and two files in the
+ * public `assets` bucket: its .pigxel file, and a PNG sheet of its frames
+ * side by side at 1×, which pages show scaled up and play with CSS. Lists
+ * only bring the rows; the files load when one is used.
+ */
+
+export type AssetCategory = "characters" | "items" | "nature" | "tiles";
 
 export const ASSET_CATEGORIES: { id: AssetCategory; label: string }[] = [
   { id: "characters", label: "Characters" },
@@ -12,116 +17,137 @@ export const ASSET_CATEGORIES: { id: AssetCategory; label: string }[] = [
   { id: "tiles", label: "Tiles" },
 ];
 
-export function findAsset(id: string | null | undefined): Asset | null {
-  return ASSETS.find((asset) => asset.id === id) ?? null;
+export const ASSET_BUCKET = "assets";
+
+export const ASSET_COLUMNS =
+  "id, name, category, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort";
+
+export type AssetRow = {
+  id: string;
+  name: string;
+  category: AssetCategory;
+  width: number;
+  height: number;
+  frame_count: number;
+  frame_ms: number;
+  colors: string[];
+  file_path: string;
+  sheet_path: string;
+  sort: number;
+};
+
+export type Asset = {
+  id: string;
+  name: string;
+  category: AssetCategory;
+  width: number;
+  height: number;
+  frames: number;
+  /** How long each frame shows in the preview, in milliseconds. */
+  frameMs: number;
+  /** Its colours, most used first. */
+  colors: string[];
+  /** The .pigxel file. */
+  fileUrl: string;
+  /** The PNG sheet of its frames side by side, at 1×. */
+  sheetUrl: string;
+};
+
+export function isAssetCategory(value: unknown): value is AssetCategory {
+  return ASSET_CATEGORIES.some((c) => c.id === value);
 }
 
-export function assetSize(asset: Asset) {
-  const rows = asset.frames[0]!;
-  return { w: rows[0]!.length, h: rows.length };
+/** Where a file of the bucket can be read; it's public, and cached for good. */
+export function assetFileUrl(path: string) {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  return `${base}/storage/v1/object/public/${ASSET_BUCKET}/${path}`;
 }
 
-/** The colours an asset paints with, as `#rrggbb`, each once. */
-export function assetPalette(asset: Asset): string[] {
-  return [...new Set(Object.values(asset.colors))];
-}
-
-const channels = (color: string) =>
-  [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-
-/** One frame of the asset as RGBA pixels, row by row from the top-left. */
-export function assetPixels(asset: Asset, frame = 0): Uint8ClampedArray {
-  const { w, h } = assetSize(asset);
-  const pixels = new Uint8ClampedArray(w * h * 4);
-  asset.frames[frame]!.forEach((row, y) => {
-    for (let x = 0; x < w; x++) {
-      const color = asset.colors[row[x]!];
-      if (color) pixels.set([...channels(color), 255], (y * w + x) * 4);
-    }
-  });
-  return pixels;
-}
-
-/** Same-colour stretches of a frame's rows, for drawing it as rectangles. */
-export function assetRuns(asset: Asset, frame = 0) {
-  const runs: { x: number; y: number; w: number; color: string }[] = [];
-  asset.frames[frame]!.forEach((row, y) => {
-    for (let x = 0; x < row.length;) {
-      const letter = row[x]!;
-      let end = x + 1;
-      while (row[end] === letter) end++;
-      const color = asset.colors[letter];
-      if (color) runs.push({ x, y, w: end - x, color });
-      x = end;
-    }
-  });
-  return runs;
-}
-
-/**
- * A new tile made from the asset: one layer holding its frames, and its
- * colours as the palette. `frames` keeps only that many, e.g. 1 to start
- * an animation from the first.
- */
-export function assetDocument(
-  asset: Asset,
-  { frames: count = asset.frames.length }: { frames?: number } = {},
-): PigxelDocument {
-  const { w, h } = assetSize(asset);
-  const layer = createLayer("normal", asset.name);
-  const frames = asset.frames
-    .slice(0, Math.max(1, count))
-    .map(() => createFrame(asset.duration));
+export function toAsset(row: AssetRow): Asset {
   return {
-    id: crypto.randomUUID(),
-    width: w,
-    height: h,
-    background: "transparent",
-    layers: [layer],
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    width: row.width,
+    height: row.height,
+    frames: row.frame_count,
+    frameMs: row.frame_ms,
+    colors: row.colors,
+    fileUrl: assetFileUrl(row.file_path),
+    sheetUrl: assetFileUrl(row.sheet_path),
+  };
+}
+
+/** The tile with only its first `count` frames, e.g. 1 to animate it yourself. */
+export function keepFrames(doc: PigxelDocument, count: number): PigxelDocument {
+  const frames = doc.frames.slice(0, Math.max(1, count));
+  return {
+    ...doc,
     frames,
-    cels: new Map(
-      frames.map((frame, i) => [
-        frame.id,
-        new Map([[layer.id, assetPixels(asset, i)]]),
-      ]),
-    ),
-    palette: assetPalette(asset),
-    slices: [],
+    cels: new Map(frames.map((f) => [f.id, doc.cels.get(f.id) ?? new Map()])),
   };
 }
 
 /**
- * The asset as a PNG, `scale` times its size: one `frame`, or else every
- * frame side by side, as a sprite sheet. Browser only.
+ * The asset as a new tile of its own, from its .pigxel file: a fresh id, so
+ * no two tiles made from it share an AI chat. `frames` keeps only the first
+ * ones.
  */
-export function assetPng(
-  asset: Asset,
-  { scale = 1, frame }: { scale?: number; frame?: number } = {},
-): Promise<Blob | null> {
-  const { w, h } = assetSize(asset);
-  const frames = frame === undefined ? asset.frames.map((_, i) => i) : [frame];
-  const sheet = document.createElement("canvas");
-  sheet.width = w * frames.length;
-  sheet.height = h;
-  const ctx = sheet.getContext("2d");
-  if (!ctx) return Promise.resolve(null);
-  frames.forEach((index, i) =>
-    ctx.putImageData(
-      new ImageData(
-        assetPixels(asset, index) as Uint8ClampedArray<ArrayBuffer>,
-        w,
-        h,
-      ),
-      i * w,
-      0,
+export async function loadAssetDocument(
+  asset: Pick<Asset, "fileUrl">,
+  { frames }: { frames?: number } = {},
+): Promise<PigxelDocument> {
+  const response = await fetch(asset.fileUrl);
+  if (!response.ok) throw new Error("Couldn’t load this asset.");
+  const doc = parsePigxel(await response.text());
+  const kept = frames ? keepFrames(doc, frames) : doc;
+  return { ...kept, id: crypto.randomUUID() };
+}
+
+/** The asset's first frame as pixels, e.g. to paste onto a tile. Browser only. */
+export async function loadAssetFrame(
+  asset: Pick<Asset, "sheetUrl" | "width" | "height">,
+): Promise<{ pixels: Uint8ClampedArray; w: number; h: number }> {
+  const ctx = (await frameCanvas(asset)).getContext("2d")!;
+  const { data } = ctx.getImageData(0, 0, asset.width, asset.height);
+  return { pixels: data, w: asset.width, h: asset.height };
+}
+
+/** The asset's first frame as a PNG, e.g. for the clipboard. Browser only. */
+export async function assetFramePng(
+  asset: Pick<Asset, "sheetUrl" | "width" | "height">,
+): Promise<Blob> {
+  const canvas = await frameCanvas(asset);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) =>
+        blob ? resolve(blob) : reject(new Error("Couldn’t copy this asset.")),
+      "image/png",
     ),
   );
-  const out = document.createElement("canvas");
-  out.width = sheet.width * scale;
-  out.height = sheet.height * scale;
-  const big = out.getContext("2d");
-  if (!big) return Promise.resolve(null);
-  big.imageSmoothingEnabled = false;
-  big.drawImage(sheet, 0, 0, out.width, out.height);
-  return new Promise((resolve) => out.toBlob(resolve, "image/png"));
+}
+
+/** Downloads one of the asset's files as it is. */
+export async function assetBlob(url: string): Promise<Blob> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Couldn’t download this asset.");
+  return response.blob();
+}
+
+/** A canvas with the first frame of the asset's sheet on it. */
+async function frameCanvas(
+  asset: Pick<Asset, "sheetUrl" | "width" | "height">,
+): Promise<HTMLCanvasElement> {
+  const bitmap = await createImageBitmap(await assetBlob(asset.sheetUrl));
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = asset.width;
+    canvas.height = asset.height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("Canvas is unavailable in this browser.");
+    ctx.drawImage(bitmap, 0, 0);
+    return canvas;
+  } finally {
+    bitmap.close();
+  }
 }

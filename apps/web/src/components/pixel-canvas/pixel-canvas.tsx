@@ -38,6 +38,7 @@ import {
   isBlank,
   largestEmptyArea,
   pixelAt,
+  pixelsPassed,
   resizeTo,
   sameSize,
   tileSnapshot,
@@ -180,6 +181,8 @@ export type PixelCanvasHandle = {
   selectArea: () => Promise<Area | null>;
   /** Shows `area` as a frame the user can move and resize; null when they cancel. */
   adjustArea: (area: Area) => Promise<Area | null>;
+  /** Where the tile is on screen, e.g. to zoom around a point on it. */
+  tileRect: () => DOMRect | null;
   /** The tile pixel under a point on the screen, or null when it is off the tile. */
   tilePointAt: (clientX: number, clientY: number) => Point | null;
 };
@@ -422,6 +425,7 @@ export function PixelCanvas({
           resolveFrame.current = resolve;
         });
       },
+      tileRect: () => screenRef.current?.getBoundingClientRect() ?? null,
     };
   }, [sprite, size]);
 
@@ -729,9 +733,13 @@ export function PixelCanvas({
     );
   };
 
-  // Shift while dragging the elliptical marquee makes a circle.
-  const moveSelect = (p: Point, shift: boolean) => {
-    if (!selectDrag) return;
+  /**
+   * Follows the pointer through `passed` pixels, the last being where it is
+   * now. Shift while dragging the elliptical marquee makes a circle.
+   */
+  const moveSelect = (passed: Point[], shift: boolean) => {
+    const p = passed.at(-1);
+    if (!selectDrag || !p) return;
     if (selectDrag.kind === "move")
       selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
     else if (selectDrag.kind === "marquee") {
@@ -742,7 +750,7 @@ export function PixelCanvas({
       if (p.x !== selectDrag.pointer.x || p.y !== selectDrag.pointer.y)
         setSelectDrag({ ...selectDrag, pointer: p });
     } else {
-      const points = extendStroke(selectDrag.points, p);
+      const points = passed.reduce(extendStroke, selectDrag.points);
       if (points !== selectDrag.points)
         setSelectDrag({ ...selectDrag, points });
     }
@@ -1128,10 +1136,13 @@ export function PixelCanvas({
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const point = pixelAt(e);
+    // Every pixel passed since the last event, so fast curves stay round.
+    const passed = pixelsPassed(e.nativeEvent, e.currentTarget);
+    const point = passed.at(-1);
+    if (!point) return;
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
-    if (selectDrag) return moveSelect(point, e.shiftKey);
+    if (selectDrag) return moveSelect(passed, e.shiftKey);
     if (sliceDrag) return moveSlice(point);
     const current = stroke.current;
     const ctx = sprite.context();
@@ -1180,7 +1191,7 @@ export function PixelCanvas({
         showCurve(current);
       }
     } else {
-      const points = extendStroke(current.points, point);
+      const points = passed.reduce(extendStroke, current.points);
       if (points === current.points) return;
       current.points = points;
     }

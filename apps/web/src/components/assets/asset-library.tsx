@@ -1,16 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import {
-  ASSET_CATEGORIES,
-  ASSETS,
-  assetSize,
-  type Asset,
-  type AssetCategory,
-} from "@/lib/assets/assets";
+import type { Asset, AssetCategory } from "@/lib/assets/assets";
 import { AssetDialog } from "./asset-dialog";
-import { AssetSprite } from "./asset-sprite";
+import { AssetImage } from "./asset-image";
 
 /** The pastel behind each kind of asset, as on Home's cards. */
 const TINTS: Record<AssetCategory, string> = {
@@ -20,44 +15,73 @@ const TINTS: Record<AssetCategory, string> = {
   tiles: "bg-[#e6e2f5]",
 };
 
-/** The sprites and tiles, a section per kind; a click opens one up close. */
-export function AssetLibrary({ only }: { only?: AssetCategory }) {
+export type AssetSection = {
+  category: { id: AssetCategory; label: string };
+  assets: Asset[];
+  /** How many the category has, which may be more than shown. */
+  total: number;
+};
+
+/** The assets, a section per kind; a click opens one up close. */
+export function AssetLibrary({
+  sections,
+  canManage,
+}: {
+  sections: AssetSection[];
+  /** Admins can take assets off the page. */
+  canManage: boolean;
+}) {
   const [open, setOpen] = useState<Asset | null>(null);
-  const categories = ASSET_CATEGORIES.filter((c) => !only || c.id === only);
 
   return (
     <>
-      {categories.map((category) => (
-        <section
-          key={category.id}
-          aria-labelledby={`assets-${category.id}`}
-          className="mt-8"
-        >
-          <h2
-            id={`assets-${category.id}`}
-            className="mb-3 font-display text-xl tracking-tight"
+      {sections.map(({ category, assets, total }) =>
+        assets.length === 0 ? null : (
+          <section
+            key={category.id}
+            aria-labelledby={`assets-${category.id}`}
+            className="mt-8"
           >
-            {category.label}
-          </h2>
-          <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            {ASSETS.filter((asset) => asset.category === category.id).map(
-              (asset) => (
+            <div className="mb-3 flex items-end justify-between gap-4">
+              <h2
+                id={`assets-${category.id}`}
+                className="font-display text-xl tracking-tight"
+              >
+                {category.label}
+              </h2>
+              {total > assets.length && (
+                <Link
+                  href={`/assets?type=${category.id}`}
+                  className="text-xs font-medium text-[#9a78d0] hover:underline"
+                >
+                  See all {total} <span aria-hidden="true">→</span>
+                </Link>
+              )}
+            </div>
+            <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
+              {assets.map((asset) => (
                 <li key={asset.id}>
                   <AssetCard asset={asset} onOpen={() => setOpen(asset)} />
                 </li>
-              ),
-            )}
-          </ul>
-        </section>
-      ))}
-      {open && <AssetDialog asset={open} onClose={() => setOpen(null)} />}
+              ))}
+            </ul>
+          </section>
+        ),
+      )}
+      {open && (
+        <AssetDialog
+          key={open.id}
+          asset={open}
+          canRemove={canManage}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </>
   );
 }
 
 function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
-  const { w, h } = assetSize(asset);
-  const frames = asset.frames.length;
+  const tile = asset.category === "tiles";
   return (
     <button
       type="button"
@@ -70,20 +94,19 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
           TINTS[asset.category],
         )}
       >
-        {asset.category === "tiles" ? (
-          // A tile next to copies of itself, to show it repeats without seams.
-          <AssetSprite
-            asset={asset}
-            repeat={3}
-            className="size-full transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
-          />
-        ) : (
-          <AssetSprite
-            asset={asset}
-            className="size-3/5 transition-transform duration-300 ease-out group-hover:-translate-y-1 group-hover:-rotate-3 motion-reduce:transition-none"
-          />
-        )}
-        {frames > 1 && (
+        <AssetImage
+          asset={asset}
+          repeat={tile}
+          className={cn(
+            "transition-transform duration-300 ease-out motion-reduce:transition-none",
+            // A tile fills the card next to copies of itself, to show it
+            // repeats without seams.
+            tile
+              ? "w-full group-hover:scale-105"
+              : "w-3/5 group-hover:-translate-y-1 group-hover:-rotate-3",
+          )}
+        />
+        {asset.frames > 1 && (
           <span className="absolute top-2 right-2 rounded-full bg-white/85 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
             Animated
           </span>
@@ -93,8 +116,8 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
         {asset.name}
       </span>
       <span className="block font-mono text-xs text-muted-foreground tabular-nums">
-        {w} × {h}
-        {frames > 1 && ` · ${frames} frames`}
+        {asset.width} × {asset.height}
+        {asset.frames > 1 && ` · ${asset.frames} frames`}
       </span>
     </button>
   );
