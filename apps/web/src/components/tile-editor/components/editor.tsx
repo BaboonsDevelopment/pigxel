@@ -100,6 +100,9 @@ const AssetPickerDialog = dynamic(() => import("./asset-picker-dialog"), {
 const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
   ssr: false,
 });
+const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
+  ssr: false,
+});
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -132,6 +135,7 @@ export function Editor({
   } | null>(null);
   const [inserting, setInserting] = useState(false);
   const [resizing, setResizing] = useState(false);
+  const [scaling, setScaling] = useState(false);
   // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
@@ -379,6 +383,7 @@ export function Editor({
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
       { label: "Canvas size…", onSelect: () => setResizing(true) },
+      { label: "Sprite size…", onSelect: () => setScaling(true) },
       {
         label: "Crop to selection",
         onSelect: cropToSelection,
@@ -805,6 +810,18 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {scaling && (
+        <SpriteSizeDialog
+          size={sprite.size}
+          picture={sprite.composite(["reference"])}
+          onApply={(next, method) => {
+            // A selection made for the old size wouldn't line up any more.
+            selection.deselect();
+            sprite.rescale(next, method);
+          }}
+          onClose={() => setScaling(false)}
         />
       )}
       {resizing && (

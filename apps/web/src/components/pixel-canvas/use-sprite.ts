@@ -7,6 +7,11 @@ import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
 import { movedSlices } from "@/lib/sprite/canvas-size";
+import {
+  scalePicture,
+  scaledSlices,
+  type ScaleMethod,
+} from "@/lib/sprite/sprite-size";
 import * as frameList from "@/lib/sprite/frames";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
@@ -578,6 +583,24 @@ export function useSprite(
     finish({ size: next, slices: nextSlices });
   };
 
+  /** Scales every cel to `next` by `method`, slices too, as one undo step. */
+  const rescale = (next: Size, method: ScaleMethod) => {
+    for (const { frameId: frame, layerId: layer } of cels.list()) {
+      const rgba = cels.pixels(frame, layer)!;
+      const scaled = scalePicture(
+        { rgba, w: size.w, h: size.h },
+        next.w,
+        next.h,
+        method,
+      );
+      changed.current.add(cels.set(frame, layer, next, scaled));
+    }
+    const nextSlices = scaledSlices(slices, size, next);
+    setSize(next);
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
+  };
+
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
 
   /** Changes the tile's slices, as one undo step. */
@@ -619,6 +642,7 @@ export function useSprite(
     editCel,
     clearCel,
     resize,
+    rescale,
     undo,
     redo,
     /** Whether a layer has anything drawn in a frame. */
