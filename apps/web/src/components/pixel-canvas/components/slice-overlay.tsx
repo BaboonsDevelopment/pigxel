@@ -21,6 +21,7 @@ export function SliceOverlay({
   slices,
   size,
   scale,
+  stretch = { x: 1, y: 1 },
   pickedId,
   drag,
   onResize,
@@ -28,6 +29,8 @@ export function SliceOverlay({
   slices: Slice[];
   size: Size;
   scale: number;
+  /** How much wider or taller pixels are shown (the pixel ratio); 1 for square. */
+  stretch?: { x: number; y: number };
   pickedId: string | null;
   drag: SliceDrag;
   /** Called with the picked slice's new bounds when a handle is let go. */
@@ -82,8 +85,8 @@ export function SliceOverlay({
   const moveResize = (e: React.PointerEvent) => {
     const h = handle.current;
     if (!h) return;
-    const dx = Math.round((e.clientX - h.x) / scale);
-    const dy = Math.round((e.clientY - h.y) / scale);
+    const dx = Math.round((e.clientX - h.x) / (scale * stretch.x));
+    const dy = Math.round((e.clientY - h.y) / (scale * stretch.y));
     h.bounds = adjustFrame(h.start, h.edges, dx, dy, size, 1);
     setResizing(h.bounds);
   };

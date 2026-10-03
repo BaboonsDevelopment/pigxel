@@ -19,11 +19,6 @@ import {
   saveDriveFile,
   type DriveFile,
 } from "@/lib/pigxel-file/google-drive";
-import {
-  asepriteBaseName,
-  isAsepriteFile,
-  readAseprite,
-} from "@/lib/pigxel-file/aseprite";
 import { downloadPigxel } from "@/lib/pigxel-file/local";
 import {
   LOCATION_LABELS,
@@ -220,7 +215,7 @@ export function useTileFile({
   const openFromComputer = () => fileInput.current?.click();
 
   /**
-   * Opens a tile made here (from a picture, an Aseprite file, a sprite sheet)
+   * Opens a tile made here (from a picture or a sprite sheet)
    * as a new tile called `tileName`. It's saved where this tile lives, so a
    * Pigxel cloud tile's imports land in Pigxel cloud too; if that fails, or
    * this tile lives only here, the new one is kept in this browser.
@@ -236,21 +231,16 @@ export function useTileFile({
     onOpen(await draftFromDocument(userId, doc, tileName, home));
   };
 
-  // A picture (PNG, GIF, JPEG, …) or an Aseprite file opens as a new tile;
-  // anything else is read as a .pigxel file.
+  // A picture (PNG, GIF, JPEG, …) opens as a new tile; anything else is read
+  // as a .pigxel file.
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
     void run(async () =>
-      isAsepriteFile(file.name)
-        ? openNew(
-            readAseprite(new Uint8Array(await file.arrayBuffer())),
-            asepriteBaseName(file.name),
-          )
-        : isImageFile(file)
-          ? openNew(await documentFromImage(file), imageBaseName(file.name))
-          : onOpen(
-              await draftFromFile(userId, await file.text(), file.name, null),
-            ),
+      isImageFile(file)
+        ? openNew(await documentFromImage(file), imageBaseName(file.name))
+        : onOpen(
+            await draftFromFile(userId, await file.text(), file.name, null),
+          ),
     );
   };
 

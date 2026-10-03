@@ -16,11 +16,9 @@ import { LayerOptions } from "./layer-options";
 export function TimelineToolbar({
   sprite,
   playback,
-  onCollapse,
 }: {
   sprite: SpriteApi;
   playback: Playback;
-  onCollapse: () => void;
 }) {
   const { activeLayer, layerId, frames, frameId } = sprite;
   const frame = frames.find((f) => f.id === frameId)!;
@@ -115,15 +113,6 @@ export function TimelineToolbar({
           onChange={(ms) => sprite.setFrameDuration(frame.id, ms)}
         />
       </ControlGroup>
-
-      <button
-        type="button"
-        className={`${ACTION} ml-auto text-muted-foreground`}
-        title="Hide the timeline"
-        onClick={onCollapse}
-      >
-        {ICONS.collapse}
-      </button>
     </header>
   );
 }

@@ -1,6 +1,3 @@
-/** The panel's height in pixels, changed by dragging its top edge. */
-export const PANEL_HEIGHT = { initial: 224, min: 120, max: 600 };
-
 /** Width of the layer names column, which stays put while frames scroll. */
 export const LAYER_COLUMN = "w-64";
 

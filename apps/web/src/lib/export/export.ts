@@ -5,6 +5,8 @@ import {
   type Background,
 } from "@/lib/pigxel-file/format";
 import { clipToTile, type Slice } from "@/lib/slices/slices";
+import type { PixelRatio } from "@/lib/sprite/pixel-ratio";
+import { scalePicture, scaledSlices } from "@/lib/sprite/sprite-size";
 import type { Frame } from "@/lib/sprite/types";
 import {
   EXPORT_FORMATS,
@@ -39,6 +41,29 @@ export type ExportSource = {
 export type ExportFile = { name: string; mime: string } & (
   { image: Bitmap } | { data: Uint8Array<ArrayBuffer> | string }
 );
+
+/**
+ * The tile with its pixels stretched to `ratio`: 2:1 pixels become two
+ * square ones side by side, so the files look as the editor shows them.
+ */
+export function stretchedSource(
+  source: ExportSource,
+  ratio: PixelRatio,
+): ExportSource {
+  const size = { w: source.size.w * ratio.w, h: source.size.h * ratio.h };
+  return {
+    ...source,
+    size,
+    picture: (id) =>
+      scalePicture(
+        { rgba: source.picture(id), ...source.size },
+        size.w,
+        size.h,
+        "nearest",
+      ),
+    slices: scaledSlices(source.slices, source.size, size),
+  };
+}
 
 export const clampScale = (scale: number) =>
   Math.min(

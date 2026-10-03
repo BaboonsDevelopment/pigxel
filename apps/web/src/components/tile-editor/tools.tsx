@@ -1,5 +1,5 @@
 import { pixelIcon } from "@/components/pixel-icon";
-import type { Tool } from "./constants";
+import type { Tool, ToolId } from "./constants";
 
 export const TOOLS: Tool[] = [
   {
@@ -533,3 +533,28 @@ export const TOOLS: Tool[] = [
     ]),
   },
 ];
+
+/** The tool panel's groups, as Aseprite's: one button each, the rest of the group in its flyout. */
+export const TOOL_GROUPS: { id: string; label: string; tools: ToolId[] }[] = [
+  {
+    id: "select",
+    label: "Select",
+    tools: ["marquee", "ellipseMarquee", "lasso", "polygonLasso", "wand"],
+  },
+  { id: "move", label: "Move", tools: ["move"] },
+  { id: "draw", label: "Draw", tools: ["pen", "brush", "spray", "eraser"] },
+  {
+    id: "shapes",
+    label: "Lines & shapes",
+    tools: ["line", "curve", "rect", "ellipse", "contour", "polygon"],
+  },
+  { id: "fill", label: "Fill", tools: ["bucket", "gradient"] },
+  { id: "effects", label: "Effects", tools: ["blur", "jumble"] },
+  { id: "text", label: "Text & slices", tools: ["text", "slice"] },
+  { id: "pick", label: "Pick colour", tools: ["pipette"] },
+];
+
+export const toolById = (id: ToolId) => TOOLS.find((t) => t.id === id)!;
+
+export const groupOf = (id: ToolId) =>
+  TOOL_GROUPS.find((g) => g.tools.includes(id));

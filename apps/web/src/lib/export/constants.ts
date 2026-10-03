@@ -57,6 +57,8 @@ export type ExportSettings = {
   layout: SheetLayout;
   /** Also downloads the sheet's frame positions and durations as JSON. */
   sheetData: boolean;
+  /** Wide or tall pixels come out stretched to their shape (see PixelRatio). */
+  applyRatio: boolean;
 };
 
 export const DEFAULT_EXPORT: ExportSettings = {
@@ -64,6 +66,7 @@ export const DEFAULT_EXPORT: ExportSettings = {
   scale: 1,
   layout: "row",
   sheetData: false,
+  applyRatio: true,
 };
 
 export const MIN_EXPORT_SCALE = 1;

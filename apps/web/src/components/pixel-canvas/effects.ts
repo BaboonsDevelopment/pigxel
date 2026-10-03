@@ -63,3 +63,14 @@ export function replacedColor(
   }
   return out;
 }
+
+/** `rgba` with every pixel in `mask` set to `color`, for Edit › Fill and Stroke. */
+export function filledMask(
+  rgba: Uint8ClampedArray,
+  mask: Uint8Array,
+  color: readonly [number, number, number, number],
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(rgba);
+  for (let i = 0; i < mask.length; i++) if (mask[i]) out.set(color, i * 4);
+  return out;
+}

@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ResizeHandle } from "@/components/resize-handle";
 import { sendMessage } from "@/lib/ai/actions";
 import { REFERENCES_NOTE } from "@/lib/ai/constants";
 import { notifyAiSpent } from "@/lib/ai/spent-event";
 import { loadChat, saveChat } from "@/lib/chat/history";
 import { findPicture, keepPicture } from "@/lib/chat/pictures";
 import { ChatComposer } from "./components/chat-composer";
-import { ChatHeader } from "./components/chat-header";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
 import {
   ASK_FRAME,
-  PANEL_WIDTH,
   UNREACHABLE,
   type CanvasBridge,
   type Chat,
@@ -23,7 +20,6 @@ import {
 import { animate } from "./flows/animate";
 import { edit } from "./flows/edit";
 import { drawOnNewLayer, generate } from "./flows/generate";
-import { ICONS } from "./icons";
 
 /** How long the chat waits after a change before saving it. */
 const SAVE_DELAY = 800;
@@ -55,8 +51,6 @@ export function ChatPanel({
   // Pictures attached to the message being written, to draw from.
   const [references, setReferences] = useState<string[]>([]);
   const [selectArea, setSelectArea] = useState(false);
-  const [width, setWidth] = useState(PANEL_WIDTH.initial);
-  const [collapsed, setCollapsed] = useState(false);
   // Pictures already in the browser's cache, by data URL, to keep each once.
   const kept = useRef(new Map<string, string>());
 
@@ -199,35 +193,9 @@ export function ChatPanel({
     if (!(await button.run())) change(index, { button });
   };
 
-  // Folded into a small tab at the top right, over the workspace.
-  if (collapsed)
-    return (
-      <aside className="relative w-0">
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          title="Show the assistant"
-          className="absolute top-0 right-0 z-10 flex items-center gap-2 rounded-bl-md border-b border-l bg-background px-3 py-2 text-xs font-semibold tracking-widest text-muted-foreground uppercase shadow-sm hover:text-foreground"
-        >
-          {ICONS.expand}
-          Assistant
-        </button>
-      </aside>
-    );
-
+  // It sits in an editor panel, which titles, folds and sizes it.
   return (
-    <aside
-      style={{ width }}
-      className="relative flex min-h-0 flex-col border-l bg-background"
-    >
-      <ResizeHandle
-        edge="left"
-        size={width}
-        min={PANEL_WIDTH.min}
-        max={PANEL_WIDTH.max}
-        onResize={setWidth}
-      />
-      <ChatHeader onCollapse={() => setCollapsed(true)} />
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <ChatWelcome />
@@ -252,6 +220,6 @@ export function ChatPanel({
         pending={pending || !loaded}
         onSend={send}
       />
-    </aside>
+    </div>
   );
 }

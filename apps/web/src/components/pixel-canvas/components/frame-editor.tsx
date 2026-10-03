@@ -15,6 +15,8 @@ type Props = {
   frame: Area;
   tile: Size;
   scale: number;
+  /** How much wider or taller pixels are shown (the pixel ratio); 1 for square. */
+  stretch?: { x: number; y: number };
   onChange: (frame: Area) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -28,6 +30,7 @@ export function FrameEditor({
   frame,
   tile,
   scale,
+  stretch = { x: 1, y: 1 },
   onChange,
   onConfirm,
   onCancel,
@@ -50,8 +53,8 @@ export function FrameEditor({
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
-    const dx = Math.round((e.clientX - d.x) / scale);
-    const dy = Math.round((e.clientY - d.y) / scale);
+    const dx = Math.round((e.clientX - d.x) / (scale * stretch.x));
+    const dy = Math.round((e.clientY - d.y) / (scale * stretch.y));
     onChange(adjustFrame(d.start, d.edges, dx, dy, tile));
   };
 

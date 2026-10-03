@@ -3,10 +3,24 @@
 import { useRef, useState } from "react";
 import { flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
+import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
+import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
+import { movedSlices } from "@/lib/sprite/canvas-size";
+import {
+  scalePicture,
+  scaledSlices,
+  type ScaleMethod,
+} from "@/lib/sprite/sprite-size";
 import * as frameList from "@/lib/sprite/frames";
+import {
+  transformPixels,
+  transformSlices,
+  turnsSideways,
+  type TileTransform,
+} from "@/lib/sprite/transform";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
@@ -58,6 +72,8 @@ type Snapshot = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  colorMode: ColorMode;
+  pixelRatio: PixelRatio;
 };
 
 /**
@@ -95,6 +111,12 @@ export function useSprite(
   const [frames, setFrames] = useState(initial.frames);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
+  const [colorMode, setColorModeState] = useState<ColorMode>(
+    initial.colorMode ?? "rgb",
+  );
+  const [pixelRatio, setPixelRatioState] = useState<PixelRatio>(
+    initial.pixelRatio ?? SQUARE,
+  );
   const [layerId, setLayerIdState] = useState(() =>
     kept && layerTree.findLayer(initial.layers, kept.layerId)
       ? kept.layerId
@@ -131,6 +153,8 @@ export function useSprite(
         cels: initial.cels,
         palette: initial.palette,
         slices: initial.slices,
+        colorMode: initial.colorMode ?? "rgb",
+        pixelRatio: initial.pixelRatio ?? SQUARE,
       }),
   );
 
@@ -193,8 +217,33 @@ export function useSprite(
       size?: Size;
       palette?: string[];
       slices?: Slice[];
+      colorMode?: ColorMode;
+      pixelRatio?: PixelRatio;
+      /** Colours to turn into others first, on an indexed tile (see inColorMode). */
+      recolor?: ReadonlyMap<string, string>;
     } = {},
   ) => {
+    // In indexed and grayscale modes, what was drawn is brought into the mode.
+    const mode = next.colorMode ?? colorMode;
+    if (mode !== "rgb")
+      for (const canvas of changed.current) {
+        const ctx = contextOf(canvas);
+        if (!ctx) continue;
+        const { width, height } = canvas;
+        const out = inColorMode(
+          ctx.getImageData(0, 0, width, height).data,
+          mode,
+          next.palette ?? palette,
+          next.recolor,
+        );
+        if (!out) continue;
+        ctx.putImageData(
+          new ImageData(out as Uint8ClampedArray<ArrayBuffer>, width, height),
+          0,
+          0,
+        );
+        cels.invalidate(canvas);
+      }
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
       frames: next.frames ?? frames,
@@ -202,6 +251,8 @@ export function useSprite(
       cels: new Map(),
       palette: next.palette ?? palette,
       slices: next.slices ?? slices,
+      colorMode: mode,
+      pixelRatio: next.pixelRatio ?? pixelRatio,
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
@@ -316,6 +367,8 @@ export function useSprite(
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
+    setColorModeState(snapshot.colorMode);
+    setPixelRatioState(snapshot.pixelRatio);
     if (!layerTree.findLayer(snapshot.tree, layerId))
       setLayerIdState(layerTree.pixelLayerIds(snapshot.tree).at(-1)!);
     if (frameList.frameIndex(snapshot.frames, frameId) < 0) {
@@ -563,12 +616,54 @@ export function useSprite(
     changeFrames(next);
   };
 
-  /** Grows or shrinks every cel, keeping the top-left; a Background fills new space. */
-  const resize = (next: Size) => {
-    cels.resize(next, fillOf);
+  /**
+   * Grows or shrinks every cel, the drawing moved by `offset` (kept at the
+   * top-left by default); a Background fills new space. Slices move along,
+   * cut to the new size. One undo step.
+   */
+  const resize = (next: Size, offset = { x: 0, y: 0 }) => {
+    cels.resize(next, fillOf, offset);
     for (const cel of cels.list()) changed.current.add(cel.canvas);
+    const nextSlices = movedSlices(slices, offset.x, offset.y, next.w, next.h);
     setSize(next);
-    finish({ size: next });
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
+  };
+
+  /** Scales every cel to `next` by `method`, slices too, as one undo step. */
+  const rescale = (next: Size, method: ScaleMethod) => {
+    for (const { frameId: frame, layerId: layer } of cels.list()) {
+      const rgba = cels.pixels(frame, layer)!;
+      const scaled = scalePicture(
+        { rgba, w: size.w, h: size.h },
+        next.w,
+        next.h,
+        method,
+      );
+      changed.current.add(cels.set(frame, layer, next, scaled));
+    }
+    const nextSlices = scaledSlices(slices, size, next);
+    setSize(next);
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
+  };
+
+  /** Turns or mirrors every cel, slices too, as one undo step. */
+  const transformAll = (t: TileTransform) => {
+    const next = turnsSideways(t) ? { w: size.h, h: size.w } : size;
+    for (const { frameId: frame, layerId: layer } of cels.list()) {
+      const out = transformPixels(
+        cels.pixels(frame, layer)!,
+        size.w,
+        size.h,
+        t,
+      );
+      changed.current.add(cels.set(frame, layer, next, out.rgba));
+    }
+    const nextSlices = transformSlices(slices, size.w, size.h, t);
+    setSize(next);
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
   };
 
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
@@ -579,10 +674,43 @@ export function useSprite(
     finish({ slices: next });
   };
 
-  /** Changes the tile's palette, as one undo step. */
-  const setPalette = (next: string[]) => {
+  /** Marks every cel as changed, so finishing brings them all into the colour mode. */
+  const touchAll = () => {
+    for (const { canvas } of cels.list()) changed.current.add(canvas);
+  };
+
+  /**
+   * Changes the tile's palette, as one undo step. On an indexed tile the
+   * pixels follow: `recolor` turns colours into others (a colour edited in
+   * the palette, or a palette loaded over the old one), and colours no
+   * longer in the palette become the nearest one left.
+   */
+  const setPalette = (
+    next: string[],
+    recolor?: ReadonlyMap<string, string>,
+  ) => {
+    if (colorMode === "indexed") touchAll();
     setPaletteState(next);
-    finish({ palette: next });
+    finish({ palette: next, recolor });
+  };
+
+  /** Changes the shape of the pixels, as one undo step; no pixel changes. */
+  const setPixelRatio = (next: PixelRatio) => {
+    if (next.w === pixelRatio.w && next.h === pixelRatio.h) return;
+    setPixelRatioState(next);
+    finish({ pixelRatio: next });
+  };
+
+  /**
+   * Switches the colour mode, as one undo step. To indexed, every pixel
+   * becomes the nearest palette colour; to grayscale, its grey. Back to RGB
+   * changes no pixels.
+   */
+  const setColorMode = (mode: ColorMode) => {
+    if (mode === colorMode) return;
+    if (mode !== "rgb") touchAll();
+    setColorModeState(mode);
+    finish({ colorMode: mode });
   };
 
   return {
@@ -594,6 +722,10 @@ export function useSprite(
     background,
     palette,
     setPalette,
+    colorMode,
+    setColorMode,
+    pixelRatio,
+    setPixelRatio,
     slices,
     setSlices,
     layerId,
@@ -612,6 +744,8 @@ export function useSprite(
     editCel,
     clearCel,
     resize,
+    rescale,
+    transformAll,
     undo,
     redo,
     /** Whether a layer has anything drawn in a frame. */
@@ -659,6 +793,8 @@ export function useSprite(
       background,
       palette,
       slices,
+      colorMode,
+      pixelRatio,
       layers: tree,
       frames,
       cels: new Map(

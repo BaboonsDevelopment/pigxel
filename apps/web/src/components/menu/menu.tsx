@@ -54,7 +54,7 @@ export function Menu({
       </summary>
       <div
         role="menu"
-        className="absolute left-0 z-30 mt-1 min-w-60 rounded-lg border bg-background p-1 shadow-lg"
+        className="absolute left-0 z-30 mt-1 max-h-[calc(100dvh-4rem)] min-w-60 overflow-y-auto rounded-lg border bg-background p-1 shadow-lg"
       >
         <MenuList sections={sections} onDone={close} />
       </div>

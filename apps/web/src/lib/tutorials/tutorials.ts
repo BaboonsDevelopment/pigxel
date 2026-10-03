@@ -61,10 +61,12 @@ export type Tutorial = {
   steps: GuideStep[];
 };
 
-const tool = (label: string) => `[aria-label="Tools"] [aria-label="${label}"]`;
+/** The tool panel's button for the group holding a tool (see ToolBar). */
+const tool = (label: string) =>
+  `[aria-label="Tools"] [data-tools*="|${label}|"]`;
 const menu = (label: string) => `[data-menu="${label}"]`;
 const CANVAS = '[data-guide="canvas"]';
-const COLORS = 'section[aria-label="Colors"]';
+const PALETTE = 'section[aria-label="Palette"]';
 const TIMELINE = 'section[aria-label="Timeline"]';
 const DUPLICATE_FRAME = 'button[title="Duplicate frame (Alt+N)"]';
 
@@ -95,7 +97,7 @@ export const TUTORIALS: Tutorial[] = [
       {
         title: "Choose a colour",
         body: "Click a swatch in the palette. The left mouse button paints the primary colour, the right one the secondary.",
-        target: COLORS,
+        target: PALETTE,
         done: (now, from) => now.color !== from.color,
       },
       {
@@ -223,7 +225,7 @@ export const TUTORIALS: Tutorial[] = [
     steps: [
       {
         title: "Show a 16 × 16 grid",
-        body: "A tileset is a sheet of same-sized tiles. View › Grid 16 × 16 marks out each one.",
+        body: "A tileset is a sheet of same-sized tiles. View › Grid › 16 × 16 marks out each one.",
         target: menu("View"),
         done: (now) => now.grid === 16,
       },
@@ -261,7 +263,7 @@ export const TUTORIALS: Tutorial[] = [
       },
       {
         title: "Check the seams",
-        body: "Zoom out and look where tiles meet: a seamless tile shows no line or jump there. On a single tile, Tiled › Both repeats it around itself, so seams can’t hide.",
+        body: "Zoom out and look where tiles meet: a seamless tile shows no line or jump there. On a single tile, View › Tiled › Both repeats it around itself, so seams can’t hide.",
         keys: ["−", "+"],
         target: CANVAS,
       },
