@@ -71,6 +71,7 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
     if (code === "KeyZ") return command(shift ? "redo" : "undo");
     if (code === "KeyY") return command("redo");
     if (code === "KeyI" && shift) return command("invertSelection");
+    if (code === "KeyD" && shift) return command("reselect");
     if (shift) return null;
     if (code === "KeyA") return command("selectAll");
     if (code === "KeyD") return command("deselect");

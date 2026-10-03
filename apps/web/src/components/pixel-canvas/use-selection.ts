@@ -47,6 +47,9 @@ type Lifted = {
 // Kept for the whole visit, so a copy can be pasted into another tile.
 let clipboard: Floating | null = null;
 
+// Selections saved with "Save selection", per tile, for the whole visit.
+const savedSelections = new Map<string, Mask>();
+
 /** A floating piece as a PNG, for other apps. */
 async function pngOf(piece: Floating): Promise<Blob | null> {
   const canvas = document.createElement("canvas");
@@ -99,6 +102,11 @@ export function useSelection(sprite: SpriteApi) {
   const { size } = sprite;
   const [ownMask, setMask] = useState<Mask | null>(null);
   const [lifted, setLifted] = useState<Lifted | null>(null);
+  // The selection before the last one replaced or cleared it, for Reselect.
+  const [previous, setPrevious] = useState<Mask | null>(null);
+  const [saved, setSaved] = useState(
+    () => savedSelections.get(sprite.id) ?? null,
+  );
   const dragFrom = useRef<{
     x: number;
     y: number;
@@ -187,7 +195,9 @@ export function useSelection(sprite: SpriteApi) {
 
   const select = (next: Mask | null, mode: SelectMode = "replace") => {
     drop();
-    setMask(next ? combineMasks(mask, next, mode) : null);
+    const result = next ? combineMasks(mask, next, mode) : null;
+    if (mask && result !== mask) setPrevious(mask);
+    setMask(result);
   };
 
   return {
@@ -198,6 +208,27 @@ export function useSelection(sprite: SpriteApi) {
     select,
     selectAll: () => select(new Uint8Array(size.w * size.h).fill(1)),
     deselect: () => select(null),
+    /** Whether Reselect has a selection to bring back. */
+    canReselect: fitting(previous) !== null,
+    /** Brings back the selection that was cleared or replaced last. */
+    reselect: () => {
+      const back = fitting(previous);
+      if (back) select(back);
+    },
+    /** Whether a selection was saved for this tile (and still fits it). */
+    hasSaved: fitting(saved) !== null,
+    /** Keeps the selection to load later, while the page is open. */
+    saveSelection: () => {
+      if (!mask) return;
+      const copy = new Uint8Array(mask);
+      savedSelections.set(sprite.id, copy);
+      setSaved(copy);
+    },
+    /** Selects the saved selection again. */
+    loadSelection: () => {
+      const back = fitting(saved);
+      if (back) select(new Uint8Array(back));
+    },
     invert: () => {
       drop();
       setMask(invertMask(mask, size));

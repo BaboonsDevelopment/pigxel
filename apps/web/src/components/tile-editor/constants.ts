@@ -47,6 +47,7 @@ export type Command =
   | "swapColors"
   | "selectAll"
   | "deselect"
+  | "reselect"
   | "invertSelection"
   | "copy"
   | "cut"

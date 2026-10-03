@@ -289,6 +289,7 @@ export function Editor({
       setPen((p) => ({ ...p, color: p.secondary, secondary: p.color })),
     selectAll: selection.selectAll,
     deselect: selection.deselect,
+    reselect: selection.reselect,
     invertSelection: selection.invert,
     copy: () => void selection.copy(),
     cut: () => {
@@ -413,6 +414,24 @@ export function Editor({
         label: "Invert selection",
         shortcut: `${mod}Shift+I`,
         onSelect: commands.invertSelection,
+      },
+      {
+        label: "Reselect",
+        shortcut: `${mod}Shift+D`,
+        onSelect: commands.reselect,
+        disabled: !selection.canReselect,
+      },
+    ],
+    [
+      {
+        label: "Save selection",
+        onSelect: selection.saveSelection,
+        disabled: !selection.mask,
+      },
+      {
+        label: "Load saved selection",
+        onSelect: selection.loadSelection,
+        disabled: !selection.hasSaved,
       },
     ],
     [
