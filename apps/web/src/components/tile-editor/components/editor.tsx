@@ -52,6 +52,7 @@ import {
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
+import type { TileTransform } from "@/lib/sprite/transform";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import {
@@ -382,16 +383,6 @@ export function Editor({
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
-      { label: "Canvas size…", onSelect: () => setResizing(true) },
-      { label: "Sprite size…", onSelect: () => setScaling(true) },
-      {
-        label: "Crop to selection",
-        onSelect: cropToSelection,
-        disabled: !selection.mask,
-      },
-      { label: "Trim empty edges", onSelect: () => void trim() },
-    ],
-    [
       {
         label: "Select all",
         shortcut: `${mod}A`,
@@ -460,6 +451,46 @@ export function Editor({
         label: "Back to the normal brush",
         onSelect: () => setStamp(null),
         hidden: !stamp,
+      },
+    ],
+  ];
+  /** The whole tile at once, every layer and frame: Aseprite's Sprite menu. */
+  const transformTile = (t: TileTransform) => {
+    selection.deselect();
+    sprite.transformAll(t);
+  };
+  const tileMenu: MenuSections = [
+    [
+      { label: "Canvas size…", onSelect: () => setResizing(true) },
+      { label: "Sprite size…", onSelect: () => setScaling(true) },
+    ],
+    [
+      {
+        label: "Crop to selection",
+        onSelect: cropToSelection,
+        disabled: !selection.mask,
+      },
+      { label: "Trim empty edges", onSelect: () => void trim() },
+    ],
+    [
+      {
+        label: "Rotate 90° right",
+        onSelect: () => transformTile("rotateRight"),
+      },
+      {
+        label: "Rotate 90° left",
+        onSelect: () => transformTile("rotateLeft"),
+      },
+      { label: "Rotate 180°", onSelect: () => transformTile("rotate180") },
+    ],
+    [
+      {
+        label: "Flip horizontally",
+        onSelect: () => transformTile("flipHorizontal"),
+      },
+      {
+        label: "Flip vertically",
+        onSelect: () => transformTile("flipVertical"),
       },
     ],
   ];
@@ -675,6 +706,7 @@ export function Editor({
         onImportSheet={() => sheetInput.current?.click()}
         menus={[
           { label: "Edit", sections: editMenu },
+          { label: "Tile", sections: tileMenu },
           { label: "View", sections: viewMenu },
         ]}
       />

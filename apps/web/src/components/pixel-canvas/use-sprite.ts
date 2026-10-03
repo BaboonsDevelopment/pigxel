@@ -13,6 +13,12 @@ import {
   type ScaleMethod,
 } from "@/lib/sprite/sprite-size";
 import * as frameList from "@/lib/sprite/frames";
+import {
+  transformPixels,
+  transformSlices,
+  turnsSideways,
+  type TileTransform,
+} from "@/lib/sprite/transform";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
@@ -601,6 +607,24 @@ export function useSprite(
     finish({ size: next, slices: nextSlices });
   };
 
+  /** Turns or mirrors every cel, slices too, as one undo step. */
+  const transformAll = (t: TileTransform) => {
+    const next = turnsSideways(t) ? { w: size.h, h: size.w } : size;
+    for (const { frameId: frame, layerId: layer } of cels.list()) {
+      const out = transformPixels(
+        cels.pixels(frame, layer)!,
+        size.w,
+        size.h,
+        t,
+      );
+      changed.current.add(cels.set(frame, layer, next, out.rgba));
+    }
+    const nextSlices = transformSlices(slices, size.w, size.h, t);
+    setSize(next);
+    setSlicesState(nextSlices);
+    finish({ size: next, slices: nextSlices });
+  };
+
   const activeLayer = layerTree.findLayer(tree, layerId)?.layer ?? null;
 
   /** Changes the tile's slices, as one undo step. */
@@ -643,6 +667,7 @@ export function useSprite(
     clearCel,
     resize,
     rescale,
+    transformAll,
     undo,
     redo,
     /** Whether a layer has anything drawn in a frame. */

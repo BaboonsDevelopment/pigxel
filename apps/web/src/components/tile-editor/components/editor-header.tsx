@@ -25,7 +25,7 @@ import { frameActions, layerActions } from "@/components/timeline/actions";
 import type { Playback } from "@/components/timeline/use-playback";
 
 /**
- * The bar on top: back to the projects, the File, Edit, View, Layer and
+ * The bar on top: back to the projects, the File, Edit, Tile, View, Layer and
  * Frame menus, the tile's name and where it is saved, and the AI tokens.
  */
 export function EditorHeader({
@@ -53,7 +53,7 @@ export function EditorHeader({
   onExport: () => void;
   /** Picks a sprite sheet to cut into the frames of a new tile. */
   onImportSheet: () => void;
-  /** More menus after File, e.g. Edit and View. */
+  /** More menus after File, e.g. Edit, Tile and View. */
   menus: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
