@@ -20,7 +20,12 @@ import {
   PixelCanvas,
   type PixelCanvasHandle,
 } from "@/components/pixel-canvas/pixel-canvas";
-import { maskBounds } from "@/components/pixel-canvas/selection";
+import {
+  borderMask,
+  contractMask,
+  expandMask,
+  maskBounds,
+} from "@/components/pixel-canvas/selection";
 import {
   pasteSource,
   useSelection,
@@ -80,6 +85,7 @@ import { ColorPanel } from "./color-panel";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
 import { TileTabs } from "./tile-tabs";
+import type { ModifyKind } from "./modify-selection-dialog";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
@@ -106,6 +112,10 @@ const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
 const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
   ssr: false,
 });
+const ModifySelectionDialog = dynamic(
+  () => import("./modify-selection-dialog"),
+  { ssr: false },
+);
 
 /**
  * The editor for one tile: file bar and tool settings on top, tools on the
@@ -139,6 +149,7 @@ export function Editor({
   const [inserting, setInserting] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
+  const [modifying, setModifying] = useState<ModifyKind | null>(null);
   // Counted for the guides, which wait for an asset to be put in.
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
@@ -402,6 +413,23 @@ export function Editor({
         label: "Invert selection",
         shortcut: `${mod}Shift+I`,
         onSelect: commands.invertSelection,
+      },
+    ],
+    [
+      {
+        label: "Expand selection…",
+        onSelect: () => setModifying("expand"),
+        disabled: !selection.mask,
+      },
+      {
+        label: "Contract selection…",
+        onSelect: () => setModifying("contract"),
+        disabled: !selection.mask,
+      },
+      {
+        label: "Border…",
+        onSelect: () => setModifying("border"),
+        disabled: !selection.mask,
       },
     ],
     [
@@ -877,6 +905,24 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {modifying && (
+        <ModifySelectionDialog
+          kind={modifying}
+          onApply={(by, shape) => {
+            const mask = selection.mask;
+            if (!mask) return;
+            const modify =
+              modifying === "expand"
+                ? expandMask
+                : modifying === "contract"
+                  ? contractMask
+                  : borderMask;
+            const next = modify(mask, sprite.size, by, shape);
+            selection.select(next.some(Boolean) ? next : null);
+          }}
+          onClose={() => setModifying(null)}
         />
       )}
       {scaling && (

@@ -295,3 +295,133 @@ export function rotateFloating(f: Floating, clockwise: boolean): Floating {
     y: f.y + Math.floor((f.h - h) / 2),
   };
 }
+
+/** How Expand, Contract and Border measure: round reaches N px straight across, square diagonally too. */
+export type ModifyShape = "round" | "square";
+
+/** Largest step Expand, Contract and Border take, in pixels. */
+export const MAX_MODIFY = 32;
+
+/**
+ * The selection grown by `by` px all round, as Aseprite's Select › Modify ›
+ * Expand. Round counts distance as the crow flies (1 px adds the four
+ * neighbours: a clean pixel-art outline); square counts diagonals as 1 too.
+ */
+export function expandMask(
+  mask: Mask,
+  size: Size,
+  by: number,
+  shape: ModifyShape = "round",
+): Mask {
+  const out = new Uint8Array(mask);
+  const offsets = reach(by, shape);
+  const { w, h } = size;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (!mask[y * w + x] || !onEdge(mask, w, h, x, y)) continue;
+      for (const [dx, dy] of offsets) {
+        const tx = x + dx;
+        const ty = y + dy;
+        if (tx >= 0 && ty >= 0 && tx < w && ty < h) out[ty * w + tx] = 1;
+      }
+    }
+  return out;
+}
+
+/**
+ * The selection shrunk by `by` px all round, as Select › Modify › Contract;
+ * the tile's edge counts as outside, so a whole-tile selection shrinks too.
+ */
+export function contractMask(
+  mask: Mask,
+  size: Size,
+  by: number,
+  shape: ModifyShape = "round",
+): Mask {
+  const out = new Uint8Array(mask);
+  const offsets = reach(by, shape);
+  const { w, h } = size;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (mask[y * w + x] || !nextToSelected(mask, w, h, x, y)) continue;
+      clear(x, y);
+    }
+  // The tile's edge: as if unselected pixels ran all round it.
+  for (let x = -1; x <= w; x++) {
+    clear(x, -1);
+    clear(x, h);
+  }
+  for (let y = 0; y < h; y++) {
+    clear(-1, y);
+    clear(w, y);
+  }
+  return out;
+
+  function clear(x: number, y: number) {
+    for (const [dx, dy] of offsets) {
+      const tx = x + dx;
+      const ty = y + dy;
+      if (tx >= 0 && ty >= 0 && tx < w && ty < h) out[ty * w + tx] = 0;
+    }
+  }
+}
+
+/** A band `by` px wide just inside the selection's edge, as Select › Modify › Border. */
+export function borderMask(
+  mask: Mask,
+  size: Size,
+  by: number,
+  shape: ModifyShape = "round",
+): Mask {
+  const inner = contractMask(mask, size, by, shape);
+  return mask.map((m, i) => (m && !inner[i] ? 1 : 0));
+}
+
+/** Every step within `by` px, but not the pixel itself. */
+function reach(by: number, shape: ModifyShape): [number, number][] {
+  const offsets: [number, number][] = [];
+  for (let dy = -by; dy <= by; dy++)
+    for (let dx = -by; dx <= by; dx++)
+      if ((dx || dy) && (shape === "square" || dx * dx + dy * dy <= by * by))
+        offsets.push([dx, dy]);
+  return offsets;
+}
+
+/** Whether a selected pixel has an unselected (or off-tile) neighbour. */
+function onEdge(mask: Mask, w: number, h: number, x: number, y: number) {
+  for (const [dx, dy] of NEIGHBOURS) {
+    const tx = x + dx;
+    const ty = y + dy;
+    if (tx < 0 || ty < 0 || tx >= w || ty >= h || !mask[ty * w + tx])
+      return true;
+  }
+  return false;
+}
+
+/** Whether an unselected pixel touches a selected one. */
+function nextToSelected(
+  mask: Mask,
+  w: number,
+  h: number,
+  x: number,
+  y: number,
+) {
+  for (const [dx, dy] of NEIGHBOURS) {
+    const tx = x + dx;
+    const ty = y + dy;
+    if (tx >= 0 && ty >= 0 && tx < w && ty < h && mask[ty * w + tx])
+      return true;
+  }
+  return false;
+}
+
+const NEIGHBOURS = [
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
+] as const;
