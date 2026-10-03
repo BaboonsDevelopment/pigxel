@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { encodeGif } from "@/lib/export/gif";
+import { encodeGif } from "@/features/editor/export/gif";
 import { decodeGif } from "@/lib/image/gif-decode";
 import {
   documentFromFrames,
@@ -14,7 +14,6 @@ const RED = [255, 0, 0, 255];
 const BLUE = [0, 0, 255, 255];
 const CLEAR = [0, 0, 0, 0];
 
-/** A w × h picture from rows of "r", "b" and "." (transparent). */
 const picture = (rows: string[]) =>
   new Uint8ClampedArray(
     rows.flatMap((row) =>
@@ -37,7 +36,6 @@ describe("reading a GIF", () => {
   it("reads a larger picture whose codes grow past 9 bits", () => {
     const w = 40;
     const rgba = new Uint8ClampedArray(w * w * 4);
-    // 200 colours (a GIF holds 255) in a long, varied pattern.
     for (let i = 0; i < w * w; i++) {
       const c = (i * 7 + Math.floor(i / 13)) % 200;
       rgba.set([c, 255 - c, (c * 3) % 256, 255], i * 4);

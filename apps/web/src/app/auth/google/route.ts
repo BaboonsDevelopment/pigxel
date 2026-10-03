@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { authUrl } from "@/lib/auth/config";
+import { authUrl, oauthCallbackUrl } from "@/lib/auth/config";
 import { safeNext, withParam } from "@/lib/auth/routes";
 import {
   DRIVE_SCOPE,
@@ -8,67 +8,49 @@ import {
 } from "@/lib/google-drive/server";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Sends the person to Google, then back to `next` through /auth/callback:
- * - signed out: "Sign in with Google", which also connects Drive;
- * - signed in with email: links a Google account (and connects Drive, when available);
- * - signed in with Google: asks again for Drive access (e.g. after disconnecting).
- */
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
-  if (!isGoogleSignInAvailable())
-    return NextResponse.redirect(authUrl("/login?error=google"));
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const redirectTo = authUrl(`/auth/callback?next=${encodeURIComponent(next)}`);
-  // "offline" returns a refresh token, so Drive keeps working after the hour-long access token.
-  const options = {
-    redirectTo,
-    scopes: DRIVE_SCOPE,
-    queryParams: { access_type: "offline", include_granted_scopes: "true" },
-  };
-
-  let url: string | undefined;
-  if (!user) {
-    const { data } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options,
+  const redirect = (path: string) =>
+    NextResponse.redirect(authUrl(path), {
+      headers: { "Cache-Control": "private, no-store" },
     });
-    url = data.url ?? undefined;
-  } else if (!isDriveAvailable()) {
-    // Without Drive, linking only adds Google as a way to sign in.
-    if (user.identities?.some((i) => i.provider === "google"))
-      return NextResponse.redirect(authUrl(next));
-    const { data } = await supabase.auth.linkIdentity({
-      provider: "google",
-      options: { redirectTo },
-    });
-    url = data?.url ?? undefined;
-  } else {
-    // "consent" makes Google send a new refresh token even if access was granted before.
-    const connect = {
-      ...options,
-      queryParams: { ...options.queryParams, prompt: "consent" },
+  if (!isGoogleSignInAvailable()) return redirect("/login?error=google");
+
+  let failure = "/login?error=google";
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const drive = isDriveAvailable();
+    failure = user
+      ? withParam(next, drive ? "drive" : "link", "error")
+      : failure;
+    const hasGoogle = user?.identities?.some((i) => i.provider === "google");
+    if (hasGoogle && !drive) return redirect(next);
+
+    // Basic Google login works without Drive secrets or an admin key.
+    const options = {
+      redirectTo: oauthCallbackUrl("google", next),
+      ...(drive && {
+        scopes: DRIVE_SCOPE,
+        queryParams: {
+          access_type: "offline",
+          include_granted_scopes: "true",
+          ...(user && { prompt: "consent" }),
+        },
+      }),
     };
-    const hasGoogle = user.identities?.some((i) => i.provider === "google");
-    const { data } = hasGoogle
-      ? await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: connect,
-        })
-      : await supabase.auth.linkIdentity({
-          provider: "google",
-          options: connect,
-        });
-    url = data?.url ?? undefined;
+    const { data, error } =
+      user && !hasGoogle
+        ? await supabase.auth.linkIdentity({ provider: "google", options })
+        : await supabase.auth.signInWithOAuth({ provider: "google", options });
+    if (!error && data?.url)
+      return NextResponse.redirect(data.url, {
+        headers: { "Cache-Control": "private, no-store" },
+      });
+  } catch {
+    // Keep OAuth setup and network failures in the sign-in/linking flow.
   }
-
-  return NextResponse.redirect(
-    url ??
-      authUrl(user ? withParam(next, "drive", "error") : "/login?error=google"),
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
+  return redirect(failure);
 }

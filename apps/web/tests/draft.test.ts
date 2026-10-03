@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_PEN } from "@/components/pixel-canvas/pen";
+import { DEFAULT_PEN } from "@/features/editor/pixel-canvas/pen";
 import {
   canStoreDrafts,
   createDraft,
@@ -31,7 +31,6 @@ function memoryStorage(): Storage {
   };
 }
 
-/** A stand-in for IndexedDB. */
 function memoryBackend(): DraftBackend & { items: Map<string, Draft> } {
   const items = new Map<string, Draft>();
   return {

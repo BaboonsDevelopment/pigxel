@@ -1,19 +1,11 @@
 import { PIGXEL_MIME_TYPE, pigxelFileName } from "./format";
 
-/**
- * Google Drive from the browser. Access tokens come from Pigxel's server, which
- * keeps the person's linked Google account, so no Google popup is needed here
- * and autosave keeps working across reloads. The `drive.file` scope only
- * reaches files Pigxel created.
- */
-
 const DRIVE_API = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_API = "https://www.googleapis.com/upload/drive/v3/files";
 
 export type DriveFile = { id: string; name: string; modifiedTime?: string };
 
 export class DriveError extends Error {
-  /** True when the person must connect (or reconnect) their Google account. */
   needsConnect = false;
 }
 
@@ -51,7 +43,6 @@ async function getToken(): Promise<string> {
   return token.value;
 }
 
-/** Pigxel files in the person's Drive, most recently changed first. */
 export async function listDriveFiles(): Promise<DriveFile[]> {
   const query = new URLSearchParams({
     q: `mimeType='${PIGXEL_MIME_TYPE}' and trashed=false`,
@@ -72,7 +63,6 @@ export async function readDriveFile(id: string): Promise<string> {
   return response.text();
 }
 
-/** Creates a file in the root of the person's Drive, or updates `id` when given. */
 export async function saveDriveFile(
   file: { id?: string; name: string },
   contents: string,
@@ -101,7 +91,6 @@ export async function saveDriveFile(
   return (await response.json()) as DriveFile;
 }
 
-/** Calls Drive, fetching a fresh token and retrying once if Google rejects the cached one. */
 async function driveFetch(
   url: string,
   init: () => RequestInit = () => ({}),

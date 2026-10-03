@@ -1,13 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { PublicHeader } from "@/components/public-header/public-header";
+import { PublicHeader } from "@/components/layout/public-header/public-header";
 import { getUser } from "@/lib/auth/session";
-import { LEGAL_LINKS } from "@/lib/legal";
+import { LEGAL_LINKS } from "@/features/legal/legal";
 
-/**
- * The policies, open to everyone: the public header (with the way back into
- * the app for people who are signed in) and a footer linking them all.
- */
 export default async function PublicLayout({
   children,
 }: {

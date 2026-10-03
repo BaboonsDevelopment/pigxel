@@ -1,6 +1,5 @@
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 
-/** A settings tab loading; the title and tabs stay in place. */
 export default function Loading() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading">

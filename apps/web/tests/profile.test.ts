@@ -3,7 +3,7 @@ import {
   joinedLabel,
   toArtistProfile,
   type ProfileRow,
-} from "@/lib/profile/profile";
+} from "@/features/profile/profile";
 import {
   linkTitle,
   normalizeUrl,
@@ -11,7 +11,7 @@ import {
   parseLinks,
   readLinks,
   usernameError,
-} from "@/lib/profile/validation";
+} from "@/features/profile/validation";
 
 describe("usernames", () => {
   it("are lowercase without the @", () => {

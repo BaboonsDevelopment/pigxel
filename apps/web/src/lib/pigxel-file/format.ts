@@ -1,7 +1,13 @@
 import { deflateSync, inflateSync } from "fflate";
 import { BLEND_MODES, LAYER_KINDS, MAX_OPACITY } from "@/lib/layers/constants";
+import { readColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { readSlices, type Slice } from "@/lib/slices/slices";
+import {
+  isSquare,
+  readPixelRatio,
+  type PixelRatio,
+} from "@/lib/sprite/pixel-ratio";
 import { flatten } from "@/lib/layers/composite";
 import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
@@ -9,61 +15,14 @@ import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
 
-/**
- * The .pigxel file format: UTF-8 JSON with the pixels as compressed base64.
- *
- * {
- *   "format": "pigxel",
- *   "id": "…",
- *   "version": 6,
- *   "width": 32,
- *   "height": 32,
- *   "background": "white",
- *   "frames": [{ "id": "…", "duration": 100 }, …],
- *   "layers": [
- *     { "id": "…", "name": "Background", "kind": "background", "visible": true,
- *       "locked": false, "opacity": 255, "blend": "normal" },
- *     { "id": "…", "name": "Group 1", "kind": "group", "visible": true,
- *       "locked": false, "opacity": 255, "blend": "normal", "collapsed": false,
- *       "children": [ …layers… ] }
- *   ],
- *   "cels": [{ "frame": "…", "layer": "…", "pixels": "<base64 deflate>" }, …],
- *   "palette": ["#1d2b53", …],
- *   "slices": [{ "id": "…", "name": "door", "bounds": { "x": 0, "y": 0, "w": 8, "h": 8 },
- *     "center": { "x": 2, "y": 2, "w": 4, "h": 4 } | null, "pivot": { "x": 4, "y": 7 } | null }]
- * }
- *
- * `frames` are the animation in playing order, each shown for `duration`
- * milliseconds; a still tile has one. `layers` is listed bottom to top; a
- * group lists its own layers the same way. A cel is one layer's pixels in one
- * frame: width × height × 4 bytes (red, green, blue, alpha), row by row from
- * the top-left, compressed with DEFLATE (raw, RFC 1951) and base64-encoded;
- * pixel art shrinks many times over. A layer with no cel in a frame is empty
- * there. `opacity`
- * runs 0–255 and `blend` is one of the blend modes in lib/layers.
- * `background` (default "transparent") is what the eraser paints on the
- * Background layer. `palette` is the tile's colours to paint from, as
- * `#rrggbb`, at most 256. `slices` are named parts of the tile, the same in
- * every frame, with `center` (the 9-slice centre) and `pivot` relative to
- * their `bounds`.
- *
- * Version 5 was the same without slices.
- * Version 4 was the same without a palette (a tile gets the default one).
- * Version 3 was the same with uncompressed cels. Version 2 had no frames: every layer but a group carried its `pixels`.
- * Version 1 had only a flat list of `{ name, visible, opacity (0–1), pixels }`
- * layers; those two are read as one frame. All are still read. Bump `version` whenever the
- * shape changes, and keep reading older versions.
- */
-
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-export const PIGXEL_VERSION = 6;
+const PIGXEL_VERSION = 6;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
 export type Background = (typeof BACKGROUNDS)[number];
 
-/** The colour a background paints, or null for transparent. */
 export function backgroundColor(background: Background) {
   return background === "white"
     ? "#ffffff"
@@ -72,32 +31,20 @@ export function backgroundColor(background: Background) {
       : null;
 }
 
-/** A tile: its size, layer tree, frames and the pixels of every cel. */
 export type PigxelDocument = {
-  /**
-   * The tile's own id, kept in its file so the tile keeps it wherever it is
-   * saved or opened (the AI chat is stored under it). Files without one get
-   * a new one.
-   */
   id: string;
   width: number;
   height: number;
   background: Background;
-  /** Bottom to top. */
   layers: Layer[];
-  /** In playing order; at least one. */
   frames: Frame[];
   cels: Cels;
-  /** Colours to paint from, as `#rrggbb`. */
   palette: string[];
-  /** Named parts of the tile, for exporting and game engines. */
   slices: Slice[];
+  colorMode?: ColorMode;
+  pixelRatio?: PixelRatio;
 };
 
-/**
- * A new tile: one frame with a Background layer of the chosen colour (none
- * for a transparent tile) and an empty layer above it to draw on.
- */
 export function blankDocument(
   width: number,
   height: number,
@@ -130,10 +77,6 @@ export function blankDocument(
   };
 }
 
-/**
- * One frame of the tile (the first by default) as one picture; references
- * are left out, as in an export.
- */
 export function flattenDocument(
   doc: PigxelDocument,
   skip: LayerKind[] = ["reference"],
@@ -199,10 +142,12 @@ export function serializePigxel(doc: PigxelDocument): string {
     cels,
     palette: doc.palette,
     slices: doc.slices,
+    ...(doc.colorMode &&
+      doc.colorMode !== "rgb" && { colorMode: doc.colorMode }),
+    ...(!isSquare(doc.pixelRatio) && { pixelRatio: doc.pixelRatio }),
   });
 }
 
-/** Reads a .pigxel file, throwing a PigxelFileError with a user-facing message. */
 export function parsePigxel(text: string): PigxelDocument {
   let file: unknown;
   try {
@@ -224,7 +169,6 @@ export function parsePigxel(text: string): PigxelDocument {
     );
   const background =
     BACKGROUNDS.find((b) => b === file.background) ?? "transparent";
-  // Cels are compressed from version 4 on.
   const compressed = file.version >= 4;
   const readPixels = (value: unknown) => {
     if (typeof value !== "string") throw DAMAGED();
@@ -249,7 +193,6 @@ export function parsePigxel(text: string): PigxelDocument {
     frames = readFrames(file.frames);
     cels = readCels(file.cels, frames, layers, readPixels);
   } else {
-    // Older files are a single frame, with the pixels inside the layers.
     const pixels = new Map<string, Uint8ClampedArray>();
     const keep: OnPixelLayer = (id, entry) =>
       pixels.set(id, readPixels(entry.pixels));
@@ -263,14 +206,11 @@ export function parsePigxel(text: string): PigxelDocument {
   }
   if (!pixelLayerIds(layers).length)
     throw new PigxelFileError("This Pigxel file has no pixels.");
-  // Older files have no id, and a damaged one is replaced.
   const id =
     typeof file.id === "string" && UUID.test(file.id)
       ? file.id
       : crypto.randomUUID();
-  // Files before version 5 have no palette; neither may a hand-edited one.
   const palette = readPalette(file.palette) ?? [...DEFAULT_PALETTE];
-  // Files before version 6 have no slices.
   const slices = readSlices(file.slices);
   return {
     id,
@@ -282,13 +222,13 @@ export function parsePigxel(text: string): PigxelDocument {
     cels,
     palette,
     slices,
+    colorMode: readColorMode(file.colorMode),
+    pixelRatio: readPixelRatio(file.pixelRatio),
   };
 }
 
-/** Called for each layer with pixels, with the layer's id and its file entry. */
 type OnPixelLayer = (id: string, entry: Record<string, unknown>) => void;
 
-/** Version 1: a flat list, the first layer holding the background colour. */
 function readVersion1(
   list: unknown,
   background: Background,
@@ -313,7 +253,6 @@ function readVersion1(
   });
 }
 
-/** The layer tree (versions 2 and 3), checked layer by layer. */
 function readLayers(
   list: unknown,
   ids: Set<string>,
@@ -325,7 +264,6 @@ function readLayers(
     if (!isObject(entry)) throw DAMAGED();
     const kind = LAYER_KINDS.find((k) => k === entry.kind);
     if (!kind) throw DAMAGED();
-    // Only the first top-level layer can be the Background.
     const isBackground = kind === "background" && topLevel && index === 0;
     const layer = createLayer(
       kind === "background" && !isBackground ? "normal" : kind,
@@ -355,7 +293,6 @@ function readLayers(
   });
 }
 
-/** Version 3 frames: at least one, each with a duration in range. */
 function readFrames(list: unknown): Frame[] {
   if (!Array.isArray(list) || !list.length) throw DAMAGED();
   const ids = new Set<string>();
@@ -368,7 +305,6 @@ function readFrames(list: unknown): Frame[] {
   });
 }
 
-/** Version 3 cels; those of unknown frames or layers are left out. */
 function readCels(
   list: unknown,
   frames: Frame[],
@@ -388,7 +324,6 @@ function readCels(
   return cels;
 }
 
-/** Ids tie cels to layers and frames, so a missing or repeated one gets `fresh`. */
 function uniqueId(value: unknown, ids: Set<string>, fresh: string) {
   const id =
     typeof value === "string" && value && !ids.has(value) ? value : fresh;
@@ -396,7 +331,6 @@ function uniqueId(value: unknown, ids: Set<string>, fresh: string) {
   return id;
 }
 
-/** The tile's name without .pigxel or characters file systems refuse. */
 export function safeFileBase(name: string) {
   return (
     stripPigxelExtension(name)
@@ -405,7 +339,6 @@ export function safeFileBase(name: string) {
   );
 }
 
-/** A safe file name ending in .pigxel. */
 export function pigxelFileName(name: string) {
   return safeFileBase(name) + PIGXEL_EXTENSION;
 }
@@ -433,8 +366,6 @@ function isValidSize(value: unknown): value is number {
   );
 }
 
-// Saving happens on every change (the draft), while most cels stay the same:
-// each cel's encoding is kept for as long as its pixels are.
 const encoded = new WeakMap<Uint8ClampedArray, string>();
 
 function encodeCel(pixels: Uint8ClampedArray) {
@@ -452,7 +383,6 @@ function encodeCel(pixels: Uint8ClampedArray) {
 
 function toBase64(bytes: Uint8Array) {
   let binary = "";
-  // Chunked so large tiles don't overflow the argument limit.
   for (let i = 0; i < bytes.length; i += 0x8000)
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);

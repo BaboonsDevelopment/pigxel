@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { annualComparison, type PriceQuote } from "@/lib/pricing-comparison";
+import {
+  annualComparison,
+  type PriceQuote,
+} from "@/features/billing/pricing-comparison";
 
 function quote(total: string, currencyCode = "USD"): PriceQuote {
   return { total, currencyCode, formattedTotal: "Paddle-formatted price" };

@@ -4,13 +4,13 @@ import {
   keepFrames,
   toAsset,
   type AssetRow,
-} from "@/lib/assets/assets";
-import { assetIdFor, sheetPixels } from "@/lib/assets/publish";
+} from "@/features/assets/assets";
+import { assetIdFor, sheetPixels } from "@/features/assets/publish";
 import {
   STARTER_ASSETS,
   starterDocument,
   starterPixels,
-} from "@/lib/assets/starter";
+} from "@/features/assets/starter";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
   flattenDocument,
@@ -22,7 +22,7 @@ import {
   TUTORIALS,
   findTutorial,
   type GuideState,
-} from "@/lib/tutorials/tutorials";
+} from "@/features/tutorials/tutorials";
 
 describe("the starter set", () => {
   it("has unique ids that work as asset ids", () => {
@@ -107,7 +107,6 @@ describe("publishing", () => {
     expect(assetIdFor("Gold coin!")).toBe("gold-coin");
     expect(assetIdFor("  Évil  Bat ")).toBe("evil-bat");
     expect(assetIdFor("!!!")).toBe("");
-    // At most 40 characters, never ending in a dash.
     expect(assetIdFor("a".repeat(30) + " " + "b".repeat(30))).toHaveLength(40);
     expect(assetIdFor("a".repeat(39) + " b")).toBe("a".repeat(39));
   });
@@ -117,7 +116,6 @@ describe("publishing", () => {
     const doc = starterDocument(coin);
     const sheet = sheetPixels(doc);
     expect(sheet).toMatchObject({ w: 64, h: 16 });
-    // Row 5 of frame 3 sits 32 pixels in.
     const row = (
       pixels: Uint8ClampedArray,
       w: number,
@@ -162,7 +160,6 @@ describe("tutorials", () => {
     const slugs = TUTORIALS.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
     for (const { practice } of TUTORIALS)
-      // Practice assets come with the starter set.
       if (practice.asset)
         expect(STARTER_ASSETS.map((a) => a.id)).toContain(practice.asset);
   });

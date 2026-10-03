@@ -1,10 +1,6 @@
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
-/**
- * A boxed message at the top of a page or section: an update confirmed, a
- * setup step missing, something that went wrong.
- */
 export function Notice({
   tone = "info",
   className,

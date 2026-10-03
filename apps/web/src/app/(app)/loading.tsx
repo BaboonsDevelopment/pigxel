@@ -1,7 +1,6 @@
 import { Page } from "@pigxel/ui/components/page";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 
-/** Shown while a signed-in page loads its data; the sidebar stays in place. */
 export default function Loading() {
   return (
     <Page aria-busy="true" aria-label="Loading">

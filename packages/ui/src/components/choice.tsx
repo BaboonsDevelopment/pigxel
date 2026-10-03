@@ -1,10 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "../lib/utils";
 
-/**
- * A bordered option that holds a radio or checkbox and its description;
- * it highlights when its input is checked.
- */
 export function ChoiceCard({ className, ...props }: ComponentProps<"label">) {
   return (
     <label
@@ -18,7 +14,6 @@ export function ChoiceCard({ className, ...props }: ComponentProps<"label">) {
   );
 }
 
-/** The title and description inside a ChoiceCard. */
 export function ChoiceText({
   title,
   children,
@@ -55,5 +50,25 @@ export function Checkbox({ className, ...props }: ComponentProps<"input">) {
       className={cn("size-4 shrink-0 accent-primary", className)}
       {...props}
     />
+  );
+}
+
+export function CheckboxField({
+  label,
+  title,
+  className,
+  ...props
+}: Omit<ComponentProps<"input">, "type"> & { label: ReactNode }) {
+  return (
+    <label
+      title={title}
+      className={cn(
+        "flex items-center gap-2 text-sm has-disabled:opacity-50",
+        className,
+      )}
+    >
+      <Checkbox {...props} />
+      {label}
+    </label>
   );
 }

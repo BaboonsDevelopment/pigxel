@@ -24,7 +24,6 @@ export async function proxy(request: NextRequest) {
       },
     },
   });
-  // Refreshes an expired access token so the session survives return visits.
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims);
 
@@ -37,7 +36,6 @@ export async function proxy(request: NextRequest) {
   } else if (
     signedIn &&
     (pathname === "/login" ||
-      // The landing page still forwards auth codes to the callback.
       (pathname === "/" &&
         !searchParams.has("code") &&
         !searchParams.has("error")))

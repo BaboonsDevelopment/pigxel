@@ -1,8 +1,7 @@
 import { Page } from "@pigxel/ui/components/page";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
-import { PageTransition } from "@/components/page-transition";
+import { PageTransition } from "@/components/layout/page-transition";
 
-/** The pricing page's outline while it loads: title and toggle, four plans. */
 export default function Loading() {
   return (
     <PageTransition>

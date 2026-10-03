@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
-import { getOwnProfile } from "@/lib/profile/server";
-import { PrivacyForm } from "./privacy-form";
+import { getOwnProfile } from "@/features/profile/server";
+import { PrivacyForm } from "@/features/settings/privacy/privacy-form";
 
 export const metadata: Metadata = { title: "Privacy settings · Pigxel" };
 export const dynamic = "force-dynamic";

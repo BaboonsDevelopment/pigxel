@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Page } from "@pigxel/ui/components/page";
 import { PageTitle } from "@pigxel/ui/components/typography";
-import { NewTileForm } from "@/components/tiles/new-tile-form";
-import { findAsset } from "@/lib/assets/server";
+import { NewTileForm } from "@/features/tiles/components/new-tile-form";
+import { findAsset } from "@/features/assets/server";
 import { requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
 

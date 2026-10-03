@@ -1,7 +1,5 @@
-/** Layer opacity runs from fully transparent (0) to fully opaque (255), as in Aseprite. */
 export const MAX_OPACITY = 255;
 
-/** How a layer's colours mix with what is below it, in Aseprite's order. */
 export const BLEND_MODES = [
   { id: "normal", label: "Normal" },
   { id: "multiply", label: "Multiply" },
@@ -31,7 +29,6 @@ export const LAYER_KINDS = [
   "reference",
 ] as const;
 
-/** The base of the names new layers get, numbered: "Layer 2", "Group 1". */
 export const DEFAULT_NAMES = {
   normal: "Layer",
   background: "Background",

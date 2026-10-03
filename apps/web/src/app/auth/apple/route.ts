@@ -1,34 +1,36 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APPLE_FLOW_PARAM, isAppleSignInAvailable } from "@/lib/auth/apple";
-import { authUrl } from "@/lib/auth/config";
+import { isAppleSignInAvailable } from "@/lib/auth/apple";
+import { authUrl, oauthCallbackUrl } from "@/lib/auth/config";
 import { safeNext, withParam } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/server";
 
-/**
- * Sends the person to Apple, then back to `next` through /auth/callback:
- * signed out it signs them in, signed in it links Apple to their account.
- */
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
-  if (!isAppleSignInAvailable())
-    return NextResponse.redirect(authUrl("/login?error=apple"));
+  const redirect = (path: string) =>
+    NextResponse.redirect(authUrl(path), {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  if (!isAppleSignInAvailable()) return redirect("/login?error=apple");
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const options = {
-    redirectTo: authUrl(
-      `/auth/callback?next=${encodeURIComponent(next)}&${APPLE_FLOW_PARAM}=apple`,
-    ),
-  };
-  const { data } = user
-    ? await supabase.auth.linkIdentity({ provider: "apple", options })
-    : await supabase.auth.signInWithOAuth({ provider: "apple", options });
-
-  return NextResponse.redirect(
-    data?.url ??
-      authUrl(user ? withParam(next, "link", "error") : "/login?error=apple"),
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
+  let failure = "/login?error=apple";
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    failure = user ? withParam(next, "link", "error") : failure;
+    if (user?.identities?.some((identity) => identity.provider === "apple"))
+      return redirect(next);
+    const options = { redirectTo: oauthCallbackUrl("apple", next) };
+    const { data, error } = user
+      ? await supabase.auth.linkIdentity({ provider: "apple", options })
+      : await supabase.auth.signInWithOAuth({ provider: "apple", options });
+    if (!error && data?.url)
+      return NextResponse.redirect(data.url, {
+        headers: { "Cache-Control": "private, no-store" },
+      });
+  } catch {
+    // Network/configuration errors return to the same sign-in or linking UI.
+  }
+  return redirect(failure);
 }

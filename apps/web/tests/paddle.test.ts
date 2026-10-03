@@ -3,7 +3,7 @@ import {
   countryFromHeaders,
   paddleClientConfig,
   paddleEnvironment,
-} from "@/lib/paddle/config";
+} from "@/features/billing/paddle";
 
 describe("paddle environment", () => {
   it("accepts sandbox and production", () => {

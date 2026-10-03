@@ -1,8 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../lib/utils";
 
-/** The look shared by text boxes: border, focus ring, placeholder. */
-export const fieldClassName =
+const fieldClassName =
   "w-full min-w-0 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive";
 
 export function Input({
@@ -33,10 +32,6 @@ export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   );
 }
 
-/**
- * A text box with fixed text before or after the value, e.g. "@" before a
- * username or ".pigxel" after a file name. Put an <InputGroupInput> inside.
- */
 export function InputGroup({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
@@ -70,6 +65,33 @@ export function InputGroupInput({
     <input
       className={cn(
         "h-full w-full min-w-0 bg-transparent px-3 outline-none placeholder:text-muted-foreground",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export type SelectSize = "xs" | "sm" | "md";
+
+const selectSizes: Record<SelectSize, string> = {
+  xs: "h-7 rounded-md px-1.5 text-xs",
+  sm: "h-8 rounded-md px-2",
+  md: "h-10 px-3",
+};
+
+export function Select({
+  className,
+  selectSize = "sm",
+  ...props
+}: ComponentProps<"select"> & { selectSize?: SelectSize }) {
+  return (
+    <select
+      data-slot="select"
+      className={cn(
+        fieldClassName,
+        "w-auto cursor-pointer",
+        selectSizes[selectSize],
         className,
       )}
       {...props}

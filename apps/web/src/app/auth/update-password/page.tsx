@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
-import { AuthPage } from "@/components/auth/auth-page";
+import { AuthPage } from "@/features/auth/components/auth-page";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { PasswordForm } from "./password-form";
+import { PasswordForm } from "@/features/auth/components/password-form";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Update password · Pigxel" };

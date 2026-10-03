@@ -8,15 +8,8 @@ import {
   MIN_GRID_FIT,
 } from "../constants";
 
-/**
- * How often each length of a same-coloured stretch occurs, along rows and
- * columns. Only stretches with a colour change at both ends count: those
- * touching transparency or the border are cut short and would mislead.
- */
 function runLengths(image: Bitmap): Map<number, number> {
   const counts = new Map<number, number>();
-  // `line` holds pixel numbers; a run ends where the colour drifts too far
-  // from the run's first pixel.
   const scan = (line: number[]) => {
     let start = 0;
     for (let k = 1; k <= line.length; k++) {
@@ -48,10 +41,6 @@ function runLengths(image: Bitmap): Map<number, number> {
   return counts;
 }
 
-/**
- * How well runs are whole numbers of `cell`: the share that are, give or
- * take `GRID_SLACK`, and their average distance from it.
- */
 function gridFit(runs: Map<number, number>, cell: number) {
   let fitting = 0;
   let total = 0;
@@ -69,13 +58,6 @@ function gridFit(runs: Map<number, number>, cell: number) {
   };
 }
 
-/**
- * The size of one model pixel, or null when the picture has no clear grid.
- * Every stretch is a whole number of model pixels. Smaller sizes always fit
- * (they split each model pixel in parts), so this takes the largest size most
- * stretches fit, then the most precise size just below it, as the slack also
- * lets slightly-too-large sizes pass.
- */
 function estimateCellSize(image: Bitmap): number | null {
   const runs = runLengths(image);
   let largest = 0;
@@ -93,7 +75,6 @@ function estimateCellSize(image: Bitmap): number | null {
   return best;
 }
 
-/** The most common colour among a cell's central pixels, or transparent. */
 function sampleCell(
   image: Bitmap,
   x0: number,
@@ -123,11 +104,6 @@ function sampleCell(
   return new Uint8ClampedArray(best.rgba);
 }
 
-/**
- * Pictures from the model are pixel art drawn on its own, finer grid. Finding
- * that grid and taking one colour per cell gives back the sprite exactly as
- * drawn, instead of blending neighbouring cells while shrinking.
- */
 export function recoverPixelGrid(image: Bitmap): Bitmap {
   const cell = estimateCellSize(image);
   if (!cell) return image;

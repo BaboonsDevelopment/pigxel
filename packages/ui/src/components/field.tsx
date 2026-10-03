@@ -11,7 +11,6 @@ export function Label({ className, ...props }: ComponentProps<"label">) {
   );
 }
 
-/** A short line under a control: a hint, an error or a confirmation. */
 export function FormMessage({
   tone = "muted",
   className,
@@ -34,7 +33,6 @@ export function FormMessage({
   );
 }
 
-/** A label, its control, and a hint that an error replaces. */
 export function Field({
   label,
   htmlFor,
@@ -44,7 +42,6 @@ export function Field({
   children,
 }: {
   label: ReactNode;
-  /** The control the label names; leave out for a group of controls. */
   htmlFor?: string;
   hint?: ReactNode;
   error?: ReactNode;
@@ -57,7 +54,6 @@ export function Field({
         {label}
       </Label>
       {children}
-      {/* Point the control's aria-describedby at `${htmlFor}-hint`. */}
       {error ? (
         <FormMessage tone="error" id={htmlFor && `${htmlFor}-hint`}>
           {error}

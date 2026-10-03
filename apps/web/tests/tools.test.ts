@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
+import {
+  outlined,
+  replacedColor,
+} from "@/features/editor/pixel-canvas/effects";
 import {
   blendInk,
   blurInk,
@@ -11,14 +14,14 @@ import {
   paintStamp,
   shadingInk,
   type PaintOptions,
-} from "@/components/pixel-canvas/paint";
+} from "@/features/editor/pixel-canvas/paint";
 import {
   brushTip,
   sprayDotCount,
   sprayDots,
   curvePoints,
-} from "@/components/pixel-canvas/pen";
-import { onionFrames } from "@/components/pixel-canvas/view";
+} from "@/features/editor/pixel-canvas/pen";
+import { onionFrames } from "@/features/editor/pixel-canvas/view";
 import { parsePaletteFile, toGpl } from "@/lib/palette/files";
 
 const size = { w: 3, h: 3 };
@@ -52,7 +55,6 @@ describe("dither", () => {
     expect(count(75)).toBe(12);
     expect(count(50)).toBe(8);
     expect(count(25)).toBe(4);
-    // 50% is a checkerboard.
     expect(inPattern(0, 0, 50)).not.toBe(inPattern(1, 0, 50));
   });
   it("applies to strokes", () => {
@@ -82,10 +84,8 @@ describe("shading ink", () => {
       throw new Error("expected a function");
     expect(forward(0)).toEqual([255, 255, 255, 255]);
     expect(back(0)).toEqual([0, 0, 0, 255]);
-    // The end of the palette stays.
     expect(forward(1)).toEqual([255, 255, 255, 255]);
     expect(forward(2)).toBeNull();
-    // Transparent pixels aren't shaded.
     expect(forward(3)).toBeNull();
   });
 });
@@ -124,7 +124,6 @@ describe("curve", () => {
       );
       expect(step).toBe(1);
     }
-    // Bent towards the controls, above the straight line between the ends.
     expect(Math.min(...points.map((p) => p.y))).toBeLessThan(6);
   });
   it("is a straight line while the controls sit on the ends", () => {
@@ -137,7 +136,6 @@ describe("curve", () => {
 });
 
 describe("inks", () => {
-  // A drawn red pixel, then an empty one.
   const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
   const halfBlack = [0, 0, 0, 128] as const;
   const at = (ink: unknown, i: number) => (ink as (i: number) => unknown)(i);
@@ -179,7 +177,6 @@ describe("blur", () => {
     const before = new Uint8ClampedArray([...RED, 0, 0, 0, 0]);
     const ink = blurInk(before, wide) as (i: number) => readonly number[];
     expect(ink(1)).toEqual([255, 0, 0, 128]);
-    // Nothing to blur where everything around is transparent.
     expect(blurInk(new Uint8ClampedArray(8), wide)).toBeTypeOf("function");
     expect(
       (blurInk(new Uint8ClampedArray(8), wide) as (i: number) => unknown)(0),
@@ -197,7 +194,6 @@ describe("jumble", () => {
     const picked = Array.from({ length: tile.w * tile.h }, (_, i) => ink(i));
     for (const rgba of picked)
       if (rgba) expect([RED.join(), BLACK.join()]).toContain(rgba.join());
-    // Some pixels on the edge between the two colours swapped sides.
     expect(picked.some((rgba, i) => rgba && rgba[0] !== before[i * 4])).toBe(
       true,
     );
@@ -217,7 +213,6 @@ describe("spray", () => {
       expect(Math.hypot(x - 10, y - 10)).toBeLessThanOrEqual(
         3.5 + Math.SQRT1_2,
       );
-    // Spread over the circle, not stuck in one spot.
     expect(new Set(dots.map((d) => `${d.x},${d.y}`)).size).toBeGreaterThan(20);
   });
   it("lays dots in proportion to speed and time held", () => {
@@ -237,7 +232,6 @@ describe("gradient", () => {
     expect(
       [0, 1, 2, 3].map((x) => gradientAt(x, 0, from, to, "linear")),
     ).toEqual([0, 1 / 3, 2 / 3, 1]);
-    // Pixels before the start and past the end keep the end colours.
     expect(gradientAt(-2, 0, from, to, "linear")).toBe(0);
     expect(gradientAt(5, 0, from, to, "linear")).toBe(1);
     expect(gradientAt(0, 3, from, to, "radial")).toBe(1);

@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Page } from "@pigxel/ui/components/page";
-import { PageTransition } from "@/components/page-transition";
-import { PricingPlans } from "@/components/pricing/pricing-plans";
+import { PageTransition } from "@/components/layout/page-transition";
+import { PricingPlans } from "@/features/billing/components/pricing-plans";
 import { getUser } from "@/lib/auth/session";
-import { LEGAL } from "@/lib/legal";
-import { countryFromHeaders, paddleClientConfig } from "@/lib/paddle/config";
+import { LEGAL } from "@/features/legal/legal";
+import {
+  countryFromHeaders,
+  paddleClientConfig,
+} from "@/features/billing/paddle";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {
   title: "Pricing · Pigxel",
@@ -14,7 +18,6 @@ export const metadata: Metadata = {
     "Pigxel is free to use. Paid plans add more AI generations and cloud storage.",
 };
 
-/** The billing questions people ask, answered in a line each. */
 const FACTS: { text: string; href?: string }[] = [
   { text: "Cancel anytime" },
   { text: `Refunds within ${LEGAL.refundDays} days`, href: "/refunds" },
@@ -22,23 +25,14 @@ const FACTS: { text: string; href?: string }[] = [
   { text: "Your art stays yours" },
 ];
 
-/** Short policy links; the Refund Policy is linked from its fact above. */
 const POLICIES = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ];
 
-/**
- * The plans side by side on one screen, with the billing answers in a line
- * underneath. It sits in the app's layout: signed-in people keep their
- * sidebar, guests get the public header, and the page fades in either way.
- */
 export default async function Pricing() {
-  // Headers first: the page renders per request, so the config is checked
-  // when it's served rather than at build time.
   const country = countryFromHeaders(await headers());
   const { environment, token } = paddleClientConfig();
-  // The layout already looked the user up; this call reuses that result.
   const user = await getUser();
   const customer = user?.email ? { id: user.id, email: user.email } : undefined;
 
@@ -52,13 +46,20 @@ export default async function Pricing() {
           customer={customer}
           heading={
             <div>
-              <h1 className="font-display text-4xl tracking-tight lg:text-5xl lg:[@media(max-height:820px)]:text-4xl">
+              <Heading
+                size="page"
+                className="lg:text-5xl lg:[@media(max-height:820px)]:text-4xl"
+              >
                 Pick your plan
-              </h1>
-              <p className="mt-2 text-muted-foreground lg:[@media(max-height:740px)]:hidden">
+              </Heading>
+              <Text
+                size="md"
+                tone="muted"
+                className="mt-2 lg:[@media(max-height:740px)]:hidden"
+              >
                 Every drawing tool is free. Paid plans add more AI and more room
                 for your art.
-              </p>
+              </Text>
             </div>
           }
         />

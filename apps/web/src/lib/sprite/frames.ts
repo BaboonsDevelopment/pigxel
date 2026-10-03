@@ -9,7 +9,6 @@ export function createFrame(duration = DEFAULT_FRAME_DURATION): Frame {
   return { id: crypto.randomUUID(), duration };
 }
 
-/** A frame duration in whole milliseconds, within the allowed range. */
 export function clampDuration(ms: number) {
   if (!Number.isFinite(ms)) return DEFAULT_FRAME_DURATION;
   return Math.max(
@@ -22,7 +21,6 @@ export function frameIndex(frames: Frame[], id: string) {
   return frames.findIndex((frame) => frame.id === id);
 }
 
-/** The frame `step` places from `id`, wrapping around at the ends. */
 export function stepFrame(frames: Frame[], id: string, step: number): Frame {
   const at = Math.max(0, frameIndex(frames, id));
   const n = frames.length;
@@ -37,7 +35,6 @@ export function removeFrame(frames: Frame[], id: string) {
   return frames.filter((frame) => frame.id !== id);
 }
 
-/** Moves a frame so that it ends up at `index` of the new list. */
 export function moveFrame(frames: Frame[], id: string, index: number) {
   const frame = frames.find((f) => f.id === id);
   if (!frame) return frames;
@@ -56,7 +53,6 @@ export function updateFrame(
   );
 }
 
-/** The pixels of a layer in a frame, if that cel isn't empty. */
 export function celOf(cels: Cels, frameId: string, layerId: string) {
   return cels.get(frameId)?.get(layerId);
 }

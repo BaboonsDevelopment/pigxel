@@ -6,13 +6,6 @@ import {
 } from "./format";
 import type { CloudTile } from "./location";
 
-/**
- * Tiles in Pigxel cloud: a row in the `tiles` table (name, size, thumbnail)
- * and the .pigxel file in the private `tiles` Storage bucket, at
- * `<user id>/<tile id>.pigxel`. Row-level security keeps each person to their
- * own tiles, so this runs with the signed-in browser session.
- */
-
 const BUCKET = "tiles";
 
 export type CloudTileSummary = CloudTile & {
@@ -37,7 +30,6 @@ type TileRow = {
 const filePath = (row: { id: string; user_id: string }) =>
   `${row.user_id}/${row.id}.pigxel`;
 
-/** The person's cloud tiles, most recently changed first. */
 export async function listCloudTiles(): Promise<CloudTileSummary[]> {
   const supabase = createClient();
   const {
@@ -47,7 +39,6 @@ export async function listCloudTiles(): Promise<CloudTileSummary[]> {
   const { data, error } = await supabase
     .from("tiles")
     .select("id, user_id, name, width, height, thumbnail, updated_at")
-    // Others' public tiles are readable too; this list is only your own.
     .eq("user_id", session.user.id)
     .order("updated_at", { ascending: false })
     .limit(200);
@@ -77,7 +68,6 @@ export async function readCloudTile(id: string): Promise<string> {
   return data.text();
 }
 
-/** The .pigxel file of anyone's published tile, e.g. to preview it on Explore. */
 export async function readPublishedTile(tile: {
   id: string;
   userId: string;
@@ -89,10 +79,6 @@ export async function readPublishedTile(tile: {
   return data.text();
 }
 
-/**
- * Creates a cloud tile, or updates `tile.id` when given, and returns it.
- * `image` fills in the size, background and thumbnail for the tile list.
- */
 export async function saveCloudTile(
   tile: { id?: string; name: string },
   contents: string,
@@ -133,7 +119,6 @@ export async function saveCloudTile(
       upsert: true,
     });
   if (upload.error) {
-    // A new tile without its file would be empty: take the row back out.
     if (!tile.id) await supabase.from("tiles").delete().eq("id", data.id);
     const tooBig =
       "statusCode" in upload.error && upload.error.statusCode === "413";

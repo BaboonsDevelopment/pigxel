@@ -19,7 +19,6 @@ function pixels(width: number, height: number, seed = 37) {
   return data;
 }
 
-/** A tile with one frame and one layer of patterned pixels. */
 function document(width: number, height: number): PigxelDocument {
   const layer = createLayer("normal", "Layer 1");
   const frame = createFrame();
@@ -36,7 +35,6 @@ function document(width: number, height: number): PigxelDocument {
   };
 }
 
-/** The pixels of the only layer in the first frame. */
 const firstCel = (doc: PigxelDocument) =>
   celOf(doc.cels, doc.frames[0]!.id, doc.layers[0]!.id);
 

@@ -4,7 +4,6 @@ export function startHistory<T>(present: T): History<T> {
   return { past: [], present, future: [] };
 }
 
-/** Makes `next` the current state; the oldest steps beyond `limit` are dropped. */
 export function record<T>(
   history: History<T>,
   next: T,
@@ -17,7 +16,6 @@ export function record<T>(
   };
 }
 
-/** One step back, or null when there is nothing to undo. */
 export function undo<T>(history: History<T>): History<T> | null {
   const previous = history.past.at(-1);
   if (previous === undefined) return null;
@@ -28,7 +26,6 @@ export function undo<T>(history: History<T>): History<T> | null {
   };
 }
 
-/** One step forward again, or null when there is nothing to redo. */
 export function redo<T>(history: History<T>): History<T> | null {
   const [next, ...rest] = history.future;
   if (next === undefined) return null;

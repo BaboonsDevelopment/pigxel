@@ -1,10 +1,8 @@
 import { GRID } from "./constants";
 import type { Rect } from "./raster";
 
-export type EncodedTile = {
-  /** The grid the AI reads: size, rulers, one character per pixel, legend. */
+type EncodedTile = {
   text: string;
-  /** Character → #rrggbb for every colour in the grid. */
   palette: Record<string, string>;
 };
 
@@ -28,11 +26,6 @@ function nearest(key: number, pool: number[]): number {
   return best;
 }
 
-/**
- * Writes `region` of the tile as a text grid. Coordinates on the rulers are
- * absolute tile coordinates, so the AI can answer with them directly. The
- * most common colours get a character each; rarer ones share the nearest.
- */
 export function encodeTile(
   pixels: Uint8ClampedArray,
   width: number,

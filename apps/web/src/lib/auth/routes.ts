@@ -1,4 +1,3 @@
-/** Where signed-in people land after logging in or returning to the site. */
 export const HOME_PATH = "/home";
 
 const protectedPaths = [
@@ -32,10 +31,6 @@ const returnPaths = [
 
 const BASE = "http://pigxel.invalid";
 
-/**
- * Where to go after sign-in or linking; unknown targets fall back to
- * HOME_PATH. Only the editor keeps a query: the id of the tile being edited.
- */
 export function safeNext(next: string | null | undefined) {
   if (!next) return HOME_PATH;
   let url: URL;
@@ -52,7 +47,6 @@ export function safeNext(next: string | null | undefined) {
     : url.pathname;
 }
 
-/** `path` with one more query parameter. */
 export function withParam(path: string, key: string, value: string) {
   const url = new URL(path, BASE);
   url.searchParams.set(key, value);

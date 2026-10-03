@@ -1,20 +1,12 @@
-/*
- * Page transitions for <PageTransition> (components/page-transition.tsx).
- * Global because view transition pseudo-elements live on the document.
- */
-
-/* Clicks during a transition reach the page, not the overlay. */
 ::view-transition {
   pointer-events: none;
 }
 
-/* Everything that isn't a page or the chrome trades places quickly. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 180ms;
 }
 
-/* The public header and the app sidebar stay still while pages change. */
 ::view-transition-group(site-header),
 ::view-transition-group(app-sidebar) {
   z-index: 100;
@@ -31,7 +23,6 @@
   animation: none;
 }
 
-/* The old page leaves fast; the new one rises in a moment later. */
 ::view-transition-old(.page-exit) {
   animation: 140ms ease-in both page-fade reverse;
 }

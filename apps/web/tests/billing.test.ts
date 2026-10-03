@@ -5,12 +5,12 @@ import {
   subscriptionRecord,
   type SubscriptionEvent,
   type SubscriptionRecord,
-} from "@/lib/billing/subscription";
-import { TIERS } from "@/lib/pricing";
+} from "@/features/billing/subscription";
+import { TIERS } from "@/features/billing/pricing";
 
 vi.mock("server-only", () => ({}));
 const saveSubscription = vi.fn();
-vi.mock("@/lib/billing/server", () => ({
+vi.mock("@/features/billing/server", () => ({
   saveSubscription: (record: unknown) => saveSubscription(record),
 }));
 

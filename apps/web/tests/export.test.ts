@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_EXPORT, type ExportSettings } from "@/lib/export/constants";
+import {
+  DEFAULT_EXPORT,
+  type ExportSettings,
+} from "@/features/editor/export/constants";
 import {
   exportFiles,
   exportSize,
   fitsCanvas,
   onColor,
   type ExportSource,
-} from "@/lib/export/export";
-import { encodeGif, toIndexed } from "@/lib/export/gif";
-import { buildSheet, sheetData, sheetGrid } from "@/lib/export/sheet";
+} from "@/features/editor/export/export";
+import { encodeGif, toIndexed } from "@/features/editor/export/gif";
+import {
+  buildSheet,
+  sheetData,
+  sheetGrid,
+} from "@/features/editor/export/sheet";
 
-/** A `w × h` picture filled with one RGBA colour. */
 const solid = (w: number, h: number, rgba: number[]) => {
   const out = new Uint8ClampedArray(w * h * 4);
   for (let p = 0; p < out.length; p += 4) out.set(rgba, p);
@@ -21,7 +27,6 @@ const pixel = (rgba: Uint8ClampedArray, w: number, x: number, y: number) => [
   ...rgba.subarray((y * w + x) * 4, (y * w + x) * 4 + 4),
 ];
 
-/** A plain GIF reader following the spec, to check what encodeGif writes. */
 function decodeGif(bytes: Uint8Array) {
   let pos = 0;
   const u8 = () => bytes[pos++]!;
@@ -119,7 +124,6 @@ function lzwDecode(data: number[], minCode: number): number[] {
   }
 }
 
-/** The RGBA a decoded frame shows. */
 function framePixels(gif: ReturnType<typeof decodeGif>, n: number) {
   const frame = gif.frames[n]!;
   const out = new Uint8ClampedArray(frame.indices.length * 4);
@@ -154,7 +158,6 @@ describe("sprite sheets", () => {
     expect(pixel(sheet.rgba, 4, 1, 2)).toEqual(colors[0]);
     expect(pixel(sheet.rgba, 4, 2, 0)).toEqual(colors[1]);
     expect(pixel(sheet.rgba, 4, 0, 3)).toEqual(colors[2]);
-    // The empty fourth cell stays transparent.
     expect(pixel(sheet.rgba, 4, 3, 5)).toEqual([0, 0, 0, 0]);
   });
 
@@ -227,16 +230,13 @@ describe("GIF", () => {
     expect(gif.header).toBe("GIF89a");
     expect([gif.width, gif.height]).toEqual([w, h]);
     expect(gif.loops).toBe(true);
-    // 100 ms is 10 hundredths; 5 ms goes up to the shortest delay browsers keep.
     expect(gif.frames.map((f) => f.delay)).toEqual([10, 2]);
-    // Each frame clears before the next, so transparent pixels stay clear.
     expect(gif.frames.every((f) => f.disposal === 2)).toBe(true);
     expect(framePixels(gif, 0)).toEqual(a);
     expect(framePixels(gif, 1)).toEqual(b);
   });
 
   it("compresses big, busy pictures correctly", () => {
-    // Enough varied pixels to fill the 4096-entry LZW table several times.
     const w = 200;
     const h = 150;
     const rgba = new Uint8ClampedArray(w * h * 4);
@@ -352,7 +352,6 @@ describe("exporting a tile", () => {
       throw new Error("expected pictures");
     expect([door.image.w, door.image.h]).toEqual([4, 4]);
     expect(pixel(door.image.rgba, 4, 2, 0)).toEqual(halfBlue);
-    // Only the part on the tile is saved.
     expect([cut.image.w, cut.image.h]).toEqual([2, 2]);
   });
 

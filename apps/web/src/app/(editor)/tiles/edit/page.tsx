@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { TileEditor } from "@/components/tile-editor/tile-editor";
+import { TileEditor } from "@/features/editor/tile-editor";
 import { isAdmin, requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
 

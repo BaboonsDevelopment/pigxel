@@ -1,7 +1,6 @@
 import { Page } from "@pigxel/ui/components/page";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 
-/** A profile loading: header, then the gallery. */
 export default function Loading() {
   return (
     <Page aria-busy="true" aria-label="Loading">

@@ -17,9 +17,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(authUrl("/auth/update-password"), {
           headers: { "Cache-Control": "private, no-store" },
         });
-    } catch {
-      /* Verification failures return to login without exposing tokens. */
-    }
+    } catch {}
   }
   return NextResponse.redirect(authUrl("/login?error=confirmation"));
 }
