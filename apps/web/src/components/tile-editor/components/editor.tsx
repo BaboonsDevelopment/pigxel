@@ -13,7 +13,11 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { choiceDialog } from "@/components/confirm-dialog/confirm-dialog";
 import { DEFAULT_SCALE, type Area } from "@/components/pixel-canvas/constants";
 import { zoom } from "@/components/pixel-canvas/helpers";
-import { outlined, replacedColor } from "@/components/pixel-canvas/effects";
+import {
+  filledMask,
+  outlined,
+  replacedColor,
+} from "@/components/pixel-canvas/effects";
 import { rgbaOf, type Stamp } from "@/components/pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "@/components/pixel-canvas/pen";
 import {
@@ -449,6 +453,21 @@ export function Editor({
         label: "Border…",
         onSelect: () => setModifying("border"),
         disabled: !selection.mask,
+      },
+    ],
+    [
+      {
+        label: "Fill with primary colour",
+        onSelect: () =>
+          applyEffect((pixels, mask) =>
+            mask ? filledMask(pixels, mask, rgbaOf(pen.color)) : pixels,
+          ),
+        disabled: !selection.mask || !sprite.canPaint,
+      },
+      {
+        label: "Stroke…",
+        onSelect: () => setModifying("stroke"),
+        disabled: !selection.mask || !sprite.canPaint,
       },
     ],
     [
@@ -932,6 +951,14 @@ export function Editor({
           onApply={(by, shape) => {
             const mask = selection.mask;
             if (!mask) return;
+            if (modifying === "stroke")
+              return applyEffect((pixels) =>
+                filledMask(
+                  pixels,
+                  borderMask(mask, sprite.size, by, shape),
+                  rgbaOf(pen.color),
+                ),
+              );
             const modify =
               modifying === "expand"
                 ? expandMask

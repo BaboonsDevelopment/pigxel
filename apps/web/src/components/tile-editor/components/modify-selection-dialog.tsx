@@ -10,7 +10,7 @@ import {
 } from "@/components/pixel-canvas/selection";
 import { NumberField } from "./number-field";
 
-export type ModifyKind = "expand" | "contract" | "border";
+export type ModifyKind = "expand" | "contract" | "border" | "stroke";
 
 const TEXT: Record<
   ModifyKind,
@@ -30,6 +30,11 @@ const TEXT: Record<
     title: "Border",
     lead: "Keep only a band just inside the selection’s edge.",
     action: "Select border",
+  },
+  stroke: {
+    title: "Stroke selection",
+    lead: "Draw a line of the primary colour along the inside of the selection’s edge.",
+    action: "Stroke",
   },
 };
 
@@ -73,7 +78,7 @@ export default function ModifySelectionDialog({
         <div className="w-32">
           <NumberField
             id="modify-by"
-            label={`By, px (1–${MAX_MODIFY})`}
+            label={`${kind === "stroke" ? "Width" : "By"}, px (1–${MAX_MODIFY})`}
             value={by}
             onChange={(n) => setBy(n)}
           />
@@ -89,7 +94,7 @@ export default function ModifySelectionDialog({
             <span>
               Round
               <span className="block text-muted-foreground">
-                Straight sides only at 1 px: the usual pixel-art outline.
+                Measures straight across: thin, clean pixel-art lines.
               </span>
             </span>
           </label>
@@ -102,7 +107,7 @@ export default function ModifySelectionDialog({
             <span>
               Square
               <span className="block text-muted-foreground">
-                Corners too, so diagonals get filled.
+                Counts diagonals too: fuller lines and corners.
               </span>
             </span>
           </label>
