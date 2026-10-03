@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import type { ColorSlot } from "@/components/pixel-canvas/pixel-canvas";
+import type { ColorSlot } from "@/components/pixel-canvas/pen";
 import type { PenSettings } from "@/components/pixel-canvas/pen";
 
 export const withColor = (pen: PenSettings, color: string, slot: ColorSlot) =>

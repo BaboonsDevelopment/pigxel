@@ -1,5 +1,4 @@
-import type { ReactNode } from "react";
-import type { PaintTool } from "@/components/pixel-canvas/pen";
+import type { ToolId } from "./tools";
 import type { DriveStatus } from "@/lib/google-drive/status";
 
 export type EditorProps = {
@@ -11,15 +10,7 @@ export type EditorProps = {
   canPublish?: boolean;
 };
 
-export type ToolId = PaintTool;
-
-export type Tool = {
-  id: ToolId;
-  label: string;
-  shortcut: string;
-  shift?: boolean;
-  icon: ReactNode;
-};
+export type { ToolId };
 
 export type Command =
   | "save"

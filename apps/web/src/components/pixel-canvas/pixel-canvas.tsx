@@ -11,14 +11,9 @@ import {
   useState,
   type Ref,
 } from "react";
-import { ellipsePoints, rectPoints } from "@/lib/edit/raster";
-import {
-  nextSliceName,
-  resizedSlice,
-  sliceAt,
-  type Slice,
-} from "@/lib/slices/slices";
 import { frameIndex } from "@/lib/sprite/frames";
+import { tipRects } from "@/components/tile-editor/tools/shared/tips";
+import type { Tool, ToolHandlers } from "@/components/tile-editor/tools";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
 import {
@@ -33,7 +28,6 @@ import {
 } from "./constants";
 import {
   areaBetween,
-  boxBetween,
   canvasOf,
   isBlank,
   largestEmptyArea,
@@ -44,107 +38,23 @@ import {
   tileSnapshot,
 } from "./helpers";
 import {
-  inPattern,
-  blendInk,
-  blurInk,
-  jumbleInk,
   mirrored,
-  paintGradient,
-  paintPoints,
-  paintStamp,
-  rgbaOf,
-  shadingInk,
   wrapPixel,
-  type Ink,
   type PaintOptions,
-  type Rgba,
   type Stamp,
   type TiledMode,
 } from "./paint";
 import {
-  SELECTION_TOOLS,
   brushOrigin,
-  brushTip,
-  clampOpacity,
-  clampTolerance,
-  curvePoints,
-  extendStroke,
-  fourConnected,
-  fillPoints,
-  linePoints,
-  lineTip,
   pixelColor,
-  snapLine,
-  sprayDotCount,
-  sprayDots,
-  squareFrom,
-  strokePixels,
-  type PaintTool,
+  type ColorSlot,
   type PenSettings,
   type Point,
 } from "./pen";
-import {
-  ellipseMask,
-  isSelected,
-  maskBounds,
-  maskOutline,
-  polygonMask,
-  rectMask,
-  selectModeOf,
-  wandMask,
-  type Floating,
-  type SelectMode,
-} from "./selection";
-import { SliceOverlay } from "./components/slice-overlay";
-import { TransformHandles } from "./components/transform-handles";
-import { identityTransform } from "./free-transform";
-import { textPiece } from "./text";
+import { isSelected, maskOutline } from "./selection";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
 import { onionFrames, type CanvasView } from "./view";
-
-type Stroke = {
-  tool: PaintTool;
-  points: Point[];
-  end: Point;
-  rgba: Rgba;
-  secondary: boolean;
-  color: string | null;
-  before: Uint8ClampedArray;
-  seed?: number;
-  curve?: CurveBend;
-};
-
-type CurveBend = { c1: Point; c2: Point; stage: 0 | 1 | 2; held: boolean };
-
-type CurveGuide = {
-  start: Point;
-  end: Point;
-  c1: Point;
-  c2: Point;
-  stage: number;
-};
-
-type SelectDrag =
-  | {
-      kind: "marquee";
-      from: Point;
-      to: Point;
-      mode: SelectMode;
-      ellipse: boolean;
-    }
-  | { kind: "lasso"; points: Point[]; mode: SelectMode }
-  | PolygonDrag
-  | { kind: "move"; from: Point };
-
-type PolygonDrag = {
-  kind: "polygon";
-  points: Point[];
-  pointer: Point;
-  mode: SelectMode;
-};
-
-export type ColorSlot = "primary" | "secondary";
 
 export type PixelCanvasHandle = {
   readTile: (area: Area) => Uint8ClampedArray;
@@ -156,9 +66,6 @@ export type PixelCanvasHandle = {
   tileRect: () => DOMRect | null;
   tilePointAt: (clientX: number, clientY: number) => Point | null;
 };
-
-const NO_GLYPHS =
-  "This font has none of these letters. For Cyrillic, pick Tiny5, DotGothic16 or Press Start 2P.";
 
 function tiledCells(tiled: TiledMode): Point[] {
   const xs = tiled === "x" || tiled === "both" ? [-1, 0, 1] : [0];
@@ -182,7 +89,7 @@ export function PixelCanvas({
   onSelectSlice,
   ref,
 }: {
-  tool: PaintTool;
+  tool: Tool;
   pen: PenSettings;
   scale: number;
   sprite: SpriteApi;
@@ -203,35 +110,11 @@ export function PixelCanvas({
   const [hover, setHover] = useState<Point | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [aiArea, setAiArea] = useState<Area | null>(null);
-  const [selectDrag, setSelectDrag] = useState<SelectDrag | null>(null);
-  const [spraying, setSpraying] = useState(false);
-  const [curveGuide, setCurveGuide] = useState<CurveGuide | null>(null);
-  const [sliceDrag, setSliceDrag] = useState<
-    | { kind: "new"; from: Point; to: Point }
-    | { kind: "move"; id: string; from: Point; dx: number; dy: number }
-    | null
-  >(null);
-  const [textBox, setTextBox] = useState<{
-    at: Point;
-    rgba: Rgba;
-    text: string;
-  } | null>(null);
-  const [textPreview, setTextPreview] = useState<Floating | null>(null);
-  const textInput = useRef<HTMLInputElement>(null);
-  const [textError, setTextError] = useState<string | null>(null);
-  const [paintPolygon, setPaintPolygon] = useState<{
-    points: Point[];
-    pointer: Point;
-  } | null>(null);
-  const [polygonTool, setPolygonTool] = useState(tool);
-  if (polygonTool !== tool) {
-    setPolygonTool(tool);
-    if (selectDrag?.kind === "polygon") setSelectDrag(null);
-  }
+  const [toolPending, setToolPending] = useState(false);
   const screenRef = useRef<HTMLCanvasElement>(null);
   const onionRef = useRef<HTMLCanvasElement>(null);
   const copies = useRef(new Set<HTMLCanvasElement>());
-  const stroke = useRef<Stroke>(null);
+  const handlers = useRef<ToolHandlers>(null);
   const lastPoint = useRef<Point>(null);
   const drag = useRef<ResizeDrag>(null);
   const aiFrom = useRef<Point>(null);
@@ -396,182 +279,12 @@ export function PixelCanvas({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [frame, finishFrame]);
 
-  const isSelectionTool = SELECTION_TOOLS.includes(tool);
-  const roundTip = (t: PaintTool) =>
-    t === "brush" || t === "blur" || t === "jumble";
-  const tipSize = (t: PaintTool) =>
-    roundTip(t)
-      ? pen.brushSize
-      : t === "eraser"
-        ? pen.eraserSize
-        : t === "spray"
-          ? pen.sprayWidth * 2 + 1
-          : pen.size;
-  const hoverSize =
-    tool === "bucket" ||
-    tool === "gradient" ||
-    tool === "contour" ||
-    tool === "polygon" ||
-    tool === "pipette"
-      ? 1
-      : tipSize(tool);
-  const lineBrush = (t: PaintTool) =>
-    t === "brush" && pen.brushShape === "line";
-  const tipOf = (t: PaintTool, size: number) =>
-    lineBrush(t)
-      ? lineTip(size, pen.brushAngle)
-      : brushTip(size, roundTip(t) || t === "spray");
-  const hoverTip = tipOf(tool, hoverSize);
-  const hoverOutline =
-    tool === "pipette" ||
-    tool === "eraser" ||
-    tool === "spray" ||
-    tool === "blur" ||
-    tool === "jumble";
-  const blocked =
-    !sprite.canPaint &&
-    tool !== "pipette" &&
-    tool !== "marquee" &&
-    tool !== "ellipseMarquee" &&
-    tool !== "lasso" &&
-    tool !== "polygonLasso" &&
-    tool !== "slice" &&
-    tool !== "wand";
-  const overSelection =
-    !!hover && isSelected(mask, size, hover) && tool !== "wand";
-
-  const drawStroke = (ctx: CanvasRenderingContext2D, current: Stroke) => {
-    const data = new Uint8ClampedArray(current.before);
-    const tipPixels = tipSize(current.tool);
-    const tip = tipOf(current.tool, tipPixels);
-    const origin = (p: Point) => brushOrigin(p, tipPixels);
-    const start = current.points[0]!;
-    const inkTool = current.tool === "pen" || current.tool === "brush";
-    const inked =
-      inkTool ||
-      current.tool === "spray" ||
-      current.tool === "contour" ||
-      current.tool === "polygon";
-    const ink: Ink =
-      current.tool === "blur"
-        ? blurInk(current.before, size)
-        : current.tool === "jumble"
-          ? jumbleInk(current.before, size, current.seed ?? 0)
-          : !inked
-            ? current.rgba
-            : pen.ink === "shading"
-              ? shadingInk(
-                  current.before,
-                  sprite.palette,
-                  current.secondary ? -1 : 1,
-                )
-              : blendInk(
-                  current.before,
-                  [
-                    current.rgba[0],
-                    current.rgba[1],
-                    current.rgba[2],
-                    clampOpacity(pen.opacity),
-                  ],
-                  pen.ink,
-                );
-    const paint = (points: Point[], thin = false) =>
-      paintPoints(
-        data,
-        points,
-        thin ? brushTip(1, false) : tip,
-        thin ? (p) => p : origin,
-        ink,
-        paintOptions,
-      );
-    if (current.tool === "rect" || current.tool === "ellipse") {
-      const box = {
-        x: Math.min(start.x, current.end.x),
-        y: Math.min(start.y, current.end.y),
-        w: Math.abs(current.end.x - start.x) + 1,
-        h: Math.abs(current.end.y - start.y) + 1,
-      };
-      const shape = current.tool === "rect" ? rectPoints : ellipsePoints;
-      if (pen.fillShapes) paint(shape(box, true), true);
-      paint(shape(box, false));
-    } else if (current.tool === "line") {
-      paint(linePoints(start, current.end));
-    } else if (current.curve) {
-      const { c1, c2 } = current.curve;
-      paint(strokePixels(curvePoints(start, c1, c2, current.end), pen));
-    } else if (current.tool === "spray") {
-      paint(current.points, true);
-    } else if (current.tool === "contour" || current.tool === "polygon") {
-      const inside = polygonMask(
-        size,
-        current.tool === "polygon"
-          ? [...current.points, current.end]
-          : current.points,
-      );
-      const points: Point[] = [];
-      inside.forEach((on, i) => {
-        if (on) points.push({ x: i % size.w, y: Math.floor(i / size.w) });
-      });
-      paint(points, true);
-    } else if (current.tool === "gradient") {
-      const primary = rgbaOf(pen.color);
-      const secondary = rgbaOf(pen.secondary);
-      if (start.x !== current.end.x || start.y !== current.end.y)
-        paintGradient(
-          data,
-          start,
-          current.end,
-          current.secondary ? secondary : primary,
-          current.secondary ? primary : secondary,
-          pen.gradientShape,
-          pen.gradientDither,
-          paintOptions,
-        );
-    } else if (inkTool && stamp) {
-      paintStamp(
-        data,
-        current.points,
-        stamp,
-        current.secondary ? current.rgba : null,
-        paintOptions,
-      );
-    } else {
-      paint(
-        current.tool === "pen"
-          ? strokePixels(current.points, pen)
-          : lineBrush(current.tool)
-            ? fourConnected(current.points)
-            : current.points,
-      );
-    }
-    ctx.putImageData(
-      new ImageData(data as Uint8ClampedArray<ArrayBuffer>, size.w),
-      0,
-      0,
-    );
-    sprite.touched();
-  };
-
-  const sprayTick = useEffectEvent((seconds: number) => {
-    const current = stroke.current;
-    const ctx = sprite.context();
-    if (current?.tool !== "spray" || !ctx) return;
-    const count = sprayDotCount(pen.spraySpeed, seconds);
-    const dots = Math.floor(count) + (Math.random() < count % 1 ? 1 : 0);
-    if (!dots) return;
-    current.points.push(...sprayDots(current.end, pen.sprayWidth, dots));
-    drawStroke(ctx, current);
-  });
-  useEffect(() => {
-    if (!spraying) return;
-    let last = performance.now();
-    let frame = requestAnimationFrame(function tick(now) {
-      sprayTick((now - last) / 1000);
-      last = now;
-      frame = requestAnimationFrame(tick);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [spraying]);
+  const pointerTip = tool.tip?.(pen) ?? null;
+  const hoverSize = pointerTip?.size ?? 1;
+  const hoverTip = tipRects(pointerTip, pen.brushAngle);
+  const hoverOutline = !!pointerTip?.outline;
+  const blocked = !sprite.canPaint && !tool.anyLayer;
+  const overSelection = !!hover && isSelected(mask, size, hover);
 
   const pickColor = (point: Point, slot: ColorSlot) => {
     const at = wrapPixel(point.x, point.y, size, tiled);
@@ -581,445 +294,15 @@ export function PixelCanvas({
     if (color) onPickColor?.(color, slot);
   };
 
-  const fillAt = (
-    ctx: CanvasRenderingContext2D,
-    point: Point,
-    rgba: Rgba,
-    color: string | null,
-  ) => {
-    const image = ctx.getImageData(0, 0, size.w, size.h);
-    const allLayers = pen.fillFrom === "all";
-    const bounds = allLayers
-      ? new ImageData(
-          sprite.composite(["reference"]) as Uint8ClampedArray<ArrayBuffer>,
-          size.w,
-          size.h,
-        )
-      : image;
-    let changed = false;
-    for (const copy of mirrored(point, size, symmetry)) {
-      const at = wrapPixel(copy.x, copy.y, size, tiled);
-      if (!at || (mask && !isSelected(mask, size, at))) continue;
-      const start = (at.y * size.w + at.x) * 4;
-      if (!allLayers && rgba.every((v, c) => image.data[start + c] === v))
-        continue;
-      for (const i of fillPoints(
-        bounds,
-        at,
-        pen.contiguous,
-        clampTolerance(pen.tolerance),
-      )) {
-        if (mask && !mask[i]) continue;
-        if (!inPattern(i % size.w, Math.floor(i / size.w), pen.density))
-          continue;
-        if (rgba.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
-        image.data.set(rgba, i * 4);
-      }
-    }
-    if (!changed) return;
-    ctx.putImageData(image, 0, 0);
-    sprite.commit();
-    if (color) onUseColor?.(color);
-  };
-
-  const startSelect = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
-    if (e.button !== 0) return;
-    if (selectDrag?.kind === "polygon") return addCorner(selectDrag, p);
-    const mode = selectModeOf(e);
-    const inside = isSelected(mask, size, p);
-    if (tool === "move" || (mode === "replace" && inside && tool !== "wand")) {
-      if (!sprite.canPaint) return;
-      if (!selection.beginMove(tool === "move" && !mask)) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setSelectDrag({ kind: "move", from: p });
-      return;
-    }
-    if (tool === "wand") {
-      const cel = sprite.readCel(sprite.layerId, sprite.frameId);
-      selection.select(
-        wandMask(cel, size, p, pen.contiguous, clampTolerance(pen.tolerance)),
-        mode,
-      );
-      return;
-    }
-    if (tool === "polygonLasso")
-      return setSelectDrag({ kind: "polygon", points: [p], pointer: p, mode });
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setSelectDrag(
-      tool === "lasso"
-        ? { kind: "lasso", points: [p], mode }
-        : {
-            kind: "marquee",
-            from: p,
-            to: p,
-            mode,
-            ellipse: tool === "ellipseMarquee",
-          },
-    );
-  };
-
-  const moveSelect = (passed: Point[], shift: boolean) => {
-    const p = passed.at(-1);
-    if (!selectDrag || !p) return;
-    if (selectDrag.kind === "move")
-      selection.moveTo(p.x - selectDrag.from.x, p.y - selectDrag.from.y);
-    else if (selectDrag.kind === "marquee") {
-      const to = selectDrag.ellipse ? squareFrom(selectDrag.from, p, shift) : p;
-      if (to.x !== selectDrag.to.x || to.y !== selectDrag.to.y)
-        setSelectDrag({ ...selectDrag, to });
-    } else if (selectDrag.kind === "polygon") {
-      if (p.x !== selectDrag.pointer.x || p.y !== selectDrag.pointer.y)
-        setSelectDrag({ ...selectDrag, pointer: p });
-    } else {
-      const points = passed.reduce(extendStroke, selectDrag.points);
-      if (points !== selectDrag.points)
-        setSelectDrag({ ...selectDrag, points });
-    }
-  };
-
-  const addCorner = (current: PolygonDrag, p: Point) => {
-    const [first] = current.points;
-    const last = current.points.at(-1)!;
-    if (current.points.length >= 3 && p.x === first!.x && p.y === first!.y)
-      return closePolygon(current);
-    if (p.x !== last.x || p.y !== last.y)
-      setSelectDrag({ ...current, points: [...current.points, p] });
-  };
-
-  const closePolygon = (current: PolygonDrag) => {
-    setSelectDrag(null);
-    if (current.points.length >= 3)
-      selection.select(polygonMask(size, current.points), current.mode);
-  };
-
-  const polygon = selectDrag?.kind === "polygon" ? selectDrag : null;
-  const onPolygonKey = useEffectEvent((e: KeyboardEvent) => {
-    if (!polygon || (e.key !== "Enter" && e.key !== "Escape")) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    if (e.key === "Enter") closePolygon(polygon);
-    else setSelectDrag(null);
-  });
-  const polygonOpen = polygon !== null;
-  useEffect(() => {
-    if (!polygonOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => onPolygonKey(e);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [polygonOpen]);
-
-  const endSelect = () => {
-    const current = selectDrag;
-    if (current?.kind === "polygon") return;
-    setSelectDrag(null);
-    if (!current) return;
-    if (current.kind === "move") return selection.endMove();
-    if (current.kind === "marquee") {
-      const { from, to, mode, ellipse } = current;
-      if (from.x === to.x && from.y === to.y && mode === "replace")
-        return selection.deselect();
-      return selection.select(
-        ellipse
-          ? ellipseMask(size, boxBetween(from, to))
-          : rectMask(size, areaBetween(from, to, size)),
-        mode,
-      );
-    }
-    if (current.points.length < 3 && current.mode === "replace")
-      return selection.deselect();
-    selection.select(polygonMask(size, current.points), current.mode);
-  };
-
   const startPointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (frame || (e.button !== 0 && e.button !== 2)) return;
     const point = pixelAt(e);
-    const slot: ColorSlot = e.button === 2 ? "secondary" : "primary";
-    const unfinished = stroke.current;
-    if (unfinished?.curve && !unfinished.curve.held) {
-      e.currentTarget.setPointerCapture(e.pointerId);
-      unfinished.curve.held = true;
-      return bendCurve(unfinished, point);
-    }
-    if (unfinished?.tool === "polygon") {
-      const last = unfinished.points.at(-1)!;
-      return addShapeCorner(
-        unfinished,
-        e.shiftKey ? snapLine(last, point) : point,
-      );
-    }
-    if (tool === "pipette" || (e.altKey && !isSelectionTool))
-      return pickColor(point, slot);
-    if (isSelectionTool) return startSelect(e, point);
-    if (tool === "slice") return startSlice(e, point);
+    const active = handlers.current;
+    if (active?.pending?.()) return active.down?.(e, point);
+    if (e.altKey && !tool.selects)
+      return pickColor(point, e.button === 2 ? "secondary" : "primary");
     if (blocked) return;
-    if (tool === "text") {
-      e.preventDefault();
-      const rgba = rgbaOf(slot === "primary" ? pen.color : pen.secondary);
-      setTextError(null);
-      return setTextBox((box) => ({ at: point, rgba, text: box?.text ?? "" }));
-    }
-    selection.drop();
-    const ctx = sprite.context(true);
-    if (!ctx) return;
-    const erase = tool === "eraser";
-    const color = erase ? null : slot === "primary" ? pen.color : pen.secondary;
-    const rgba: Rgba = color
-      ? rgbaOf(color)
-      : sprite.eraseFill
-        ? rgbaOf(sprite.eraseFill)
-        : [0, 0, 0, 0];
-    if (tool === "bucket") return fillAt(ctx, point, rgba, color);
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const freehand =
-      tool === "pen" ||
-      tool === "brush" ||
-      tool === "blur" ||
-      tool === "jumble" ||
-      erase;
-    const shading =
-      pen.ink === "shading" &&
-      (((tool === "pen" || tool === "brush") && !stamp) ||
-        tool === "spray" ||
-        tool === "contour" ||
-        tool === "polygon");
-    stroke.current = {
-      tool,
-      points:
-        tool === "spray"
-          ? sprayDots(point, pen.sprayWidth, 1)
-          : freehand && e.shiftKey && lastPoint.current
-            ? linePoints(lastPoint.current, point)
-            : [point],
-      end: point,
-      rgba,
-      secondary: slot === "secondary",
-      color:
-        shading ||
-        (stamp && freehand && !erase) ||
-        tool === "gradient" ||
-        tool === "blur" ||
-        tool === "jumble"
-          ? null
-          : color,
-      before: new Uint8ClampedArray(
-        ctx.getImageData(0, 0, size.w, size.h).data,
-      ),
-      seed: tool === "jumble" ? (Math.random() * 2 ** 31) | 0 : undefined,
-      curve:
-        tool === "curve"
-          ? { c1: point, c2: point, stage: 0, held: true }
-          : undefined,
-    };
-    drawStroke(ctx, stroke.current);
-    if (tool === "spray") setSpraying(true);
-    if (tool === "curve") showCurve(stroke.current);
-    if (tool === "polygon") showPolygon(stroke.current);
-  };
-
-  const showPolygon = (current: Stroke) =>
-    setPaintPolygon({ points: [...current.points], pointer: current.end });
-
-  const addShapeCorner = (current: Stroke, point: Point) => {
-    const first = current.points[0]!;
-    const last = current.points.at(-1)!;
-    if (
-      current.points.length >= 3 &&
-      point.x === first.x &&
-      point.y === first.y
-    )
-      return closeShape(current);
-    if (point.x === last.x && point.y === last.y) return;
-    current.points.push(point);
-    current.end = point;
-    const ctx = sprite.context();
-    if (ctx) drawStroke(ctx, current);
-    showPolygon(current);
-  };
-
-  const closeShape = (current: Stroke) => {
-    if (current.points.length < 3) return cancelStroke(current);
-    current.end = current.points.at(-1)!;
-    const ctx = sprite.context();
-    if (ctx) drawStroke(ctx, current);
-    finishStroke(current);
-  };
-
-  const showCurve = (current: Stroke) =>
-    setCurveGuide(
-      current.curve
-        ? {
-            start: current.points[0]!,
-            end: current.end,
-            c1: current.curve.c1,
-            c2: current.curve.c2,
-            stage: current.curve.stage,
-          }
-        : null,
-    );
-
-  const bendCurve = (current: Stroke, point: Point) => {
-    const ctx = sprite.context();
-    if (!current.curve || !ctx) return;
-    if (current.curve.stage === 1) {
-      current.curve.c1 = point;
-      current.curve.c2 = point;
-    } else current.curve.c2 = point;
-    drawStroke(ctx, current);
-    showCurve(current);
-  };
-
-  const finishStroke = (current: Stroke) => {
-    lastPoint.current =
-      current.tool === "line" || current.curve
-        ? current.end
-        : (current.points.at(-1) ?? null);
-    stroke.current = null;
-    setSpraying(false);
-    setCurveGuide(null);
-    setPaintPolygon(null);
-    sprite.commit();
-    if (current.color) onUseColor?.(current.color);
-  };
-
-  const cancelStroke = (current: Stroke) => {
-    stroke.current = null;
-    setCurveGuide(null);
-    setPaintPolygon(null);
-    const ctx = sprite.context();
-    if (!ctx) return;
-    ctx.putImageData(
-      new ImageData(current.before as Uint8ClampedArray<ArrayBuffer>, size.w),
-      0,
-      0,
-    );
-    sprite.touched();
-  };
-
-  const onShapeKey = useEffectEvent((e: KeyboardEvent) => {
-    const current = stroke.current;
-    const open = current?.curve || current?.tool === "polygon";
-    if (!current || !open || (e.key !== "Enter" && e.key !== "Escape")) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    if (e.key === "Escape") cancelStroke(current);
-    else if (current.curve) finishStroke(current);
-    else closeShape(current);
-  });
-  const shapeOpen = curveGuide !== null || paintPolygon !== null;
-  useEffect(() => {
-    if (!shapeOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => onShapeKey(e);
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [shapeOpen]);
-
-  const keepShape = useEffectEvent(() => {
-    const current = stroke.current;
-    if (current?.curve) finishStroke(current);
-    else if (current?.tool === "polygon") closeShape(current);
-  });
-  useEffect(() => keepShape(), [tool, sprite.layerId, sprite.frameId]);
-
-  const openText = tool === "text" ? textBox : null;
-
-  useEffect(() => {
-    if (!openText) return;
-    let live = true;
-    void textPiece(
-      openText.text,
-      pen.textFont,
-      pen.textScale,
-      openText.rgba,
-      openText.at.x,
-      openText.at.y,
-    ).then((piece) => {
-      if (live) setTextPreview(piece);
-    });
-    return () => {
-      live = false;
-    };
-  }, [openText, pen.textFont, pen.textScale]);
-
-  const textAt = openText?.at;
-  useEffect(() => textInput.current?.focus(), [textAt]);
-
-  const placeText = async () => {
-    if (!openText) return;
-    const piece = await textPiece(
-      openText.text,
-      pen.textFont,
-      pen.textScale,
-      openText.rgba,
-      openText.at.x,
-      openText.at.y,
-    );
-    if (!piece) return setTextError(NO_GLYPHS);
-    if (!selection.paste(piece))
-      return setTextError("Pick a visible, unlocked layer to put the text on.");
-    setTextBox(null);
-    setTextPreview(null);
-    onTextPlaced?.();
-  };
-
-  const startSlice = (e: React.PointerEvent<HTMLCanvasElement>, p: Point) => {
-    if (e.button !== 0) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const picked = sprite.slices.find((s) => s.id === sliceId);
-    const hit =
-      picked && sliceAt([picked], p.x, p.y)
-        ? picked
-        : sliceAt(sprite.slices, p.x, p.y);
-    if (hit) {
-      onSelectSlice?.(hit.id);
-      setSliceDrag({ kind: "move", id: hit.id, from: p, dx: 0, dy: 0 });
-    } else setSliceDrag({ kind: "new", from: p, to: p });
-  };
-
-  const moveSlice = (p: Point) => {
-    if (!sliceDrag) return;
-    if (sliceDrag.kind === "new") {
-      if (p.x !== sliceDrag.to.x || p.y !== sliceDrag.to.y)
-        setSliceDrag({ ...sliceDrag, to: p });
-      return;
-    }
-    const dx = p.x - sliceDrag.from.x;
-    const dy = p.y - sliceDrag.from.y;
-    if (dx !== sliceDrag.dx || dy !== sliceDrag.dy)
-      setSliceDrag({ ...sliceDrag, dx, dy });
-  };
-
-  const endSlice = () => {
-    const drag = sliceDrag;
-    setSliceDrag(null);
-    if (!drag) return;
-    if (drag.kind === "move") {
-      if (!drag.dx && !drag.dy) return;
-      return sprite.setSlices(
-        sprite.slices.map((s) =>
-          s.id === drag.id
-            ? {
-                ...s,
-                bounds: {
-                  ...s.bounds,
-                  x: s.bounds.x + drag.dx,
-                  y: s.bounds.y + drag.dy,
-                },
-              }
-            : s,
-        ),
-      );
-    }
-    if (drag.from.x === drag.to.x && drag.from.y === drag.to.y)
-      return onSelectSlice?.(null);
-    const slice: Slice = {
-      id: crypto.randomUUID(),
-      name: nextSliceName(sprite.slices),
-      bounds: areaBetween(drag.from, drag.to, size),
-      center: null,
-      pivot: null,
-    };
-    sprite.setSlices([...sprite.slices, slice]);
-    onSelectSlice?.(slice.id);
+    active?.down?.(e, point);
   };
 
   const movePointer = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -1028,73 +311,12 @@ export function PixelCanvas({
     if (!point) return;
     const at = wrapPixel(point.x, point.y, size, tiled);
     setHover((h) => (at && h?.x === at.x && h.y === at.y ? h : (at ?? null)));
-    if (selectDrag) return moveSelect(passed, e.shiftKey);
-    if (sliceDrag) return moveSlice(point);
-    const current = stroke.current;
-    const ctx = sprite.context();
-    if (!current || !ctx) return;
-    if (current.tool === "spray") {
-      current.end = point;
-      return;
-    }
-    if (current.tool === "polygon") {
-      const last = current.points.at(-1)!;
-      const end = e.shiftKey ? snapLine(last, point) : point;
-      if (end.x === current.end.x && end.y === current.end.y) return;
-      current.end = end;
-      drawStroke(ctx, current);
-      return showPolygon(current);
-    }
-    if (current.curve && current.curve.stage > 0) {
-      if (current.curve.held) bendCurve(current, point);
-      return;
-    }
-    if (
-      current.curve ||
-      current.tool === "line" ||
-      current.tool === "gradient" ||
-      current.tool === "rect" ||
-      current.tool === "ellipse"
-    ) {
-      const from = current.points[0]!;
-      const end =
-        current.curve || current.tool === "line" || current.tool === "gradient"
-          ? e.shiftKey
-            ? snapLine(from, point)
-            : point
-          : squareFrom(from, point, e.shiftKey);
-      if (end.x === current.end.x && end.y === current.end.y) return;
-      current.end = end;
-      if (current.curve) {
-        current.curve.c1 = from;
-        current.curve.c2 = end;
-        showCurve(current);
-      }
-    } else {
-      const points = passed.reduce(extendStroke, current.points);
-      if (points === current.points) return;
-      current.points = points;
-    }
-    drawStroke(ctx, current);
+    const active = handlers.current;
+    setToolPending(active?.pending?.() ?? false);
+    active?.move?.(e, passed);
   };
 
-  const endPointer = () => {
-    if (selectDrag) return endSelect();
-    if (sliceDrag) return endSlice();
-    const current = stroke.current;
-    if (!current || current.tool === "polygon") return;
-    const curve = current.curve;
-    if (curve) {
-      curve.held = false;
-      const start = current.points[0]!;
-      const dot = start.x === current.end.x && start.y === current.end.y;
-      if (curve.stage < 2 && !(curve.stage === 0 && dot)) {
-        curve.stage = curve.stage === 0 ? 1 : 2;
-        return showCurve(current);
-      }
-    }
-    finishStroke(current);
-  };
+  const endPointer = () => handlers.current?.up?.();
 
   const startAiArea = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -1136,57 +358,24 @@ export function PixelCanvas({
     onPointerUp: selecting ? endAiArea : endPointer,
     onPointerCancel: selecting ? endAiArea : endPointer,
     onPointerLeave: () => setHover(null),
-    onDoubleClick: () => {
-      if (polygon) closePolygon(polygon);
-      if (stroke.current?.tool === "polygon") closeShape(stroke.current);
-    },
+    onDoubleClick: () => handlers.current?.doubleClick?.(),
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
   const cursor =
     blocked && !selecting
       ? "cursor-not-allowed"
-      : tool === "move" || (overSelection && isSelectionTool && !polygon)
+      : tool.cursor === "move" ||
+          (tool.cursor === "selection" && overSelection && !toolPending)
         ? "cursor-move"
-        : tool === "text"
+        : tool.cursor === "text"
           ? "cursor-text"
           : "cursor-crosshair";
+  const ToolCanvas = tool.canvas;
   const tileStyle = { width: size.w * scale, height: size.h * scale };
-  const selectionBox =
-    tool === "move" && selection.mask && sprite.canPaint
-      ? maskBounds(selection.mask, size)
-      : null;
-  const transformBox =
-    selection.freeTransform ??
-    (selectionBox && {
-      t: identityTransform(selectionBox),
-      w: selectionBox.w,
-      h: selectionBox.h,
-    });
   const stretch = { x: sprite.pixelRatio.w, y: sprite.pixelRatio.h };
   const showTip =
-    hover &&
-    !pending &&
-    !selecting &&
-    !frame &&
-    !blocked &&
-    !isSelectionTool &&
-    tool !== "text" &&
-    tool !== "slice" &&
-    !selectDrag;
-  const stampTip = stamp && (tool === "pen" || tool === "brush") ? stamp : null;
-  const corners = polygon ?? paintPolygon;
-  const lasso =
-    selectDrag?.kind === "lasso"
-      ? selectDrag.points
-      : polygon && [...polygon.points, polygon.pointer];
-  const marquee =
-    selectDrag?.kind === "marquee"
-      ? selectDrag.ellipse
-        ? boxBetween(selectDrag.from, selectDrag.to)
-        : areaBetween(selectDrag.from, selectDrag.to, size)
-      : null;
-  const ellipseMarquee = selectDrag?.kind === "marquee" && selectDrag.ellipse;
-
+    hover && pointerTip && !pending && !selecting && !frame && !blocked;
+  const stampTip = stamp && tool.stamp ? stamp : null;
   const tile = (
     <div
       className={`group relative shadow-[0_0_0_1px_var(--color-border),0_18px_48px_rgba(0,0,0,0.25)] ${selecting ? "z-50" : ""}`}
@@ -1286,220 +475,51 @@ export function PixelCanvas({
         />
       )}
 
-      {(outline || marquee || lasso || corners || curveGuide) && (
+      {outline && (
         <svg
           aria-hidden="true"
           viewBox={`0 0 ${size.w} ${size.h}`}
           preserveAspectRatio="none"
           className="pointer-events-none absolute inset-0 size-full overflow-visible"
         >
-          {outline && (
-            <>
-              <path
-                d={outline}
-                fill="none"
-                stroke="white"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-              <path
-                d={outline}
-                fill="none"
-                stroke="black"
-                strokeWidth={1}
-                strokeDasharray="4 4"
-                vectorEffect="non-scaling-stroke"
-                className="motion-safe:animate-[marching-ants_0.8s_linear_infinite]"
-              />
-            </>
-          )}
-          {marquee && ellipseMarquee && (
-            <ellipse
-              cx={marquee.x + marquee.w / 2}
-              cy={marquee.y + marquee.h / 2}
-              rx={marquee.w / 2}
-              ry={marquee.h / 2}
-              fill="rgb(59 130 246 / 0.12)"
-              stroke="rgb(59 130 246)"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {marquee && !ellipseMarquee && (
-            <rect
-              x={marquee.x}
-              y={marquee.y}
-              width={marquee.w}
-              height={marquee.h}
-              fill="rgb(59 130 246 / 0.12)"
-              stroke="rgb(59 130 246)"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {lasso && (
-            <polyline
-              points={lasso.map((p) => `${p.x + 0.5},${p.y + 0.5}`).join(" ")}
-              fill="rgb(59 130 246 / 0.12)"
-              stroke="rgb(59 130 246)"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {curveGuide &&
-            curveGuide.stage > 0 &&
-            [
-              { from: curveGuide.start, handle: curveGuide.c1 },
-              { from: curveGuide.end, handle: curveGuide.c2 },
-            ].map(({ from, handle }, i) => (
-              <g key={i}>
-                <line
-                  x1={from.x + 0.5}
-                  y1={from.y + 0.5}
-                  x2={handle.x + 0.5}
-                  y2={handle.y + 0.5}
-                  stroke="rgb(59 130 246)"
-                  strokeDasharray="4 3"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <circle
-                  cx={handle.x + 0.5}
-                  cy={handle.y + 0.5}
-                  r={0.5}
-                  fill="white"
-                  stroke="rgb(59 130 246)"
-                  vectorEffect="non-scaling-stroke"
-                />
-              </g>
-            ))}
-          {corners?.points.map((p, i) => {
-            const closes =
-              i === 0 &&
-              corners.points.length >= 3 &&
-              p.x === corners.pointer.x &&
-              p.y === corners.pointer.y;
-            return (
-              <rect
-                key={i}
-                x={p.x}
-                y={p.y}
-                width={1}
-                height={1}
-                fill={closes ? "rgb(59 130 246)" : "white"}
-                stroke="rgb(59 130 246)"
-                vectorEffect="non-scaling-stroke"
-              />
-            );
-          })}
+          <path
+            d={outline}
+            fill="none"
+            stroke="white"
+            strokeWidth={1}
+            vectorEffect="non-scaling-stroke"
+          />
+          <path
+            d={outline}
+            fill="none"
+            stroke="black"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+            vectorEffect="non-scaling-stroke"
+            className="motion-safe:animate-[marching-ants_0.8s_linear_infinite]"
+          />
         </svg>
       )}
 
-      {marquee && (
-        <span
-          className="pointer-events-none absolute rounded bg-blue-500 px-2 py-0.5 text-xs whitespace-nowrap text-white tabular-nums"
-          style={{
-            left: (marquee.x + marquee.w) * scale,
-            top: (marquee.y + marquee.h) * scale + 4,
-          }}
-        >
-          {marquee.w} × {marquee.h}
-        </span>
-      )}
-
-      {tool === "move" && transformBox && !selecting && !frame && (
-        <TransformHandles
-          box={transformBox}
-          scale={scale}
-          size={size}
-          begin={selection.beginTransform}
-          onChange={selection.setTransform}
-        />
-      )}
-
-      {tool === "slice" && (
-        <SliceOverlay
-          slices={sprite.slices}
-          size={size}
-          scale={scale}
-          stretch={stretch}
-          pickedId={sliceId}
-          drag={sliceDrag}
-          onResize={(bounds) =>
-            sprite.setSlices(
-              sprite.slices.map((s) =>
-                s.id === sliceId ? resizedSlice(s, bounds) : s,
-              ),
-            )
-          }
-        />
-      )}
-
-      {openText && textPreview && (
-        <canvas
-          aria-hidden="true"
-          width={textPreview.w}
-          height={textPreview.h}
-          className="pointer-events-none absolute outline-1 outline-blue-500 outline-dashed [image-rendering:pixelated]"
-          style={{
-            left: openText.at.x * scale,
-            top: openText.at.y * scale,
-            width: textPreview.w * scale,
-            height: textPreview.h * scale,
-          }}
-          ref={(canvas) =>
-            canvas
-              ?.getContext("2d")
-              ?.putImageData(
-                new ImageData(
-                  textPreview.pixels as Uint8ClampedArray<ArrayBuffer>,
-                  textPreview.w,
-                  textPreview.h,
-                ),
-                0,
-                0,
-              )
-          }
-        />
-      )}
-      {openText && (
-        <input
-          ref={textInput}
-          aria-label="Text"
-          placeholder="Type, then Enter"
-          value={openText.text}
-          onChange={(e) => {
-            setTextBox({ ...openText, text: e.target.value });
-            setTextError(null);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void placeText();
-            if (e.key === "Escape") {
-              setTextBox(null);
-              setTextPreview(null);
-              setTextError(null);
-            }
-          }}
-          className="absolute z-10 h-7 w-44 rounded-md border bg-background px-2 text-sm text-foreground shadow-md"
-          style={{
-            left: openText.at.x * scale,
-            top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 6,
-          }}
-        />
-      )}
-      {openText &&
-        (textError ??
-          (openText.text.trim() && !textPreview ? NO_GLYPHS : null)) && (
-          <p
-            role="status"
-            className="absolute z-10 w-56 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md"
-            style={{
-              left: openText.at.x * scale,
-              top: (openText.at.y + (textPreview?.h ?? 0)) * scale + 40,
-            }}
-          >
-            {textError ?? NO_GLYPHS}
-          </p>
-        )}
+      <ToolCanvas
+        key={tool.id}
+        ref={handlers}
+        tool={tool}
+        pen={pen}
+        sprite={sprite}
+        selection={selection}
+        stamp={stamp}
+        scale={scale}
+        stretch={stretch}
+        paintOptions={paintOptions}
+        paused={selecting || !!frame}
+        lastPointRef={lastPoint}
+        pickColor={pickColor}
+        onUseColor={onUseColor}
+        onTextPlaced={onTextPlaced}
+        sliceId={sliceId}
+        onSelectSlice={onSelectSlice}
+      />
 
       {aiArea && (
         <div

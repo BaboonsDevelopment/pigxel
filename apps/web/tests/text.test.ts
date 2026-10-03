@@ -1,12 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { textPiece } from "@/components/pixel-canvas/text";
-
-vi.mock("@/lib/pixel-fonts", () => ({
-  tiny5: { style: { fontFamily: "Tiny5" } },
-  dotGothic16: { style: { fontFamily: "DotGothic16" } },
-  silkscreen: { style: { fontFamily: "Silkscreen" } },
-  pressStart2P: { style: { fontFamily: "Press Start 2P" } },
-}));
 
 const RED = [255, 0, 0, 255] as const;
 

@@ -95,7 +95,7 @@ import { useModifierLabel } from "../use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
 import { useTileFile } from "../use-tile-file";
-import { groupOf } from "../tools";
+import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorsPanel } from "./colors/colors-panel";
@@ -927,7 +927,7 @@ export function Editor({
       />
       <div className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2">
         <ToolOptions
-          tool={tool}
+          tool={toolById(tool)}
           pen={pen}
           onChange={setPen}
           selection={selection}
@@ -972,7 +972,7 @@ export function Editor({
               <div className="m-auto">
                 <PixelCanvas
                   ref={canvas}
-                  tool={tool}
+                  tool={toolById(tool)}
                   pen={pen}
                   scale={scale}
                   sprite={sprite}
