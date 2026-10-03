@@ -1,7 +1,9 @@
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { cn } from "@pigxel/ui/lib/utils";
 import type { ProfileTile } from "@/lib/profile/profile";
+import { PixelImage } from "@/components/ui/pixel-image";
+import { Badge } from "@pigxel/ui/components/badge";
+import { Text } from "@pigxel/ui/components/typography";
 
 export function ArtCard({
   tile,
@@ -21,38 +23,38 @@ export function ArtCard({
     <li className="flex flex-col">
       <div className="relative aspect-square overflow-hidden rounded-xl border bg-checker">
         {tile.thumbnail ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a small data URL kept with the tile
-          <img
+          <PixelImage
             src={tile.thumbnail}
             alt={tile.name}
             loading="lazy"
-            decoding="async"
-            className="size-full object-contain [image-rendering:pixelated]"
+            className="size-full object-contain"
           />
         ) : (
-          <span className="flex size-full items-center justify-center text-xs text-muted-foreground">
+          <Text
+            as="span"
+            size="xs"
+            tone="muted"
+            className="flex size-full items-center justify-center"
+          >
             No preview
-          </span>
+          </Text>
         )}
         {isOwner && (
-          <span
-            className={cn(
-              "absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
-              isPublic
-                ? "bg-primary text-primary-foreground"
-                : "bg-background/90 text-muted-foreground",
-            )}
+          <Badge
+            tone={isPublic ? "primary" : "overlay"}
+            size="md"
+            className="absolute top-2 left-2 transition-colors"
           >
             {isPublic ? "Public" : "Private"}
-          </span>
+          </Badge>
         )}
       </div>
       <p className="mt-2 truncate text-sm font-medium" title={tile.name}>
         {tile.name}
       </p>
-      <p className="text-xs text-muted-foreground tabular-nums">
+      <Text size="xs" tone="muted" className="tabular-nums">
         {tile.width} × {tile.height}
-      </p>
+      </Text>
       {isOwner && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           <Button

@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition, type ReactNode } from "react";
-import { SectionTitle } from "@pigxel/ui/components/typography";
+import { Heading } from "@pigxel/ui/components/typography";
 import {
   setTilePinned,
   setTileVisibility,
@@ -106,7 +106,7 @@ export function ProfileGallery({
 function Gallery({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="mt-12">
-      <SectionTitle className="text-lg">{title}</SectionTitle>
+      <Heading>{title}</Heading>
       <ul className="mt-4 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
         {children}
       </ul>

@@ -52,3 +52,23 @@ export function Checkbox({ className, ...props }: ComponentProps<"input">) {
     />
   );
 }
+
+export function CheckboxField({
+  label,
+  title,
+  className,
+  ...props
+}: Omit<ComponentProps<"input">, "type"> & { label: ReactNode }) {
+  return (
+    <label
+      title={title}
+      className={cn(
+        "flex items-center gap-2 text-sm has-disabled:opacity-50",
+        className,
+      )}
+    >
+      <Checkbox {...props} />
+      {label}
+    </label>
+  );
+}

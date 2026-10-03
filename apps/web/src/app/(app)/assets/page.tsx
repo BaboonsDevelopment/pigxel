@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
+import { PageHeader } from "@pigxel/ui/components/typography";
 import {
   AssetLibrary,
   type AssetSection,
@@ -46,16 +47,11 @@ export default async function Assets({ searchParams }: Props) {
 
   return (
     <ScaledPage>
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div>
-          <h1 className="font-display text-4xl tracking-tight">Assets</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Sprites, seamless tiles and palettes to start a tile from or drop
-            into yours.
-          </p>
-        </div>
-        <AssetTabs active={tab} />
-      </div>
+      <PageHeader
+        title="Assets"
+        description="Sprites, seamless tiles and palettes to start a tile from or drop into yours."
+        actions={<AssetTabs active={tab} />}
+      />
       {empty ? (
         <EmptyState
           className="mt-12"

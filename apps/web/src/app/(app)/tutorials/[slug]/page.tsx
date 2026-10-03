@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cardVariants } from "@pigxel/ui/components/card";
+import {
+  Heading,
+  Lead,
+  linkVariants,
+  Text,
+} from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/scaled-page";
 import { StartGuideButton } from "@/components/tutorials/start-guide-button";
 import { TutorialVideo } from "@/components/tutorials/tutorial-video";
@@ -28,43 +35,33 @@ export default async function TutorialPage({ params }: Props) {
 
   return (
     <ScaledPage>
-      <Link
-        href="/tutorials"
-        className="text-xs font-medium text-[#9a78d0] hover:underline"
-      >
+      <Link href="/tutorials" className={linkVariants({ variant: "accent" })}>
         <span aria-hidden="true">←</span> All tutorials
       </Link>
-      <h1 className="mt-2 font-display text-4xl tracking-tight">
+      <Heading size="page" className="mt-2">
         {tutorial.title}
-      </h1>
-      <p className="mt-1 font-mono text-xs text-muted-foreground">
+      </Heading>
+      <Text size="xs" tone="muted" className="mt-1 font-mono">
         {tutorial.level} · {tutorial.minutes} min · {tutorial.steps.length}{" "}
         steps
-      </p>
+      </Text>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div>
           <TutorialVideo tutorial={tutorial} />
-          <p className="mt-4 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            {tutorial.summary}
-          </p>
+          <Lead className="mt-4 max-w-prose">{tutorial.summary}</Lead>
         </div>
 
         <section
           aria-labelledby="guide-heading"
-          className="rounded-2xl bg-[#e9e4f5] p-5"
+          className={cardVariants({ tone: "lavender" })}
         >
-          <h2
-            id="guide-heading"
-            className="font-display text-xl tracking-tight"
-          >
-            Interactive guide
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <Heading id="guide-heading">Interactive guide</Heading>
+          <Text tone="muted" className="mt-1">
             Opens a {practice.width} × {practice.height} practice tile, “
             {practice.name}”, kept in this browser. The guide points at each
             tool, and steps tick off by themselves as you do them.
-          </p>
+          </Text>
           <div className="mt-4">
             <StartGuideButton
               userId={user.id}
@@ -80,9 +77,9 @@ export default async function TutorialPage({ params }: Props) {
                 </span>
                 <span>
                   <span className="block font-medium">{step.title}</span>
-                  <span className="block text-xs text-muted-foreground">
+                  <Text as="span" size="xs" tone="muted" className="block">
                     {step.body}
-                  </span>
+                  </Text>
                 </span>
               </li>
             ))}

@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
+import { cardVariants } from "@pigxel/ui/components/card";
+import {
+  linkVariants,
+  SectionHeader,
+  Text,
+} from "@pigxel/ui/components/typography";
 import { downloadBlob } from "@/lib/download";
 import { toGpl } from "@/lib/palette/files";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
@@ -10,17 +16,15 @@ import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
 export function PaletteList() {
   return (
     <section aria-labelledby="assets-palettes" className="mt-8">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-        <h2
-          id="assets-palettes"
-          className="font-display text-xl tracking-tight"
-        >
-          Palettes
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          In the editor, pick one from the palette panel’s Load… menu.
-        </p>
-      </div>
+      <SectionHeader
+        id="assets-palettes"
+        title="Palettes"
+        actions={
+          <Text size="xs" tone="muted">
+            In the editor, pick one from the palette panel’s Load… menu.
+          </Text>
+        }
+      />
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {PALETTE_PRESETS.map((palette) => (
           <li key={palette.id}>
@@ -43,24 +47,34 @@ function PaletteCard({ palette }: { palette: PalettePreset }) {
     );
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border bg-card p-4">
+    <div
+      className={cardVariants({
+        padding: "sm",
+        className: "flex h-full flex-col",
+      })}
+    >
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="truncate font-semibold">{palette.name}</h3>
-        <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
+        <Text
+          as="span"
+          size="xs"
+          tone="muted"
+          className="shrink-0 font-mono tabular-nums"
+        >
           {colors.length} colours
-        </span>
+        </Text>
       </div>
-      <p className="truncate text-xs text-muted-foreground">
+      <Text size="xs" tone="muted" className="truncate">
         {palette.author ? `by ${palette.author} · ` : ""}
         <a
           href={`https://lospec.com/palette-list/${palette.id}`}
           target="_blank"
           rel="noreferrer"
-          className="underline-offset-2 hover:text-foreground hover:underline"
+          className={linkVariants({ variant: "muted" })}
         >
           Lospec
         </a>
-      </p>
+      </Text>
       <ul
         aria-label={`${palette.name} colours`}
         className="mt-3 grid overflow-hidden rounded-lg ring-1 ring-black/10"

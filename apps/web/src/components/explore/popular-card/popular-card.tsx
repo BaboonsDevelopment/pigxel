@@ -7,6 +7,7 @@ import { ProfileAvatar } from "@/components/profile/profile-avatar";
 import { HoverOverlay } from "@/components/tiles/hover-overlay";
 import { LikeButton } from "./components/like-button";
 import { PreviewDialog } from "./components/preview-dialog";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 export function PopularCard({ tile }: { tile: PublicTile }) {
   const { author } = tile;
@@ -24,13 +25,11 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
         <span className="relative block aspect-[16/10] overflow-hidden bg-checker">
           <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-focus-visible:scale-105 group-focus-visible:blur-[2px] motion-reduce:transition-none">
             {tile.thumbnail ? (
-              // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
-              <img
+              <PixelImage
                 src={tile.thumbnail}
                 alt=""
-                decoding="async"
                 loading="lazy"
-                className="size-full object-contain [image-rendering:pixelated]"
+                className="size-full object-contain"
               />
             ) : (
               <span className="flex size-full items-center justify-center font-mono text-xs text-muted-foreground">

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Badge } from "@pigxel/ui/components/badge";
 import { videoEmbedUrl, type Tutorial } from "@/lib/tutorials/tutorials";
 
 export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
@@ -14,7 +15,7 @@ export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
       />
     );
   return (
-    <div className="relative aspect-video overflow-hidden rounded-2xl border bg-[#f8dde6]">
+    <div className="relative aspect-video overflow-hidden rounded-2xl border bg-pastel-pink">
       <Image
         src={tutorial.image}
         alt=""
@@ -30,9 +31,9 @@ export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
             <path d="M4 2.5v11L13 8z" fill="currentColor" />
           </svg>
         </span>
-        <p className="rounded-full bg-white/90 px-3 py-1 font-mono text-xs tracking-wide text-muted-foreground">
+        <Badge tone="overlay" className="px-3 py-1 text-xs">
           Video coming soon: try the interactive guide
-        </p>
+        </Badge>
       </div>
     </div>
   );

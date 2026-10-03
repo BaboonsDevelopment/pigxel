@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "@pigxel/ui/components/button";
+import { Button, IconButton } from "@pigxel/ui/components/button";
+import { Text } from "@pigxel/ui/components/typography";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
@@ -119,21 +120,18 @@ export function PreviewDialog({
     >
       <div className="flex items-center justify-between gap-4 border-b py-2 pr-2 pl-5">
         <div className="min-w-0">
-          <p className="truncate font-mono text-sm">{tile.name}</p>
-          <p className="truncate text-xs text-muted-foreground">
+          <Text className="truncate font-mono">{tile.name}</Text>
+          <Text size="xs" tone="muted" className="truncate">
             @{tile.author.username} · {tile.width} × {tile.height}
-          </p>
+          </Text>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
+        <IconButton
+          label="Close"
           onClick={() => void dismiss()}
           className="text-lg leading-none"
         >
           ×
-        </Button>
+        </IconButton>
       </div>
       <div className="flex aspect-square max-h-[70vh] w-full items-center justify-center bg-checker">
         {picture ? (
@@ -146,7 +144,9 @@ export function PreviewDialog({
         ) : error ? (
           <FormMessage tone="error">{error}</FormMessage>
         ) : (
-          <span className="text-sm text-muted-foreground">Loading…</span>
+          <Text as="span" tone="muted">
+            Loading…
+          </Text>
         )}
       </div>
       {animated && (
@@ -160,9 +160,9 @@ export function PreviewDialog({
           >
             {playing ? "Pause" : "Play animation"}
           </Button>
-          <span className="text-xs text-muted-foreground tabular-nums">
+          <Text as="span" size="xs" tone="muted" className="tabular-nums">
             {picture!.frames.length} frames
-          </span>
+          </Text>
         </div>
       )}
     </dialog>,

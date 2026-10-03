@@ -4,6 +4,7 @@ import { Card } from "@pigxel/ui/components/card";
 import {
   Lead,
   SectionTitle,
+  Text,
   textLinkClassName,
 } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
@@ -22,13 +23,13 @@ export default async function SubscriptionSettings() {
     <section aria-labelledby="plan-heading">
       <SectionTitle id="plan-heading">Your plan</SectionTitle>
       <Card className="mt-4">
-        <p className="text-sm text-muted-foreground">Current plan</p>
+        <Text tone="muted">Current plan</Text>
         <p className="mt-1 text-2xl font-semibold">
           {plan.name}
           {plan.name !== "Free" && (
-            <span className="ml-2 text-base font-normal text-muted-foreground">
+            <Text as="span" size="md" tone="muted" className="ml-2 font-normal">
               billed {plan.cycle === "month" ? "monthly" : "yearly"}
-            </span>
+            </Text>
           )}
         </p>
         <Lead className="mt-3">

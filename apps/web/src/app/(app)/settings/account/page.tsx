@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Notice } from "@pigxel/ui/components/notice";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { Lead, SectionTitle, Text } from "@pigxel/ui/components/typography";
 import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { requireUser } from "@/lib/auth/session";
 import {
@@ -113,11 +113,11 @@ export default async function AccountSettings({
                 >
                   <div>
                     <p className="text-sm font-medium">{p.label}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <Text size="xs" tone="muted">
                       {linked
                         ? (identityEmail(p.id) ?? "Connected")
                         : "Not connected"}
-                    </p>
+                    </Text>
                   </div>
                   {!linked ? (
                     <a href={p.connectUrl} className={secondaryButton}>
@@ -126,9 +126,13 @@ export default async function AccountSettings({
                   ) : canUnlink ? (
                     <UnlinkButton provider={p.id} label={p.label} />
                   ) : (
-                    <p className="max-w-48 text-right text-xs text-muted-foreground">
+                    <Text
+                      size="xs"
+                      tone="muted"
+                      className="max-w-48 text-right"
+                    >
                       Your only way to sign in
-                    </p>
+                    </Text>
                   )}
                 </li>
               );

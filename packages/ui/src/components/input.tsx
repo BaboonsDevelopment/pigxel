@@ -71,3 +71,30 @@ export function InputGroupInput({
     />
   );
 }
+
+export type SelectSize = "xs" | "sm" | "md";
+
+const selectSizes: Record<SelectSize, string> = {
+  xs: "h-7 rounded-md px-1.5 text-xs",
+  sm: "h-8 rounded-md px-2",
+  md: "h-10 px-3",
+};
+
+export function Select({
+  className,
+  selectSize = "sm",
+  ...props
+}: ComponentProps<"select"> & { selectSize?: SelectSize }) {
+  return (
+    <select
+      data-slot="select"
+      className={cn(
+        fieldClassName,
+        "w-auto cursor-pointer",
+        selectSizes[selectSize],
+        className,
+      )}
+      {...props}
+    />
+  );
+}

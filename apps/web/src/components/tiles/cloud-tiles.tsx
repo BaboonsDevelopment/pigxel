@@ -8,6 +8,8 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { scrollParent } from "@/lib/scroll-parent";
 import { ProjectCard } from "./project-card/project-card";
 import { useCloudTileActions } from "./tile-actions";
+import { PixelImage } from "@/components/ui/pixel-image";
+import { Heading } from "@pigxel/ui/components/typography";
 
 const PRELOAD = "1500px";
 
@@ -57,12 +59,9 @@ export function CloudTiles({
   if (visible.length === 0) return null;
   return (
     <section aria-labelledby="cloud-tiles-heading" className="mt-6">
-      <h2
-        id="cloud-tiles-heading"
-        className="mb-3 font-display text-xl tracking-tight"
-      >
+      <Heading id="cloud-tiles-heading" className="mb-3">
         In Pigxel cloud
-      </h2>
+      </Heading>
       {error && (
         <FormMessage tone="error" className="mb-4">
           {error}
@@ -74,10 +73,7 @@ export function CloudTiles({
             key={tile.id}
             name={tile.name}
             thumbnail={
-              tile.thumbnail && (
-                // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
-                <img src={tile.thumbnail} alt="" decoding="async" />
-              )
+              tile.thumbnail && <PixelImage src={tile.thumbnail} alt="" />
             }
             open={{ onClick: () => void open(tile) }}
             opening={busy === tile.id}

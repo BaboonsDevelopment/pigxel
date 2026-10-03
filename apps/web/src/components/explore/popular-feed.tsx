@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@pigxel/ui/components/badge";
+import { IconButton } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
+import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { loadPopularTiles } from "@/app/(app)/explore/actions";
-import { PeriodTabs } from "@/app/(app)/explore/period-tabs";
-import type { Period } from "@/app/(app)/explore/constants";
+import { PERIODS, type Period } from "@/app/(app)/explore/constants";
+import { TabLinks } from "@/components/ui/tab-links";
 import type { PublicTile } from "@/lib/profile/profile";
 import { scrollParent } from "@/lib/scroll-parent";
 import { PopularCard } from "./popular-card/popular-card";
@@ -87,40 +90,41 @@ export function PopularFeed({
     <section aria-labelledby="popular-heading" className={styles.gallery}>
       <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b bg-background/95 py-2 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
-          <h1
-            id="popular-heading"
-            className="font-display text-xl tracking-tight"
-          >
+          <Heading as="h1" id="popular-heading">
             Popular tiles
-          </h1>
-          <span
-            className={cn(
-              "rounded bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums text-primary-soft-foreground",
-            )}
+          </Heading>
+          <Badge
+            tone="muted"
+            className="text-xs text-primary-soft-foreground tabular-nums"
           >
             {count}
-          </span>
+          </Badge>
         </div>
         <div className="flex items-center gap-4">
-          <PeriodTabs active={period} />
+          <TabLinks
+            label="Period"
+            variant="segmented"
+            tabs={PERIODS.map((p) => ({
+              href: `/explore?period=${p.value}`,
+              label: p.label,
+              active: p.value === period,
+            }))}
+          />
           <div
             aria-label="Gallery density"
             role="group"
             className={cn(styles.density, "gap-1 border-l pl-4")}
           >
             {(["comfortable", "compact"] as const).map((value) => (
-              <button
+              <IconButton
                 key={value}
-                type="button"
-                aria-label={
+                label={
                   value === "comfortable" ? "Larger previews" : "Compact grid"
                 }
-                title={
-                  value === "comfortable" ? "Larger previews" : "Compact grid"
-                }
+                size="md"
                 aria-pressed={density === value}
                 onClick={() => setDensity(value)}
-                className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted aria-pressed:bg-primary aria-pressed:text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="size-9"
               >
                 <svg
                   aria-hidden="true"
@@ -147,7 +151,7 @@ export function PopularFeed({
                     },
                   )}
                 </svg>
-              </button>
+              </IconButton>
             ))}
           </div>
         </div>

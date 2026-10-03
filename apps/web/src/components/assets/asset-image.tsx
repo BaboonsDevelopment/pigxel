@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Asset } from "@/lib/assets/assets";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 export function AssetImage({
   asset,
@@ -38,17 +39,15 @@ export function AssetImage({
       className={cn("relative block overflow-hidden", className)}
       style={{ aspectRatio: `${width} / ${height}` }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- a 1× pixel sheet, scaled by CSS */}
-      <img
+      <PixelImage
         src={sheetUrl}
         alt=""
         width={width * frames}
         height={height}
         loading="lazy"
-        decoding="async"
         draggable={false}
         className={cn(
-          "absolute inset-y-0 left-0 h-full max-w-none [image-rendering:pixelated]",
+          "absolute inset-y-0 left-0 h-full max-w-none",
           frames > 1 &&
             "animate-[sprite-sheet_var(--duration)_steps(var(--frames))_infinite] motion-reduce:animate-none",
         )}

@@ -30,6 +30,15 @@
   --sidebar-end: #f4e6ed;
   --sidebar-accent: #f6dbe5;
   --canvas: #fcf6f9;
+  --pastel-pink: #f8dde6;
+  --pastel-pink-soft: #fde8ef;
+  --pastel-lavender: #e9e4f5;
+  --pastel-peach: #f9e0d6;
+  --pastel-mint: #dfeae4;
+  --pastel-blush: #f6e8f0;
+  --pastel-lilac: #efe6f8;
+  --lavender-foreground: #5b3f8f;
+  --link-accent: #9a78d0;
   --radius: 0.625rem;
 }
 
@@ -60,6 +69,15 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-end: var(--sidebar-end);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-pastel-pink: var(--pastel-pink);
+  --color-pastel-pink-soft: var(--pastel-pink-soft);
+  --color-pastel-lavender: var(--pastel-lavender);
+  --color-pastel-peach: var(--pastel-peach);
+  --color-pastel-mint: var(--pastel-mint);
+  --color-pastel-blush: var(--pastel-blush);
+  --color-pastel-lilac: var(--pastel-lilac);
+  --color-lavender-foreground: var(--lavender-foreground);
+  --color-link-accent: var(--link-accent);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

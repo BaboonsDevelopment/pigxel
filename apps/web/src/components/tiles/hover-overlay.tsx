@@ -25,7 +25,7 @@ export function HoverOverlay({
           }}
         />
       ))}
-      <span className="absolute bottom-3 left-1/2 flex -translate-x-1/2 translate-y-1 items-center gap-1.5 rounded-full bg-[#fde8ef] py-1 pr-2.5 pl-3.5 font-mono text-xs text-foreground shadow-sm transition-transform duration-200 group-hover:translate-y-0">
+      <span className="absolute bottom-3 left-1/2 flex -translate-x-1/2 translate-y-1 items-center gap-1.5 rounded-full bg-pastel-pink-soft py-1 pr-2.5 pl-3.5 font-mono text-xs text-foreground shadow-sm transition-transform duration-200 group-hover:translate-y-0">
         {label}
         <svg viewBox="0 0 16 16" className="size-3" fill="none">
           <path

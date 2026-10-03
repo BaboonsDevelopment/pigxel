@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
+import { cardVariants } from "@pigxel/ui/components/card";
 import { ChoiceCard, ChoiceText, Radio } from "@pigxel/ui/components/choice";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input, Textarea } from "@pigxel/ui/components/input";
@@ -85,7 +86,13 @@ export function NewFeedbackForm({
       </fieldset>
 
       {full ? (
-        <div className="rounded-xl bg-muted/60 p-4 text-sm">
+        <div
+          className={cardVariants({
+            tone: "muted",
+            padding: "sm",
+            className: "text-sm",
+          })}
+        >
           <p>
             You have {OPEN_LIMIT} open {FEEDBACK_KINDS[kind].one}s waiting for
             the team. Once one of them is approved, declined or closed, you can

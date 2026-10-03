@@ -18,6 +18,7 @@ import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import type { SearchResults } from "@/lib/search/server";
 import { SearchIcon } from "./icons";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 type Result = {
   key: string;
@@ -249,11 +250,10 @@ function SearchPanel({ userId, close }: { userId: string; close: () => void }) {
                   ) : (
                     <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-checker">
                       {result.thumbnail && (
-                        // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
-                        <img
+                        <PixelImage
                           src={result.thumbnail}
                           alt=""
-                          className="size-full object-cover [image-rendering:pixelated]"
+                          className="size-full object-cover"
                         />
                       )}
                     </span>

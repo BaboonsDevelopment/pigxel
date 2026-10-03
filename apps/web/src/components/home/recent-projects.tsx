@@ -14,6 +14,7 @@ import {
 } from "@/components/tiles/tile-actions";
 import { ProjectCard } from "@/components/tiles/project-card/project-card";
 import { TileThumbnail } from "@/components/tiles/tile-thumbnail";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 type Project =
   | {
@@ -120,8 +121,7 @@ function Row({
               name={project.name}
               thumbnail={
                 project.tile.thumbnail && (
-                  // eslint-disable-next-line @next/next/no-img-element -- a tiny data URL
-                  <img src={project.tile.thumbnail} alt="" decoding="async" />
+                  <PixelImage src={project.tile.thumbnail} alt="" />
                 )
               }
               open={{ onClick: () => void cloud.open(project.tile) }}

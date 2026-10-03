@@ -1,5 +1,7 @@
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ProfileActivity } from "@/lib/profile/server";
+import { cardVariants } from "@pigxel/ui/components/card";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 
 const DAY = 86_400_000;
 const WEEKS = 53;
@@ -46,17 +48,21 @@ export function ProfileStats({
           <FrameIcon />
         </span>
         <div>
-          <p className="text-sm text-muted-foreground">Total arts</p>
-          <p className="mt-1 font-display text-5xl tracking-tight tabular-nums">
+          <Text tone="muted">Total arts</Text>
+          <Heading
+            as="p"
+            size="display"
+            className="mt-1 text-5xl tabular-nums sm:text-5xl"
+          >
             {artCount}
-          </p>
+          </Heading>
           {publishedCount !== undefined && (
-            <p className="mt-1 text-xs text-muted-foreground">
+            <Text size="xs" tone="muted" className="mt-1">
               <span className="font-semibold text-success tabular-nums">
                 {publishedCount}
               </span>{" "}
               published
-            </p>
+            </Text>
           )}
         </div>
       </div>
@@ -100,14 +106,14 @@ function ActivityCard({
   });
 
   return (
-    <div className="min-w-0 rounded-2xl border bg-card p-5">
+    <div className={cardVariants({ className: "min-w-0" })}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h2 className="font-display text-xl tracking-tight">Daily activity</h2>
-        <p className="text-xs text-muted-foreground">
+        <Heading>Daily activity</Heading>
+        <Text size="xs" tone="muted">
           <Stat value={total} label={total === 1 ? "art" : "arts"} /> in the
           last year · <Stat value={activeDays} label="active days" /> ·{" "}
           <Stat value={streak} label="day streak" />
-        </p>
+        </Text>
       </div>
 
       <div className="mt-5 overflow-x-auto pb-1 [direction:rtl]">

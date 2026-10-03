@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Badge } from "@pigxel/ui/components/badge";
+import { cardVariants } from "@pigxel/ui/components/card";
+import { Heading, PageHeader, Text } from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/scaled-page";
 import { TUTORIALS } from "@/lib/tutorials/tutorials";
 
@@ -9,43 +12,44 @@ export const metadata: Metadata = { title: "Tutorials · Pigxel" };
 export default function Tutorials() {
   return (
     <ScaledPage>
-      <h1 className="font-display text-4xl tracking-tight">Tutorials</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Watch a short video, then practise in the editor with a guide that
-        points at each tool and ticks steps off as you do them.
-      </p>
+      <PageHeader
+        title="Tutorials"
+        description="Watch a short video, then practise in the editor with a guide that points at each tool and ticks steps off as you do them."
+      />
       <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {TUTORIALS.map((tutorial) => (
           <li key={tutorial.slug}>
             <Link
               href={`/tutorials/${tutorial.slug}`}
-              className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-card transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none"
+              className={cardVariants({
+                padding: "none",
+                className:
+                  "group flex h-full flex-col overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none",
+              })}
             >
-              <span className="relative block aspect-[3/2] overflow-hidden bg-[#f8dde6]">
+              <span className="relative block aspect-[3/2] overflow-hidden bg-pastel-pink">
                 <Image
                   src={tutorial.image}
                   alt=""
                   sizes="(min-width: 1024px) 400px, (min-width: 640px) 45vw, 90vw"
                   className="size-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none"
                 />
-                <span className="absolute top-3 left-3 rounded-full bg-white/90 px-2 py-0.5 font-mono text-[10px] tracking-wide text-muted-foreground">
+                <Badge tone="overlay" className="absolute top-3 left-3">
                   {tutorial.level} · {tutorial.minutes} min
-                </span>
+                </Badge>
               </span>
               <span className="flex flex-1 flex-col p-4">
-                <span className="font-display text-xl tracking-tight">
-                  {tutorial.title}
-                </span>
-                <span className="mt-1 text-sm text-muted-foreground">
+                <Heading as="span">{tutorial.title}</Heading>
+                <Text as="span" tone="muted" className="mt-1">
                   {tutorial.summary}
-                </span>
-                <span className="mt-auto flex flex-wrap gap-1.5 pt-4 text-xs">
-                  <span className="rounded-full bg-[#fde8ef] px-2 py-0.5">
+                </Text>
+                <span className="mt-auto flex flex-wrap gap-1.5 pt-4">
+                  <Badge tone="pink" size="md">
                     {tutorial.youtubeId ? "▶ Video" : "Video soon"}
-                  </span>
-                  <span className="rounded-full bg-[#e9e4f5] px-2 py-0.5">
+                  </Badge>
+                  <Badge tone="lavender" size="md">
                     Interactive guide · {tutorial.steps.length} steps
-                  </span>
+                  </Badge>
                 </span>
               </span>
             </Link>
