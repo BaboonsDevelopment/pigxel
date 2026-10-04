@@ -1,12 +1,13 @@
 "use client";
 
 import type { SpriteApi } from "../../pixel-canvas/use-sprite";
+import { EditorSelect } from "../../components/editor-select";
+import { PLAY_MODES, PLAY_SPEEDS, type PlayMode } from "@/lib/sprite/tags";
 import { ACTION } from "../constants";
 import { ICONS } from "../icons";
 import type { Playback } from "../use-playback";
 import { ControlGroup } from "./control-group";
 import { FrameDuration } from "./frame-duration";
-import { FrameJump } from "./frame-jump";
 import { LayerOptions } from "./layer-options";
 
 export function TimelineToolbar({
@@ -21,7 +22,7 @@ export function TimelineToolbar({
   const single = frames.length < 2;
 
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-3 py-1">
+    <header className="flex items-center gap-x-4 overflow-x-auto border-b px-3 py-1 whitespace-nowrap">
       <ControlGroup label="Layer">
         <button
           type="button"
@@ -87,6 +88,30 @@ export function TimelineToolbar({
         >
           {ICONS.next}
         </button>
+        <EditorSelect
+          ariaLabel="Playback speed"
+          title="Playback speed"
+          value={String(playback.speed)}
+          onChange={(value) => playback.setSpeed(Number(value))}
+          options={PLAY_SPEEDS.map((speed) => ({
+            value: String(speed),
+            label: String(speed) + "×",
+          }))}
+          className="h-7 w-14 shrink-0 px-2 text-xs"
+        />
+        <EditorSelect
+          ariaLabel="Playback mode"
+          title={
+            playback.tagId
+              ? "The selected tag sets how it plays"
+              : "How all frames play"
+          }
+          disabled={!!playback.tagId}
+          value={playback.mode}
+          onChange={(value) => playback.setMode(value as PlayMode)}
+          options={PLAY_MODES}
+          className="h-7 w-24 shrink-0 px-2 text-xs"
+        />
         <button
           type="button"
           className={ACTION}
@@ -112,15 +137,6 @@ export function TimelineToolbar({
         >
           {ICONS.remove}
         </button>
-        <FrameJump
-          key={frameId}
-          index={frames.indexOf(frame)}
-          count={frames.length}
-          onJump={(index) => {
-            sprite.pickFrames([]);
-            sprite.selectFrame(frames[index]!.id);
-          }}
-        />
         <FrameDuration
           key={`${frame.id}:${frame.duration}:${sprite.selectedFrames.length}`}
           duration={frame.duration}

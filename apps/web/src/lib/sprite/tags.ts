@@ -90,3 +90,25 @@ export function tagSequence(tag: FrameTag): number[] {
     return [...forward, ...forward.slice(1, -1).reverse()];
   return forward;
 }
+
+export type PlayMode = "loop" | "once" | "pingpong";
+
+export const PLAY_MODES: { value: PlayMode; label: string }[] = [
+  { value: "loop", label: "Loop" },
+  { value: "once", label: "Once" },
+  { value: "pingpong", label: "Ping-pong" },
+];
+
+export const PLAY_SPEEDS = [0.25, 0.5, 1, 2, 4];
+
+export function playSequence(frameCount: number, mode: PlayMode): number[] {
+  return tagSequence({
+    id: "",
+    name: "",
+    color: "",
+    from: 0,
+    to: frameCount - 1,
+    direction: mode === "pingpong" ? "pingpong" : "forward",
+    repeat: 0,
+  });
+}
