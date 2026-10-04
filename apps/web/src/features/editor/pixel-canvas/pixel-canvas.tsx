@@ -14,6 +14,7 @@ import {
 import { frameIndex } from "@/lib/sprite/frames";
 import { tipRects } from "../tools/shared/tips";
 import type { Tool, ToolHandlers } from "../tools";
+import { SymmetryAxes } from "./components/symmetry-axes";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
 import {
@@ -38,8 +39,10 @@ import {
   tileSnapshot,
 } from "./helpers";
 import {
+  centreAxes,
   mirrored,
   wrapPixel,
+  type Axes,
   type PaintOptions,
   type Stamp,
   type TiledMode,
@@ -87,6 +90,7 @@ export function PixelCanvas({
   onTextPlaced,
   sliceId = null,
   onSelectSlice,
+  onAxesChange,
   ref,
 }: {
   tool: Tool;
@@ -102,10 +106,12 @@ export function PixelCanvas({
   onTextPlaced?: () => void;
   sliceId?: string | null;
   onSelectSlice?: (id: string | null) => void;
+  onAxesChange?: (axes: Axes | null) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
   const { symmetry, tiled } = view;
+  const axes = view.axes ?? centreAxes(sprite.size);
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -129,6 +135,7 @@ export function PixelCanvas({
   const paintOptions: PaintOptions = {
     size,
     symmetry,
+    axes,
     tiled,
     mask,
     density: pen.density,
@@ -407,7 +414,7 @@ export function PixelCanvas({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
-          {mirrored(hover, size, symmetry).flatMap((at, copy) =>
+          {mirrored(hover, size, symmetry, axes).flatMap((at, copy) =>
             stampTip ? (
               <div
                 key={copy}
@@ -460,18 +467,13 @@ export function PixelCanvas({
         />
       )}
 
-      {(symmetry === "horizontal" || symmetry === "both") && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 border-l border-dashed border-fuchsia-500"
-          style={{ left: (size.w / 2) * scale }}
-        />
-      )}
-      {(symmetry === "vertical" || symmetry === "both") && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-fuchsia-500"
-          style={{ top: (size.h / 2) * scale }}
+      {symmetry !== "none" && (
+        <SymmetryAxes
+          symmetry={symmetry}
+          axes={axes}
+          size={size}
+          scale={scale}
+          onChange={onAxesChange}
         />
       )}
 

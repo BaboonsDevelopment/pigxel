@@ -1,7 +1,8 @@
-import type { Symmetry, TiledMode } from "./paint";
+import type { Axes, Symmetry, TiledMode } from "./paint";
 
 export type CanvasView = {
   symmetry: Symmetry;
+  axes: Axes | null;
   tiled: TiledMode;
   onion: number;
   gridSize: number;
@@ -10,6 +11,7 @@ export type CanvasView = {
 
 export const DEFAULT_VIEW: CanvasView = {
   symmetry: "none",
+  axes: null,
   tiled: "none",
   onion: 0,
   gridSize: 0,
@@ -23,6 +25,9 @@ export const SYMMETRY_OPTIONS: [Symmetry, string][] = [
   ["horizontal", "Left ↔ right"],
   ["vertical", "Top ↕ bottom"],
   ["both", "Both"],
+  ["diagonal", "Diagonal ↘"],
+  ["antiDiagonal", "Diagonal ↙"],
+  ["all", "All eight ways"],
 ];
 
 export const TILED_OPTIONS: [TiledMode, string][] = [

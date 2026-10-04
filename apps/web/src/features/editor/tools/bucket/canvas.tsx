@@ -20,7 +20,7 @@ function fillAt(
   rgba: Rgba,
   color: string | null,
 ) {
-  const { size, symmetry, tiled, mask } = paintOptions;
+  const { size, symmetry, axes, tiled, mask } = paintOptions;
   const image = ctx.getImageData(0, 0, size.w, size.h);
   const allLayers = pen.fillFrom === "all";
   const bounds = allLayers
@@ -32,7 +32,7 @@ function fillAt(
     : image;
   const texture = pen.stampPattern ? stamp : null;
   let changed = false;
-  for (const copy of mirrored(point, size, symmetry)) {
+  for (const copy of mirrored(point, size, symmetry, axes)) {
     const at = wrapPixel(copy.x, copy.y, size, tiled);
     if (!at || (mask && !isSelected(mask, size, at))) continue;
     const start = (at.y * size.w + at.x) * 4;

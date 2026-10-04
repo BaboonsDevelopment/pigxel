@@ -721,6 +721,13 @@ export function Editor({
             label: check(view.symmetry === value, label),
             onSelect: () => setView((v) => ({ ...v, symmetry: value })),
           })),
+          [
+            {
+              label: "Back to the middle",
+              onSelect: () => setView((v) => ({ ...v, axes: null })),
+              disabled: !view.axes,
+            },
+          ],
         ],
       },
       {
@@ -1041,6 +1048,7 @@ export function Editor({
                   onTextPlaced={() => setTool("move")}
                   sliceId={sliceId}
                   onSelectSlice={setSliceId}
+                  onAxesChange={(axes) => setView((v) => ({ ...v, axes }))}
                   onPickColor={(color, slot) =>
                     setPen((p) =>
                       slot === "primary"
