@@ -136,6 +136,9 @@ const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
 const ReduceColorsDialog = dynamic(() => import("./reduce-colors-dialog"), {
   ssr: false,
 });
+const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
+  ssr: false,
+});
 const CustomizeToolsDialog = dynamic(() => import("./customize-tools-dialog"), {
   ssr: false,
 });
@@ -173,6 +176,10 @@ export function Editor({
   const [inserting, setInserting] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
+  const [replacing, setReplacing] = useState<{
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
   const [reducing, setReducing] = useState<{
     frames: Uint8ClampedArray[];
     picture: Uint8ClampedArray;
@@ -525,16 +532,17 @@ export function Editor({
                 ),
             },
             {
-              label: "Replace primary colour with secondary",
-              onSelect: () =>
-                applyEffect((pixels, mask) =>
-                  replacedColor(
-                    pixels,
-                    rgbaOf(pen.color),
-                    rgbaOf(pen.secondary),
-                    mask,
+              label: "Replace colour…",
+              onSelect: () => {
+                selection.drop();
+                setReplacing({
+                  pixels: new Uint8ClampedArray(
+                    sprite.readCel(sprite.layerId, sprite.frameId),
                   ),
-                ),
+                  mask: selection.mask,
+                });
+              },
+              disabled: !sprite.canPaint,
             },
           ],
         ],
@@ -1176,6 +1184,29 @@ export function Editor({
             selection.select(next.some(Boolean) ? next : null);
           }}
           onClose={() => setModifying(null)}
+        />
+      )}
+      {replacing && (
+        <ReplaceColorDialog
+          size={sprite.size}
+          pixels={replacing.pixels}
+          mask={replacing.mask}
+          palette={sprite.palette}
+          from={pen.color}
+          to={pen.secondary}
+          onApply={({ from, to, tolerance, keepShading }) =>
+            applyEffect((pixels, mask) =>
+              replacedColor(
+                pixels,
+                rgbaOf(from),
+                rgbaOf(to),
+                mask,
+                tolerance,
+                keepShading,
+              ),
+            )
+          }
+          onClose={() => setReplacing(null)}
         />
       )}
       {reducing && (

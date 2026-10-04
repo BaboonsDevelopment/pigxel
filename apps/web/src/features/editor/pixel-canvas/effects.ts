@@ -38,18 +38,23 @@ export function replacedColor(
   from: Rgba,
   to: Rgba,
   mask: Uint8Array | null,
+  tolerance = 0,
+  keepShading = false,
 ): Uint8ClampedArray {
   const out = new Uint8ClampedArray(pixels);
   for (let i = 0; i < pixels.length / 4; i++) {
     if (mask && !mask[i]) continue;
     const p = i * 4;
-    if (
-      pixels[p] === from[0] &&
-      pixels[p + 1] === from[1] &&
-      pixels[p + 2] === from[2] &&
-      pixels[p + 3] === from[3]
-    )
+    if (!pixels[p + 3] && from[3]) continue;
+    let matches = true;
+    for (let c = 0; c < 4; c++)
+      if (Math.abs(pixels[p + c]! - from[c]!) > tolerance) matches = false;
+    if (!matches) continue;
+    if (!keepShading) {
       out.set(to, p);
+      continue;
+    }
+    for (let c = 0; c < 4; c++) out[p + c] = pixels[p + c]! + to[c]! - from[c]!;
   }
   return out;
 }
