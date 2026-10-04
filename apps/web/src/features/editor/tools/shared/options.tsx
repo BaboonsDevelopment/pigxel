@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, IconButton } from "@pigxel/ui/components/button";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { Text } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
 import type { Stamp } from "../../pixel-canvas/paint";
 import {
   MAX_STABILIZER,
@@ -41,7 +42,9 @@ export function StampOption({
       )}
       <BrushLibrary
         brushes={brushes}
+        current={stamp}
         onPick={onPickBrush}
+        onDefault={onClearStamp}
         onRemove={onRemoveBrush}
       />
       {stamp && (
@@ -63,11 +66,15 @@ export function StampOption({
 
 function BrushLibrary({
   brushes,
+  current,
   onPick,
+  onDefault,
   onRemove,
 }: {
   brushes: SavedBrush[];
+  current: Stamp | null;
   onPick: (stamp: Stamp) => void;
+  onDefault: () => void;
   onRemove: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -80,10 +87,24 @@ function BrushLibrary({
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
       >
-        Saved ({brushes.length}) ▾
+        {current ? "Change" : "Default"} ▾
       </Button>
       {open && (
         <span className="absolute top-full left-0 z-50 mt-1 grid w-64 grid-cols-4 gap-1 rounded-lg border bg-background p-2 shadow-lg">
+          <button
+            type="button"
+            aria-pressed={!current}
+            onClick={() => {
+              onDefault();
+              setOpen(false);
+            }}
+            className={cn(
+              "grid h-12 w-full place-items-center rounded-md border text-xs hover:bg-muted",
+              !current && "border-primary bg-primary/10",
+            )}
+          >
+            Default
+          </button>
           {brushes.map((brush) => (
             <span key={brush.id} className="group relative">
               <button
@@ -93,7 +114,12 @@ function BrushLibrary({
                   onPick(brush.stamp);
                   setOpen(false);
                 }}
-                className="grid h-12 w-full place-items-center rounded-md border hover:bg-muted"
+                className={cn(
+                  "grid h-12 w-full place-items-center rounded-md border hover:bg-muted",
+                  current &&
+                    sameStamp(current, brush.stamp) &&
+                    "border-primary bg-primary/10",
+                )}
               >
                 <StampPreview stamp={brush.stamp} />
               </button>
