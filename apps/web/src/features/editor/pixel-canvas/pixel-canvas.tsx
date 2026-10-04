@@ -41,6 +41,7 @@ import {
 import {
   centreAxes,
   mirrored,
+  rgbaOf,
   wrapPixel,
   type Axes,
   type PaintOptions,
@@ -153,10 +154,17 @@ export function PixelCanvas({
     if (!ctx) return;
     ctx.clearRect(0, 0, size.w, size.h);
     const { frames } = sprite;
+    const at = frameIndex(frames, sprite.frameId);
+    const settings = view.onionSettings;
+    const tag = settings.inTag
+      ? sprite.tags.find((t) => t.from <= at && at <= t.to)
+      : undefined;
     const around = onionFrames(
       view.onion,
-      frameIndex(frames, sprite.frameId),
+      at,
       frames.length,
+      settings.side,
+      tag,
     );
     if (!around.length) return;
     const out = new Uint8ClampedArray(size.w * size.h * 4);
@@ -165,12 +173,14 @@ export function PixelCanvas({
         ["reference", "background"],
         frames[index]!.id,
       );
-      const tint = before ? [255, 70, 90] : [60, 130, 255];
+      const tint = rgbaOf(before ? settings.before : settings.after);
       for (let i = 0; i < pixels.length; i += 4) {
         if (!pixels[i + 3]) continue;
         for (let c = 0; c < 3; c++)
-          out[i + c] = (pixels[i + c]! + tint[c]!) / 2;
-        out[i + 3] = pixels[i + 3]! * 0.4 * strength;
+          out[i + c] = settings.tint
+            ? (pixels[i + c]! + tint[c]!) / 2
+            : pixels[i + c]!;
+        out[i + 3] = pixels[i + 3]! * (settings.opacity / 100) * strength;
       }
     }
     ctx.putImageData(
@@ -205,6 +215,8 @@ export function PixelCanvas({
       sprite.frames,
       size,
       view.onion,
+      view.onionSettings,
+      sprite.tags,
     ],
   );
 

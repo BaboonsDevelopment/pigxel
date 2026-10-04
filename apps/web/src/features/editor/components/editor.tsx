@@ -151,6 +151,9 @@ const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
 const OutlineDialog = dynamic(() => import("./outline-dialog"), {
   ssr: false,
 });
+const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
+  ssr: false,
+});
 const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
   ssr: false,
 });
@@ -229,6 +232,7 @@ export function Editor({
     }));
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
+  const [onionSettings, setOnionSettings] = useState(false);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
   const changeBrushes = (next: SavedBrush[]) => {
@@ -814,6 +818,13 @@ export function Editor({
           })),
         ],
       },
+      {
+        label: "Onion skin settings…",
+        onSelect: () => {
+          setView((v) => ({ ...v, onion: v.onion || 1 }));
+          setOnionSettings(true);
+        },
+      },
     ],
     [
       {
@@ -1314,6 +1325,13 @@ export function Editor({
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {onionSettings && (
+        <OnionSettingsDialog
+          settings={view.onionSettings}
+          onChange={(next) => setView((v) => ({ ...v, onionSettings: next }))}
+          onClose={() => setOnionSettings(false)}
         />
       )}
       {outlining && (
