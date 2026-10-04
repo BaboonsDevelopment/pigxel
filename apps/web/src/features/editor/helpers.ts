@@ -88,6 +88,8 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
   if (code === "KeyX") return command("swapColors");
   if (code === "F3") return command("toggleOnion");
   if (code === "F7") return command("togglePreview");
+  if (code === "Tab") return command("toggleCanvasOnly");
+  if (code === "F11") return command("toggleFullScreen");
   if (NUDGES[code]) return command(NUDGES[code]);
   return toolKey(code, false);
 }

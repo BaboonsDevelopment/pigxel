@@ -244,6 +244,8 @@ export function Editor({
   const [onionSettings, setOnionSettings] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [gridding, setGridding] = useState(false);
+  const [canvasOnly, setCanvasOnly] = useState(false);
+  const fullScreened = useRef(false);
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
@@ -421,6 +423,18 @@ export function Editor({
     nudgeRight: () => void selection.nudge(1, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
     togglePreview: () => setPreviewing((on) => !on),
+    toggleCanvasOnly: () => setCanvasOnly((on) => !on),
+    toggleFullScreen: () => {
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+        return;
+      }
+      fullScreened.current = true;
+      setCanvasOnly(true);
+      void document.documentElement.requestFullscreen().catch(() => {
+        fullScreened.current = false;
+      });
+    },
   };
 
   const applyEffect = (
@@ -825,6 +839,18 @@ export function Editor({
   const viewMenu: MenuSections = [
     [
       {
+        label: check(canvasOnly, "Canvas only"),
+        shortcut: "Tab",
+        onSelect: commands.toggleCanvasOnly,
+      },
+      {
+        label: "Full screen",
+        shortcut: "F11",
+        onSelect: commands.toggleFullScreen,
+      },
+    ],
+    [
+      {
         label: check(previewing, "Preview window"),
         shortcut: "F7",
         onSelect: commands.togglePreview,
@@ -1050,6 +1076,16 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    const onChange = () => {
+      if (document.fullscreenElement || !fullScreened.current) return;
+      fullScreened.current = false;
+      setCanvasOnly(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
   const changePalette = (
     next: string[],
     change?: { edited?: { from: string; to: string }; loaded?: boolean },
@@ -1169,7 +1205,21 @@ export function Editor({
           </p>
         </div>
       )}
+      {canvasOnly && (
+        <button
+          type="button"
+          title="Show the menus and panels again (Tab)"
+          onClick={() => {
+            setCanvasOnly(false);
+            if (document.fullscreenElement) void document.exitFullscreen();
+          }}
+          className="absolute top-3 right-3 z-30 rounded-md border bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+        >
+          Show panels · Tab
+        </button>
+      )}
       <EditorHeader
+        hidden={canvasOnly}
         draftId={draft.id}
         file={file}
         fileInput={fileInput}
@@ -1190,7 +1240,10 @@ export function Editor({
         ]}
         afterMenus={[{ label: "Window", sections: windowMenu }]}
       />
-      <div className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2">
+      <div
+        hidden={canvasOnly}
+        className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2"
+      >
         <ToolOptions
           tool={toolById(tool)}
           pen={pen}
@@ -1214,9 +1267,12 @@ export function Editor({
         />
       </div>
       <div className="flex min-h-0 flex-1">
-        <Dock side="left" {...dockProps} />
+        <div hidden={canvasOnly} className="contents">
+          <Dock side="left" {...dockProps} />
+        </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TileTabs
+            hidden={canvasOnly}
             userId={userId}
             current={{
               id: draft.id,
@@ -1232,7 +1288,9 @@ export function Editor({
             })}
           />
           <div className="flex min-h-0 flex-1">
-            <Dock side="innerLeft" {...dockProps} />
+            <div hidden={canvasOnly} className="contents">
+              <Dock side="innerLeft" {...dockProps} />
+            </div>
             <main
               ref={workspace}
               data-guide="canvas"
@@ -1275,11 +1333,17 @@ export function Editor({
                 />
               </div>
             </main>
-            <Dock side="innerRight" {...dockProps} />
+            <div hidden={canvasOnly} className="contents">
+              <Dock side="innerRight" {...dockProps} />
+            </div>
           </div>
-          <Dock side="bottom" {...dockProps} />
+          <div hidden={canvasOnly} className="contents">
+            <Dock side="bottom" {...dockProps} />
+          </div>
         </div>
-        <Dock side="right" {...dockProps} />
+        <div hidden={canvasOnly} className="contents">
+          <Dock side="right" {...dockProps} />
+        </div>
       </div>
       <DragOverlay drag={panelDrag} />
       {customizing && (

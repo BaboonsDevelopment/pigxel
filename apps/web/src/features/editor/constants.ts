@@ -47,7 +47,9 @@ export type Command =
   | "nudgeLeft"
   | "nudgeRight"
   | "toggleOnion"
-  | "togglePreview";
+  | "togglePreview"
+  | "toggleCanvasOnly"
+  | "toggleFullScreen";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
 

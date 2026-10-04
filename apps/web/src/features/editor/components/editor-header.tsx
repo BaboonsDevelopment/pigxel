@@ -25,6 +25,7 @@ import { frameActions, layerActions } from "../timeline/actions";
 import type { Playback } from "../timeline/use-playback";
 
 export function EditorHeader({
+  hidden,
   draftId,
   file,
   fileInput,
@@ -40,6 +41,7 @@ export function EditorHeader({
   menus,
   afterMenus = [],
 }: {
+  hidden?: boolean;
   draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
@@ -60,7 +62,10 @@ export function EditorHeader({
   const mod = useModifierLabel();
 
   return (
-    <header className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
+    <header
+      hidden={hidden}
+      className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2"
+    >
       <Link
         href="/tiles"
         className={buttonVariants({
