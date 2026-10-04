@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
@@ -211,12 +212,11 @@ export default function AdjustColorsDialog({
                   onDoubleClick={() => set(initial)}
                   className="min-w-0 flex-1 accent-primary"
                 />
-                <input
-                  type="number"
+                <NumericInput
                   min={min}
                   max={max}
                   value={value}
-                  onChange={(e) => set(Number(e.target.value))}
+                  onValueChange={set}
                   className="h-7 w-14 rounded-md border bg-background px-1 text-center tabular-nums"
                 />
               </label>

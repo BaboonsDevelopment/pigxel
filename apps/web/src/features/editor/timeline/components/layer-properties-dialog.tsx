@@ -11,6 +11,7 @@ import {
 import { BLEND_MODES, MAX_OPACITY } from "@/lib/layers/constants";
 import type { Layer } from "@/lib/layers/types";
 import type { LayerPatch } from "../../pixel-canvas/use-sprite";
+import { EditorSelect } from "../../components/editor-select";
 
 const COLORS = [
   "#ef4444",
@@ -77,17 +78,15 @@ export function LayerPropertiesDialog({
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block">Blend mode</span>
-                <select
+                <EditorSelect
                   value={blend}
-                  onChange={(e) => setBlend(e.target.value as Layer["blend"])}
+                  onChange={(value) => setBlend(value as Layer["blend"])}
                   className="h-9 w-full rounded-md border bg-background px-2"
-                >
-                  {BLEND_MODES.map((mode) => (
-                    <option key={mode.id} value={mode.id}>
-                      {mode.label}
-                    </option>
-                  ))}
-                </select>
+                  options={BLEND_MODES.map((mode) => ({
+                    value: mode.id,
+                    label: mode.label,
+                  }))}
+                />
               </label>
             </>
           )}

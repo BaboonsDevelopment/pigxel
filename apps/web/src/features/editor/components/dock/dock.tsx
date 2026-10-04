@@ -97,8 +97,26 @@ export function Dock({
                 const from =
                   el.previousElementSibling?.getBoundingClientRect().height ??
                   MIN_PANEL;
-                return (delta) =>
-                  setLayout((l) => setPanelHeight(l, item.id, from + delta));
+                const following =
+                  next && !layout.collapsed.includes(next.id) ? next.id : null;
+                const after = following
+                  ? (el.nextElementSibling?.getBoundingClientRect().height ??
+                    MIN_PANEL)
+                  : 0;
+                return (delta) => {
+                  const change = following
+                    ? Math.max(
+                        MIN_PANEL - from,
+                        Math.min(after - MIN_PANEL, delta),
+                      )
+                    : delta;
+                  setLayout((l) => {
+                    const resized = setPanelHeight(l, item.id, from + change);
+                    return following
+                      ? setPanelHeight(resized, following, after - change)
+                      : resized;
+                  });
+                };
               }}
             />
           ) : (

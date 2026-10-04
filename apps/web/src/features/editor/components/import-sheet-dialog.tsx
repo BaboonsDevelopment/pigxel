@@ -5,6 +5,7 @@ import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { FormMessage, Label } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
+import { NumericInput } from "./numeric-input";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import type { DecodedAnimation } from "@/lib/image/gif-decode";
 import {
@@ -156,17 +157,14 @@ export default function ImportSheetDialog({
               <Label htmlFor={`sheet-${key}`} className="block text-xs">
                 {label}
               </Label>
-              <Input
+              <NumericInput
+                as={Input}
                 id={`sheet-${key}`}
-                type="number"
                 inputSize="sm"
                 min={min}
                 value={grid[key] as number}
-                onChange={(e) =>
-                  set(
-                    key,
-                    Math.max(min, Math.round(Number(e.target.value)) || min),
-                  )
+                onValueChange={(next) =>
+                  set(key, Math.max(min, Math.round(next) || min))
                 }
                 className="tabular-nums"
               />
@@ -176,21 +174,21 @@ export default function ImportSheetDialog({
             <Label htmlFor="sheet-duration" className="block text-xs">
               Frame duration, ms
             </Label>
-            <Input
+            <NumericInput
+              as={Input}
               id="sheet-duration"
-              type="number"
               inputSize="sm"
               min={MIN_FRAME_DURATION}
               max={MAX_FRAME_DURATION}
               value={grid.duration}
-              onChange={(e) =>
+              onValueChange={(next) =>
                 set(
                   "duration",
                   Math.max(
                     MIN_FRAME_DURATION,
                     Math.min(
                       MAX_FRAME_DURATION,
-                      Math.round(Number(e.target.value)) || MIN_FRAME_DURATION,
+                      Math.round(next) || MIN_FRAME_DURATION,
                     ),
                   ),
                 )

@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@pigxel/ui/lib/utils";
+import { NumericInput } from "./numeric-input";
 import { CONVOLUTIONS, type ConvolutionPreset } from "../pixel-canvas/effects";
 
 const MAX_WEIGHT = 99;
@@ -37,23 +38,19 @@ export function MatrixEditor({
       <div className="flex items-center gap-4">
         <div className="grid w-40 grid-cols-3 gap-1">
           {matrix.map((value, i) => (
-            <input
+            <NumericInput
               key={i}
-              type="number"
               aria-label={`Weight ${Math.floor(i / 3) + 1}, ${(i % 3) + 1}`}
               min={-MAX_WEIGHT}
               max={MAX_WEIGHT}
               value={value}
-              onChange={(e) =>
+              onValueChange={(next) =>
                 onChange(
                   matrix.map((v, j) =>
                     j === i
                       ? Math.min(
                           MAX_WEIGHT,
-                          Math.max(
-                            -MAX_WEIGHT,
-                            Math.round(Number(e.target.value)) || 0,
-                          ),
+                          Math.max(-MAX_WEIGHT, Math.round(next) || 0),
                         )
                       : v,
                   ),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
 import {
   Checkbox,
@@ -190,15 +191,13 @@ export default function ExportDialog({
           </Label>
           <div className="flex items-center gap-3">
             <InputGroup className="h-8 w-24">
-              <InputGroupInput
+              <NumericInput
+                as={InputGroupInput}
                 id="export-scale"
-                type="number"
                 min={MIN_EXPORT_SCALE}
                 max={MAX_EXPORT_SCALE}
                 value={settings.scale}
-                onChange={(e) =>
-                  set({ scale: clampScale(Number(e.target.value)) })
-                }
+                onValueChange={(next) => set({ scale: clampScale(next) })}
                 aria-describedby="export-scale-hint"
                 className="px-2 tabular-nums"
               />

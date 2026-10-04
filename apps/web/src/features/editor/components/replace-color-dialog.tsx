@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { FormMessage } from "@pigxel/ui/components/field";
@@ -316,18 +317,12 @@ export default function ReplaceColorDialog({
             onChange={(e) => setTolerance(Number(e.target.value))}
             className="min-w-0 flex-1 accent-primary"
           />
-          <input
-            type="number"
+          <NumericInput
             min={0}
             max={255}
             value={tolerance}
-            onChange={(e) =>
-              setTolerance(
-                Math.min(
-                  255,
-                  Math.max(0, Math.round(Number(e.target.value)) || 0),
-                ),
-              )
+            onValueChange={(next) =>
+              setTolerance(Math.min(255, Math.max(0, Math.round(next) || 0)))
             }
             className="h-7 w-14 rounded-md border bg-background px-1 text-center tabular-nums"
           />

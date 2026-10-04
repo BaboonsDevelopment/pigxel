@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type PointerEvent } from "react";
+import { NumericInput } from "../numeric-input";
 import { cn } from "@pigxel/ui/lib/utils";
 import { swatchStyle } from "./helpers";
 import {
@@ -332,16 +333,11 @@ function Channel({
         onChange={(e) => onChange(Number(e.target.value))}
         className="min-w-0 flex-1 accent-primary"
       />
-      <input
-        type="number"
+      <NumericInput
         min={0}
         max={max}
         value={shown}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (e.target.value !== "" && Number.isFinite(n))
-            onChange(Math.min(max, Math.max(0, n)));
-        }}
+        onValueChange={(n) => onChange(Math.min(max, Math.max(0, n)))}
         className="h-6 w-11 rounded border bg-background px-1 text-right tabular-nums text-foreground"
       />
     </label>

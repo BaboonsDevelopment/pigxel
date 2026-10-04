@@ -1,5 +1,7 @@
 import { IconButton } from "@pigxel/ui/components/button";
-import { Input, Select } from "@pigxel/ui/components/input";
+import { Input } from "@pigxel/ui/components/input";
+import { NumericInput } from "../../components/numeric-input";
+import { EditorSelect } from "../../components/editor-select";
 import { Text } from "@pigxel/ui/components/typography";
 import { MAX_PEN_SIZE, MIN_PEN_SIZE } from "../../pixel-canvas/pen";
 
@@ -21,13 +23,14 @@ export function OptionSelect<T extends string>({
       <Text as="span" tone="muted">
         {label}
       </Text>
-      <Select value={value} onChange={(e) => onChange(e.target.value as T)}>
-        {options.map(([option, text]) => (
-          <option key={option} value={option}>
-            {text}
-          </option>
-        ))}
-      </Select>
+      <EditorSelect
+        value={value}
+        onChange={(next) => onChange(next as T)}
+        options={options.map(([option, text]) => ({
+          value: option,
+          label: text,
+        }))}
+      />
     </label>
   );
 }
@@ -56,14 +59,14 @@ export function NumberOption({
       <Text as="span" tone="muted">
         {label}
       </Text>
-      <Input
-        type="number"
+      <NumericInput
+        as={Input}
         inputSize="sm"
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onValueChange={onChange}
         className="w-14 px-1 text-center tabular-nums"
       />
       {unit}
@@ -94,14 +97,14 @@ export function SizeField({
       >
         −
       </IconButton>
-      <Input
-        type="number"
+      <NumericInput
+        as={Input}
         inputSize="sm"
         aria-labelledby="tool-size-label"
         min={MIN_PEN_SIZE}
         max={MAX_PEN_SIZE}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value) || MIN_PEN_SIZE)}
+        onValueChange={(next) => onChange(next || MIN_PEN_SIZE)}
         className="w-12 px-1 text-center tabular-nums"
       />
       <IconButton

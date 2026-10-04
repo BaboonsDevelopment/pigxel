@@ -39,7 +39,7 @@ export function Panel({
         flex: collapsed
           ? "none"
           : height
-            ? `0 1 ${height}px`
+            ? `0 0 ${height}px`
             : fill
               ? "1 1 0"
               : "0 1 auto",

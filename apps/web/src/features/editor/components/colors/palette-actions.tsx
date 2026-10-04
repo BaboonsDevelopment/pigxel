@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { NumericInput } from "../numeric-input";
 import type { PenSettings } from "../../pixel-canvas/pen";
 import { downloadBlob } from "@/lib/utils/download";
 import { decodeImage } from "@/lib/image/decode";
@@ -97,20 +98,16 @@ export function PaletteActions({
               ))}
             </span>
             <span className="flex items-center gap-2">
-              <input
-                type="number"
+              <NumericInput
                 aria-label="Shades in the ramp"
                 min={MIN_RAMP}
                 max={MAX_RAMP}
                 value={rampSteps}
-                onChange={(e) =>
+                onValueChange={(next) =>
                   setRampSteps(
                     Math.min(
                       MAX_RAMP,
-                      Math.max(
-                        MIN_RAMP,
-                        Math.round(Number(e.target.value)) || MIN_RAMP,
-                      ),
+                      Math.max(MIN_RAMP, Math.round(next) || MIN_RAMP),
                     ),
                   )
                 }

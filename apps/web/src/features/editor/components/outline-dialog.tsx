@@ -6,6 +6,7 @@ import { Radio } from "@pigxel/ui/components/choice";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { NumericInput } from "./numeric-input";
 import {
   MAX_OUTLINE,
   outlinedWith,
@@ -183,17 +184,13 @@ export default function OutlineDialog({
             </fieldset>
             <label className="flex items-center gap-3 text-sm">
               <span className="font-medium">Width</span>
-              <input
-                type="number"
+              <NumericInput
                 min={1}
                 max={MAX_OUTLINE}
                 value={width}
-                onChange={(e) =>
+                onValueChange={(next) =>
                   setWidth(
-                    Math.min(
-                      MAX_OUTLINE,
-                      Math.max(1, Math.round(Number(e.target.value)) || 1),
-                    ),
+                    Math.min(MAX_OUTLINE, Math.max(1, Math.round(next) || 1)),
                   )
                 }
                 className="h-7 w-14 rounded-md border bg-background px-1 text-center tabular-nums"

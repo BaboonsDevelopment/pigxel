@@ -1420,6 +1420,7 @@ export function Editor({
             name: file.name,
             size: sprite.size,
             frames: sprite.frames,
+            tags: sprite.tags,
             frameId: sprite.frameId,
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),

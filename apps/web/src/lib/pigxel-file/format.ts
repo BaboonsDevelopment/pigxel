@@ -14,6 +14,7 @@ import type { Layer, LayerKind } from "@/lib/layers/types";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
+import { readFrameTags, type FrameTag } from "@/lib/sprite/tags";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
@@ -38,6 +39,7 @@ export type PigxelDocument = {
   background: Background;
   layers: Layer[];
   frames: Frame[];
+  tags?: FrameTag[];
   cels: Cels;
   palette: string[];
   slices: Slice[];
@@ -71,6 +73,7 @@ export function blankDocument(
     background,
     layers,
     frames: [frame],
+    tags: [],
     cels: new Map([[frame.id, frameCels]]),
     palette: [...DEFAULT_PALETTE],
     slices: [],
@@ -149,6 +152,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     height: doc.height,
     background: doc.background,
     frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
+    tags: doc.tags ?? [],
     layers: doc.layers.map(toFile),
     cels,
     palette: doc.palette,
@@ -230,6 +234,7 @@ export function parsePigxel(text: string): PigxelDocument {
     background,
     layers,
     frames,
+    tags: readFrameTags(file.tags, frames.length),
     cels,
     palette,
     slices,

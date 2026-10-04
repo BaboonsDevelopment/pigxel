@@ -1,6 +1,8 @@
 import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { Input } from "@pigxel/ui/components/input";
+import { NumericInput } from "../../components/numeric-input";
+import { EditorSelect } from "../../components/editor-select";
 import {
   PIVOTS,
   borderOf,
@@ -84,13 +86,13 @@ export function SliceOptions({
           title="Corner size, in pixels"
         >
           <span className="text-muted-foreground">Border</span>
-          <Input
-            type="number"
+          <NumericInput
+            as={Input}
             inputSize="sm"
             min={1}
             max={maxBorder}
             value={border}
-            onChange={(e) => setBorder(Number(e.target.value))}
+            onValueChange={setBorder}
             className="w-12 px-1 text-center tabular-nums"
           />
         </label>
@@ -101,23 +103,18 @@ export function SliceOptions({
         title="The point a game places the slice by"
       >
         <span className="text-muted-foreground">Pivot</span>
-        <select
+        <EditorSelect
           value={pivotIdOf(slice)}
-          onChange={(e) => {
-            const pivot = PIVOTS.find((p) => p.id === e.target.value);
+          onChange={(value) => {
+            const pivot = PIVOTS.find((p) => p.id === value);
             onChange({
               ...slice,
               pivot: pivot?.at?.(bounds.w, bounds.h) ?? null,
             });
           }}
           className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
-          {PIVOTS.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          options={PIVOTS.map((p) => ({ value: p.id, label: p.label }))}
+        />
       </label>
 
       <Button

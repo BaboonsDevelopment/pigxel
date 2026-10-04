@@ -23,6 +23,7 @@ import {
 } from "@/lib/sprite/transform";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
+import { insertAt, removeAt, type FrameTag } from "@/lib/sprite/tags";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
 
@@ -57,6 +58,7 @@ type Snapshot = {
   tree: Layer[];
   background: PigxelDocument["background"];
   frames: Frame[];
+  tags: FrameTag[];
   size: Size;
   cels: Cels;
   palette: string[];
@@ -84,6 +86,7 @@ export function useSprite(
   const [tree, setTree] = useState(initial.layers);
   const [soloId, setSoloId] = useState<string | null>(null);
   const [frames, setFrames] = useState(initial.frames);
+  const [tags, setTags] = useState(initial.tags ?? []);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
   const [colorMode, setColorModeState] = useState<ColorMode>(
@@ -121,6 +124,7 @@ export function useSprite(
         tree: initial.layers,
         background: initial.background,
         frames: initial.frames,
+        tags: initial.tags ?? [],
         size,
         cels: initial.cels,
         palette: initial.palette,
@@ -185,6 +189,7 @@ export function useSprite(
       tree?: Layer[];
       background?: PigxelDocument["background"];
       frames?: Frame[];
+      tags?: FrameTag[];
       size?: Size;
       palette?: string[];
       slices?: Slice[];
@@ -217,6 +222,7 @@ export function useSprite(
       tree: next.tree ?? tree,
       background: next.background ?? background,
       frames: next.frames ?? frames,
+      tags: next.tags ?? tags,
       size: next.size ?? size,
       cels: new Map(),
       palette: next.palette ?? palette,
@@ -300,9 +306,24 @@ export function useSprite(
     finish({ tree: next });
   };
 
-  const changeFrames = (next: Frame[]) => {
+  const changeFrames = (next: Frame[], nextTags = tags) => {
     setFrames(next);
-    finish({ frames: next });
+    setTags(nextTags);
+    finish({ frames: next, tags: nextTags });
+  };
+
+  const saveTag = (tag: FrameTag) => {
+    const next = tags.some((current) => current.id === tag.id)
+      ? tags.map((current) => (current.id === tag.id ? tag : current))
+      : [...tags, tag];
+    setTags(next);
+    finish({ tags: next });
+  };
+
+  const removeTag = (id: string) => {
+    const next = tags.filter((tag) => tag.id !== id);
+    setTags(next);
+    finish({ tags: next });
   };
 
   const restore = (snapshot: Snapshot) => {
@@ -324,6 +345,7 @@ export function useSprite(
     setTree(snapshot.tree);
     setBackground(snapshot.background);
     setFrames(snapshot.frames);
+    setTags(snapshot.tags);
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
@@ -379,7 +401,10 @@ export function useSprite(
     const pixels = new Uint8ClampedArray(size.w * size.h * 4);
     for (let i = 0; i < pixels.length; i += 4)
       pixels.set([value, value, value, 255], i);
-    putCels(layer.id, frames.map((frame) => [frame.id, pixels] as const));
+    putCels(
+      layer.id,
+      frames.map((frame) => [frame.id, pixels] as const),
+    );
     const next = [layer, ...tree];
     setBackground(nextBackground);
     setLayerId(layer.id);
@@ -644,7 +669,7 @@ export function useSprite(
     }
     const at = frameList.frameIndex(frames, frameId) + 1;
     setFrameId(frame.id);
-    changeFrames(frameList.insertFrame(frames, frame, at));
+    changeFrames(frameList.insertFrame(frames, frame, at), insertAt(tags, at));
   };
 
   const removeFrame = (id: string) => {
@@ -655,7 +680,7 @@ export function useSprite(
       const at = frameList.frameIndex(frames, id);
       setFrameId(next[Math.min(at, next.length - 1)]!.id);
     }
-    changeFrames(next);
+    changeFrames(next, removeAt(tags, frameList.frameIndex(frames, id)));
   };
 
   const resize = (next: Size, offset = { x: 0, y: 0 }) => {
@@ -754,6 +779,9 @@ export function useSprite(
     toggleSolo: (id: string) =>
       setSoloId((current) => (current === id ? null : id)),
     frames,
+    tags,
+    saveTag,
+    removeTag,
     background,
     palette,
     setPalette,
@@ -833,6 +861,7 @@ export function useSprite(
       pixelRatio,
       layers: tree,
       frames,
+      tags,
       cels: new Map(
         frames.map((frame) => [
           frame.id,

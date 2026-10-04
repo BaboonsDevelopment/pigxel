@@ -2,6 +2,7 @@
 
 import { BLEND_MODES, MAX_OPACITY } from "@/lib/layers/constants";
 import type { BlendMode, Layer } from "@/lib/layers/types";
+import { EditorSelect } from "../../components/editor-select";
 
 export function LayerOptions({
   layer,
@@ -27,17 +28,15 @@ export function LayerOptions({
       </label>
       <label className="flex items-center gap-2">
         <span className="text-muted-foreground">Blend</span>
-        <select
+        <EditorSelect
           value={layer.blend}
-          onChange={(e) => onChange({ blend: e.target.value as BlendMode })}
+          onChange={(value) => onChange({ blend: value as BlendMode })}
           className="h-7 rounded-md border bg-background px-1"
-        >
-          {BLEND_MODES.map((mode) => (
-            <option key={mode.id} value={mode.id}>
-              {mode.label}
-            </option>
-          ))}
-        </select>
+          options={BLEND_MODES.map((mode) => ({
+            value: mode.id,
+            label: mode.label,
+          }))}
+        />
       </label>
     </div>
   );
