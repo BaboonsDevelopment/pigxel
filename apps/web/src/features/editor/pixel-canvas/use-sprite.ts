@@ -399,6 +399,29 @@ export function useSprite(
     return ids;
   };
 
+  const duplicateLayer = (id: string) => {
+    const source = layerTree.findLayer(tree, id)?.layer;
+    if (!source) return;
+    const copyOf = (layer: Layer): Layer => {
+      const copy = { ...layer, id: crypto.randomUUID() };
+      for (const frame of frames) {
+        const pixels = cels.pixels(frame.id, layer.id);
+        if (pixels)
+          putCels(copy.id, [[frame.id, new Uint8ClampedArray(pixels)]]);
+      }
+      return copy.kind === "group"
+        ? { ...copy, children: copy.children.map(copyOf) }
+        : copy.kind === "background"
+          ? { ...copy, kind: "normal" }
+          : copy;
+    };
+    const layer = { ...copyOf(source), name: `${source.name} copy` };
+    setLayerId(layer.id);
+    changeTree(
+      layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, id)),
+    );
+  };
+
   const cutToLayer = (id: string, area: Area, name: string) => {
     const layer = layerTree.createLayer("normal", name);
     const inside = (i: number) => {
@@ -658,6 +681,7 @@ export function useSprite(
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
     cutToLayer,
+    duplicateLayer,
     addAnimation,
     selectLayer: setLayerId,
     onLeaveCel: (callback: () => void) => {

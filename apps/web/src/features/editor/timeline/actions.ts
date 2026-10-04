@@ -38,6 +38,11 @@ export function layerActions(
     [
       { label: "Rename", onSelect: () => rename?.(), hidden: !rename },
       {
+        label: "Duplicate layer",
+        onSelect: () => sprite.duplicateLayer(layerId),
+        disabled: !layer,
+      },
+      {
         label: layer?.visible ? "Hide" : "Show",
         onSelect: () =>
           layer && sprite.updateLayer(layerId, { visible: !layer.visible }),
