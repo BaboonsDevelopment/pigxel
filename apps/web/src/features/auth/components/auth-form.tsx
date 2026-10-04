@@ -8,6 +8,7 @@ import { Input } from "@pigxel/ui/components/input";
 import { Notice } from "@pigxel/ui/components/notice";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { authenticate } from "../actions";
+import { HOME_PATH, loginUrl } from "@/lib/auth/routes";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
 
 const labels: Record<AuthMode, string> = {
@@ -19,9 +20,11 @@ const labels: Record<AuthMode, string> = {
 export function AuthForm({
   mode,
   configured,
+  next = HOME_PATH,
 }: {
   mode: AuthMode;
   configured: boolean;
+  next?: string;
 }) {
   const [state, action, pending] = useActionState(
     authenticate.bind(null, mode),
@@ -30,6 +33,7 @@ export function AuthForm({
   const signup = mode === "signup";
   return (
     <form action={action} className="space-y-5">
+      <input type="hidden" name="next" value={next} />
       <Field label="Email" htmlFor="email">
         <Input
           id="email"
@@ -92,19 +96,19 @@ export function AuthForm({
         {mode === "login" ? (
           <>
             New to Pigxel?{" "}
-            <Link className={textLinkClassName} href="/login?mode=signup">
+            <Link className={textLinkClassName} href={loginUrl("signup", next)}>
               Create an account
             </Link>
           </>
         ) : signup ? (
           <>
             Already have an account?{" "}
-            <Link className={textLinkClassName} href="/login">
+            <Link className={textLinkClassName} href={loginUrl("login", next)}>
               Log in
             </Link>
           </>
         ) : (
-          <Link className={textLinkClassName} href="/login">
+          <Link className={textLinkClassName} href={loginUrl("login", next)}>
             Back to log in
           </Link>
         )}

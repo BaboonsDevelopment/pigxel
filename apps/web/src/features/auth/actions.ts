@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { authUrl } from "@/lib/auth/config";
-import { HOME_PATH } from "@/lib/auth/routes";
+import { safeNext } from "@/lib/auth/routes";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
 
 export async function authenticate(
@@ -99,7 +99,7 @@ export async function authenticate(
     });
   }
   revalidatePath("/", "layout");
-  redirect(HOME_PATH);
+  redirect(safeNext(formData.get("next") as string | null));
 }
 
 export async function signOut(): Promise<AuthState> {

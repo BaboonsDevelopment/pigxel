@@ -9,6 +9,7 @@ export type SubscriptionRecord = {
   currentPeriodEndsAt: string | null;
   cancelsAt: string | null;
   eventAt: string;
+  pendingPriceId?: string | null;
 };
 
 export type SubscriptionEvent = {
@@ -54,34 +55,80 @@ const PAID = new Set<SubscriptionRecord["status"]>([
   "past_due",
 ]);
 
+type PlanPrice = { name: Tier["name"]; cycle: BillingCycle };
+
 export type CurrentPlan =
   | { name: "Free" }
-  | {
-      name: Tier["name"];
-      cycle: BillingCycle;
+  | (PlanPrice & {
+      subscriptionId: string;
+      customerId: string;
+      priceId: string;
       status: SubscriptionRecord["status"];
       renewsAt: string | null;
       cancelsAt: string | null;
-    };
+      switchesTo: PlanPrice | null;
+    });
+
+export type PlanChange = "upgrade" | "downgrade" | "same";
+
+const CYCLES: BillingCycle[] = ["month", "year"];
+
+export function planOfPrice(priceId: string): PlanPrice | null {
+  for (const tier of TIERS)
+    for (const cycle of CYCLES)
+      if (tier.priceId[cycle] === priceId) return { name: tier.name, cycle };
+  return null;
+}
+
+const rank = ({ name, cycle }: PlanPrice) =>
+  TIERS.findIndex((tier) => tier.name === name) * 2 + CYCLES.indexOf(cycle);
+
+/** A higher tier, or yearly billing on the same tier, is an upgrade. */
+export function planChange(from: string, to: string): PlanChange | null {
+  const current = planOfPrice(from);
+  const next = planOfPrice(to);
+  if (!current || !next) return null;
+  return from === to
+    ? "same"
+    : rank(next) > rank(current)
+      ? "upgrade"
+      : "downgrade";
+}
+
+export function canChangePlan(plan: CurrentPlan) {
+  return (
+    plan.name !== "Free" &&
+    (plan.status === "active" || plan.status === "trialing") &&
+    !plan.cancelsAt
+  );
+}
+
+export function formatMoney(minorUnits: string, currency: string) {
+  const format = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  });
+  const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
+  return format.format(Number(minorUnits) / 10 ** digits);
+}
 
 export function currentPlan(subscriptions: SubscriptionRecord[]): CurrentPlan {
   const latest = subscriptions
     .filter((sub) => PAID.has(sub.status))
     .sort((a, b) => b.eventAt.localeCompare(a.eventAt));
   for (const sub of latest) {
-    for (const tier of TIERS) {
-      const cycle = (["month", "year"] as const).find(
-        (c) => tier.priceId[c] === sub.priceId,
-      );
-      if (cycle)
-        return {
-          name: tier.name,
-          cycle,
-          status: sub.status,
-          renewsAt: sub.cancelsAt ? null : sub.currentPeriodEndsAt,
-          cancelsAt: sub.cancelsAt,
-        };
-    }
+    const price = planOfPrice(sub.priceId);
+    if (price)
+      return {
+        ...price,
+        subscriptionId: sub.id,
+        customerId: sub.customerId,
+        priceId: sub.priceId,
+        status: sub.status,
+        renewsAt: sub.cancelsAt ? null : sub.currentPeriodEndsAt,
+        cancelsAt: sub.cancelsAt,
+        switchesTo: sub.pendingPriceId ? planOfPrice(sub.pendingPriceId) : null,
+      };
   }
   return { name: "Free" };
 }

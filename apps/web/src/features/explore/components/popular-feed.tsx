@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@pigxel/ui/components/badge";
-import { IconButton } from "@pigxel/ui/components/button";
+import { Button, IconButton } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
@@ -22,11 +22,14 @@ export function PopularFeed({
   initial,
   count,
   guest,
+  failed = false,
 }: {
   period: Period;
   initial: PublicTile[];
   count: number;
   guest: boolean;
+  /** The first page couldn't be loaded. */
+  failed?: boolean;
 }) {
   const [tiles, setTiles] = useState(initial);
   const [density, setDensity] = useState<"comfortable" | "compact">(
@@ -36,12 +39,13 @@ export function PopularFeed({
   const [done, setDone] = useState(initial.length >= count);
   const [banner, setBanner] = useState(false);
   const [allowed, setAllowed] = useState(!guest);
+  const [moreFailed, setMoreFailed] = useState(false);
   const loading = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const target = sentinel.current;
-    if (done || !target) return;
+    if (done || moreFailed || !target) return;
     const loadMore = async () => {
       if (loading.current) return;
       loading.current = true;
@@ -54,6 +58,8 @@ export function PopularFeed({
           const shown = new Set(all.map((t) => t.id));
           return [...all, ...more.filter((t) => !shown.has(t.id))];
         });
+      } catch {
+        setMoreFailed(true);
       } finally {
         loading.current = false;
       }
@@ -71,7 +77,7 @@ export function PopularFeed({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [period, offset, count, done, guest, allowed]);
+  }, [period, offset, count, done, guest, allowed, moreFailed]);
 
   useEffect(() => {
     if (!banner) return;
@@ -162,6 +168,12 @@ export function PopularFeed({
             <PopularCard key={tile.id} tile={tile} />
           ))}
         </ul>
+      ) : failed ? (
+        <EmptyState
+          title="Couldn’t load popular tiles"
+          description="Refresh the page to try again."
+          className="border-solid bg-[#faf9fa]"
+        />
       ) : (
         <EmptyState
           title="No tiles in this period"
@@ -177,7 +189,21 @@ export function PopularFeed({
           }}
         />
       )}
-      {!done && <div ref={sentinel} aria-hidden="true" className="h-px" />}
+      {moreFailed && (
+        <p role="alert" className="mt-6 text-center text-sm">
+          Couldn’t load more tiles.{" "}
+          <Button
+            variant="link"
+            className="text-sm"
+            onClick={() => setMoreFailed(false)}
+          >
+            Try again
+          </Button>
+        </p>
+      )}
+      {!done && !moreFailed && (
+        <div ref={sentinel} aria-hidden="true" className="h-px" />
+      )}
     </section>
   );
 }

@@ -23,6 +23,9 @@ import {
   type BoardQuery,
 } from "@/features/feedback/server";
 import { BoardItem } from "@/features/feedback/components/board-item";
+import { shownFrom } from "@/lib/utils/shown";
+
+const STEP = 50;
 
 export const metadata: Metadata = { title: "Feedback · Pigxel" };
 export const dynamic = "force-dynamic";
@@ -34,6 +37,7 @@ type Props = {
     sort?: string;
     q?: string;
     from?: string;
+    shown?: string;
   }>;
 };
 
@@ -45,10 +49,16 @@ export default async function Feedback({ searchParams }: Props) {
     sort: params.sort === "newest" ? "newest" : "votes",
     search: (params.q ?? "").slice(0, 100),
   };
-  const [items, counts] = await Promise.all([
-    listFeedback(query),
+  const shown = shownFrom(params.shown, STEP);
+  const [loaded, counts] = await Promise.all([
+    listFeedback(query, shown + 1).catch((error: unknown) => {
+      console.error(error);
+      return null;
+    }),
     countFeedback(query.kind),
   ]);
+  const items = loaded?.slice(0, shown) ?? [];
+  const more = (loaded?.length ?? 0) > shown;
   const from = pageFrom(params.from);
   const link = (change: Partial<BoardQuery>) =>
     boardUrl({ ...query, ...change });
@@ -99,7 +109,7 @@ export default async function Feedback({ searchParams }: Props) {
             size="sm"
             tabs={(["open", "closed"] as const).map((state) => ({
               href: link({ state }),
-              label: `${counts[state]} ${state === "open" ? "Open" : "Closed"}`,
+              label: `${counts ? `${counts[state]} ` : ""}${state === "open" ? "Open" : "Closed"}`,
               active: state === query.state,
             }))}
           />
@@ -138,7 +148,14 @@ export default async function Feedback({ searchParams }: Props) {
           </div>
         </div>
 
-        {items.length === 0 ? (
+        {!loaded ? (
+          <Text role="alert" className="px-4 py-12 text-center">
+            Couldn’t load feedback.{" "}
+            <Link href={link({})} className={linkVariants()}>
+              Try again
+            </Link>
+          </Text>
+        ) : items.length === 0 ? (
           <Text tone="muted" className="px-4 py-12 text-center">
             {query.search
               ? `Nothing ${query.state} matches “${query.search}”.`
@@ -152,11 +169,24 @@ export default async function Feedback({ searchParams }: Props) {
             )}
           </Text>
         ) : (
-          <ul className="divide-y">
-            {items.map((item) => (
-              <BoardItem key={item.id} item={item} />
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y">
+              {items.map((item) => (
+                <BoardItem key={item.id} item={item} />
+              ))}
+            </ul>
+            {more && (
+              <div className="border-t px-4 py-3 text-center">
+                <Link
+                  href={`${link({})}&shown=${shown + STEP}`}
+                  scroll={false}
+                  className={linkVariants()}
+                >
+                  Show more
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </section>
     </Page>

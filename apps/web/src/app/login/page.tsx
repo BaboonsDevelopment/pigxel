@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AuthPage } from "@/features/auth/components/auth-page";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { HOME_PATH } from "@/lib/auth/routes";
+import { safeNext } from "@/lib/auth/routes";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import {
   isDriveAvailable,
@@ -27,14 +27,15 @@ export const dynamic = "force-dynamic";
 export default async function Login({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; error?: string }>;
+  searchParams: Promise<{ mode?: string; error?: string; next?: string }>;
 }) {
-  const { mode, error } = await searchParams;
+  const { mode, error, ...params } = await searchParams;
+  const next = safeNext(params.next);
   const configured = isSupabaseConfigured();
   if (configured) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getUser();
-    if (data.user) redirect(HOME_PATH);
+    if (data.user) redirect(next);
   }
   const google = isGoogleSignInAvailable();
   const apple = isAppleSignInAvailable();
@@ -66,7 +67,7 @@ export default async function Login({
         <>
           <div className="grid grid-cols-2 gap-3">
             <ProviderButton
-              href={google ? connectDriveUrl(HOME_PATH) : undefined}
+              href={google ? connectDriveUrl(next) : undefined}
               logo={<GoogleLogo />}
               name="Google"
               hint={
@@ -78,7 +79,7 @@ export default async function Login({
             <ProviderButton
               href={
                 apple
-                  ? `/auth/apple?next=${encodeURIComponent(HOME_PATH)}`
+                  ? `/auth/apple?next=${encodeURIComponent(next)}`
                   : undefined
               }
               logo={<AppleLogo />}
@@ -92,7 +93,12 @@ export default async function Login({
           </div>
         </>
       )}
-      <AuthForm key={authMode} mode={authMode} configured={configured} />
+      <AuthForm
+        key={authMode}
+        mode={authMode}
+        configured={configured}
+        next={next}
+      />
       {authMode !== "forgot" && (
         <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
           By continuing, you agree to Pigxel’s{" "}

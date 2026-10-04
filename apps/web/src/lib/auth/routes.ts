@@ -1,3 +1,5 @@
+import type { AuthMode } from "./types";
+
 export const HOME_PATH = "/home";
 
 const protectedPaths = [
@@ -9,7 +11,6 @@ const protectedPaths = [
   "/assets",
   "/tutorials",
   "/feedback",
-  "/u",
   "/auth/update-password",
 ];
 
@@ -26,6 +27,7 @@ const returnPaths = [
   "/tiles/edit",
   "/settings/account",
   "/settings/profile",
+  "/pricing",
   "/auth/update-password",
 ];
 
@@ -39,12 +41,20 @@ export function safeNext(next: string | null | undefined) {
   } catch {
     return HOME_PATH;
   }
-  if (url.origin !== BASE || !returnPaths.includes(url.pathname))
-    return HOME_PATH;
+  if (url.origin !== BASE) return HOME_PATH;
+  if (/^\/u\/[a-z0-9_]{3,20}$/.test(url.pathname)) return url.pathname;
+  if (!returnPaths.includes(url.pathname)) return HOME_PATH;
   const id = url.searchParams.get("id");
   return url.pathname === "/tiles/edit" && id && /^[\w-]{1,64}$/.test(id)
     ? `/tiles/edit?id=${id}`
     : url.pathname;
+}
+
+export function loginUrl(mode: AuthMode = "login", next = HOME_PATH) {
+  const url = new URL("/login", BASE);
+  if (mode !== "login") url.searchParams.set("mode", mode);
+  if (next !== HOME_PATH) url.searchParams.set("next", next);
+  return url.pathname + url.search;
 }
 
 export function withParam(path: string, key: string, value: string) {

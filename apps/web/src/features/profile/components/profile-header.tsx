@@ -7,14 +7,17 @@ import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Heading, Text } from "@pigxel/ui/components/typography";
+import { loginUrl } from "@/lib/auth/routes";
 
 export function ProfileHeader({
   profile,
   isOwner,
+  guest = false,
   follows,
 }: {
   profile: ArtistProfile;
   isOwner: boolean;
+  guest?: boolean;
   follows: { followers: number; following: boolean };
 }) {
   const joined = joinedLabel(profile.joinedAt);
@@ -68,6 +71,20 @@ export function ProfileHeader({
                   })}
                 >
                   Edit profile
+                </Link>
+                <FollowerCount count={follows.followers} />
+              </div>
+            ) : guest ? (
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <Link
+                  href={loginUrl("signup", `/u/${profile.username}`)}
+                  aria-label={`Sign up to follow ${profile.name}`}
+                  className={buttonVariants({
+                    size: "lg",
+                    className: "rounded-full px-6",
+                  })}
+                >
+                  + Follow
                 </Link>
                 <FollowerCount count={follows.followers} />
               </div>
