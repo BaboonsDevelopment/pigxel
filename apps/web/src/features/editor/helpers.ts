@@ -87,6 +87,7 @@ export function shortcutFor(e: KeyboardEvent): Shortcut | null {
   if (code === "Escape") return command("deselect");
   if (code === "KeyX") return command("swapColors");
   if (code === "F3") return command("toggleOnion");
+  if (code === "F7") return command("togglePreview");
   if (NUDGES[code]) return command(NUDGES[code]);
   return toolKey(code, false);
 }

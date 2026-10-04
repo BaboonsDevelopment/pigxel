@@ -46,7 +46,8 @@ export type Command =
   | "nudgeDown"
   | "nudgeLeft"
   | "nudgeRight"
-  | "toggleOnion";
+  | "toggleOnion"
+  | "togglePreview";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
 

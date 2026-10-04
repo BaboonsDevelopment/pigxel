@@ -50,6 +50,7 @@ import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
+import { PreviewWindow } from "./preview/preview-window";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
@@ -239,6 +240,7 @@ export function Editor({
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [onionSettings, setOnionSettings] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
@@ -415,6 +417,7 @@ export function Editor({
     nudgeLeft: () => void selection.nudge(-1, 0),
     nudgeRight: () => void selection.nudge(1, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
+    togglePreview: () => setPreviewing((on) => !on),
   };
 
   const applyEffect = (
@@ -817,6 +820,13 @@ export function Editor({
     ],
   ];
   const viewMenu: MenuSections = [
+    [
+      {
+        label: check(previewing, "Preview window"),
+        shortcut: "F7",
+        onSelect: commands.togglePreview,
+      },
+    ],
     [
       {
         label: check(view.onion > 0, "Onion skin"),
@@ -1371,6 +1381,9 @@ export function Editor({
           }}
           onClose={() => setTiling(null)}
         />
+      )}
+      {previewing && (
+        <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
       )}
       {onionSettings && (
         <OnionSettingsDialog
