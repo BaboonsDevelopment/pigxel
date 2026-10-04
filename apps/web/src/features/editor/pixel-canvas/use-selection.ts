@@ -65,6 +65,15 @@ function copyToSystem(piece: Floating) {
     .catch(() => {});
 }
 
+export function copiedPiece(): Floating | null {
+  if (!clipboard) return null;
+  const pixels = new Uint8ClampedArray(clipboard.pixels);
+  clipboard.mask.forEach((selected, i) => {
+    if (!selected) pixels.fill(0, i * 4, i * 4 + 4);
+  });
+  return { ...clipboard, pixels };
+}
+
 export function pasteSource(image: Floating | null): Floating | null {
   if (!image) return clipboard;
   if (clipboard && clipboard.w === image.w && clipboard.h === image.h)
@@ -214,9 +223,13 @@ export function useSelection(sprite: SpriteApi) {
       setLifted(current);
       return true;
     },
-    moveTo(dx: number, dy: number) {
+    moveTo(dx: number, dy: number, grid = 0) {
       const from = dragFrom.current;
       if (!from || !lifted) return;
+      if (grid > 0) {
+        dx = Math.round((from.x + dx) / grid) * grid - from.x;
+        dy = Math.round((from.y + dy) / grid) * grid - from.y;
+      }
       const { piece } = lifted;
       if (piece.x === from.x + dx && piece.y === from.y + dy) return;
       if (lifted.source && from.t)

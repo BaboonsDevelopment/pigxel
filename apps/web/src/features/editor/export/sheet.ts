@@ -1,5 +1,6 @@
 import type { Bitmap, Size } from "@/lib/image/bitmap";
 import type { Slice } from "@/lib/slices/slices";
+import type { FrameTag } from "@/lib/sprite/tags";
 import type { SheetLayout } from "./constants";
 
 export function sheetGrid(count: number, layout: SheetLayout) {
@@ -48,6 +49,7 @@ export function sheetData({
   frame,
   scale,
   slices = [],
+  tags = [],
 }: {
   name: string;
   image: string;
@@ -56,6 +58,7 @@ export function sheetData({
   frame: Size;
   scale: number;
   slices?: Slice[];
+  tags?: FrameTag[];
 }) {
   const scaled = <T extends Record<string, number>>(r: T) =>
     Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v * scale])) as T;
@@ -78,7 +81,14 @@ export function sheetData({
       format: "RGBA8888",
       size: sheetSize(durations.length, layout, frame),
       scale: String(scale),
-      frameTags: [],
+      frameTags: tags.map((tag) => ({
+        name: tag.name,
+        from: tag.from,
+        to: tag.to,
+        direction: tag.direction,
+        color: `${tag.color}ff`,
+        repeat: tag.repeat,
+      })),
       layers: [],
       slices: slices.map((slice) => ({
         name: slice.name,

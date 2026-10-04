@@ -12,7 +12,14 @@ import {
 import { cn } from "@pigxel/ui/lib/utils";
 import { choiceDialog } from "@/components/ui/confirm-dialog";
 import type { Area } from "../pixel-canvas/constants";
-import { filledMask, outlined, replacedColor } from "../pixel-canvas/effects";
+import {
+  adjustedColors,
+  filledMask,
+  invertedColors,
+  outlinedWith,
+  replacedColor,
+  type AdjustKind,
+} from "../pixel-canvas/effects";
 import { rgbaOf, type Stamp } from "../pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "../pixel-canvas/pen";
 import {
@@ -25,7 +32,11 @@ import {
   expandMask,
   maskBounds,
 } from "../pixel-canvas/selection";
-import { pasteSource, useSelection } from "../pixel-canvas/use-selection";
+import {
+  copiedPiece,
+  pasteSource,
+  useSelection,
+} from "../pixel-canvas/use-selection";
 import {
   DEFAULT_VIEW,
   GRID_SIZES,
@@ -42,8 +53,9 @@ import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { panelRows } from "@/lib/layers/tree";
+import { allLayers, panelRows } from "@/lib/layers/tree";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
+import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import {
   readDraft,
@@ -52,6 +64,7 @@ import {
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
 import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
@@ -74,6 +87,8 @@ import {
   PANELS,
   PANEL_LABELS,
   movePanel,
+  movesPanel,
+  setPanelCollapsed,
   setPanelShown,
   setToolShown,
   type PanelId,
@@ -84,11 +99,18 @@ import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
+import {
+  readBrushes,
+  withBrush,
+  writeBrushes,
+  type SavedBrush,
+} from "../brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorsPanel } from "./colors/colors-panel";
+import { PaletteActions } from "./colors/palette-actions";
 import { PalettePanel } from "./colors/palette-panel";
 import { Dock, type PanelContent } from "./dock/dock";
 import { DragOverlay } from "./dock/drag-overlay";
@@ -118,6 +140,21 @@ const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
   ssr: false,
 });
 const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
+  ssr: false,
+});
+const ReduceColorsDialog = dynamic(() => import("./reduce-colors-dialog"), {
+  ssr: false,
+});
+const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
+  ssr: false,
+});
+const OutlineDialog = dynamic(() => import("./outline-dialog"), {
+  ssr: false,
+});
+const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
+  ssr: false,
+});
+const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
   ssr: false,
 });
 const CustomizeToolsDialog = dynamic(() => import("./customize-tools-dialog"), {
@@ -157,6 +194,23 @@ export function Editor({
   const [inserting, setInserting] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
+  const [replacing, setReplacing] = useState<{
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
+  const [outlining, setOutlining] = useState<{
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
+  const [adjusting, setAdjusting] = useState<{
+    kind: AdjustKind;
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
+  const [reducing, setReducing] = useState<{
+    frames: Uint8ClampedArray[];
+    picture: Uint8ClampedArray;
+  } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [inserted, setInserted] = useState(0);
@@ -165,8 +219,9 @@ export function Editor({
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [layout, setLayout] = useEditorLayout(userId);
-  const panelDrag = usePanelDrag((id, target) =>
-    setLayout((l) => movePanel(l, id, target)),
+  const panelDrag = usePanelDrag(
+    (id, target) => setLayout((l) => movePanel(l, id, target)),
+    (id, target) => movesPanel(layout, id, target),
   );
   const [customizing, setCustomizing] = useState(false);
   const toolGroup = groupOf(tool)?.id;
@@ -177,7 +232,13 @@ export function Editor({
     }));
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
+  const [onionSettings, setOnionSettings] = useState(false);
   const [stamp, setStamp] = useState<Stamp | null>(null);
+  const [brushes, setBrushes] = useState(() => readBrushes(userId));
+  const changeBrushes = (next: SavedBrush[]) => {
+    setBrushes(next);
+    writeBrushes(userId, next);
+  };
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
@@ -209,6 +270,23 @@ export function Editor({
   });
 
   const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
+  const [seenLayers, setSeenLayers] = useState(layerIds);
+  if (seenLayers.join() !== layerIds.join()) {
+    setSeenLayers(layerIds);
+    if (
+      !seenLayers.includes(sprite.layerId) &&
+      layerIds.includes(sprite.layerId) &&
+      seenLayers.every((id) => layerIds.includes(id))
+    )
+      setLayout((l) =>
+        setPanelCollapsed(
+          setPanelShown(l, "timeline", true),
+          "timeline",
+          false,
+        ),
+      );
+  }
   const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;
@@ -332,6 +410,53 @@ export function Editor({
     sprite.editCel((pixels) => change(pixels, selection.mask));
   };
 
+  const adjust = (kind: AdjustKind) => {
+    selection.drop();
+    setAdjusting({
+      kind,
+      pixels: new Uint8ClampedArray(
+        sprite.readCel(sprite.layerId, sprite.frameId),
+      ),
+      mask: selection.mask,
+    });
+  };
+
+  const pasteAsNewLayer = () => {
+    const piece = copiedPiece();
+    if (!piece) return;
+    selection.drop();
+    const { w, h } = sprite.size;
+    const keepIn = (pos: number, len: number, max: number) =>
+      len >= max ? 0 : Math.max(0, Math.min(max - len, pos));
+    const left = keepIn(piece.x, piece.w, w);
+    const top = keepIn(piece.y, piece.h, h);
+    const pixels = new Uint8ClampedArray(w * h * 4);
+    const mask = new Uint8Array(w * h);
+    for (let y = 0; y < piece.h && top + y < h; y++)
+      for (let x = 0; x < piece.w && left + x < w; x++) {
+        const j = y * piece.w + x;
+        const i = (top + y) * w + left + x;
+        pixels.set(piece.pixels.subarray(j * 4, j * 4 + 4), i * 4);
+        mask[i] = piece.mask[j]!;
+      }
+    sprite.addLayer("normal", { cels: new Map([[sprite.frameId, pixels]]) });
+    selection.select(mask);
+    setTool("move");
+  };
+
+  const pasteAsNewTile = () => {
+    const piece = copiedPiece();
+    if (!piece) return;
+    file.openDocument(
+      documentFromFrames({
+        w: piece.w,
+        h: piece.h,
+        frames: [{ rgba: piece.pixels, duration: DEFAULT_FRAME_DURATION }],
+      }),
+      `${file.name} pasted`,
+    );
+  };
+
   const useAsBrush = () => {
     const piece = selection.selectedPiece();
     if (!piece) return;
@@ -406,6 +531,8 @@ export function Editor({
       { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
       { label: "Copy", shortcut: `${mod}C`, onSelect: commands.copy },
       { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
+      { label: "Paste as new layer", onSelect: pasteAsNewLayer },
+      { label: "Paste as new tile", onSelect: pasteAsNewTile },
       { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
@@ -454,23 +581,69 @@ export function Editor({
           ],
           [
             {
-              label: "Outline in primary colour",
-              onSelect: () =>
-                applyEffect((pixels, mask) =>
-                  outlined(pixels, sprite.size, rgbaOf(pen.color), mask),
-                ),
+              label: "Outline…",
+              onSelect: () => {
+                selection.drop();
+                setOutlining({
+                  pixels: new Uint8ClampedArray(
+                    sprite.readCel(sprite.layerId, sprite.frameId),
+                  ),
+                  mask: selection.mask,
+                });
+              },
+              disabled: !sprite.canPaint,
             },
             {
-              label: "Replace primary colour with secondary",
-              onSelect: () =>
-                applyEffect((pixels, mask) =>
-                  replacedColor(
-                    pixels,
-                    rgbaOf(pen.color),
-                    rgbaOf(pen.secondary),
-                    mask,
+              label: "Replace colour…",
+              onSelect: () => {
+                selection.drop();
+                setReplacing({
+                  pixels: new Uint8ClampedArray(
+                    sprite.readCel(sprite.layerId, sprite.frameId),
                   ),
-                ),
+                  mask: selection.mask,
+                });
+              },
+              disabled: !sprite.canPaint,
+            },
+          ],
+        ],
+      },
+      {
+        label: "Adjust",
+        submenu: [
+          [
+            {
+              label: "Hue / Saturation…",
+              onSelect: () => adjust("hueSaturation"),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Brightness / Contrast…",
+              onSelect: () => adjust("brightnessContrast"),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Colour curve…",
+              onSelect: () => adjust("curve"),
+              disabled: !sprite.canPaint,
+            },
+          ],
+          [
+            {
+              label: "Invert colours",
+              onSelect: () => applyEffect(invertedColors),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Despeckle…",
+              onSelect: () => adjust("despeckle"),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Convolution matrix…",
+              onSelect: () => adjust("convolution"),
+              disabled: !sprite.canPaint,
             },
           ],
         ],
@@ -594,6 +767,16 @@ export function Editor({
     ],
     [
       {
+        label: "Reduce colours…",
+        onSelect: () =>
+          setReducing({
+            frames: sprite.frames.map((f) =>
+              sprite.composite(["reference"], f.id),
+            ),
+            picture: sprite.composite(["reference"]),
+          }),
+      },
+      {
         label: "Colour mode",
         submenu: [
           COLOR_MODES.map(({ value, label }) => ({
@@ -635,6 +818,13 @@ export function Editor({
           })),
         ],
       },
+      {
+        label: "Onion skin settings…",
+        onSelect: () => {
+          setView((v) => ({ ...v, onion: v.onion || 1 }));
+          setOnionSettings(true);
+        },
+      },
     ],
     [
       {
@@ -656,6 +846,11 @@ export function Editor({
           ],
         ],
       },
+      {
+        label: check(view.snap && view.gridSize > 0, "Snap to grid"),
+        onSelect: () => setView((v) => ({ ...v, snap: !v.snap })),
+        disabled: !view.gridSize,
+      },
     ],
     [
       {
@@ -665,6 +860,13 @@ export function Editor({
             label: check(view.symmetry === value, label),
             onSelect: () => setView((v) => ({ ...v, symmetry: value })),
           })),
+          [
+            {
+              label: "Back to the middle",
+              onSelect: () => setView((v) => ({ ...v, axes: null })),
+              disabled: !view.axes,
+            },
+          ],
         ],
       },
       {
@@ -805,9 +1007,28 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const changePalette = (
+    next: string[],
+    change?: { edited?: { from: string; to: string }; loaded?: boolean },
+  ) => {
+    const edited = change?.edited;
+    sprite.setPalette(
+      next,
+      edited
+        ? new Map([[edited.from, edited.to]])
+        : change?.loaded
+          ? recolorByPlace(sprite.palette, next)
+          : undefined,
+    );
+    if (edited)
+      setPen((p) => ({
+        ...p,
+        color: p.color === edited.from ? edited.to : p.color,
+        secondary: p.secondary === edited.from ? edited.to : p.secondary,
+      }));
+  };
   const panels: Record<PanelId, PanelContent> = {
     tools: {
-      fit: true,
       body: (
         <ToolBar
           tool={tool}
@@ -819,37 +1040,31 @@ export function Editor({
     },
     colors: { body: <ColorsPanel pen={pen} onChange={setPen} /> },
     palette: {
+      actions: (
+        <PaletteActions
+          pen={pen}
+          palette={sprite.palette}
+          onPaletteChange={changePalette}
+          frameColors={() => colorsOf(sprite.composite(["reference"]))}
+          fileName={file.name}
+        />
+      ),
       body: (
         <PalettePanel
           pen={pen}
           onChange={setPen}
           palette={sprite.palette}
           colorMode={sprite.colorMode}
-          onPaletteChange={(next, change) => {
-            const edited = change?.edited;
-            sprite.setPalette(
-              next,
-              edited
-                ? new Map([[edited.from, edited.to]])
-                : change?.loaded
-                  ? recolorByPlace(sprite.palette, next)
-                  : undefined,
-            );
-            if (edited)
-              setPen((p) => ({
-                ...p,
-                color: p.color === edited.from ? edited.to : p.color,
-                secondary:
-                  p.secondary === edited.from ? edited.to : p.secondary,
-              }));
-          }}
-          frameColors={() => colorsOf(sprite.composite(["reference"]))}
-          fileName={file.name}
+          onPaletteChange={changePalette}
         />
       ),
     },
-    timeline: { body: <Timeline sprite={sprite} playback={playback} /> },
+    timeline: {
+      fill: true,
+      body: <Timeline sprite={sprite} playback={playback} />,
+    },
     assistant: {
+      fill: true,
       body: (
         <EditorChat
           canvas={canvas}
@@ -924,6 +1139,15 @@ export function Editor({
           stamp={stamp}
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
+          brushes={brushes}
+          onSaveBrush={() =>
+            stamp &&
+            changeBrushes(withBrush(brushes, stamp, crypto.randomUUID()))
+          }
+          onPickBrush={setStamp}
+          onRemoveBrush={(id) =>
+            changeBrushes(brushes.filter((b) => b.id !== id))
+          }
           slice={slice}
           onSliceChange={changeSlice}
           onSliceDelete={deleteSlice}
@@ -973,6 +1197,7 @@ export function Editor({
                   onTextPlaced={() => setTool("move")}
                   sliceId={sliceId}
                   onSelectSlice={setSliceId}
+                  onAxesChange={(axes) => setView((v) => ({ ...v, axes }))}
                   onPickColor={(color, slot) =>
                     setPen((p) =>
                       slot === "primary"
@@ -1079,6 +1304,87 @@ export function Editor({
           onClose={() => setModifying(null)}
         />
       )}
+      {replacing && (
+        <ReplaceColorDialog
+          size={sprite.size}
+          pixels={replacing.pixels}
+          mask={replacing.mask}
+          palette={sprite.palette}
+          from={pen.color}
+          to={pen.secondary}
+          onApply={({ from, to, tolerance, keepShading }) =>
+            applyEffect((pixels, mask) =>
+              replacedColor(
+                pixels,
+                rgbaOf(from),
+                rgbaOf(to),
+                mask,
+                tolerance,
+                keepShading,
+              ),
+            )
+          }
+          onClose={() => setReplacing(null)}
+        />
+      )}
+      {onionSettings && (
+        <OnionSettingsDialog
+          settings={view.onionSettings}
+          onChange={(next) => setView((v) => ({ ...v, onionSettings: next }))}
+          onClose={() => setOnionSettings(false)}
+        />
+      )}
+      {outlining && (
+        <OutlineDialog
+          size={sprite.size}
+          pixels={outlining.pixels}
+          mask={outlining.mask}
+          palette={sprite.palette}
+          color={pen.color}
+          onApply={({ color, ...settings }) =>
+            applyEffect((pixels, mask) =>
+              outlinedWith(pixels, sprite.size, rgbaOf(color), mask, settings),
+            )
+          }
+          onClose={() => setOutlining(null)}
+        />
+      )}
+      {adjusting && (
+        <AdjustColorsDialog
+          kind={adjusting.kind}
+          size={sprite.size}
+          pixels={adjusting.pixels}
+          mask={adjusting.mask}
+          onApply={(settings) =>
+            applyEffect((pixels, mask) =>
+              adjustedColors(
+                adjusting.kind,
+                pixels,
+                mask,
+                sprite.size,
+                settings,
+              ),
+            )
+          }
+          onClose={() => setAdjusting(null)}
+        />
+      )}
+      {reducing && (
+        <ReduceColorsDialog
+          size={sprite.size}
+          frames={reducing.frames}
+          picture={reducing.picture}
+          palette={sprite.palette}
+          onApply={({ palette, dither, replacePalette }) => {
+            selection.deselect();
+            sprite.mapAllCels(
+              (rgba) => mapToPalette(rgba, sprite.size.w, palette, dither),
+              replacePalette ? palette : undefined,
+            );
+          }}
+          onClose={() => setReducing(null)}
+        />
+      )}
       {scaling && (
         <SpriteSizeDialog
           size={sprite.size}
@@ -1132,6 +1438,7 @@ export function Editor({
             name: file.name,
             size: sprite.size,
             frames: sprite.frames,
+            tags: sprite.tags,
             frameId: sprite.frameId,
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),

@@ -44,7 +44,15 @@ export type StrokeRender = (canvas: StrokeCanvas) => void;
 export const slotOf = (e: CanvasPointer): ColorSlot =>
   e.button === 2 ? "secondary" : "primary";
 
-export const colorInk: StrokeInk = (stroke) => stroke.rgba;
+export const inkAlpha = (rgba: Rgba, opacity: number) =>
+  Math.round((rgba[3] * clampOpacity(opacity)) / 255);
+
+export const colorInk: StrokeInk = (stroke, { pen }) => {
+  const alpha = inkAlpha(stroke.rgba, pen.opacity);
+  if (!stroke.color || alpha === 255) return stroke.rgba;
+  const [r, g, b] = stroke.rgba;
+  return blendInk(stroke.before, [r, g, b, alpha], "simple");
+};
 
 export const penInk: StrokeInk = (stroke, { pen, sprite }) =>
   pen.ink === "shading"
@@ -55,7 +63,7 @@ export const penInk: StrokeInk = (stroke, { pen, sprite }) =>
           stroke.rgba[0],
           stroke.rgba[1],
           stroke.rgba[2],
-          clampOpacity(pen.opacity),
+          inkAlpha(stroke.rgba, pen.opacity),
         ],
         pen.ink,
       );
@@ -138,6 +146,7 @@ export function drawStroke(
         stamp,
         stroke.secondary ? stroke.rgba : null,
         paintOptions,
+        props.pen.stampPattern,
       ),
   });
   ctx.putImageData(

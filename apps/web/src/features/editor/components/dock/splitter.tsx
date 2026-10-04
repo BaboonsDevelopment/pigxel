@@ -39,9 +39,7 @@ export function Splitter({
       onPointerDown={start}
       className={cn(
         "relative z-10 shrink-0 touch-none transition-colors hover:bg-primary/40 active:bg-primary/60",
-        axis === "x"
-          ? "-mx-0.5 w-1 cursor-col-resize"
-          : "-my-0.5 h-1 cursor-row-resize",
+        axis === "x" ? "w-1.5 cursor-col-resize" : "h-1.5 cursor-row-resize",
         className,
       )}
     />

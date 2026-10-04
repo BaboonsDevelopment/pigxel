@@ -4,6 +4,8 @@ import {
   DEFAULT_LAYOUT,
   STACK_WIDTH,
   movePanel,
+  movesPanel,
+  setPanelHeight,
   readLayout,
   setPanelShown,
   setToolShown,
@@ -132,6 +134,33 @@ describe("editor layout", () => {
     expect(odd.hidden).toEqual(["colors"]);
     expect(odd.hiddenTools).toEqual(["blur"]);
     expect(odd.groupTools).toEqual({ select: "lasso" });
+  });
+});
+
+describe("panel moves and heights", () => {
+  it("tells a drop that changes nothing from one that does", () => {
+    expect(
+      movesPanel(DEFAULT_LAYOUT, "colors", {
+        kind: "panel",
+        anchor: "tools",
+        where: "below",
+      }),
+    ).toBe(false);
+    expect(
+      movesPanel(DEFAULT_LAYOUT, "colors", {
+        kind: "panel",
+        anchor: "tools",
+        where: "above",
+      }),
+    ).toBe(true);
+  });
+  it("keeps a height set by hand, never below the least", () => {
+    expect(setPanelHeight(DEFAULT_LAYOUT, "palette", 240).heights).toEqual({
+      palette: 240,
+    });
+    expect(setPanelHeight(DEFAULT_LAYOUT, "palette", 3).heights.palette).toBe(
+      56,
+    );
   });
 });
 

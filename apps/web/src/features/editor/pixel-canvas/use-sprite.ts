@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { flatten } from "@/lib/layers/composite";
+import { compositeOver, flatten, orderedLayers } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
@@ -23,11 +23,22 @@ import {
 } from "@/lib/sprite/transform";
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
+import { insertAt, removeAt, type FrameTag } from "@/lib/sprite/tags";
+import * as celLinks from "@/lib/sprite/cel-links";
+import type { CelLink } from "@/lib/sprite/cel-links";
+import {
+  pruneCelSettings,
+  settingsForFrame,
+  type CelSetting,
+} from "@/lib/sprite/cel-settings";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
 
 export type LayerPatch = Partial<
-  Pick<Layer, "name" | "visible" | "locked" | "opacity" | "blend">
+  Pick<
+    Layer,
+    "name" | "visible" | "locked" | "opacity" | "blend" | "labelColor"
+  >
 > & { collapsed?: boolean };
 
 export type SpriteApi = ReturnType<typeof useSprite>;
@@ -52,7 +63,11 @@ export type AnimationSpec = {
 
 type Snapshot = {
   tree: Layer[];
+  background: PigxelDocument["background"];
   frames: Frame[];
+  tags: FrameTag[];
+  links: CelLink[];
+  celSettings: CelSetting[];
   size: Size;
   cels: Cels;
   palette: string[];
@@ -72,13 +87,18 @@ export function useSprite(
   onChange: () => void,
   kept?: KeptSprite,
 ) {
-  const { background } = initial;
+  const [background, setBackground] = useState(initial.background);
   const [size, setSize] = useState<Size>({
     w: initial.width,
     h: initial.height,
   });
   const [tree, setTree] = useState(initial.layers);
+  const [soloId, setSoloId] = useState<string | null>(null);
+  const [pickedFrames, setPickedFrames] = useState<string[]>([]);
   const [frames, setFrames] = useState(initial.frames);
+  const [tags, setTags] = useState(initial.tags ?? []);
+  const [links, setLinks] = useState(initial.links ?? []);
+  const [celSettings, setCelSettings] = useState(initial.celSettings ?? []);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
   const [colorMode, setColorModeState] = useState<ColorMode>(
@@ -114,7 +134,11 @@ export function useSprite(
     kept?.history ??
       history.startHistory({
         tree: initial.layers,
+        background: initial.background,
         frames: initial.frames,
+        tags: initial.tags ?? [],
+        links: initial.links ?? [],
+        celSettings: initial.celSettings ?? [],
         size,
         cels: initial.cels,
         palette: initial.palette,
@@ -151,8 +175,29 @@ export function useSprite(
     return contextOf(canvas);
   };
 
-  const composite = (skip: LayerKind[] = [], frame = frameId) =>
-    flatten(tree, (id) => cels.pixels(frame, id), size.w * size.h * 4, skip);
+  const composite = (skip: LayerKind[] = [], frame = frameId) => {
+    const appearance = settingsForFrame(celSettings, frame);
+    return flatten(
+      tree,
+      (id) => cels.pixels(frame, id),
+      size.w * size.h * 4,
+      skip,
+      (id) => appearance.get(id),
+    );
+  };
+
+  const previewComposite = (skip: LayerKind[] = [], frame = frameId) => {
+    const solo = soloId ? layerTree.findLayer(tree, soloId) : null;
+    const shown = solo ? layerTree.soloTree(tree, soloId!) : tree;
+    const appearance = settingsForFrame(celSettings, frame);
+    return flatten(
+      shown,
+      (id) => cels.pixels(frame, id),
+      size.w * size.h * 4,
+      skip,
+      (id) => appearance.get(id),
+    );
+  };
 
   const buildUp = (skip: LayerKind[] = [], frame = frameId) => {
     const shown = new Set<string>();
@@ -182,7 +227,11 @@ export function useSprite(
   const finish = (
     next: {
       tree?: Layer[];
+      background?: PigxelDocument["background"];
       frames?: Frame[];
+      tags?: FrameTag[];
+      links?: CelLink[];
+      celSettings?: CelSetting[];
       size?: Size;
       palette?: string[];
       slices?: Slice[];
@@ -211,9 +260,64 @@ export function useSprite(
         );
         cels.invalidate(canvas);
       }
+    const { present } = past.current;
+    const validLinks = celLinks.pruneCelLinks(
+      next.links ?? links,
+      (next.frames ?? frames).map((frame) => frame.id),
+      layerTree.pixelLayerIds(next.tree ?? tree),
+    );
+    const samePixels = (
+      a: Uint8ClampedArray | undefined,
+      b: Uint8ClampedArray | undefined,
+    ) =>
+      a === b ||
+      (!!a &&
+        !!b &&
+        a.length === b.length &&
+        a.every((value, index) => value === b[index]));
+    const keptLinks = validLinks.filter((link) => {
+      const modified = link.frameIds.filter((frame) => {
+        const canvas = cels.get(frame, link.layerId);
+        const before = frameList.celOf(present.cels, frame, link.layerId);
+        return (canvas && changed.current.has(canvas)) || !!canvas !== !!before;
+      });
+      if (modified.length === 1) {
+        const source = cels.pixels(modified[0]!, link.layerId);
+        for (const frame of link.frameIds) {
+          if (frame === modified[0]) continue;
+          if (source)
+            changed.current.add(
+              cels.set(
+                frame,
+                link.layerId,
+                next.size ?? size,
+                new Uint8ClampedArray(source),
+              ),
+            );
+          else cels.delete(frame, link.layerId);
+        }
+      } else if (modified.length > 1) {
+        const first = cels.pixels(link.frameIds[0]!, link.layerId);
+        if (
+          link.frameIds.some(
+            (frame) => !samePixels(first, cels.pixels(frame, link.layerId)),
+          )
+        )
+          return false;
+      }
+      return true;
+    });
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
+      background: next.background ?? background,
       frames: next.frames ?? frames,
+      tags: next.tags ?? tags,
+      links: keptLinks,
+      celSettings: pruneCelSettings(
+        next.celSettings ?? celSettings,
+        (next.frames ?? frames).map((frame) => frame.id),
+        layerTree.allLayers(next.tree ?? tree).map((layer) => layer.id),
+      ),
       size: next.size ?? size,
       cels: new Map(),
       palette: next.palette ?? palette,
@@ -223,7 +327,6 @@ export function useSprite(
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
-    const { present } = past.current;
     for (const cel of cels.list()) {
       const frameCels = snapshot.cels.get(cel.frameId);
       const drawn = changed.current.has(cel.canvas);
@@ -239,6 +342,8 @@ export function useSprite(
       else frameCels.set(cel.layerId, pixels);
     }
     changed.current.clear();
+    setLinks(keptLinks);
+    setCelSettings(snapshot.celSettings);
     past.current = history.record(past.current, snapshot, MAX_UNDO);
     repaint();
     onChange();
@@ -297,9 +402,28 @@ export function useSprite(
     finish({ tree: next });
   };
 
-  const changeFrames = (next: Frame[]) => {
+  const changeFrames = (
+    next: Frame[],
+    nextTags = tags,
+    nextCelSettings = celSettings,
+  ) => {
     setFrames(next);
-    finish({ frames: next });
+    setTags(nextTags);
+    finish({ frames: next, tags: nextTags, celSettings: nextCelSettings });
+  };
+
+  const saveTag = (tag: FrameTag) => {
+    const next = tags.some((current) => current.id === tag.id)
+      ? tags.map((current) => (current.id === tag.id ? tag : current))
+      : [...tags, tag];
+    setTags(next);
+    finish({ tags: next });
+  };
+
+  const removeTag = (id: string) => {
+    const next = tags.filter((tag) => tag.id !== id);
+    setTags(next);
+    finish({ tags: next });
   };
 
   const restore = (snapshot: Snapshot) => {
@@ -319,7 +443,11 @@ export function useSprite(
       }
     changed.current.clear();
     setTree(snapshot.tree);
+    setBackground(snapshot.background);
     setFrames(snapshot.frames);
+    setTags(snapshot.tags);
+    setLinks(snapshot.links);
+    setCelSettings(snapshot.celSettings);
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
@@ -356,7 +484,7 @@ export function useSprite(
 
   const putCels = (
     id: string,
-    next: Iterable<[string, Uint8ClampedArray | null]>,
+    next: Iterable<readonly [string, Uint8ClampedArray | null]>,
   ) => {
     for (const [frame, pixels] of next) {
       if (pixels) changed.current.add(addCel(frame, id, pixels));
@@ -364,8 +492,131 @@ export function useSprite(
     }
   };
 
+  const linkCelRange = (
+    layer: string,
+    sourceFrame: string,
+    frameIds: string[],
+  ) => {
+    const selected = new Set(frameIds);
+    const members = frames
+      .map((frame) => frame.id)
+      .filter((id) => selected.has(id));
+    const target = layerTree.findLayer(tree, layer)?.layer;
+    if (
+      !target ||
+      target.kind === "group" ||
+      members.length < 2 ||
+      !members.includes(sourceFrame)
+    )
+      return;
+    const source = cels.pixels(sourceFrame, layer);
+    putCels(
+      layer,
+      members.map(
+        (id) => [id, source ? new Uint8ClampedArray(source) : null] as const,
+      ),
+    );
+    const next = celLinks.linkCels(links, layer, members);
+    setLinks(next);
+    finish({ links: next });
+  };
+
+  const unlinkCel = (layer: string, frame: string) => {
+    const next = celLinks.unlinkCel(links, layer, frame);
+    if (next === links) return;
+    setLinks(next);
+    finish({ links: next });
+  };
+
+  const celAppearance = (layer: string, frame: string) => {
+    const found = layerTree.findLayer(tree, layer);
+    if (!found || found.layer.kind === "group") return null;
+    const appearance = settingsForFrame(celSettings, frame);
+    const siblings = orderedLayers(found.parent?.children ?? tree, (id) =>
+      appearance.get(id),
+    ).filter((item) => item.kind !== "background");
+    return {
+      opacity: appearance.get(layer)?.opacity ?? 255,
+      zIndex:
+        found.layer.kind === "background"
+          ? 0
+          : siblings.findIndex((item) => item.id === layer),
+      zCount: siblings.length,
+    };
+  };
+
+  const setCelAppearance = (
+    layer: string,
+    frame: string,
+    opacity: number,
+    zIndex: number,
+  ) => {
+    const found = layerTree.findLayer(tree, layer);
+    if (!found || found.layer.kind === "group") return;
+    const current = celAppearance(layer, frame);
+    if (!current) return;
+    const appearance = settingsForFrame(celSettings, frame);
+    const siblings = orderedLayers(found.parent?.children ?? tree, (id) =>
+      appearance.get(id),
+    ).filter((item) => item.kind !== "background");
+    const without = siblings.filter((item) => item.id !== layer);
+    if (found.layer.kind !== "background")
+      without.splice(
+        Math.max(0, Math.min(zIndex, without.length)),
+        0,
+        found.layer,
+      );
+    const changed = new Map<string, CelSetting>();
+    for (const [index, item] of without.entries()) {
+      const previous = appearance.get(item.id);
+      changed.set(item.id, {
+        frameId: frame,
+        layerId: item.id,
+        ...(previous?.opacity !== undefined && { opacity: previous.opacity }),
+        zIndex:
+          index +
+          ((found.parent?.children ?? tree)[0]?.kind === "background" ? 1 : 0),
+      });
+    }
+    if (found.layer.kind === "background")
+      changed.set(layer, { frameId: frame, layerId: layer });
+    const selected = changed.get(layer)!;
+    if (opacity !== 255) selected.opacity = opacity;
+    else delete selected.opacity;
+    const next = [
+      ...celSettings.filter(
+        (setting) => setting.frameId !== frame || !changed.has(setting.layerId),
+      ),
+      ...[...changed.values()].filter(
+        (setting) =>
+          setting.opacity !== undefined || setting.zIndex !== undefined,
+      ),
+    ];
+    if (current.opacity === opacity && current.zIndex === zIndex) return;
+    finish({ celSettings: next });
+  };
+
   const addLayer = (kind: Exclude<LayerKind, "background">, layer?: NewLayer) =>
     addLayers(kind, [layer ?? {}])[0]!;
+
+  const addBackgroundLayer = () => {
+    if (tree.some((layer) => layer.kind === "background")) return;
+    const nextBackground = background === "transparent" ? "white" : background;
+    const layer = layerTree.createLayer("background", "Background");
+    const value = nextBackground === "black" ? 0 : 255;
+    const pixels = new Uint8ClampedArray(size.w * size.h * 4);
+    for (let i = 0; i < pixels.length; i += 4)
+      pixels.set([value, value, value, 255], i);
+    putCels(
+      layer.id,
+      frames.map((frame) => [frame.id, pixels] as const),
+    );
+    const next = [layer, ...tree];
+    setBackground(nextBackground);
+    setLayerId(layer.id);
+    setTree(next);
+    finish({ tree: next, background: nextBackground });
+  };
 
   const addLayers = (
     kind: Exclude<LayerKind, "background">,
@@ -413,6 +664,46 @@ export function useSprite(
     setLayerId(above);
     changeTree(next);
     return ids;
+  };
+
+  const duplicateLayer = (id: string) => {
+    const source = layerTree.findLayer(tree, id)?.layer;
+    if (!source) return;
+    const copiedSettings: CelSetting[] = [];
+    const copyOf = (layer: Layer): Layer => {
+      const copy = { ...layer, id: crypto.randomUUID() };
+      copiedSettings.push(
+        ...celSettings
+          .filter(
+            (setting) =>
+              setting.layerId === layer.id && setting.opacity !== undefined,
+          )
+          .map((setting) => ({
+            frameId: setting.frameId,
+            layerId: copy.id,
+            opacity: setting.opacity,
+          })),
+      );
+      for (const frame of frames) {
+        const pixels = cels.pixels(frame.id, layer.id);
+        if (pixels)
+          putCels(copy.id, [[frame.id, new Uint8ClampedArray(pixels)]]);
+      }
+      return copy.kind === "group"
+        ? { ...copy, children: copy.children.map(copyOf) }
+        : copy.kind === "background"
+          ? { ...copy, kind: "normal" }
+          : copy;
+    };
+    const layer = { ...copyOf(source), name: `${source.name} copy` };
+    setLayerId(layer.id);
+    const next = layerTree.insertLayer(
+      tree,
+      layer,
+      layerTree.placeAbove(tree, id),
+    );
+    setTree(next);
+    finish({ tree: next, celSettings: [...celSettings, ...copiedSettings] });
   };
 
   const cutToLayer = (id: string, area: Area, name: string) => {
@@ -500,6 +791,82 @@ export function useSprite(
     finish({ tree: nextTree, frames: nextFrames });
   };
 
+  const canMergeDown = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    const below = layerTree.layerBelow(tree, id);
+    return (
+      !!layer &&
+      layer.kind !== "reference" &&
+      (below?.kind === "normal" || below?.kind === "background")
+    );
+  };
+
+  const mergeDown = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    const below = layerTree.layerBelow(tree, id);
+    if (!layer || !below || !canMergeDown(id)) return;
+    const length = size.w * size.h * 4;
+    for (const frame of frames) {
+      const top =
+        layer.kind === "group"
+          ? flatten(
+              layer.children,
+              (child) => cels.pixels(frame.id, child),
+              length,
+              ["reference"],
+              (child) => settingsForFrame(celSettings, frame.id).get(child),
+            )
+          : cels.pixels(frame.id, layer.id);
+      if (!top) continue;
+      const own = cels.pixels(frame.id, below.id);
+      const base = own
+        ? new Uint8ClampedArray(own)
+        : new Uint8ClampedArray(length);
+      compositeOver(
+        base,
+        top,
+        layer.opacity *
+          ((settingsForFrame(celSettings, frame.id).get(layer.id)?.opacity ??
+            255) /
+            255),
+        layer.blend,
+      );
+      putCels(below.id, [[frame.id, base]]);
+    }
+    for (const gone of layerTree.pixelLayerIds([layer])) cels.deleteLayer(gone);
+    setLayerId(below.id);
+    changeTree(layerTree.removeLayer(tree, id));
+  };
+
+  const canFlatten = (visibleOnly: boolean) =>
+    layerTree.flattenTargets(tree, visibleOnly).length > 1;
+
+  const flattenLayers = (visibleOnly: boolean) => {
+    const ids = layerTree.flattenTargets(tree, visibleOnly);
+    if (ids.length < 2) return;
+    const merged = new Set(ids);
+    const background = layerTree
+      .allLayers(tree)
+      .find(
+        (layer) =>
+          merged.has(layer.id) && layer.kind === "background" && layer.visible,
+      );
+    const layer = layerTree.createLayer(
+      background ? "background" : "normal",
+      background?.name ?? "Flattened",
+    );
+    for (const frame of frames)
+      putCels(layer.id, [[frame.id, composite(["reference"], frame.id)]]);
+    for (const id of ids) cels.deleteLayer(id);
+    setLayerId(layer.id);
+    changeTree(
+      layerTree.insertLayer(layerTree.withoutLayers(tree, merged), layer, {
+        parentId: null,
+        index: 0,
+      }),
+    );
+  };
+
   const canRemoveLayer = (id: string) =>
     layerTree
       .allLayers(layerTree.removeLayer(tree, id))
@@ -534,7 +901,18 @@ export function useSprite(
     }
     const at = frameList.frameIndex(frames, frameId) + 1;
     setFrameId(frame.id);
-    changeFrames(frameList.insertFrame(frames, frame, at));
+    changeFrames(
+      frameList.insertFrame(frames, frame, at),
+      insertAt(tags, at),
+      copy
+        ? [
+            ...celSettings,
+            ...celSettings
+              .filter((setting) => setting.frameId === frameId)
+              .map((setting) => ({ ...setting, frameId: frame.id })),
+          ]
+        : celSettings,
+    );
   };
 
   const removeFrame = (id: string) => {
@@ -545,7 +923,7 @@ export function useSprite(
       const at = frameList.frameIndex(frames, id);
       setFrameId(next[Math.min(at, next.length - 1)]!.id);
     }
-    changeFrames(next);
+    changeFrames(next, removeAt(tags, frameList.frameIndex(frames, id)));
   };
 
   const resize = (next: Size, offset = { x: 0, y: 0 }) => {
@@ -572,6 +950,18 @@ export function useSprite(
     setSize(next);
     setSlicesState(nextSlices);
     finish({ size: next, slices: nextSlices });
+  };
+
+  const mapAllCels = (
+    map: (rgba: Uint8ClampedArray) => Uint8ClampedArray,
+    nextPalette?: string[],
+  ) => {
+    for (const { frameId: frame, layerId: layer } of cels.list())
+      changed.current.add(
+        cels.set(frame, layer, size, map(cels.pixels(frame, layer)!)),
+      );
+    if (nextPalette) setPaletteState(nextPalette);
+    finish(nextPalette ? { palette: nextPalette } : {});
   };
 
   const transformAll = (t: TileTransform) => {
@@ -628,7 +1018,17 @@ export function useSprite(
     id: initial.id,
     size,
     tree,
+    soloId: soloId && layerTree.findLayer(tree, soloId) ? soloId : null,
+    toggleSolo: (id: string) =>
+      setSoloId((current) => (current === id ? null : id)),
     frames,
+    tags,
+    links,
+    celSettings,
+    celAppearance,
+    setCelAppearance,
+    saveTag,
+    removeTag,
     background,
     palette,
     setPalette,
@@ -646,6 +1046,7 @@ export function useSprite(
     version,
     context,
     composite,
+    previewComposite,
     buildUp,
     touched,
     commit,
@@ -655,19 +1056,31 @@ export function useSprite(
     resize,
     rescale,
     transformAll,
+    mapAllCels,
     undo,
     redo,
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
+    isCelLinked: (layer: string, frame: string) =>
+      !!celLinks.linkOf(links, layer, frame),
+    linkCelRange,
+    unlinkCel,
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
     cutToLayer,
+    duplicateLayer,
+    canMergeDown,
+    mergeDown,
+    canFlatten,
+    flattenLayers,
     addAnimation,
     selectLayer: setLayerId,
     onLeaveCel: (callback: () => void) => {
       beforeLeave.current = callback;
     },
     addLayer,
+    addBackgroundLayer,
+    canAddBackgroundLayer: !tree.some((layer) => layer.kind === "background"),
     addLayers,
     canRemoveLayer,
     removeLayer,
@@ -676,6 +1089,17 @@ export function useSprite(
     moveLayer: (id: string, place: Place) =>
       changeTree(layerTree.moveLayer(tree, id, place)),
     selectFrame: setFrameId,
+    selectedFrames: (() => {
+      const picked = frames
+        .filter((frame) => pickedFrames.includes(frame.id))
+        .map((frame) => frame.id);
+      return picked.length > 1 ? picked : [frameId];
+    })(),
+    pickFrames: setPickedFrames,
+    reverseFrames: (ids: string[]) =>
+      changeFrames(frameList.reversedFrames(frames, ids)),
+    setFramesDuration: (ids: string[], ms: number) =>
+      changeFrames(frameList.withDuration(frames, ids, ms)),
     stepFrame: (step: number) =>
       setFrameId(frameList.stepFrame(frames, frameId, step).id),
     addFrame,
@@ -700,6 +1124,9 @@ export function useSprite(
       pixelRatio,
       layers: tree,
       frames,
+      tags,
+      links,
+      celSettings,
       cels: new Map(
         frames.map((frame) => [
           frame.id,

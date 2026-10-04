@@ -1,7 +1,21 @@
 import type { Size } from "./constants";
 import type { Point, TipRect } from "./pen";
 
-export type Symmetry = "none" | "horizontal" | "vertical" | "both";
+export type Symmetry =
+  | "none"
+  | "horizontal"
+  | "vertical"
+  | "both"
+  | "diagonal"
+  | "antiDiagonal"
+  | "all";
+
+export type Axes = { x: number; y: number };
+
+export const centreAxes = (size: Size): Axes => ({
+  x: (size.w - 1) / 2,
+  y: (size.h - 1) / 2,
+});
 
 export type TiledMode = "none" | "x" | "y" | "both";
 
@@ -12,6 +26,7 @@ export type Ink = Rgba | ((index: number) => Rgba | null);
 export type PaintOptions = {
   size: Size;
   symmetry: Symmetry;
+  axes?: Axes | null;
   tiled: TiledMode;
   mask: Uint8Array | null;
   density?: number;
@@ -105,16 +120,41 @@ export function wrapPixel(
   return { x: px, y: py };
 }
 
-export function mirrored(point: Point, size: Size, symmetry: Symmetry) {
-  const out = [point];
-  const mx = size.w - 1 - point.x;
-  const my = size.h - 1 - point.y;
-  if (symmetry === "horizontal" || symmetry === "both")
-    out.push({ x: mx, y: point.y });
-  if (symmetry === "vertical" || symmetry === "both")
-    out.push({ x: point.x, y: my });
-  if (symmetry === "both") out.push({ x: mx, y: my });
-  return out;
+export function mirrored(
+  point: Point,
+  size: Size,
+  symmetry: Symmetry,
+  axes?: Axes | null,
+) {
+  if (symmetry === "none") return [point];
+  const { x: a, y: b } = axes ?? centreAxes(size);
+  const mx = Math.round(2 * a - point.x);
+  const my = Math.round(2 * b - point.y);
+  const dx = Math.round(a + point.y - b);
+  const dy = Math.round(b + point.x - a);
+  const ax = Math.round(a - point.y + b);
+  const ay = Math.round(b - point.x + a);
+  const copies: Record<Exclude<Symmetry, "none">, Point[]> = {
+    horizontal: [{ x: mx, y: point.y }],
+    vertical: [{ x: point.x, y: my }],
+    both: [
+      { x: mx, y: point.y },
+      { x: point.x, y: my },
+      { x: mx, y: my },
+    ],
+    diagonal: [{ x: dx, y: dy }],
+    antiDiagonal: [{ x: ax, y: ay }],
+    all: [
+      { x: mx, y: point.y },
+      { x: point.x, y: my },
+      { x: mx, y: my },
+      { x: dx, y: dy },
+      { x: ax, y: ay },
+      { x: Math.round(2 * a - dx), y: dy },
+      { x: dx, y: Math.round(2 * b - dy) },
+    ],
+  };
+  return [point, ...copies[symmetry]];
 }
 
 function plot(
@@ -123,8 +163,8 @@ function plot(
   ink: Ink,
   options: PaintOptions,
 ) {
-  const { size, symmetry, tiled, mask, density } = options;
-  for (const copy of mirrored(point, size, symmetry)) {
+  const { size, symmetry, axes, tiled, mask, density } = options;
+  for (const copy of mirrored(point, size, symmetry, axes)) {
     const at = wrapPixel(copy.x, copy.y, size, tiled);
     if (!at || !inPattern(at.x, at.y, density)) continue;
     const i = at.y * size.w + at.x;
@@ -153,12 +193,25 @@ export function paintPoints(
 
 export type Stamp = { w: number; h: number; pixels: Uint8ClampedArray };
 
+export function patternColor(stamp: Stamp, x: number, y: number): Rgba {
+  const px = ((x % stamp.w) + stamp.w) % stamp.w;
+  const py = ((y % stamp.h) + stamp.h) % stamp.h;
+  const j = (py * stamp.w + px) * 4;
+  return [
+    stamp.pixels[j]!,
+    stamp.pixels[j + 1]!,
+    stamp.pixels[j + 2]!,
+    stamp.pixels[j + 3]!,
+  ];
+}
+
 export function paintStamp(
   data: Uint8ClampedArray,
   points: Point[],
   stamp: Stamp,
   solid: Rgba | null,
   options: PaintOptions,
+  pattern = false,
 ) {
   const ox = Math.floor((stamp.w - 1) / 2);
   const oy = Math.floor((stamp.h - 1) / 2);
@@ -166,14 +219,13 @@ export function paintStamp(
     for (let y = 0; y < stamp.h; y++)
       for (let x = 0; x < stamp.w; x++) {
         const j = (y * stamp.w + x) * 4;
-        if (!stamp.pixels[j + 3]) continue;
-        const own = stamp.pixels.subarray(j, j + 4);
-        plot(
-          data,
-          { x: point.x - ox + x, y: point.y - oy + y },
-          solid ?? [own[0]!, own[1]!, own[2]!, own[3]!],
-          options,
-        );
+        if (!pattern && !stamp.pixels[j + 3]) continue;
+        const at = { x: point.x - ox + x, y: point.y - oy + y };
+        const own = pattern
+          ? patternColor(stamp, at.x, at.y)
+          : patternColor(stamp, x, y);
+        if (!own[3]) continue;
+        plot(data, at, solid ?? own, options);
       }
 }
 
@@ -284,6 +336,6 @@ export function rgbaOf(hex: string): Rgba {
     parseInt(v.slice(0, 2), 16),
     parseInt(v.slice(2, 4), 16),
     parseInt(v.slice(4, 6), 16),
-    255,
+    v.length === 8 ? parseInt(v.slice(6, 8), 16) : 255,
   ];
 }

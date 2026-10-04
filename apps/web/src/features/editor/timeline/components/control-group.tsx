@@ -15,7 +15,7 @@ export function ControlGroup({
     <div
       role="group"
       aria-label={label}
-      className="flex items-center gap-1 border-r pr-4 last:border-r-0"
+      className="flex shrink-0 items-center gap-1 border-r pr-4 last:border-r-0"
     >
       <button
         type="button"

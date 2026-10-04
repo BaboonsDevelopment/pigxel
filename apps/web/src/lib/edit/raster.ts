@@ -63,6 +63,35 @@ export function rectPoints(r: Rect, filled: boolean): Point[] {
   return points;
 }
 
+function insideRounded(r: Rect, radius: number, x: number, y: number) {
+  if (r.w <= 0 || r.h <= 0) return false;
+  const right = r.x + r.w - 1;
+  const bottom = r.y + r.h - 1;
+  if (x < r.x || y < r.y || x > right || y > bottom) return false;
+  const k = Math.max(0, Math.min(radius, Math.floor(Math.min(r.w, r.h) / 2)));
+  const cx = Math.min(Math.max(x, r.x + k), right - k);
+  const cy = Math.min(Math.max(y, r.y + k), bottom - k);
+  return (x - cx) ** 2 + (y - cy) ** 2 <= k ** 2;
+}
+
+export function roundedRectPoints(
+  r: Rect,
+  filled: boolean,
+  radius: number,
+): Point[] {
+  if (radius <= 0) return rectPoints(r, filled);
+  const inner = { x: r.x + 1, y: r.y + 1, w: r.w - 2, h: r.h - 2 };
+  const points: Point[] = [];
+  for (let y = r.y; y < r.y + r.h; y++)
+    for (let x = r.x; x < r.x + r.w; x++)
+      if (
+        insideRounded(r, radius, x, y) &&
+        (filled || !insideRounded(inner, radius - 1, x, y))
+      )
+        points.push({ x, y });
+  return points;
+}
+
 export function ellipsePoints(r: Rect, filled: boolean): Point[] {
   const rx = (r.w - 1) / 2;
   const ry = (r.h - 1) / 2;

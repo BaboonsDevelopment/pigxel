@@ -11,6 +11,7 @@ type LayerBase = {
   locked: boolean;
   opacity: number;
   blend: BlendMode;
+  labelColor?: string;
 };
 
 export type PixelLayer = LayerBase & {

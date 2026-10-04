@@ -2,6 +2,8 @@
 
 import { Button } from "@pigxel/ui/components/button";
 import { Input } from "@pigxel/ui/components/input";
+import { NumericInput } from "../../components/numeric-input";
+import { EditorSelect } from "../../components/editor-select";
 import type { FreeTransform } from "../../pixel-canvas/free-transform";
 import type { SelectionApi } from "../../pixel-canvas/use-selection";
 
@@ -65,15 +67,12 @@ export function TransformOptions({ selection }: { selection: SelectionApi }) {
       {FIELDS.map(({ key, label, unit, title }) => (
         <label key={key} className="flex items-center gap-1" title={title}>
           <span className="text-muted-foreground">{label}</span>
-          <Input
-            type="number"
+          <NumericInput
+            as={Input}
             inputSize="sm"
             step={key === "width" || key === "height" ? 5 : 1}
             value={values[key]}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              if (e.target.value !== "" && Number.isFinite(n)) set(key, n);
-            }}
+            onValueChange={(n) => set(key, n)}
             className="w-16 px-1 text-center tabular-nums"
           />
           <span className="text-muted-foreground">{unit}</span>
@@ -83,16 +82,17 @@ export function TransformOptions({ selection }: { selection: SelectionApi }) {
         className="flex items-center gap-1"
         title="RotSprite keeps pixel art clean when turned; Nearest takes the nearest pixel"
       >
-        <select
+        <EditorSelect
           value={current?.method ?? "rotsprite"}
-          onChange={(e) =>
-            change({ method: e.target.value as FreeTransform["method"] })
+          onChange={(value) =>
+            change({ method: value as FreeTransform["method"] })
           }
           className="h-8 rounded-md border bg-background px-2 text-sm"
-        >
-          <option value="rotsprite">RotSprite</option>
-          <option value="nearest">Nearest</option>
-        </select>
+          options={[
+            { value: "rotsprite", label: "RotSprite" },
+            { value: "nearest", label: "Nearest" },
+          ]}
+        />
       </label>
       {selection.freeTransform && (
         <Button

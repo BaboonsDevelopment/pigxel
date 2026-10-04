@@ -8,6 +8,7 @@ import { clipToTile, type Slice } from "@/lib/slices/slices";
 import type { PixelRatio } from "@/lib/sprite/pixel-ratio";
 import { scalePicture, scaledSlices } from "@/lib/sprite/sprite-size";
 import type { Frame } from "@/lib/sprite/types";
+import type { FrameTag } from "@/lib/sprite/tags";
 import {
   EXPORT_FORMATS,
   JPEG_BACKGROUND,
@@ -24,6 +25,7 @@ export type ExportSource = {
   name: string;
   size: Size;
   frames: Frame[];
+  tags?: FrameTag[];
   frameId: string;
   background: Background;
   picture: (frameId: string) => Uint8ClampedArray;
@@ -194,6 +196,7 @@ export function exportFiles(
     frame,
     scale,
     slices: source.slices,
+    tags: source.tags,
   });
   return [
     sheet,

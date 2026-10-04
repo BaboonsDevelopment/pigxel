@@ -29,6 +29,9 @@ export type PenSettings = {
   gradientDither: GradientDither;
   textFont: TextFont;
   textScale: number;
+  stabilizer: number;
+  stampPattern: boolean;
+  cornerRadius: number;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -56,7 +59,46 @@ export const DEFAULT_PEN: PenSettings = {
   gradientDither: "bayer4",
   textFont: "tiny5",
   textScale: 1,
+  stabilizer: 0,
+  stampPattern: false,
+  cornerRadius: 0,
 };
+
+export const MAX_CORNER_RADIUS = 32;
+
+export const MAX_STABILIZER = 20;
+
+export const clampStabilizer = (value: number) =>
+  Math.min(MAX_STABILIZER, Math.max(0, Math.round(value) || 0));
+
+export function snapSpan(
+  start: Point,
+  point: Point,
+  grid: number,
+): { from: Point; to: Point } {
+  if (grid <= 0) return { from: start, to: point };
+  const axis = (a: number, b: number) => {
+    const first = Math.floor(a / grid) * grid;
+    const last = Math.floor(b / grid) * grid;
+    return b >= a ? [first, last + grid - 1] : [first + grid - 1, last];
+  };
+  const [fx, tx] = axis(start.x, point.x);
+  const [fy, ty] = axis(start.y, point.y);
+  return { from: { x: fx!, y: fy! }, to: { x: tx!, y: ty! } };
+}
+
+export function followRope(
+  at: { x: number; y: number },
+  target: Point,
+  length: number,
+): { x: number; y: number } {
+  const dx = target.x - at.x;
+  const dy = target.y - at.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= length) return at;
+  const pull = (distance - length) / distance;
+  return { x: at.x + dx * pull, y: at.y + dy * pull };
+}
 
 export const MIN_SPRAY_SPEED = 1;
 export const MAX_SPRAY_SPEED = 100;
@@ -268,8 +310,8 @@ export function fillPoints(
 export function pixelColor(image: ImageData, point: Point): string | null {
   const i = (point.y * image.width + point.x) * 4;
   if (!image.data[i + 3]) return null;
-  const hex = [0, 1, 2].map((c) =>
-    image.data[i + c]!.toString(16).padStart(2, "0"),
-  );
+  const hex = [0, 1, 2, 3]
+    .slice(0, image.data[i + 3] === 255 ? 3 : 4)
+    .map((c) => image.data[i + c]!.toString(16).padStart(2, "0"));
   return `#${hex.join("")}`;
 }

@@ -18,3 +18,8 @@ export function swatchProps(
     },
   };
 }
+
+export const swatchStyle = (color: string) => ({
+  backgroundImage: `linear-gradient(${color}, ${color}), repeating-conic-gradient(#e7e1e4 0 25%, #ffffff 0 50%)`,
+  backgroundSize: "100% 100%, 8px 8px",
+});

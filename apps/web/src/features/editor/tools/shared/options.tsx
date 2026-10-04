@@ -1,27 +1,141 @@
+import { useState } from "react";
 import { Button, IconButton } from "@pigxel/ui/components/button";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { Text } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
 import type { Stamp } from "../../pixel-canvas/paint";
 import {
+  MAX_CORNER_RADIUS,
+  MAX_STABILIZER,
   clampOpacity,
   clampPenSize,
+  clampStabilizer,
   clampTolerance,
 } from "../../pixel-canvas/pen";
 import type { Transform } from "../../pixel-canvas/use-selection";
 import type { ToolOptionProps } from "../types";
+import { fitsLibrary, sameStamp, type SavedBrush } from "../../brush-library";
 import { NumberOption, OptionSelect, SizeField } from "./fields";
 
-export function StampOption({ tool, stamp, onClearStamp }: ToolOptionProps) {
-  if (!tool.stamp || !stamp) return null;
+export function StampOption({
+  tool,
+  pen,
+  onChange,
+  stamp,
+  onClearStamp,
+  brushes,
+  onSaveBrush,
+  onPickBrush,
+  onRemoveBrush,
+}: ToolOptionProps) {
+  if (!tool.stamp || (!stamp && !brushes.length)) return null;
+  const saved = stamp && brushes.some((b) => sameStamp(b.stamp, stamp));
   return (
     <span className="flex items-center gap-2">
       <Text as="span" tone="muted">
         Brush
       </Text>
-      <StampPreview stamp={stamp} />
-      <IconButton label="Back to the normal brush" onClick={onClearStamp}>
-        ✕
-      </IconButton>
+      {stamp && <StampPreview stamp={stamp} />}
+      {stamp && !saved && fitsLibrary(stamp) && (
+        <Button size="sm" variant="ghost" onClick={onSaveBrush}>
+          Save
+        </Button>
+      )}
+      <BrushLibrary
+        brushes={brushes}
+        current={stamp}
+        onPick={onPickBrush}
+        onDefault={onClearStamp}
+        onRemove={onRemoveBrush}
+      />
+      {stamp && (
+        <CheckboxField
+          label="Pattern"
+          title="Paints the brush as a texture fixed to the tile, so strokes join up seamlessly"
+          checked={pen.stampPattern}
+          onChange={(e) => onChange({ ...pen, stampPattern: e.target.checked })}
+        />
+      )}
+      {stamp && (
+        <IconButton label="Back to the normal brush" onClick={onClearStamp}>
+          ✕
+        </IconButton>
+      )}
+    </span>
+  );
+}
+
+function BrushLibrary({
+  brushes,
+  current,
+  onPick,
+  onDefault,
+  onRemove,
+}: {
+  brushes: SavedBrush[];
+  current: Stamp | null;
+  onPick: (stamp: Stamp) => void;
+  onDefault: () => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!brushes.length) return null;
+  return (
+    <span className="relative">
+      <Button
+        size="sm"
+        variant="secondary"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {current ? "Change" : "Default"} ▾
+      </Button>
+      {open && (
+        <span className="absolute top-full left-0 z-50 mt-1 grid w-64 grid-cols-4 gap-1 rounded-lg border bg-background p-2 shadow-lg">
+          <button
+            type="button"
+            aria-pressed={!current}
+            onClick={() => {
+              onDefault();
+              setOpen(false);
+            }}
+            className={cn(
+              "grid h-12 w-full place-items-center rounded-md border text-xs hover:bg-muted",
+              !current && "border-primary bg-primary/10",
+            )}
+          >
+            Default
+          </button>
+          {brushes.map((brush) => (
+            <span key={brush.id} className="group relative">
+              <button
+                type="button"
+                aria-label={`Use brush ${brush.stamp.w} × ${brush.stamp.h}`}
+                onClick={() => {
+                  onPick(brush.stamp);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "grid h-12 w-full place-items-center rounded-md border hover:bg-muted",
+                  current &&
+                    sameStamp(current, brush.stamp) &&
+                    "border-primary bg-primary/10",
+                )}
+              >
+                <StampPreview stamp={brush.stamp} />
+              </button>
+              <button
+                type="button"
+                aria-label="Remove this brush"
+                onClick={() => onRemove(brush.id)}
+                className="absolute -top-1 -right-1 hidden size-4 place-items-center rounded-full bg-foreground text-[10px] leading-none text-background group-hover:grid"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </span>
+      )}
     </span>
   );
 }
@@ -128,6 +242,27 @@ export function FilledOption({ pen, onChange }: ToolOptionProps) {
   );
 }
 
+export function CornerRadiusOption({ pen, onChange }: ToolOptionProps) {
+  return (
+    <NumberOption
+      label="Corners"
+      title="Rounds the corners by this many pixels; 0 keeps them square"
+      min={0}
+      max={MAX_CORNER_RADIUS}
+      value={pen.cornerRadius}
+      onChange={(value) =>
+        onChange({
+          ...pen,
+          cornerRadius: Math.min(
+            MAX_CORNER_RADIUS,
+            Math.max(0, Math.round(value) || 0),
+          ),
+        })
+      }
+    />
+  );
+}
+
 export function ContiguousOption({ pen, onChange }: ToolOptionProps) {
   return (
     <CheckboxField
@@ -135,6 +270,21 @@ export function ContiguousOption({ pen, onChange }: ToolOptionProps) {
       title="Off: takes every pixel of the clicked colour, connected or not"
       checked={pen.contiguous}
       onChange={(e) => onChange({ ...pen, contiguous: e.target.checked })}
+    />
+  );
+}
+
+export function StabilizerOption({ pen, onChange }: ToolOptionProps) {
+  return (
+    <NumberOption
+      label="Stabilizer"
+      title="The line follows the pointer on a string this many pixels long, smoothing out a shaky hand. 0 is off"
+      min={0}
+      max={MAX_STABILIZER}
+      value={pen.stabilizer}
+      onChange={(value) =>
+        onChange({ ...pen, stabilizer: clampStabilizer(value) })
+      }
     />
   );
 }

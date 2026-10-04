@@ -1,4 +1,5 @@
 "use client";
+import { EditorSelect } from "./editor-select";
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -128,21 +129,18 @@ export default function PublishAssetDialog({
             />
           </Field>
           <Field label="Kind" htmlFor="asset-category">
-            <select
+            <EditorSelect
               id="asset-category"
               value={category}
-              onChange={(e) => {
-                if (isAssetCategory(e.target.value))
-                  setCategory(e.target.value);
+              onChange={(value) => {
+                if (isAssetCategory(value)) setCategory(value);
               }}
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
-            >
-              {ASSET_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              options={ASSET_CATEGORIES.map((c) => ({
+                value: c.id,
+                label: c.label,
+              }))}
+            />
           </Field>
           {status.state === "replace" && (
             <FormMessage>

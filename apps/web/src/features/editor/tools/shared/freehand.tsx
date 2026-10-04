@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useEffectEvent, useImperativeHandle, useRef } from "react";
-import { extendStroke, linePoints } from "../../pixel-canvas/pen";
+import {
+  extendStroke,
+  followRope,
+  linePoints,
+  type Point,
+} from "../../pixel-canvas/pen";
 import type { ToolCanvasProps } from "../types";
 import {
   colorInk,
@@ -29,6 +34,7 @@ export function FreehandStroke({
   joinsLast?: boolean;
 }) {
   const stroke = useRef<Stroke>(null);
+  const rope = useRef<{ x: number; y: number } | null>(null);
   const draw = (current: Stroke) => drawStroke(props, current, ink, render);
 
   const finish = () => {
@@ -51,12 +57,26 @@ export function FreehandStroke({
       });
       if (!current) return;
       stroke.current = current;
+      rope.current = point;
       draw(current);
     },
     move(_, passed) {
       const current = stroke.current;
       if (!current) return;
-      const points = passed.reduce(extendStroke, current.points);
+      const length = props.pen.stabilizer;
+      const followed: Point[] = [];
+      if (length && rope.current)
+        for (const target of passed) {
+          rope.current = followRope(rope.current, target, length);
+          followed.push({
+            x: Math.round(rope.current.x),
+            y: Math.round(rope.current.y),
+          });
+        }
+      const points = (length ? followed : passed).reduce(
+        extendStroke,
+        current.points,
+      );
       if (points === current.points) return;
       current.points = points;
       draw(current);

@@ -7,6 +7,7 @@ import {
   PANEL_LABELS,
   setBottomHeight,
   setPanelCollapsed,
+  setPanelHeight,
   setPanelShown,
   onLeft,
   shownStacks,
@@ -19,7 +20,11 @@ import { Panel } from "./panel";
 import { Splitter, shareBetween } from "./splitter";
 import type { PanelDrag } from "./use-panel-drag";
 
-export type PanelContent = { body: ReactNode; fit?: boolean };
+export type PanelContent = {
+  body: ReactNode;
+  fill?: boolean;
+  actions?: ReactNode;
+};
 
 type SetLayout = (change: (layout: Layout) => Layout) => void;
 
@@ -58,6 +63,7 @@ export function Dock({
   const widthBar = (index: number, size: number) => (
     <Splitter
       axis="x"
+      className={cn("absolute inset-y-0", leftish ? "-right-1" : "-left-1")}
       onStart={() => (delta) =>
         setLayout((l) =>
           updateStack(l, side, index, {
@@ -70,11 +76,10 @@ export function Dock({
 
   const widthTotal = stacks.reduce((sum, s) => sum + s.size, 0) || 1;
   const column = (stack: (typeof stacks)[number]) => {
-    const weightTotal = stack.items.reduce((sum, i) => sum + i.weight, 0) || 1;
     return (
       <div
         data-stack
-        className="flex min-h-0 min-w-0 flex-col"
+        className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-1"
         style={
           bottom
             ? { flex: `${stack.size / widthTotal} 1 0` }
@@ -84,40 +89,48 @@ export function Dock({
         {stack.items.map((item, i) => {
           const collapsed = layout.collapsed.includes(item.id);
           const next = stack.items[i + 1];
-          const fit = (id: PanelId) =>
-            layout.collapsed.includes(id) || panels[id].fit;
-          const bar =
-            next && !fit(item.id) && !fit(next.id) ? (
-              <Splitter
-                axis="y"
-                onStart={(el) => {
-                  const share = shareBetween(
-                    el,
-                    "y",
-                    [item.weight, next.weight],
-                    MIN_PANEL,
-                  );
-                  return (delta) =>
-                    setLayout((l) => {
-                      const weights = [
-                        ...l.docks[side].stacks[stack.index]!.weights,
-                      ];
-                      [weights[item.at], weights[next.at]] = share(delta);
-                      return updateStack(l, side, stack.index, { weights });
-                    });
-                }}
-              />
-            ) : (
-              next && <div className="h-px shrink-0 bg-border" />
-            );
+          const bar = !collapsed ? (
+            <Splitter
+              className="h-1"
+              axis="y"
+              onStart={(el) => {
+                const from =
+                  el.previousElementSibling?.getBoundingClientRect().height ??
+                  MIN_PANEL;
+                const following =
+                  next && !layout.collapsed.includes(next.id) ? next.id : null;
+                const after = following
+                  ? (el.nextElementSibling?.getBoundingClientRect().height ??
+                    MIN_PANEL)
+                  : 0;
+                return (delta) => {
+                  const change = following
+                    ? Math.max(
+                        MIN_PANEL - from,
+                        Math.min(after - MIN_PANEL, delta),
+                      )
+                    : delta;
+                  setLayout((l) => {
+                    const resized = setPanelHeight(l, item.id, from + change);
+                    return following
+                      ? setPanelHeight(resized, following, after - change)
+                      : resized;
+                  });
+                };
+              }}
+            />
+          ) : (
+            next && <div className="h-1 shrink-0" />
+          );
           return (
             <Fragment key={item.id}>
               <Panel
                 id={item.id}
                 title={PANEL_LABELS[item.id]}
                 collapsed={collapsed}
-                fit={panels[item.id].fit}
-                weight={item.weight / weightTotal}
+                fill={panels[item.id].fill}
+                actions={panels[item.id].actions}
+                height={layout.heights[item.id]}
                 dragging={drag.dragging === item.id}
                 onDragStart={drag.start}
                 onCollapse={(on) =>
@@ -142,10 +155,11 @@ export function Dock({
       <div
         data-dock="bottom"
         style={{ height: layout.docks.bottom.size }}
-        className="flex shrink-0 flex-col border-t bg-background"
+        className="relative flex shrink-0 flex-col bg-muted"
       >
         <Splitter
           axis="y"
+          className="absolute inset-x-0 -top-1"
           onStart={() => {
             const height = layout.docks.bottom.size;
             return (delta) =>
@@ -161,7 +175,7 @@ export function Dock({
                 {next && (
                   <Splitter
                     axis="x"
-                    className="bg-border"
+                    className="-mx-1 w-2"
                     onStart={(el) => {
                       const share = shareBetween(
                         el,
@@ -193,18 +207,13 @@ export function Dock({
     <aside
       data-dock={side}
       aria-label={leftish ? "Left panels" : "Right panels"}
-      className={cn(
-        "flex min-h-0 shrink-0 bg-background",
-        leftish ? "border-r" : "border-l",
-      )}
+      className="flex min-h-0 shrink-0 bg-muted"
     >
-      {stacks.map((stack, i) => (
-        <Fragment key={stack.index}>
-          {!leftish && widthBar(stack.index, stack.size)}
+      {stacks.map((stack) => (
+        <div key={stack.index} className="relative flex min-h-0">
           {column(stack)}
-          {leftish && widthBar(stack.index, stack.size)}
-          {i < stacks.length - 1 && <div className="w-px shrink-0 bg-border" />}
-        </Fragment>
+          {widthBar(stack.index, stack.size)}
+        </div>
       ))}
     </aside>
   );
