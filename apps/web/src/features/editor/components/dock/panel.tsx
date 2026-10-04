@@ -2,6 +2,8 @@
 
 import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { HeaderButton } from "./header-button";
+import { PANEL_ICONS } from "./icons";
 import { MIN_PANEL, type PanelId } from "../../layout";
 
 export function Panel({
@@ -10,6 +12,7 @@ export function Panel({
   collapsed,
   fill,
   height,
+  actions,
   dragging,
   onDragStart,
   onCollapse,
@@ -21,6 +24,7 @@ export function Panel({
   collapsed: boolean;
   fill?: boolean;
   height?: number;
+  actions?: ReactNode;
   dragging: boolean;
   onDragStart: (id: PanelId, e: PointerEvent<HTMLElement>) => void;
   onCollapse: (collapsed: boolean) => void;
@@ -42,7 +46,7 @@ export function Panel({
         minHeight: collapsed ? undefined : MIN_PANEL,
       }}
       className={cn(
-        "flex min-h-0 flex-col overflow-hidden transition-opacity",
+        "flex min-h-0 flex-col overflow-hidden rounded-lg border bg-background shadow-sm transition-opacity",
         dragging && "opacity-30",
       )}
     >
@@ -52,30 +56,31 @@ export function Panel({
           if ((e.target as HTMLElement).closest("button")) return;
           onDragStart(id, e);
         }}
-        className="flex h-7 shrink-0 cursor-grab touch-none items-center gap-1 bg-muted/40 pr-1 pl-2 select-none active:cursor-grabbing"
+        className={cn(
+          "flex h-8 shrink-0 cursor-grab touch-none items-center gap-0.5 pr-1.5 pl-1 select-none active:cursor-grabbing",
+          !collapsed && "border-b",
+        )}
       >
-        <span className="min-w-0 flex-1 truncate text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+        <span className="text-muted-foreground/60">{PANEL_ICONS.grip}</span>
+        <span className="min-w-0 flex-1 truncate text-[11px] font-semibold tracking-wider text-foreground/80 uppercase">
           {title}
         </span>
-        <button
-          type="button"
-          aria-label={collapsed ? `Open ${title}` : `Fold ${title}`}
-          aria-expanded={!collapsed}
-          title={collapsed ? "Open" : "Fold"}
+        {!collapsed && actions && (
+          <>
+            {actions}
+            <span aria-hidden="true" className="mx-1 h-4 w-px bg-border" />
+          </>
+        )}
+        <HeaderButton
+          label={collapsed ? "Open" : "Fold"}
+          icon={collapsed ? PANEL_ICONS.open : PANEL_ICONS.fold}
           onClick={() => onCollapse(!collapsed)}
-          className="grid size-5 place-items-center rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          {collapsed ? "▸" : "▾"}
-        </button>
-        <button
-          type="button"
-          aria-label={`Close ${title}`}
-          title="Close (Window brings it back)"
+        />
+        <HeaderButton
+          label="Close · Window brings it back"
+          icon={PANEL_ICONS.close}
           onClick={onClose}
-          className="grid size-5 place-items-center rounded text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          ×
-        </button>
+        />
       </header>
       {!collapsed && (
         <div className="flex min-h-0 flex-1 flex-col overflow-auto">

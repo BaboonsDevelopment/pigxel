@@ -102,6 +102,7 @@ import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
 import { ColorsPanel } from "./colors/colors-panel";
+import { PaletteActions } from "./colors/palette-actions";
 import { PalettePanel } from "./colors/palette-panel";
 import { Dock, type PanelContent } from "./dock/dock";
 import { DragOverlay } from "./dock/drag-overlay";
@@ -899,6 +900,26 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  const changePalette = (
+    next: string[],
+    change?: { edited?: { from: string; to: string }; loaded?: boolean },
+  ) => {
+    const edited = change?.edited;
+    sprite.setPalette(
+      next,
+      edited
+        ? new Map([[edited.from, edited.to]])
+        : change?.loaded
+          ? recolorByPlace(sprite.palette, next)
+          : undefined,
+    );
+    if (edited)
+      setPen((p) => ({
+        ...p,
+        color: p.color === edited.from ? edited.to : p.color,
+        secondary: p.secondary === edited.from ? edited.to : p.secondary,
+      }));
+  };
   const panels: Record<PanelId, PanelContent> = {
     tools: {
       body: (
@@ -912,32 +933,22 @@ export function Editor({
     },
     colors: { body: <ColorsPanel pen={pen} onChange={setPen} /> },
     palette: {
+      actions: (
+        <PaletteActions
+          pen={pen}
+          palette={sprite.palette}
+          onPaletteChange={changePalette}
+          frameColors={() => colorsOf(sprite.composite(["reference"]))}
+          fileName={file.name}
+        />
+      ),
       body: (
         <PalettePanel
           pen={pen}
           onChange={setPen}
           palette={sprite.palette}
           colorMode={sprite.colorMode}
-          onPaletteChange={(next, change) => {
-            const edited = change?.edited;
-            sprite.setPalette(
-              next,
-              edited
-                ? new Map([[edited.from, edited.to]])
-                : change?.loaded
-                  ? recolorByPlace(sprite.palette, next)
-                  : undefined,
-            );
-            if (edited)
-              setPen((p) => ({
-                ...p,
-                color: p.color === edited.from ? edited.to : p.color,
-                secondary:
-                  p.secondary === edited.from ? edited.to : p.secondary,
-              }));
-          }}
-          frameColors={() => colorsOf(sprite.composite(["reference"]))}
-          fileName={file.name}
+          onPaletteChange={changePalette}
         />
       ),
     },

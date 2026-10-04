@@ -30,6 +30,7 @@ export function ColorPicker({
   const opaque = opaqueHex(color);
   const onAlpha = (a: number) => onChange(withAlpha(opaque, a));
   const [model, setModel] = useState<"hsv" | "hsl">("hsv");
+  const [sliders, setSliders] = useState(false);
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(color));
   const [shown, setShown] = useState(color);
   const [text, setText] = useState(color);
@@ -190,75 +191,87 @@ export function ColorPicker({
       }
 
       <div className="flex flex-col gap-1">
-        <div className="flex gap-1 self-start rounded-md bg-muted p-0.5 text-[10px] font-medium">
-          {(["hsv", "hsl"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={model === m}
-              onClick={() => setModel(m)}
-              className={cn(
-                "rounded px-2 py-0.5 uppercase",
-                model === m
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground",
-              )}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        {model === "hsv" ? (
+        <button
+          type="button"
+          aria-expanded={sliders}
+          onClick={() => setSliders((open) => !open)}
+          className="flex items-center gap-1 self-start text-[10px] font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground"
+        >
+          {sliders ? "▾" : "▸"} Sliders
+        </button>
+        {sliders && (
           <>
-            <Channel
-              label="H"
-              max={360}
-              value={hsv.h}
-              onChange={(h) => change({ ...hsv, h })}
-            />
-            <Channel
-              label="S"
-              max={100}
-              value={hsv.s * 100}
-              onChange={(v) => change({ ...hsv, s: v / 100 })}
-            />
-            <Channel
-              label="V"
-              max={100}
-              value={hsv.v * 100}
-              onChange={(v) => change({ ...hsv, v: v / 100 })}
-            />
-          </>
-        ) : (
-          (() => {
-            const hsl = hsvToHsl(hsv);
-            const set = (patch: Partial<typeof hsl>) =>
-              change(hslToHsv({ ...hsl, ...patch }));
-            return (
+            <div className="flex gap-1 self-start rounded-md bg-muted p-0.5 text-[10px] font-medium">
+              {(["hsv", "hsl"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={model === m}
+                  onClick={() => setModel(m)}
+                  className={cn(
+                    "rounded px-2 py-0.5 uppercase",
+                    model === m
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            {model === "hsv" ? (
               <>
                 <Channel
                   label="H"
                   max={360}
-                  value={hsl.h}
-                  onChange={(h) => set({ h })}
+                  value={hsv.h}
+                  onChange={(h) => change({ ...hsv, h })}
                 />
                 <Channel
                   label="S"
                   max={100}
-                  value={hsl.s * 100}
-                  onChange={(v) => set({ s: v / 100 })}
+                  value={hsv.s * 100}
+                  onChange={(v) => change({ ...hsv, s: v / 100 })}
                 />
                 <Channel
-                  label="L"
+                  label="V"
                   max={100}
-                  value={hsl.l * 100}
-                  onChange={(v) => set({ l: v / 100 })}
+                  value={hsv.v * 100}
+                  onChange={(v) => change({ ...hsv, v: v / 100 })}
                 />
               </>
-            );
-          })()
+            ) : (
+              (() => {
+                const hsl = hsvToHsl(hsv);
+                const set = (patch: Partial<typeof hsl>) =>
+                  change(hslToHsv({ ...hsl, ...patch }));
+                return (
+                  <>
+                    <Channel
+                      label="H"
+                      max={360}
+                      value={hsl.h}
+                      onChange={(h) => set({ h })}
+                    />
+                    <Channel
+                      label="S"
+                      max={100}
+                      value={hsl.s * 100}
+                      onChange={(v) => set({ s: v / 100 })}
+                    />
+                    <Channel
+                      label="L"
+                      max={100}
+                      value={hsl.l * 100}
+                      onChange={(v) => set({ l: v / 100 })}
+                    />
+                  </>
+                );
+              })()
+            )}
+            <Channel label="A" max={255} value={alpha} onChange={onAlpha} />
+          </>
         )}
-        <Channel label="A" max={255} value={alpha} onChange={onAlpha} />
       </div>
 
       <div className="flex gap-0.5" role="group" aria-label="Shades">
