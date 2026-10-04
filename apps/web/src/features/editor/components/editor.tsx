@@ -49,6 +49,9 @@ import type { MenuSections } from "./menu/constants";
 import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
+import { TilesetPanel } from "./tileset/tileset-panel";
+import { saveExport } from "../export/save";
+import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
@@ -154,6 +157,9 @@ const OutlineDialog = dynamic(() => import("./outline-dialog"), {
 const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
   ssr: false,
 });
+const TileSizeDialog = dynamic(() => import("./tileset/tile-size-dialog"), {
+  ssr: false,
+});
 const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
   ssr: false,
 });
@@ -233,6 +239,7 @@ export function Editor({
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [onionSettings, setOnionSettings] = useState(false);
+  const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
   const changeBrushes = (next: SavedBrush[]) => {
@@ -285,6 +292,16 @@ export function Editor({
           "timeline",
           false,
         ),
+      );
+  }
+  const tilemapKey =
+    sprite.activeLayer?.kind === "tilemap" ? sprite.layerId : null;
+  const [seenTilemap, setSeenTilemap] = useState(tilemapKey);
+  if (seenTilemap !== tilemapKey) {
+    setSeenTilemap(tilemapKey);
+    if (tilemapKey)
+      setLayout((l) =>
+        setPanelCollapsed(setPanelShown(l, "tileset", true), "tileset", false),
       );
   }
   const latestScale = useRef(scale);
@@ -1059,9 +1076,25 @@ export function Editor({
         />
       ),
     },
+    tileset: {
+      body: (
+        <TilesetPanel
+          sprite={sprite}
+          onNewTilemap={(convert) => setTiling({ convert })}
+          onPickTile={() => setTool("tile")}
+          onExport={() => void saveExport(tilemapFiles(sprite, file.name))}
+        />
+      ),
+    },
     timeline: {
       fill: true,
-      body: <Timeline sprite={sprite} playback={playback} />,
+      body: (
+        <Timeline
+          sprite={sprite}
+          playback={playback}
+          onTilemap={(convert) => setTiling({ convert })}
+        />
+      ),
     },
     assistant: {
       fill: true,
@@ -1122,6 +1155,7 @@ export function Editor({
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         onImportSheet={() => sheetInput.current?.click()}
+        onTilemap={(convert) => setTiling({ convert })}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "Select", sections: selectMenu },
@@ -1325,6 +1359,17 @@ export function Editor({
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {tiling && (
+        <TileSizeDialog
+          convert={tiling.convert}
+          onApply={(tile) => {
+            selection.deselect();
+            if (tiling.convert) sprite.convertToTilemap(sprite.layerId, tile);
+            else sprite.addTilemapLayer(tile);
+          }}
+          onClose={() => setTiling(null)}
         />
       )}
       {onionSettings && (

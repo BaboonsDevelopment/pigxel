@@ -2,6 +2,7 @@ export const PANELS = [
   "tools",
   "colors",
   "palette",
+  "tileset",
   "assistant",
   "timeline",
 ] as const;
@@ -22,6 +23,7 @@ export const PANEL_LABELS: Record<PanelId, string> = {
   tools: "Tools",
   colors: "Colors",
   palette: "Palette",
+  tileset: "Tileset",
   assistant: "Assistant",
   timeline: "Timeline",
 };
@@ -55,7 +57,10 @@ const stack = (panels: PanelId[], weights: number[], size: number): Stack => ({
 export const DEFAULT_LAYOUT: Layout = {
   docks: {
     left: { stacks: [stack(["tools", "colors"], [3, 2], 112)], size: 0 },
-    right: { stacks: [stack(["palette", "assistant"], [1, 2], 320)], size: 0 },
+    right: {
+      stacks: [stack(["palette", "tileset", "assistant"], [1, 1, 2], 320)],
+      size: 0,
+    },
     bottom: {
       stacks: [stack(["timeline"], [1], 1)],
       size: BOTTOM_HEIGHT.initial,
@@ -64,7 +69,7 @@ export const DEFAULT_LAYOUT: Layout = {
     innerRight: { stacks: [], size: 0 },
   },
   collapsed: [],
-  hidden: [],
+  hidden: ["tileset"],
   hiddenTools: [],
   groupTools: {},
   heights: {},
@@ -74,9 +79,12 @@ const HOME: Record<PanelId, DockSide> = {
   tools: "left",
   colors: "left",
   palette: "right",
+  tileset: "right",
   assistant: "right",
   timeline: "bottom",
 };
+
+const ANCHORS: Partial<Record<PanelId, PanelId>> = { tileset: "palette" };
 
 const isPanel = (v: unknown): v is PanelId => PANELS.includes(v as PanelId);
 const clamp = (v: number, min: number, max: number) =>
@@ -157,8 +165,16 @@ export function readLayout(raw: unknown): Layout {
           )
         : {},
   };
-  for (const p of PANELS)
-    if (!seen.has(p)) layout = placeAtEdge(layout, p, HOME[p], "end");
+  for (const p of PANELS) {
+    if (seen.has(p)) continue;
+    const anchor = ANCHORS[p];
+    layout =
+      anchor && seen.has(anchor)
+        ? movePanel(layout, p, { kind: "panel", anchor, where: "below" })
+        : placeAtEdge(layout, p, HOME[p], "end");
+    if (DEFAULT_LAYOUT.hidden.includes(p))
+      layout = { ...layout, hidden: [...layout.hidden, p] };
+  }
   return layout;
 }
 

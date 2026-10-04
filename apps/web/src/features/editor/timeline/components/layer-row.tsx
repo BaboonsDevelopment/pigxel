@@ -148,6 +148,7 @@ export function LayerRow({
         )}
         {layer.kind === "group" && ICONS.group}
         {layer.kind === "reference" && ICONS.reference}
+        {layer.kind === "tilemap" && ICONS.tilemap}
 
         {renaming ? (
           <input

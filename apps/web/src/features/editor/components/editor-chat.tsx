@@ -58,7 +58,7 @@ function createBridge(
   const layers = (): LayerInfo[] => {
     const { tree, frameId, size } = sprite();
     return allLayers(tree)
-      .filter((layer) => layer.kind === "normal")
+      .filter((layer) => layer.kind === "normal" || layer.kind === "tilemap")
       .reverse()
       .map((layer) => ({
         id: layer.id,

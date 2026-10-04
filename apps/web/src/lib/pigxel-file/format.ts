@@ -11,6 +11,7 @@ import {
 import { flatten } from "@/lib/layers/composite";
 import { allLayers, createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
+import { MAX_TILE, MIN_TILE, type TileSize } from "@/lib/tilemap/tilemap";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
@@ -24,7 +25,7 @@ import {
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-const PIGXEL_VERSION = 6;
+const PIGXEL_VERSION = 7;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -116,6 +117,9 @@ type FileLayer = {
   labelColor?: string;
   collapsed?: boolean;
   children?: FileLayer[];
+  tile?: TileSize;
+  tiles?: string[];
+  flips?: boolean;
 };
 
 export class PigxelFileError extends Error {}
@@ -138,6 +142,13 @@ export function serializePigxel(doc: PigxelDocument): string {
       blend,
       ...(labelColor && { labelColor }),
     };
+    if (layer.kind === "tilemap")
+      return {
+        ...base,
+        tile: layer.tile,
+        tiles: layer.tiles.map(encodeCel),
+        ...(layer.flips && { flips: true }),
+      };
     return layer.kind === "group"
       ? {
           ...base,
@@ -334,6 +345,18 @@ function readLayers(
         children: readLayers(entry.children, ids, false, onPixelLayer),
       };
     onPixelLayer?.(id, entry);
+    if (layer.kind === "tilemap") {
+      const tile = readTileSize(entry.tile);
+      return {
+        ...layer,
+        ...settings,
+        tile,
+        flips: entry.flips === true,
+        tiles: Array.isArray(entry.tiles)
+          ? entry.tiles.map((value) => readTile(value, tile.w * tile.h * 4))
+          : [],
+      };
+    }
     return { ...layer, ...settings };
   });
 }
@@ -367,6 +390,28 @@ function readCels(
       frameCels.set(layer, readPixels(entry.pixels));
   }
   return cels;
+}
+
+function readTileSize(value: unknown): TileSize {
+  const side = (v: unknown) =>
+    Number.isInteger(v) &&
+    (v as number) >= MIN_TILE &&
+    (v as number) <= MAX_TILE;
+  if (!isObject(value) || !side(value.w) || !side(value.h)) throw DAMAGED();
+  return { w: value.w as number, h: value.h as number };
+}
+
+function readTile(value: unknown, length: number) {
+  if (typeof value !== "string") throw DAMAGED();
+  let data: Uint8ClampedArray;
+  try {
+    const bytes = fromBase64(value);
+    data = new Uint8ClampedArray(inflateSync(new Uint8Array(bytes.buffer)));
+  } catch {
+    throw DAMAGED();
+  }
+  if (data.length !== length) throw DAMAGED();
+  return data;
 }
 
 function uniqueId(value: unknown, ids: Set<string>, fresh: string) {

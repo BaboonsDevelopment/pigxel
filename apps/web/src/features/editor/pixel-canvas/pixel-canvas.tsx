@@ -480,6 +480,17 @@ export function PixelCanvas({
         />
       )}
 
+      {sprite.activeLayer?.kind === "tilemap" && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            ...MAJOR_GRID_STYLE,
+            backgroundSize: `${sprite.activeLayer.tile.w * scale}px ${sprite.activeLayer.tile.h * scale}px`,
+          }}
+        />
+      )}
+
       {symmetry !== "none" && (
         <SymmetryAxes
           symmetry={symmetry}

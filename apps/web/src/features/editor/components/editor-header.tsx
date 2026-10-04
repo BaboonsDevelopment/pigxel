@@ -36,6 +36,7 @@ export function EditorHeader({
   onExport,
   onPublish,
   onImportSheet,
+  onTilemap,
   menus,
   afterMenus = [],
 }: {
@@ -50,6 +51,7 @@ export function EditorHeader({
   onExport: () => void;
   onPublish?: () => void;
   onImportSheet: () => void;
+  onTilemap: (convert: boolean) => void;
   menus: { label: string; sections: MenuSections }[];
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
@@ -150,7 +152,10 @@ export function EditorHeader({
       {menus.map((menu) => (
         <Menu key={menu.label} label={menu.label} sections={menu.sections} />
       ))}
-      <Menu label="Layer" sections={layerActions(sprite)} />
+      <Menu
+        label="Layer"
+        sections={layerActions(sprite, undefined, undefined, onTilemap)}
+      />
       <Menu label="Frame" sections={frameActions(sprite, playback)} />
       {afterMenus.map((menu) => (
         <Menu key={menu.label} label={menu.label} sections={menu.sections} />

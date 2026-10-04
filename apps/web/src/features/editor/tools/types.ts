@@ -13,7 +13,15 @@ import type { Slice } from "@/lib/slices/slices";
 import type { SavedBrush } from "../brush-library";
 
 export type ToolGroupId =
-  "select" | "move" | "draw" | "shapes" | "fill" | "effects" | "text" | "pick";
+  | "select"
+  | "move"
+  | "draw"
+  | "shapes"
+  | "fill"
+  | "effects"
+  | "text"
+  | "tiles"
+  | "pick";
 
 export type SizeKey = "size" | "brushSize" | "eraserSize" | "sprayWidth";
 
