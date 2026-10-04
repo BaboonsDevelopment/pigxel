@@ -53,7 +53,7 @@ import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { panelRows } from "@/lib/layers/tree";
+import { allLayers, panelRows } from "@/lib/layers/tree";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
@@ -88,6 +88,7 @@ import {
   PANEL_LABELS,
   movePanel,
   movesPanel,
+  setPanelCollapsed,
   setPanelShown,
   setToolShown,
   type PanelId,
@@ -265,6 +266,23 @@ export function Editor({
   });
 
   const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
+  const [seenLayers, setSeenLayers] = useState(layerIds);
+  if (seenLayers.join() !== layerIds.join()) {
+    setSeenLayers(layerIds);
+    if (
+      !seenLayers.includes(sprite.layerId) &&
+      layerIds.includes(sprite.layerId) &&
+      seenLayers.every((id) => layerIds.includes(id))
+    )
+      setLayout((l) =>
+        setPanelCollapsed(
+          setPanelShown(l, "timeline", true),
+          "timeline",
+          false,
+        ),
+      );
+  }
   const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;

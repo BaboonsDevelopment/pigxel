@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { flatten } from "@/lib/layers/composite";
+import { compositeOver, flatten } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
@@ -507,6 +507,73 @@ export function useSprite(
     finish({ tree: nextTree, frames: nextFrames });
   };
 
+  const canMergeDown = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    const below = layerTree.layerBelow(tree, id);
+    return (
+      !!layer &&
+      layer.kind !== "reference" &&
+      (below?.kind === "normal" || below?.kind === "background")
+    );
+  };
+
+  const mergeDown = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    const below = layerTree.layerBelow(tree, id);
+    if (!layer || !below || !canMergeDown(id)) return;
+    const length = size.w * size.h * 4;
+    for (const frame of frames) {
+      const top =
+        layer.kind === "group"
+          ? flatten(
+              layer.children,
+              (child) => cels.pixels(frame.id, child),
+              length,
+              ["reference"],
+            )
+          : cels.pixels(frame.id, layer.id);
+      if (!top) continue;
+      const own = cels.pixels(frame.id, below.id);
+      const base = own
+        ? new Uint8ClampedArray(own)
+        : new Uint8ClampedArray(length);
+      compositeOver(base, top, layer.opacity, layer.blend);
+      putCels(below.id, [[frame.id, base]]);
+    }
+    for (const gone of layerTree.pixelLayerIds([layer])) cels.deleteLayer(gone);
+    setLayerId(below.id);
+    changeTree(layerTree.removeLayer(tree, id));
+  };
+
+  const canFlatten = (visibleOnly: boolean) =>
+    layerTree.flattenTargets(tree, visibleOnly).length > 1;
+
+  const flattenLayers = (visibleOnly: boolean) => {
+    const ids = layerTree.flattenTargets(tree, visibleOnly);
+    if (ids.length < 2) return;
+    const merged = new Set(ids);
+    const background = layerTree
+      .allLayers(tree)
+      .find(
+        (layer) =>
+          merged.has(layer.id) && layer.kind === "background" && layer.visible,
+      );
+    const layer = layerTree.createLayer(
+      background ? "background" : "normal",
+      background?.name ?? "Flattened",
+    );
+    for (const frame of frames)
+      putCels(layer.id, [[frame.id, composite(["reference"], frame.id)]]);
+    for (const id of ids) cels.deleteLayer(id);
+    setLayerId(layer.id);
+    changeTree(
+      layerTree.insertLayer(layerTree.withoutLayers(tree, merged), layer, {
+        parentId: null,
+        index: 0,
+      }),
+    );
+  };
+
   const canRemoveLayer = (id: string) =>
     layerTree
       .allLayers(layerTree.removeLayer(tree, id))
@@ -682,6 +749,10 @@ export function useSprite(
     writeCels,
     cutToLayer,
     duplicateLayer,
+    canMergeDown,
+    mergeDown,
+    canFlatten,
+    flattenLayers,
     addAnimation,
     selectLayer: setLayerId,
     onLeaveCel: (callback: () => void) => {

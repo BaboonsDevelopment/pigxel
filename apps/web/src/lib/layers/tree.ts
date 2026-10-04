@@ -105,6 +105,38 @@ export function placeAbove(tree: Layer[], id: string | null): Place {
   return { parentId: found.parent?.id ?? null, index: found.index + 1 };
 }
 
+export function layerBelow(tree: Layer[], id: string): Layer | null {
+  const found = findLayer(tree, id);
+  if (!found) return null;
+  return (found.parent?.children ?? tree)[found.index - 1] ?? null;
+}
+
+export function flattenTargets(
+  tree: Layer[],
+  visibleOnly: boolean,
+  shown = true,
+): string[] {
+  return tree.flatMap((layer) => {
+    const visible = shown && layer.visible;
+    if (layer.kind === "group")
+      return flattenTargets(layer.children, visibleOnly, visible);
+    return layer.kind !== "reference" && (visible || !visibleOnly)
+      ? [layer.id]
+      : [];
+  });
+}
+
+export function withoutLayers(tree: Layer[], ids: Set<string>): Layer[] {
+  return tree.flatMap((layer): Layer[] => {
+    if (ids.has(layer.id)) return [];
+    if (layer.kind !== "group") return [layer];
+    const children = withoutLayers(layer.children, ids);
+    return children.length || !layer.children.length
+      ? [{ ...layer, children }]
+      : [];
+  });
+}
+
 export function placeOutside(tree: Layer[], id: string): Place | null {
   const parent = findLayer(tree, id)?.parent;
   return parent ? placeAbove(tree, parent.id) : null;

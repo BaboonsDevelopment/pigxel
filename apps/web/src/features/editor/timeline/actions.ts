@@ -68,6 +68,23 @@ export function layerActions(
     ],
     [
       {
+        label: "Merge down",
+        onSelect: () => sprite.mergeDown(layerId),
+        disabled: !sprite.canMergeDown(layerId),
+      },
+      {
+        label: "Flatten visible",
+        onSelect: () => sprite.flattenLayers(true),
+        disabled: !sprite.canFlatten(true),
+      },
+      {
+        label: "Flatten",
+        onSelect: () => sprite.flattenLayers(false),
+        disabled: !sprite.canFlatten(false),
+      },
+    ],
+    [
+      {
         label: "Delete layer",
         onSelect: () => sprite.removeLayer(layerId),
         disabled: !sprite.canRemoveLayer(layerId),
