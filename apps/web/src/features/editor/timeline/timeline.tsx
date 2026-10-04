@@ -15,6 +15,7 @@ import { CelPropertiesDialog } from "./components/cel-properties-dialog";
 import { TimelineToolbar } from "./components/timeline-toolbar";
 import { LAYER_COLUMN, type DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
+import { frameRange } from "@/lib/sprite/frames";
 import { ICONS } from "./icons";
 import { EditorSelect } from "../components/editor-select";
 import type { Playback } from "./use-playback";
@@ -178,10 +179,28 @@ export function Timeline({
           <FrameHeader
             frames={frames}
             frameId={frameId}
-            onSelect={sprite.selectFrame}
+            selected={sprite.selectedFrames}
+            onSelect={(id, e) => {
+              if (e.shiftKey)
+                return sprite.pickFrames(frameRange(frames, frameId, id));
+              if (e.ctrlKey || e.metaKey) {
+                if (id === frameId) return;
+                const picked = sprite.selectedFrames;
+                return sprite.pickFrames(
+                  picked.includes(id)
+                    ? picked.filter((frame) => frame !== id)
+                    : [...picked, id],
+                );
+              }
+              sprite.pickFrames([]);
+              sprite.selectFrame(id);
+            }}
             onMove={sprite.moveFrame}
             onContextMenu={(id, e) => {
-              sprite.selectFrame(id);
+              if (!sprite.selectedFrames.includes(id)) {
+                sprite.pickFrames([]);
+                sprite.selectFrame(id);
+              }
               openMenu("frame", e);
             }}
           />

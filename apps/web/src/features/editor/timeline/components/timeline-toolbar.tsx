@@ -6,6 +6,7 @@ import { ICONS } from "../icons";
 import type { Playback } from "../use-playback";
 import { ControlGroup } from "./control-group";
 import { FrameDuration } from "./frame-duration";
+import { FrameJump } from "./frame-jump";
 import { LayerOptions } from "./layer-options";
 
 export function TimelineToolbar({
@@ -111,10 +112,20 @@ export function TimelineToolbar({
         >
           {ICONS.remove}
         </button>
+        <FrameJump
+          key={frameId}
+          index={frames.indexOf(frame)}
+          count={frames.length}
+          onJump={(index) => {
+            sprite.pickFrames([]);
+            sprite.selectFrame(frames[index]!.id);
+          }}
+        />
         <FrameDuration
-          key={`${frame.id}:${frame.duration}`}
+          key={`${frame.id}:${frame.duration}:${sprite.selectedFrames.length}`}
           duration={frame.duration}
-          onChange={(ms) => sprite.setFrameDuration(frame.id, ms)}
+          count={sprite.selectedFrames.length}
+          onChange={(ms) => sprite.setFramesDuration(sprite.selectedFrames, ms)}
         />
       </ControlGroup>
     </header>

@@ -116,6 +116,7 @@ export function frameActions(
   const { frames, frameId } = sprite;
   const at = frameIndex(frames, frameId);
   const single = frames.length < 2;
+  const several = sprite.selectedFrames.length > 1;
   return [
     [
       { label: "New empty frame", onSelect: () => sprite.addFrame(false) },
@@ -141,6 +142,18 @@ export function frameActions(
         label: "Next frame",
         shortcut: ".",
         onSelect: () => sprite.stepFrame(1),
+        disabled: single,
+      },
+    ],
+    [
+      {
+        label: "Select all frames",
+        onSelect: () => sprite.pickFrames(frames.map((frame) => frame.id)),
+        disabled: single,
+      },
+      {
+        label: several ? "Reverse selected frames" : "Reverse all frames",
+        onSelect: () => sprite.reverseFrames(sprite.selectedFrames),
         disabled: single,
       },
     ],

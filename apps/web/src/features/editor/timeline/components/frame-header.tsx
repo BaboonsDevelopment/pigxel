@@ -9,13 +9,15 @@ import { frameDropIndex, sideAt } from "../helpers";
 export function FrameHeader({
   frames,
   frameId,
+  selected,
   onSelect,
   onMove,
   onContextMenu,
 }: {
   frames: Frame[];
   frameId: string;
-  onSelect: (id: string) => void;
+  selected: string[];
+  onSelect: (id: string, e: React.MouseEvent) => void;
   onMove: (id: string, index: number) => void;
   onContextMenu: (id: string, e: React.MouseEvent) => void;
 }) {
@@ -45,7 +47,7 @@ export function FrameHeader({
           type="button"
           draggable
           title={`Frame ${index + 1} · ${frame.duration} ms`}
-          onClick={() => onSelect(frame.id)}
+          onClick={(e) => onSelect(frame.id, e)}
           onContextMenu={(e) => onContextMenu(frame.id, e)}
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
@@ -72,7 +74,9 @@ export function FrameHeader({
             FRAME_COLUMN,
             frame.id === frameId
               ? "bg-primary font-semibold text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted",
+              : selected.includes(frame.id)
+                ? "bg-primary/20 font-semibold text-foreground"
+                : "text-muted-foreground hover:bg-muted",
             over?.index === index &&
               (over.side === "before"
                 ? "shadow-[inset_2px_0_0_var(--color-primary)]"

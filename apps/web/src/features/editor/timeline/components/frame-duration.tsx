@@ -5,16 +5,20 @@ import { MAX_FRAME_DURATION, MIN_FRAME_DURATION } from "@/lib/sprite/constants";
 
 export function FrameDuration({
   duration,
+  count,
   onChange,
 }: {
   duration: number;
+  count: number;
   onChange: (ms: number) => void;
 }) {
   const [draft, setDraft] = useState(String(duration));
+  const [edited, setEdited] = useState(false);
 
   const apply = () => {
     const ms = Number(draft);
-    if (draft.trim() && ms !== duration) onChange(ms);
+    if (draft.trim() && (ms !== duration || (count > 1 && edited)))
+      onChange(ms);
     else setDraft(String(duration));
   };
 
@@ -23,13 +27,18 @@ export function FrameDuration({
       data-guide="frame-duration"
       className="flex items-center gap-1 text-sm"
     >
-      <span className="text-muted-foreground">Duration</span>
+      <span className="text-muted-foreground">
+        Duration{count > 1 && ` · ${count} frames`}
+      </span>
       <input
         type="number"
         min={MIN_FRAME_DURATION}
         max={MAX_FRAME_DURATION}
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          setEdited(true);
+        }}
         onBlur={apply}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();

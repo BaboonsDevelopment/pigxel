@@ -94,6 +94,7 @@ export function useSprite(
   });
   const [tree, setTree] = useState(initial.layers);
   const [soloId, setSoloId] = useState<string | null>(null);
+  const [pickedFrames, setPickedFrames] = useState<string[]>([]);
   const [frames, setFrames] = useState(initial.frames);
   const [tags, setTags] = useState(initial.tags ?? []);
   const [links, setLinks] = useState(initial.links ?? []);
@@ -1071,6 +1072,17 @@ export function useSprite(
     moveLayer: (id: string, place: Place) =>
       changeTree(layerTree.moveLayer(tree, id, place)),
     selectFrame: setFrameId,
+    selectedFrames: (() => {
+      const picked = frames
+        .filter((frame) => pickedFrames.includes(frame.id))
+        .map((frame) => frame.id);
+      return picked.length > 1 ? picked : [frameId];
+    })(),
+    pickFrames: setPickedFrames,
+    reverseFrames: (ids: string[]) =>
+      changeFrames(frameList.reversedFrames(frames, ids)),
+    setFramesDuration: (ids: string[], ms: number) =>
+      changeFrames(frameList.withDuration(frames, ids, ms)),
     stepFrame: (step: number) =>
       setFrameId(frameList.stepFrame(frames, frameId, step).id),
     addFrame,

@@ -53,6 +53,30 @@ export function updateFrame(
   );
 }
 
+export function reversedFrames(frames: Frame[], ids: string[]): Frame[] {
+  const picked = new Set(ids.length > 1 ? ids : frames.map((f) => f.id));
+  const reversed = frames.filter((frame) => picked.has(frame.id)).reverse();
+  let next = 0;
+  return frames.map((frame) =>
+    picked.has(frame.id) ? reversed[next++]! : frame,
+  );
+}
+
+export function withDuration(frames: Frame[], ids: string[], ms: number) {
+  const duration = clampDuration(ms);
+  return frames.map((frame) =>
+    ids.includes(frame.id) ? { ...frame, duration } : frame,
+  );
+}
+
+export function frameRange(frames: Frame[], from: string, to: string) {
+  const a = frameIndex(frames, from);
+  const b = frameIndex(frames, to);
+  return frames
+    .slice(Math.min(a, b), Math.max(a, b) + 1)
+    .map((frame) => frame.id);
+}
+
 export function celOf(cels: Cels, frameId: string, layerId: string) {
   return cels.get(frameId)?.get(layerId);
 }
