@@ -1611,9 +1611,12 @@ export function Editor({
                   isShown(sprite.tree, layer.id),
               )
               .map((layer) => ({
+                id: layer.id,
                 name: layer.name,
                 picture: (id: string) => sprite.readCel(layer.id, id),
               })),
+            compose: sprite.compositeOf,
+            selection: selection.mask,
             slices: sprite.slices,
           }}
           pixelRatio={sprite.pixelRatio}

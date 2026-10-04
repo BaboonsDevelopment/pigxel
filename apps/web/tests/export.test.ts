@@ -1,3 +1,4 @@
+import { unzipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXPORT,
@@ -8,6 +9,7 @@ import {
   exportSize,
   fitsCanvas,
   onColor,
+  partialSource,
   type ExportSource,
 } from "@/features/editor/export/export";
 import { encodeApng } from "@/features/editor/export/apng";
@@ -563,5 +565,68 @@ describe("animated PNG and WebP", () => {
     expect(text(webp, 8)).toBe("WEBP");
     expect(count(webp, "ANMF")).toBe(2);
     expect(count(webp, "VP8L")).toBe(2);
+  });
+});
+
+describe("PNG sequence and exporting a part", () => {
+  const red = [255, 0, 0, 255];
+  const blue = [0, 0, 255, 255];
+  const base: ExportSource = {
+    name: "Hero.pigxel",
+    size: { w: 2, h: 2 },
+    frames: [
+      { id: "f1", duration: 100 },
+      { id: "f2", duration: 200 },
+      { id: "f3", duration: 300 },
+    ],
+    tags: [
+      {
+        id: "t",
+        name: "walk",
+        from: 1,
+        to: 2,
+        color: "#ff0000",
+        direction: "forward",
+        repeat: 0,
+      },
+    ],
+    frameId: "f1",
+    background: "transparent",
+    picture: () => solid(2, 2, red),
+    layers: [
+      { id: "a", name: "Hero", picture: () => solid(2, 2, red) },
+      { id: "b", name: "Sky", picture: () => solid(2, 2, blue) },
+    ],
+    compose: (ids) => solid(2, 2, ids.includes("b") ? blue : red),
+    selection: new Uint8Array([0, 1, 0, 1]),
+    slices: [],
+  };
+  const settings = (patch: Partial<ExportSettings>): ExportSettings => ({
+    ...DEFAULT_EXPORT,
+    ...patch,
+  });
+
+  it("zips every frame as a numbered PNG", () => {
+    const [zip] = exportFiles(base, settings({ format: "frames" }));
+    expect(zip!.name).toBe("Hero-frames.zip");
+    if (!("data" in zip!) || typeof zip.data === "string")
+      throw new Error("expected bytes");
+    expect(Object.keys(unzipSync(zip.data))).toEqual([
+      "Hero 0.png",
+      "Hero 1.png",
+      "Hero 2.png",
+    ]);
+  });
+
+  it("keeps only the chosen layers, the tag's frames and the selection", () => {
+    const part = partialSource(
+      base,
+      settings({ partLayers: ["a"], partTag: "t", partSelection: true }),
+    );
+    expect(part.frames.map((f) => f.id)).toEqual(["f2", "f3"]);
+    expect(part.tags?.[0]).toMatchObject({ from: 0, to: 1 });
+    expect(part.size).toEqual({ w: 1, h: 2 });
+    expect([...part.picture("f2")]).toEqual([...red, ...red]);
+    expect(part.layers?.map((l) => l.name)).toEqual(["Hero"]);
   });
 });

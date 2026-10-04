@@ -61,6 +61,12 @@ export function replaceLayer(tree: Layer[], id: string, next: Layer): Layer[] {
   return mapTree(tree, (layer) => (layer.id === id ? next : layer));
 }
 
+export function onlyLayers(tree: Layer[], ids: ReadonlySet<string>): Layer[] {
+  return mapTree(tree, (layer) =>
+    layer.kind === "group" ? layer : { ...layer, visible: ids.has(layer.id) },
+  );
+}
+
 export function removeLayer(tree: Layer[], id: string): Layer[] {
   return tree
     .filter((layer) => layer.id !== id)

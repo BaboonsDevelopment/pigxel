@@ -55,17 +55,39 @@ function compressed(rgba: Uint8ClampedArray, width: number, height: number) {
   return zlibSync(rows, { level: 9 });
 }
 
+function joined(out: Uint8Array[]): Uint8Array<ArrayBuffer> {
+  const total = out.reduce((sum, part) => sum + part.length, 0);
+  const file = new Uint8Array(total);
+  let at = 0;
+  for (const part of out) {
+    file.set(part, at);
+    at += part.length;
+  }
+  return file;
+}
+
+const header = (width: number, height: number) =>
+  new Bytes().u32(width).u32(height).u8(8).u8(6).u8(0).u8(0).u8(0).done();
+
+export function encodePng(
+  rgba: Uint8ClampedArray,
+  width: number,
+  height: number,
+): Uint8Array<ArrayBuffer> {
+  const out: Uint8Array[] = [new Uint8Array(SIGNATURE)];
+  chunk(out, "IHDR", header(width, height));
+  chunk(out, "IDAT", compressed(rgba, width, height));
+  chunk(out, "IEND", new Uint8Array());
+  return joined(out);
+}
+
 export function encodeApng(
   frames: AnimatedFrame[],
   width: number,
   height: number,
 ): Uint8Array<ArrayBuffer> {
   const out: Uint8Array[] = [new Uint8Array(SIGNATURE)];
-  chunk(
-    out,
-    "IHDR",
-    new Bytes().u32(width).u32(height).u8(8).u8(6).u8(0).u8(0).u8(0).done(),
-  );
+  chunk(out, "IHDR", header(width, height));
   chunk(out, "acTL", new Bytes().u32(frames.length).u32(0).done());
   let sequence = 0;
   frames.forEach((frame, n) => {
@@ -89,12 +111,5 @@ export function encodeApng(
     else chunk(out, "fdAT", new Bytes().u32(sequence++).raw(data).done());
   });
   chunk(out, "IEND", new Uint8Array());
-  const total = out.reduce((sum, part) => sum + part.length, 0);
-  const file = new Uint8Array(total);
-  let at = 0;
-  for (const part of out) {
-    file.set(part, at);
-    at += part.length;
-  }
-  return file;
+  return joined(out);
 }

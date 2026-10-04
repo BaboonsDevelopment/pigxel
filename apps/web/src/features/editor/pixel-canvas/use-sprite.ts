@@ -204,6 +204,17 @@ export function useSprite(
     );
   };
 
+  const compositeOf = (ids: string[], frame = frameId) => {
+    const appearance = settingsForFrame(celSettings, frame);
+    return flatten(
+      layerTree.onlyLayers(tree, new Set(ids)),
+      (id) => cels.pixels(frame, id),
+      size.w * size.h * 4,
+      ["reference"],
+      (id) => appearance.get(id),
+    );
+  };
+
   const previewComposite = (skip: LayerKind[] = [], frame = frameId) => {
     const solo = soloId ? layerTree.findLayer(tree, soloId) : null;
     const shown = solo ? layerTree.soloTree(tree, soloId!) : tree;
@@ -1296,6 +1307,7 @@ export function useSprite(
     context,
     composite,
     previewComposite,
+    compositeOf,
     buildUp,
     touched,
     commit,

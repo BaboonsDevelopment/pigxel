@@ -37,6 +37,7 @@ import {
   exportFiles,
   exportSize,
   fitsCanvas,
+  partialSource,
   stretchedSource,
   type ExportSource,
 } from "../export/export";
@@ -45,6 +46,7 @@ import { saveExport } from "../export/save";
 import { timelapseTiming } from "../export/timelapse";
 import { renderTimelapse } from "../export/timelapse-video";
 import { frameIndex } from "@/lib/sprite/frames";
+import { EditorSelect } from "./editor-select";
 
 function Options<T extends string | number>({
   name,
@@ -104,10 +106,17 @@ export default function ExportDialog({
   };
 
   const stretch = !isSquare(pixelRatio) && settings.applyRatio;
-  const source = stretch ? stretchedSource(tile, pixelRatio!) : tile;
-  const { size, frames } = source;
-  const animated = ["gif", "apng", "webp", "sheet"].includes(settings.format);
+  const animated = ["gif", "apng", "webp", "frames", "sheet"].includes(
+    settings.format,
+  );
   const timelapse = settings.format === "timelapse";
+  const part = timelapse
+    ? tile
+    : partialSource(tile, animated ? settings : { ...settings, partTag: null });
+  const source = stretch ? stretchedSource(part, pixelRatio!) : part;
+  const chosenLayers = settings.partLayers ?? [];
+  const noLayers = !timelapse && !!settings.partLayers && !chosenLayers.length;
+  const { size, frames } = source;
   const style = TIMELAPSE_STYLES.find((s) => s.id === settings.timelapseStyle)!;
   const seconds = Math.round(
     timelapseTiming(settings.timelapseLength).total / TIMELAPSE_FPS,
@@ -199,6 +208,11 @@ export default function ExportDialog({
               </ChoiceCard>
             ))}
           </div>
+          {noLayers && (
+            <FormMessage tone="error" className="text-xs">
+              Pick at least one layer under Export only.
+            </FormMessage>
+          )}
           {noSlices && (
             <FormMessage tone="error" className="text-xs">
               This tile has no slices yet. Mark parts of it with the Slice tool
@@ -208,11 +222,91 @@ export default function ExportDialog({
           {!animated && frames.length > 1 && (
             <FormMessage className="text-xs">
               Exports frame {frameIndex(frames, source.frameId) + 1} of{" "}
-              {frames.length}. GIF, Animated PNG, Animated WebP and Sprite sheet
-              export every frame.
+              {frames.length}. GIF, Animated PNG, Animated WebP, PNG sequence
+              and Sprite sheet export every frame.
             </FormMessage>
           )}
         </fieldset>
+
+        {!timelapse && (
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-sm font-medium">Export only</legend>
+            {tile.selection && (
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={settings.partSelection}
+                  onChange={(e) => set({ partSelection: e.target.checked })}
+                />
+                The selection, cut to its size
+              </label>
+            )}
+            {(tile.layers?.length ?? 0) > 1 && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!settings.partLayers}
+                    onChange={(e) =>
+                      set({
+                        partLayers: e.target.checked
+                          ? (tile.layers ?? []).map((layer) => layer.id)
+                          : null,
+                      })
+                    }
+                  />
+                  These layers:
+                </label>
+                {settings.partLayers && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 pl-6">
+                    {tile.layers!.map((layer) => (
+                      <label
+                        key={layer.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={chosenLayers.includes(layer.id)}
+                          onChange={(e) =>
+                            set({
+                              partLayers: e.target.checked
+                                ? [...chosenLayers, layer.id]
+                                : chosenLayers.filter((id) => id !== layer.id),
+                            })
+                          }
+                        />
+                        {layer.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {animated && !!tile.tags?.length && (
+              <label className="flex items-center gap-3 text-sm">
+                Frames
+                <EditorSelect
+                  ariaLabel="Frames to export"
+                  value={settings.partTag ?? ""}
+                  onChange={(value) => set({ partTag: value || null })}
+                  options={[
+                    { value: "", label: "All frames" },
+                    ...tile.tags.map((tag) => ({
+                      value: tag.id,
+                      label: `${tag.name} (${tag.from + 1}–${tag.to + 1})`,
+                    })),
+                  ]}
+                  className="h-8 w-48 px-2 text-sm"
+                />
+              </label>
+            )}
+            {!tile.selection &&
+              (tile.layers?.length ?? 0) < 2 &&
+              !(animated && tile.tags?.length) && (
+                <FormMessage className="text-xs">
+                  Select an area, add layers or tag frames to export just a
+                  part.
+                </FormMessage>
+              )}
+          </fieldset>
+        )}
 
         {settings.format === "sheet" && (
           <fieldset className="space-y-2">
@@ -438,7 +532,10 @@ export default function ExportDialog({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={busy || !fits || noSlices}>
+          <Button
+            type="submit"
+            disabled={busy || !fits || noSlices || noLayers}
+          >
             {progress !== null
               ? `Rendering ${progress}%…`
               : busy

@@ -38,6 +38,13 @@ export const EXPORT_FORMATS = [
       "Every frame as a looping animation with full transparency, lossless and smaller than PNG.",
   },
   {
+    id: "frames",
+    label: "PNG sequence",
+    extension: ".zip",
+    mime: "application/zip",
+    description: "Every frame as its own PNG, numbered, in one ZIP file.",
+  },
+  {
     id: "sheet",
     label: "Sprite sheet",
     extension: ".png",
@@ -136,6 +143,9 @@ export type ExportSettings = {
   format: ExportFormat;
   scale: number;
   layout: SheetLayout;
+  partSelection: boolean;
+  partLayers: string[] | null;
+  partTag: string | null;
   sheetData: boolean;
   sheetJson: SheetJson;
   sheetSplit: SheetSplit;
@@ -155,6 +165,9 @@ export const DEFAULT_EXPORT: ExportSettings = {
   format: "png",
   scale: 1,
   layout: "row",
+  partSelection: false,
+  partLayers: null,
+  partTag: null,
   sheetData: false,
   sheetJson: "array",
   sheetSplit: "none",
