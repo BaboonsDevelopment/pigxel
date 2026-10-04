@@ -5,12 +5,14 @@ import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import {
+  CONVOLUTIONS,
   STRAIGHT_CURVE,
   adjustedColors,
   type AdjustKind,
   type AdjustSettings,
 } from "../pixel-canvas/effects";
 import { CurveEditor } from "./curve-editor";
+import { MatrixEditor } from "./matrix-editor";
 
 type Size = { w: number; h: number };
 
@@ -26,6 +28,9 @@ const SLIDERS = {
   ],
   despeckle: [{ key: "radius", label: "Radius", min: 1, max: 5, initial: 1 }],
   curve: [],
+  convolution: [
+    { key: "bias", label: "Bias", min: -255, max: 255, initial: 0 },
+  ],
 } as const;
 
 const TITLES = {
@@ -33,6 +38,7 @@ const TITLES = {
   brightnessContrast: "Brightness / Contrast",
   despeckle: "Despeckle",
   curve: "Colour curve",
+  convolution: "Convolution matrix",
 };
 
 const HINTS = {
@@ -42,7 +48,11 @@ const HINTS = {
     "Each pixel takes the middle colour of its neighbours, so lone stray pixels disappear.",
   curve:
     "Click the curve to add a point and drag it. Double-click or right-click a point to remove it.",
+  convolution:
+    "Each pixel becomes its neighbours weighted by the grid, divided by the grid’s sum, plus the bias.",
 };
+
+const FIRST = CONVOLUTIONS[0]!;
 
 const initialValues = (kind: AdjustKind) =>
   Object.fromEntries(
@@ -70,11 +80,12 @@ export default function AdjustColorsDialog({
   const preview = useRef<HTMLCanvasElement>(null);
   const [values, setValues] = useState(() => initialValues(kind));
   const [curve, setCurve] = useState(STRAIGHT_CURVE);
+  const [matrix, setMatrix] = useState(FIRST.matrix);
   useEffect(() => dialog.current?.showModal(), []);
 
   const result = useMemo(
-    () => adjustedColors(kind, pixels, mask, size, { values, curve }),
-    [kind, pixels, mask, size, values, curve],
+    () => adjustedColors(kind, pixels, mask, size, { values, curve, matrix }),
+    [kind, pixels, mask, size, values, curve, matrix],
   );
   const changed = useMemo(() => {
     let n = 0;
@@ -90,6 +101,7 @@ export default function AdjustColorsDialog({
   }, [result, pixels]);
   const untouched =
     curve === STRAIGHT_CURVE &&
+    matrix === FIRST.matrix &&
     SLIDERS[kind].every(({ key, initial }) => values[key] === initial);
   const fit = Math.min(PREVIEW.w / size.w, PREVIEW.h / size.h);
   const zoom = fit >= 1 ? Math.floor(fit) : fit;
@@ -143,7 +155,7 @@ export default function AdjustColorsDialog({
         onSubmit={(e) => {
           e.preventDefault();
           if (!changed) return;
-          onApply({ values, curve });
+          onApply({ values, curve, matrix });
           dialog.current?.close();
         }}
       >
@@ -163,6 +175,17 @@ export default function AdjustColorsDialog({
           <div className="flex justify-center">
             <CurveEditor points={curve} onChange={setCurve} />
           </div>
+        )}
+
+        {kind === "convolution" && (
+          <MatrixEditor
+            matrix={matrix}
+            onChange={setMatrix}
+            onPreset={({ matrix, bias }) => {
+              setMatrix(matrix);
+              setValues((v) => ({ ...v, bias }));
+            }}
+          />
         )}
 
         <div className="space-y-3">
@@ -216,6 +239,7 @@ export default function AdjustColorsDialog({
             onClick={() => {
               setValues(initialValues(kind));
               setCurve(STRAIGHT_CURVE);
+              setMatrix(FIRST.matrix);
             }}
           >
             Reset

@@ -618,6 +618,11 @@ export function Editor({
               onSelect: () => adjust("despeckle"),
               disabled: !sprite.canPaint,
             },
+            {
+              label: "Convolution matrix…",
+              onSelect: () => adjust("convolution"),
+              disabled: !sprite.canPaint,
+            },
           ],
         ],
       },

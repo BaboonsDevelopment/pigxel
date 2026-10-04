@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONVOLUTIONS,
   STRAIGHT_CURVE,
   adjustedBrightnessContrast,
   adjustedHueSaturation,
+  convolved,
   curveTable,
   despeckled,
   invertedColors,
@@ -96,5 +98,49 @@ describe("invert, despeckle, curve", () => {
     expect(table[128]).toBe(200);
     for (let i = 1; i < 256; i++)
       expect(table[i]).toBeGreaterThanOrEqual(table[i - 1]!);
+  });
+});
+
+describe("convolution matrix", () => {
+  const tile = () =>
+    new Uint8ClampedArray(
+      Array.from({ length: 9 }, (_, i) =>
+        i === 4 ? [200, 200, 200, 255] : [20, 20, 20, 255],
+      ).flat(),
+    );
+  it("keeps the picture with a lone centre weight", () => {
+    expect([
+      ...convolved(
+        tile(),
+        null,
+        { w: 3, h: 3 },
+        [0, 0, 0, 0, 1, 0, 0, 0, 0],
+        0,
+      ),
+    ]).toEqual([...tile()]);
+  });
+  it("blurs the bright pixel into its neighbours", () => {
+    const out = convolved(
+      tile(),
+      null,
+      { w: 3, h: 3 },
+      CONVOLUTIONS[1]!.matrix,
+      0,
+    );
+    expect(out[16]).toBe(40);
+    expect(out[19]).toBe(255);
+  });
+  it("adds the bias and leaves clear pixels alone", () => {
+    const px = tile();
+    px[3] = 0;
+    const out = convolved(
+      px,
+      null,
+      { w: 3, h: 3 },
+      [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+      128,
+    );
+    expect(out[3]).toBe(0);
+    expect(out[16]).toBe(255);
   });
 });

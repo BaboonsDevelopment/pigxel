@@ -332,12 +332,60 @@ export function curvedColors(
   return adjusted(pixels, mask, (...rgb) => rgb.map((v) => table[v]!));
 }
 
+export type ConvolutionPreset = {
+  name: string;
+  matrix: number[];
+  bias: number;
+};
+
+export const CONVOLUTIONS: ConvolutionPreset[] = [
+  { name: "Blur", matrix: [1, 2, 1, 2, 4, 2, 1, 2, 1], bias: 0 },
+  { name: "Box blur", matrix: [1, 1, 1, 1, 1, 1, 1, 1, 1], bias: 0 },
+  { name: "Sharpen", matrix: [0, -1, 0, -1, 5, -1, 0, -1, 0], bias: 0 },
+  { name: "Emboss", matrix: [-2, -1, 0, -1, 1, 1, 0, 1, 2], bias: 0 },
+  { name: "Relief", matrix: [-1, -1, 0, -1, 0, 1, 0, 1, 1], bias: 128 },
+  { name: "Edges", matrix: [-1, -1, -1, -1, 8, -1, -1, -1, -1], bias: 0 },
+];
+
+export function convolved(
+  pixels: Uint8ClampedArray,
+  mask: Uint8Array | null,
+  size: Size,
+  matrix: number[],
+  bias: number,
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(pixels);
+  const divisor = matrix.reduce((a, b) => a + b, 0) || 1;
+  for (let y = 0; y < size.h; y++)
+    for (let x = 0; x < size.w; x++) {
+      const i = y * size.w + x;
+      const p = i * 4;
+      if ((mask && !mask[i]) || !pixels[p + 3]) continue;
+      for (let c = 0; c < 3; c++) {
+        let sum = 0;
+        for (let k = 0; k < 9; k++) {
+          const nx = Math.min(size.w - 1, Math.max(0, x + (k % 3) - 1));
+          const ny = Math.min(size.h - 1, Math.max(0, y + ((k / 3) | 0) - 1));
+          const q = (ny * size.w + nx) * 4;
+          sum += matrix[k]! * (pixels[q + 3] ? pixels[q + c]! : pixels[p + c]!);
+        }
+        out[p + c] = Math.round(sum / divisor + bias);
+      }
+    }
+  return out;
+}
+
 export type AdjustKind =
-  "hueSaturation" | "brightnessContrast" | "despeckle" | "curve";
+  | "hueSaturation"
+  | "brightnessContrast"
+  | "despeckle"
+  | "curve"
+  | "convolution";
 
 export type AdjustSettings = {
   values: Record<string, number>;
   curve: CurvePoint[];
+  matrix: number[];
 };
 
 export function adjustedColors(
@@ -345,8 +393,10 @@ export function adjustedColors(
   pixels: Uint8ClampedArray,
   mask: Uint8Array | null,
   size: Size,
-  { values, curve }: AdjustSettings,
+  { values, curve, matrix }: AdjustSettings,
 ): Uint8ClampedArray {
+  if (kind === "convolution")
+    return convolved(pixels, mask, size, matrix, values.bias ?? 0);
   if (kind === "despeckle")
     return despeckled(pixels, mask, size, values.radius ?? 1);
   if (kind === "curve") return curvedColors(pixels, mask, curve);
