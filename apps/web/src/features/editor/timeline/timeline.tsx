@@ -8,6 +8,7 @@ import { frameActions, layerActions } from "./actions";
 import { CelStrip } from "./components/cel-strip";
 import { FrameHeader } from "./components/frame-header";
 import { LayerRow } from "./components/layer-row";
+import { LayerPropertiesDialog } from "./components/layer-properties-dialog";
 import { TimelineToolbar } from "./components/timeline-toolbar";
 import type { DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
@@ -25,6 +26,7 @@ export function Timeline({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [propertiesId, setPropertiesId] = useState<string | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const rows = panelRows(sprite.tree);
@@ -65,10 +67,12 @@ export function Timeline({
                 key={row.layer.id}
                 row={row}
                 active={row.layer.id === layerId}
+                solo={sprite.soloId === row.layer.id}
                 drop={over?.id === row.layer.id ? over.zone : null}
                 renaming={renaming === row.layer.id}
                 onRenamingChange={(on) => setRenaming(on ? row.layer.id : null)}
                 onSelect={() => sprite.selectLayer(row.layer.id)}
+                onSolo={() => sprite.toggleSolo(row.layer.id)}
                 onChange={(patch) => sprite.updateLayer(row.layer.id, patch)}
                 onContextMenu={(e) => {
                   sprite.selectLayer(row.layer.id);
@@ -111,12 +115,30 @@ export function Timeline({
           y={menu.y}
           sections={
             menu.of === "layer"
-              ? layerActions(sprite, () => setRenaming(layerId))
+              ? layerActions(
+                  sprite,
+                  () => setRenaming(layerId),
+                  () => setPropertiesId(layerId),
+                )
               : frameActions(sprite, playback)
           }
           onClose={closeMenu}
         />
       )}
+      {propertiesId &&
+        (() => {
+          const layer = rows.find(
+            (row) => row.layer.id === propertiesId,
+          )?.layer;
+          return layer ? (
+            <LayerPropertiesDialog
+              key={propertiesId}
+              layer={layer}
+              onChange={(patch) => sprite.updateLayer(propertiesId, patch)}
+              onClose={() => setPropertiesId(null)}
+            />
+          ) : null;
+        })()}
     </section>
   );
 }

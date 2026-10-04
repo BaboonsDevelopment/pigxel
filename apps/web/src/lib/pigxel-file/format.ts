@@ -98,6 +98,7 @@ type FileLayer = {
   locked: boolean;
   opacity: number;
   blend: string;
+  labelColor?: string;
   collapsed?: boolean;
   children?: FileLayer[];
 };
@@ -110,8 +111,18 @@ const DAMAGED = () => new PigxelFileError("This Pigxel file is damaged.");
 
 export function serializePigxel(doc: PigxelDocument): string {
   const toFile = (layer: Layer): FileLayer => {
-    const { id, name, kind, visible, locked, opacity, blend } = layer;
-    const base = { id, name, kind, visible, locked, opacity, blend };
+    const { id, name, kind, visible, locked, opacity, blend, labelColor } =
+      layer;
+    const base = {
+      id,
+      name,
+      kind,
+      visible,
+      locked,
+      opacity,
+      blend,
+      ...(labelColor && { labelColor }),
+    };
     return layer.kind === "group"
       ? {
           ...base,
@@ -280,6 +291,11 @@ function readLayers(
       blend: isBackground
         ? ("normal" as const)
         : (BLEND_MODES.find((m) => m.id === entry.blend)?.id ?? "normal"),
+      labelColor:
+        typeof entry.labelColor === "string" &&
+        /^#[0-9a-fA-F]{6}$/.test(entry.labelColor)
+          ? entry.labelColor
+          : undefined,
     };
     if (layer.kind === "group")
       return {

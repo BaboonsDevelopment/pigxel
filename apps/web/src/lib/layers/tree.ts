@@ -172,6 +172,19 @@ function withAncestors(tree: Layer[], id: string): Layer[] {
 export const isShown = (tree: Layer[], id: string) =>
   withAncestors(tree, id).every((layer) => layer.visible);
 
+export function soloTree(tree: Layer[], id: string): Layer[] {
+  return tree.map((layer): Layer => {
+    if (layer.id === id) return { ...layer, visible: true };
+    if (layer.kind === "group" && findLayer(layer.children, id))
+      return {
+        ...layer,
+        visible: true,
+        children: soloTree(layer.children, id),
+      };
+    return { ...layer, visible: false };
+  });
+}
+
 const isLocked = (tree: Layer[], id: string) =>
   withAncestors(tree, id).some((layer) => layer.locked);
 

@@ -10,10 +10,12 @@ import { ICONS } from "../icons";
 type Props = {
   row: PanelRow;
   active: boolean;
+  solo: boolean;
   drop: DropZone | null;
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
   onSelect: () => void;
+  onSolo: () => void;
   onChange: (patch: LayerPatch) => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: () => void;
@@ -30,10 +32,12 @@ const toggle =
 export function LayerRow({
   row,
   active,
+  solo,
   drop,
   renaming,
   onRenamingChange,
   onSelect,
+  onSolo,
   onChange,
   onContextMenu,
   children,
@@ -68,6 +72,12 @@ export function LayerRow({
         drop === "into" && "ring-2 ring-primary ring-inset",
       )}
     >
+      {layer.labelColor && (
+        <span
+          className="absolute inset-y-0 left-0 z-20 w-1"
+          style={{ backgroundColor: layer.labelColor }}
+        />
+      )}
       <div
         draggable={movable && !renaming}
         onDragStart={(e) => {
@@ -80,6 +90,18 @@ export function LayerRow({
           LAYER_COLUMN,
         )}
       >
+        <button
+          type="button"
+          title={solo ? "Exit solo" : "Solo layer"}
+          aria-pressed={solo}
+          className={cn(toggle, solo && "bg-primary/15 text-primary")}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSolo();
+          }}
+        >
+          S
+        </button>
         <button
           type="button"
           title={layer.visible ? "Hide layer" : "Show layer"}

@@ -161,7 +161,7 @@ export function PixelCanvas({
     if (!around.length) return;
     const out = new Uint8ClampedArray(size.w * size.h * 4);
     for (const { index, before, strength } of around.reverse()) {
-      const pixels = sprite.composite(
+      const pixels = sprite.previewComposite(
         ["reference", "background"],
         frames[index]!.id,
       );
@@ -185,7 +185,7 @@ export function PixelCanvas({
       ?.getContext("2d")
       ?.putImageData(
         new ImageData(
-          sprite.composite() as Uint8ClampedArray<ArrayBuffer>,
+          sprite.previewComposite() as Uint8ClampedArray<ArrayBuffer>,
           size.w,
           size.h,
         ),
@@ -200,6 +200,7 @@ export function PixelCanvas({
     [
       sprite.version,
       sprite.tree,
+      sprite.soloId,
       sprite.frameId,
       sprite.frames,
       size,

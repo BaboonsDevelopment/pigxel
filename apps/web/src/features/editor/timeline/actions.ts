@@ -19,6 +19,7 @@ async function addReference(sprite: SpriteApi) {
 export function layerActions(
   sprite: SpriteApi,
   rename?: () => void,
+  properties?: () => void,
 ): MenuSections {
   const { activeLayer: layer, layerId } = sprite;
   const outside = placeOutside(sprite.tree, layerId);
@@ -29,6 +30,11 @@ export function layerActions(
         shortcut: "Shift+N",
         onSelect: () => sprite.addLayer("normal"),
       },
+      {
+        label: "New background layer",
+        onSelect: sprite.addBackgroundLayer,
+        disabled: !sprite.canAddBackgroundLayer,
+      },
       { label: "New group", onSelect: () => sprite.addLayer("group") },
       {
         label: "New reference layer…",
@@ -38,6 +44,11 @@ export function layerActions(
     [
       { label: "Rename", onSelect: () => rename?.(), hidden: !rename },
       {
+        label: "Properties…",
+        onSelect: () => properties?.(),
+        hidden: !properties,
+      },
+      {
         label: "Duplicate layer",
         onSelect: () => sprite.duplicateLayer(layerId),
         disabled: !layer,
@@ -46,6 +57,11 @@ export function layerActions(
         label: layer?.visible ? "Hide" : "Show",
         onSelect: () =>
           layer && sprite.updateLayer(layerId, { visible: !layer.visible }),
+      },
+      {
+        label: sprite.soloId === layerId ? "Exit solo" : "Solo layer",
+        onSelect: () => sprite.toggleSolo(layerId),
+        disabled: !layer,
       },
       {
         label: layer?.locked ? "Unlock" : "Lock",

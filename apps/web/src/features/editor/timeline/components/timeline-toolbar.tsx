@@ -33,6 +33,15 @@ export function TimelineToolbar({
         <button
           type="button"
           className={ACTION}
+          title="New background layer"
+          disabled={!sprite.canAddBackgroundLayer}
+          onClick={sprite.addBackgroundLayer}
+        >
+          Background
+        </button>
+        <button
+          type="button"
+          className={ACTION}
           title="Delete layer"
           disabled={!sprite.canRemoveLayer(layerId)}
           onClick={() => sprite.removeLayer(layerId)}

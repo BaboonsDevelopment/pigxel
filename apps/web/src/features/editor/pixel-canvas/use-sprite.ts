@@ -27,7 +27,10 @@ import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
 
 export type LayerPatch = Partial<
-  Pick<Layer, "name" | "visible" | "locked" | "opacity" | "blend">
+  Pick<
+    Layer,
+    "name" | "visible" | "locked" | "opacity" | "blend" | "labelColor"
+  >
 > & { collapsed?: boolean };
 
 export type SpriteApi = ReturnType<typeof useSprite>;
@@ -52,6 +55,7 @@ export type AnimationSpec = {
 
 type Snapshot = {
   tree: Layer[];
+  background: PigxelDocument["background"];
   frames: Frame[];
   size: Size;
   cels: Cels;
@@ -72,12 +76,13 @@ export function useSprite(
   onChange: () => void,
   kept?: KeptSprite,
 ) {
-  const { background } = initial;
+  const [background, setBackground] = useState(initial.background);
   const [size, setSize] = useState<Size>({
     w: initial.width,
     h: initial.height,
   });
   const [tree, setTree] = useState(initial.layers);
+  const [soloId, setSoloId] = useState<string | null>(null);
   const [frames, setFrames] = useState(initial.frames);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
@@ -114,6 +119,7 @@ export function useSprite(
     kept?.history ??
       history.startHistory({
         tree: initial.layers,
+        background: initial.background,
         frames: initial.frames,
         size,
         cels: initial.cels,
@@ -154,6 +160,17 @@ export function useSprite(
   const composite = (skip: LayerKind[] = [], frame = frameId) =>
     flatten(tree, (id) => cels.pixels(frame, id), size.w * size.h * 4, skip);
 
+  const previewComposite = (skip: LayerKind[] = [], frame = frameId) => {
+    const solo = soloId ? layerTree.findLayer(tree, soloId) : null;
+    const shown = solo ? layerTree.soloTree(tree, soloId!) : tree;
+    return flatten(
+      shown,
+      (id) => cels.pixels(frame, id),
+      size.w * size.h * 4,
+      skip,
+    );
+  };
+
   const touched = () => {
     const canvas = cels.get(frameId, layerId);
     if (canvas) {
@@ -166,6 +183,7 @@ export function useSprite(
   const finish = (
     next: {
       tree?: Layer[];
+      background?: PigxelDocument["background"];
       frames?: Frame[];
       size?: Size;
       palette?: string[];
@@ -197,6 +215,7 @@ export function useSprite(
       }
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
+      background: next.background ?? background,
       frames: next.frames ?? frames,
       size: next.size ?? size,
       cels: new Map(),
@@ -303,6 +322,7 @@ export function useSprite(
       }
     changed.current.clear();
     setTree(snapshot.tree);
+    setBackground(snapshot.background);
     setFrames(snapshot.frames);
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
@@ -350,6 +370,22 @@ export function useSprite(
 
   const addLayer = (kind: Exclude<LayerKind, "background">, layer?: NewLayer) =>
     addLayers(kind, [layer ?? {}])[0]!;
+
+  const addBackgroundLayer = () => {
+    if (tree.some((layer) => layer.kind === "background")) return;
+    const nextBackground = background === "transparent" ? "white" : background;
+    const layer = layerTree.createLayer("background", "Background");
+    const value = nextBackground === "black" ? 0 : 255;
+    const pixels = new Uint8ClampedArray(size.w * size.h * 4);
+    for (let i = 0; i < pixels.length; i += 4)
+      pixels.set([value, value, value, 255], i);
+    putCels(layer.id, frames.map((frame) => [frame.id, pixels] as const));
+    const next = [layer, ...tree];
+    setBackground(nextBackground);
+    setLayerId(layer.id);
+    setTree(next);
+    finish({ tree: next, background: nextBackground });
+  };
 
   const addLayers = (
     kind: Exclude<LayerKind, "background">,
@@ -714,6 +750,9 @@ export function useSprite(
     id: initial.id,
     size,
     tree,
+    soloId: soloId && layerTree.findLayer(tree, soloId) ? soloId : null,
+    toggleSolo: (id: string) =>
+      setSoloId((current) => (current === id ? null : id)),
     frames,
     background,
     palette,
@@ -732,6 +771,7 @@ export function useSprite(
     version,
     context,
     composite,
+    previewComposite,
     touched,
     commit,
     revert,
@@ -759,6 +799,8 @@ export function useSprite(
       beforeLeave.current = callback;
     },
     addLayer,
+    addBackgroundLayer,
+    canAddBackgroundLayer: !tree.some((layer) => layer.kind === "background"),
     addLayers,
     canRemoveLayer,
     removeLayer,
