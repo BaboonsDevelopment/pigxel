@@ -9,14 +9,9 @@ import {
   wrapPixel,
   type Rgba,
 } from "../../pixel-canvas/paint";
-import {
-  clampOpacity,
-  clampTolerance,
-  fillPoints,
-  type Point,
-} from "../../pixel-canvas/pen";
+import { clampTolerance, fillPoints, type Point } from "../../pixel-canvas/pen";
 import { isSelected } from "../../pixel-canvas/selection";
-import { inkColor, slotOf } from "../shared/stroke";
+import { inkAlpha, inkColor, slotOf } from "../shared/stroke";
 import type { ToolCanvasProps, ToolContext } from "../types";
 
 function fillAt(
@@ -37,7 +32,7 @@ function fillAt(
       )
     : image;
   const texture = pen.stampPattern ? stamp : null;
-  const opacity = clampOpacity(pen.opacity);
+  const opacity = inkAlpha(rgba, pen.opacity);
   const blend =
     color && opacity < 255
       ? blendInk(

@@ -17,7 +17,7 @@ import { MAX_PALETTE, PALETTE_PRESETS, colorsOf } from "@/lib/palette/presets";
 import { safeFileBase } from "@/lib/pigxel-file/format";
 
 import { ColorPicker } from "./color-picker";
-import { swatchProps, withColor } from "./helpers";
+import { swatchProps, swatchStyle, withColor } from "./helpers";
 
 type PaletteChange = {
   edited?: { from: string; to: string };
@@ -216,7 +216,7 @@ export function PalettePanel({
                   "z-10 ring-2 ring-foreground ring-offset-1",
                 dragged === i && "opacity-40",
               )}
-              style={{ backgroundColor: color }}
+              style={swatchStyle(color)}
             >
               {color === pen.secondary && (
                 <span

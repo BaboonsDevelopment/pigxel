@@ -1,3 +1,5 @@
+import { alphaOf } from "./hsv";
+
 export type ColorMode = "rgb" | "indexed" | "grayscale";
 
 export const COLOR_MODES: { value: ColorMode; label: string }[] = [
@@ -52,6 +54,8 @@ export function inColorMode(
     }
     return changed ? out : null;
   }
+  if (palette.some((c) => alphaOf(c) < 255))
+    return inTranslucentPalette(out, palette, set, recolor) ? out : null;
   const colors = palette.map(rgbOf);
   if (!colors.length) return null;
   const swaps = new Map(
@@ -75,6 +79,53 @@ export function inColorMode(
 }
 
 const packed = ([r, g, b]: Rgb) => (r << 16) | (g << 8) | b;
+
+type Rgba = readonly [number, number, number, number];
+
+const rgbaOfHex = (hex: string): Rgba => [...rgbOf(hex), alphaOf(hex)];
+
+function inTranslucentPalette(
+  out: Uint8ClampedArray,
+  palette: string[],
+  set: (i: number, r: number, g: number, b: number, a: number) => void,
+  recolor?: ReadonlyMap<string, string>,
+): boolean {
+  const colors = palette.map(rgbaOfHex);
+  const key = (c: Rgba) => `${c[0]},${c[1]},${c[2]},${c[3]}`;
+  const swaps = new Map(
+    [...(recolor ?? [])].map(([from, to]) => [
+      key(rgbaOfHex(from)),
+      rgbaOfHex(to),
+    ]),
+  );
+  const nearest = new Map<string, Rgba>();
+  let changed = false;
+  for (let i = 0; i < out.length; i += 4) {
+    if (!out[i + 3]) continue;
+    const c: Rgba = [out[i]!, out[i + 1]!, out[i + 2]!, out[i + 3]!];
+    const k = key(c);
+    let to = swaps.get(k) ?? nearest.get(k);
+    if (!to) {
+      to = colors[0]!;
+      let best = Infinity;
+      for (const p of colors) {
+        const d =
+          2 * (c[0] - p[0]) ** 2 +
+          4 * (c[1] - p[1]) ** 2 +
+          3 * (c[2] - p[2]) ** 2 +
+          3 * (c[3] - p[3]) ** 2;
+        if (d < best) {
+          best = d;
+          to = p;
+        }
+      }
+      nearest.set(k, to);
+    }
+    if (to.some((v, j) => v !== c[j])) changed = true;
+    set(i, to[0], to[1], to[2], to[3]);
+  }
+  return changed;
+}
 
 function nearestColor(c: Rgb, colors: Rgb[]): Rgb {
   let best = colors[0]!;

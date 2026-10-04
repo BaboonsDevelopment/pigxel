@@ -1,7 +1,21 @@
 export type Hsv = { h: number; s: number; v: number };
 
+export const opaqueHex = (hex: string) => hex.slice(0, 7);
+
+export function alphaOf(hex: string): number {
+  const a = hex.length === 9 ? parseInt(hex.slice(7, 9), 16) : 255;
+  return Number.isFinite(a) ? a : 255;
+}
+
+export function withAlpha(hex: string, alpha: number): string {
+  const a = Math.min(255, Math.max(0, Math.round(alpha)));
+  return a === 255
+    ? opaqueHex(hex)
+    : `${opaqueHex(hex)}${a.toString(16).padStart(2, "0")}`;
+}
+
 export function hexToHsv(hex: string): Hsv {
-  const n = parseInt(hex.replace("#", ""), 16) || 0;
+  const n = parseInt(hex.replace("#", "").slice(0, 6), 16) || 0;
   const r = ((n >> 16) & 255) / 255;
   const g = ((n >> 8) & 255) / 255;
   const b = (n & 255) / 255;
@@ -33,8 +47,13 @@ export function hsvToHex({ h, s, v }: Hsv): string {
 
 export function readHex(text: string): string | null {
   const v = text.trim().replace(/^#/, "").toLowerCase();
-  if (/^[0-9a-f]{3}$/.test(v)) return `#${[...v].map((c) => c + c).join("")}`;
-  return /^[0-9a-f]{6}$/.test(v) ? `#${v}` : null;
+  const full = /^[0-9a-f]{3,4}$/.test(v)
+    ? [...v].map((c) => c + c).join("")
+    : v;
+  if (/^[0-9a-f]{6}$/.test(full)) return `#${full}`;
+  if (/^[0-9a-f]{8}$/.test(full))
+    return withAlpha(`#${full.slice(0, 6)}`, parseInt(full.slice(6), 16));
+  return null;
 }
 
 export type Hsl = { h: number; s: number; l: number };

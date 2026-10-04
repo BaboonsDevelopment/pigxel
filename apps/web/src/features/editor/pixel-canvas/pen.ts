@@ -310,8 +310,8 @@ export function fillPoints(
 export function pixelColor(image: ImageData, point: Point): string | null {
   const i = (point.y * image.width + point.x) * 4;
   if (!image.data[i + 3]) return null;
-  const hex = [0, 1, 2].map((c) =>
-    image.data[i + c]!.toString(16).padStart(2, "0"),
-  );
+  const hex = [0, 1, 2, 3]
+    .slice(0, image.data[i + 3] === 255 ? 3 : 4)
+    .map((c) => image.data[i + c]!.toString(16).padStart(2, "0"));
   return `#${hex.join("")}`;
 }

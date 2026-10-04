@@ -151,12 +151,13 @@ export const PALETTE_PRESETS: PalettePreset[] = [
 
 export const DEFAULT_PALETTE = PALETTE_PRESETS[0]!.colors;
 
-const HEX = /^#[0-9a-f]{6}$/;
+const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/;
 
 export function normalizeColor(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const color = value.trim().toLowerCase();
-  return HEX.test(color) ? color : null;
+  if (!HEX.test(color)) return null;
+  return color.endsWith("ff") && color.length === 9 ? color.slice(0, 7) : color;
 }
 
 export function readPalette(value: unknown): string[] | null {

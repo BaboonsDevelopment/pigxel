@@ -336,6 +336,6 @@ export function rgbaOf(hex: string): Rgba {
     parseInt(v.slice(0, 2), 16),
     parseInt(v.slice(2, 4), 16),
     parseInt(v.slice(4, 6), 16),
-    255,
+    v.length === 8 ? parseInt(v.slice(6, 8), 16) : 255,
   ];
 }

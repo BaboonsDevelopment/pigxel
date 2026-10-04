@@ -2,8 +2,12 @@
 
 import { useState, type PointerEvent } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { swatchStyle } from "./helpers";
 import {
+  alphaOf,
   hexToHsv,
+  opaqueHex,
+  withAlpha,
   hslToHsv,
   hsvToHex,
   hsvToHsl,
@@ -18,14 +22,13 @@ const HUES =
 export function ColorPicker({
   color,
   onChange,
-  alpha,
-  onAlpha,
 }: {
   color: string;
   onChange: (color: string) => void;
-  alpha?: number;
-  onAlpha?: (alpha: number) => void;
 }) {
+  const alpha = alphaOf(color);
+  const opaque = opaqueHex(color);
+  const onAlpha = (a: number) => onChange(withAlpha(opaque, a));
   const [model, setModel] = useState<"hsv" | "hsl">("hsv");
   const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(color));
   const [shown, setShown] = useState(color);
@@ -33,7 +36,7 @@ export function ColorPicker({
   if (color !== shown) {
     setShown(color);
     setText(color);
-    if (color !== hsvToHex(hsv)) {
+    if (opaque !== hsvToHex(hsv)) {
       const next = hexToHsv(color);
       setHsv(next.s && next.v ? next : { ...next, h: hsv.h });
     }
@@ -41,7 +44,7 @@ export function ColorPicker({
 
   const change = (next: Hsv) => {
     setHsv(next);
-    const hex = hsvToHex(next);
+    const hex = withAlpha(hsvToHex(next), alpha);
     setShown(hex);
     setText(hex);
     onChange(hex);
@@ -151,7 +154,7 @@ export function ColorPicker({
         />
       </div>
 
-      {onAlpha && alpha !== undefined && (
+      {
         <div
           role="slider"
           aria-label="Alpha"
@@ -159,7 +162,7 @@ export function ColorPicker({
           aria-valuemax={255}
           aria-valuenow={alpha}
           tabIndex={0}
-          title={`Alpha ${alpha} · the pen's opacity`}
+          title={`Alpha ${alpha}`}
           onPointerDown={(e) => drag(e, (fx) => onAlpha(Math.round(fx * 255)))}
           onKeyDown={(e) => {
             const step = e.shiftKey ? 16 : 1;
@@ -175,7 +178,7 @@ export function ColorPicker({
             aria-hidden="true"
             className="absolute inset-0 rounded-full"
             style={{
-              backgroundImage: `linear-gradient(to right, transparent, ${color})`,
+              backgroundImage: `linear-gradient(to right, transparent, ${opaque})`,
             }}
           />
           <span
@@ -184,7 +187,7 @@ export function ColorPicker({
             style={{ left: `${(alpha / 255) * 100}%`, backgroundColor: color }}
           />
         </div>
-      )}
+      }
 
       <div className="flex flex-col gap-1">
         <div className="flex gap-1 self-start rounded-md bg-muted p-0.5 text-[10px] font-medium">
@@ -255,26 +258,26 @@ export function ColorPicker({
             );
           })()
         )}
-        {onAlpha && alpha !== undefined && (
-          <Channel label="A" max={255} value={alpha} onChange={onAlpha} />
-        )}
+        <Channel label="A" max={255} value={alpha} onChange={onAlpha} />
       </div>
 
       <div className="flex gap-0.5" role="group" aria-label="Shades">
-        {shadesOf(color).map((shade, i) => (
-          <button
-            key={i}
-            type="button"
-            title={i === 3 ? shade : `${i < 3 ? "Shadow" : "Light"} ${shade}`}
-            aria-label={shade}
-            onClick={() => onChange(shade)}
-            className={cn(
-              "h-5 flex-1 rounded-[2px] ring-1 ring-black/10",
-              i === 3 && "ring-2 ring-foreground",
-            )}
-            style={{ backgroundColor: shade }}
-          />
-        ))}
+        {shadesOf(opaque)
+          .map((shade) => withAlpha(shade, alpha))
+          .map((shade, i) => (
+            <button
+              key={i}
+              type="button"
+              title={i === 3 ? shade : `${i < 3 ? "Shadow" : "Light"} ${shade}`}
+              aria-label={shade}
+              onClick={() => onChange(shade)}
+              className={cn(
+                "h-5 flex-1 rounded-[2px] ring-1 ring-black/10",
+                i === 3 && "ring-2 ring-foreground",
+              )}
+              style={swatchStyle(shade)}
+            />
+          ))}
       </div>
 
       <input
