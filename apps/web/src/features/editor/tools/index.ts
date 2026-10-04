@@ -20,6 +20,7 @@ import { rectTool } from "./rect";
 import { sliceTool } from "./slice";
 import { sprayTool } from "./spray";
 import { textTool } from "./text";
+import { tileTool } from "./tile";
 import { wandTool } from "./wand";
 import type { ToolDefinition, ToolGroupId } from "./types";
 
@@ -48,6 +49,7 @@ export const TOOLS = [
   jumbleTool,
   textTool,
   sliceTool,
+  tileTool,
   pipetteTool,
 ] as const satisfies readonly ToolDefinition[];
 
@@ -63,6 +65,7 @@ const GROUP_LABELS: { id: ToolGroupId; label: string }[] = [
   { id: "fill", label: "Fill" },
   { id: "effects", label: "Effects" },
   { id: "text", label: "Text & slices" },
+  { id: "tiles", label: "Tiles" },
   { id: "pick", label: "Pick colour" },
 ];
 

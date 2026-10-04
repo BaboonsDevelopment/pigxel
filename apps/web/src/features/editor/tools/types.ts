@@ -6,14 +6,27 @@ import type {
   RefObject,
 } from "react";
 import type { PaintOptions, Stamp } from "../pixel-canvas/paint";
-import type { ColorSlot, PenSettings, Point } from "../pixel-canvas/pen";
+import type {
+  ColorSlot,
+  PenSettings,
+  Point,
+  SnapGrid,
+} from "../pixel-canvas/pen";
 import type { SelectionApi } from "../pixel-canvas/use-selection";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import type { Slice } from "@/lib/slices/slices";
 import type { SavedBrush } from "../brush-library";
 
 export type ToolGroupId =
-  "select" | "move" | "draw" | "shapes" | "fill" | "effects" | "text" | "pick";
+  | "select"
+  | "move"
+  | "draw"
+  | "shapes"
+  | "fill"
+  | "effects"
+  | "text"
+  | "tiles"
+  | "pick";
 
 export type SizeKey = "size" | "brushSize" | "eraserSize" | "sprayWidth";
 
@@ -58,7 +71,7 @@ export type ToolContext = {
   stamp: Stamp | null;
   scale: number;
   stretch: { x: number; y: number };
-  snap: number;
+  snap: SnapGrid | null;
   paintOptions: PaintOptions;
   paused: boolean;
   lastPointRef: RefObject<Point | null>;

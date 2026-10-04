@@ -6,6 +6,19 @@ import * as layerTree from "@/lib/layers/tree";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
+import {
+  NO_FLIP,
+  flipTile,
+  readCell,
+  syncTilemap,
+  tileCells,
+  uniqueTiles,
+  withNewTiles,
+  writeCell,
+  type TileFlip,
+  type TileMode,
+  type TileSize,
+} from "@/lib/tilemap/tilemap";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
 import { movedSlices } from "@/lib/sprite/canvas-size";
@@ -33,6 +46,7 @@ import {
 } from "@/lib/sprite/cel-settings";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
+import { describeStep } from "./history-steps";
 
 export type LayerPatch = Partial<
   Pick<
@@ -95,6 +109,11 @@ export function useSprite(
   const [tree, setTree] = useState(initial.layers);
   const [soloId, setSoloId] = useState<string | null>(null);
   const [pickedFrames, setPickedFrames] = useState<string[]>([]);
+  const [tileMode, setTileMode] = useState<TileMode>("manual");
+  const [activeTile, setActiveTile] = useState(0);
+  const [tileFlip, setTileFlip] = useState<TileFlip>(NO_FLIP);
+  const placing = useRef(false);
+  const live = useRef<{ layerId: string; written: Set<string> } | null>(null);
   const [frames, setFrames] = useState(initial.frames);
   const [tags, setTags] = useState(initial.tags ?? []);
   const [links, setLinks] = useState(initial.links ?? []);
@@ -130,6 +149,7 @@ export function useSprite(
   const [version, setVersion] = useState(0);
   const [cels] = useState(() => new CelCanvases(initial.cels, size));
   const changed = useRef(new Set<HTMLCanvasElement>());
+  const [stepLabels] = useState(() => new WeakMap<Snapshot, string>());
   const past = useRef<History<Snapshot>>(
     kept?.history ??
       history.startHistory({
@@ -186,6 +206,17 @@ export function useSprite(
     );
   };
 
+  const compositeOf = (ids: string[], frame = frameId) => {
+    const appearance = settingsForFrame(celSettings, frame);
+    return flatten(
+      layerTree.onlyLayers(tree, new Set(ids)),
+      (id) => cels.pixels(frame, id),
+      size.w * size.h * 4,
+      ["reference"],
+      (id) => appearance.get(id),
+    );
+  };
+
   const previewComposite = (skip: LayerKind[] = [], frame = frameId) => {
     const solo = soloId ? layerTree.findLayer(tree, soloId) : null;
     const shown = solo ? layerTree.soloTree(tree, soloId!) : tree;
@@ -221,7 +252,89 @@ export function useSprite(
       cels.invalidate(canvas);
       changed.current.add(canvas);
     }
+    liveTiles();
     repaint();
+  };
+
+  const liveTiles = () => {
+    const layer = layerTree.findLayer(tree, layerId)?.layer;
+    if (layer?.kind !== "tilemap" || tileMode !== "manual" || placing.current)
+      return;
+    const ids = frames.map((frame) => frame.id);
+    const after = ids.map((frame) => cels.pixels(frame, layer.id));
+    const synced = syncTilemap({
+      size,
+      tile: layer.tile,
+      tiles: layer.tiles,
+      before: ids.map((frame) =>
+        frameList.celOf(past.current.present.cels, frame, layer.id),
+      ),
+      after,
+      mode: "manual",
+      flips: layer.flips,
+      written:
+        live.current?.layerId === layer.id ? live.current.written : undefined,
+      collect: false,
+    });
+    live.current = { layerId: layer.id, written: synced.written };
+    synced.cels.forEach((pixels, i) => {
+      if (!pixels || pixels === after[i]) return;
+      const target = cels.get(ids[i]!, layer.id);
+      const ctx = contextOf(target);
+      if (!target || !ctx) return;
+      ctx.putImageData(
+        new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, size.w, size.h),
+        0,
+        0,
+      );
+      cels.invalidate(target);
+      changed.current.add(target);
+    });
+  };
+
+  const syncTilemaps = (
+    inTree: Layer[],
+    inFrames: Frame[],
+    inSize: Size,
+    present: Snapshot,
+  ) => {
+    const resized = inSize.w !== present.size.w || inSize.h !== present.size.h;
+    const ids = inFrames.map((frame) => frame.id);
+    let out = inTree;
+    for (const layer of layerTree.allLayers(inTree)) {
+      if (layer.kind !== "tilemap") continue;
+      const drawn = ids.some((frame) => {
+        const canvas = cels.get(frame, layer.id);
+        return !!canvas && changed.current.has(canvas);
+      });
+      if (!drawn && !resized) continue;
+      const after = ids.map((frame) => cels.pixels(frame, layer.id));
+      const synced = syncTilemap({
+        size: inSize,
+        tile: layer.tile,
+        tiles: layer.tiles,
+        before: ids.map((frame) =>
+          resized ? undefined : frameList.celOf(present.cels, frame, layer.id),
+        ),
+        after,
+        mode: resized ? "auto" : placing.current ? "place" : tileMode,
+        flips: layer.flips,
+        written:
+          live.current?.layerId === layer.id ? live.current.written : undefined,
+      });
+      synced.cels.forEach((pixels, i) => {
+        if (pixels && pixels !== after[i])
+          changed.current.add(cels.set(ids[i]!, layer.id, inSize, pixels));
+      });
+      if (
+        synced.tiles.length !== layer.tiles.length ||
+        synced.tiles.some((tile, i) => tile !== layer.tiles[i])
+      )
+        out = layerTree.updateLayer(out, layer.id, { tiles: synced.tiles });
+    }
+    placing.current = false;
+    live.current = null;
+    return out;
   };
 
   const finish = (
@@ -261,10 +374,17 @@ export function useSprite(
         cels.invalidate(canvas);
       }
     const { present } = past.current;
+    const nextTree = syncTilemaps(
+      next.tree ?? tree,
+      next.frames ?? frames,
+      next.size ?? size,
+      present,
+    );
+    if (nextTree !== (next.tree ?? tree)) setTree(nextTree);
     const validLinks = celLinks.pruneCelLinks(
       next.links ?? links,
       (next.frames ?? frames).map((frame) => frame.id),
-      layerTree.pixelLayerIds(next.tree ?? tree),
+      layerTree.pixelLayerIds(nextTree),
     );
     const samePixels = (
       a: Uint8ClampedArray | undefined,
@@ -308,7 +428,7 @@ export function useSprite(
       return true;
     });
     const snapshot: Snapshot = {
-      tree: next.tree ?? tree,
+      tree: nextTree,
       background: next.background ?? background,
       frames: next.frames ?? frames,
       tags: next.tags ?? tags,
@@ -316,7 +436,7 @@ export function useSprite(
       celSettings: pruneCelSettings(
         next.celSettings ?? celSettings,
         (next.frames ?? frames).map((frame) => frame.id),
-        layerTree.allLayers(next.tree ?? tree).map((layer) => layer.id),
+        layerTree.allLayers(nextTree).map((layer) => layer.id),
       ),
       size: next.size ?? size,
       cels: new Map(),
@@ -355,6 +475,22 @@ export function useSprite(
   };
 
   const revert = () => {
+    if (live.current?.layerId === layerId) {
+      for (const frame of frames) {
+        const copy = cels.get(frame.id, layerId);
+        if (frame.id === frameId || !copy || !changed.current.has(copy))
+          continue;
+        const kept = frameList.celOf(
+          past.current.present.cels,
+          frame.id,
+          layerId,
+        );
+        if (kept) cels.set(frame.id, layerId, size, kept);
+        else cels.delete(frame.id, layerId);
+        changed.current.delete(copy);
+      }
+      live.current = null;
+    }
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !changed.current.has(canvas)) return;
     const kept = frameList.celOf(past.current.present.cels, frameId, layerId);
@@ -471,6 +607,36 @@ export function useSprite(
     restore(back.present);
     past.current = back;
     return true;
+  };
+
+  const historySteps = () => {
+    const { past: before, present, future } = past.current;
+    const all = [...before, present, ...future];
+    return {
+      current: before.length,
+      steps: all.map((step, i) => {
+        if (!i) return "Start";
+        let label = stepLabels.get(step);
+        if (label === undefined) {
+          label = describeStep(all[i - 1]!, step);
+          stepLabels.set(step, label);
+        }
+        return label;
+      }),
+    };
+  };
+
+  const goToStep = (index: number) => {
+    const { past: before, present, future } = past.current;
+    const all = [...before, present, ...future];
+    const target = all[index];
+    if (!target || index === before.length) return;
+    restore(target);
+    past.current = {
+      past: all.slice(0, index),
+      present: target,
+      future: all.slice(index + 1),
+    };
   };
 
   const redo = () => {
@@ -740,6 +906,7 @@ export function useSprite(
     next: Map<string, Uint8ClampedArray | null>,
   ) => {
     putCels(id, next);
+    placing.current = layerTree.findLayer(tree, id)?.layer.kind === "tilemap";
     finish();
   };
 
@@ -870,7 +1037,132 @@ export function useSprite(
   const canRemoveLayer = (id: string) =>
     layerTree
       .allLayers(layerTree.removeLayer(tree, id))
-      .some((layer) => layer.kind === "normal" || layer.kind === "background");
+      .some(
+        (layer) =>
+          layer.kind === "normal" ||
+          layer.kind === "background" ||
+          layer.kind === "tilemap",
+      );
+
+  const addTilemapLayer = (tile: TileSize) => {
+    const base = layerTree.createLayer(
+      "tilemap",
+      layerTree.nextName(tree, "tilemap"),
+    );
+    if (base.kind !== "tilemap") return;
+    const layer = { ...base, tile };
+    setLayerId(layer.id);
+    changeTree(
+      layerTree.insertLayer(tree, layer, layerTree.placeAbove(tree, layerId)),
+    );
+  };
+
+  const convertToTilemap = (id: string, tile: TileSize) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "normal") return;
+    const tiles = withNewTiles(
+      [],
+      frames.map((frame) => cels.pixels(frame.id, id)),
+      size,
+      tile,
+    );
+    setActiveTile(0);
+    changeTree(
+      layerTree.replaceLayer(tree, id, {
+        ...layer,
+        kind: "tilemap",
+        tile,
+        tiles,
+        flips: false,
+      }),
+    );
+  };
+
+  const convertToNormal = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap") return;
+    const { name, visible, locked, opacity, blend, labelColor } = layer;
+    changeTree(
+      layerTree.replaceLayer(tree, id, {
+        id,
+        name,
+        visible,
+        locked,
+        opacity,
+        blend,
+        labelColor,
+        kind: "normal",
+      }),
+    );
+  };
+
+  const activeTilemap = () => {
+    const layer = layerTree.findLayer(tree, layerId)?.layer;
+    return layer?.kind === "tilemap" && layerTree.canPaint(tree, layerId)
+      ? layer
+      : null;
+  };
+
+  const placeTile = (col: number, row: number, index: number | null) => {
+    const layer = activeTilemap();
+    const tile = index === null ? null : layer?.tiles[index];
+    if (!layer || tile === undefined) return;
+    const content =
+      tile && flipTile(tile, layer.tile, layer.flips ? tileFlip : NO_FLIP);
+    placing.current = true;
+    const own = cels.pixels(frameId, layerId);
+    const pixels = own
+      ? new Uint8ClampedArray(own)
+      : new Uint8ClampedArray(size.w * size.h * 4);
+    writeCell(pixels, size, layer.tile, col, row, content);
+    const ctx = context(true);
+    if (!ctx) return;
+    ctx.putImageData(
+      new ImageData(pixels as Uint8ClampedArray<ArrayBuffer>, size.w, size.h),
+      0,
+      0,
+    );
+    touched();
+  };
+
+  const finishPlacing = () => {
+    placing.current = true;
+    finish();
+  };
+
+  const pickTile = (col: number, row: number) => {
+    const layer = layerTree.findLayer(tree, layerId)?.layer;
+    if (layer?.kind !== "tilemap") return;
+    const content = readCell(
+      cels.pixels(frameId, layerId),
+      size,
+      layer.tile,
+      col,
+      row,
+    );
+    const found = tileCells(
+      content,
+      layer.tile,
+      layer.tile,
+      layer.tiles,
+      layer.flips,
+    )[0];
+    if (!found) return;
+    setActiveTile(found.index);
+    setTileFlip(found.flip);
+  };
+
+  const setTileFlips = (id: string, flips: boolean) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap" || layer.flips === flips) return;
+    if (!flips) setTileFlip(NO_FLIP);
+    changeTree(
+      layerTree.updateLayer(tree, id, {
+        flips,
+        ...(flips && { tiles: uniqueTiles(layer.tiles, layer.tile, true) }),
+      }),
+    );
+  };
 
   const removeLayer = (id: string) => {
     if (!canRemoveLayer(id)) return;
@@ -1047,6 +1339,7 @@ export function useSprite(
     context,
     composite,
     previewComposite,
+    compositeOf,
     buildUp,
     touched,
     commit,
@@ -1059,6 +1352,8 @@ export function useSprite(
     mapAllCels,
     undo,
     redo,
+    historySteps,
+    goToStep,
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
     isCelLinked: (layer: string, frame: string) =>
       !!celLinks.linkOf(links, layer, frame),
@@ -1069,6 +1364,19 @@ export function useSprite(
     writeCels,
     cutToLayer,
     duplicateLayer,
+    tileMode,
+    setTileMode,
+    activeTile,
+    setActiveTile,
+    addTilemapLayer,
+    convertToTilemap,
+    convertToNormal,
+    placeTile,
+    finishPlacing,
+    pickTile,
+    tileFlip,
+    setTileFlip,
+    setTileFlips,
     canMergeDown,
     mergeDown,
     canFlatten,

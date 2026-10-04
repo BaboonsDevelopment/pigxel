@@ -20,6 +20,7 @@ export function layerActions(
   sprite: SpriteApi,
   rename?: () => void,
   properties?: () => void,
+  tilemap?: (convert: boolean) => void,
 ): MenuSections {
   const { activeLayer: layer, layerId } = sprite;
   const outside = placeOutside(sprite.tree, layerId);
@@ -39,6 +40,11 @@ export function layerActions(
       {
         label: "New reference layer…",
         onSelect: () => void addReference(sprite),
+      },
+      {
+        label: "New tilemap layer…",
+        onSelect: () => tilemap?.(false),
+        hidden: !tilemap,
       },
     ],
     [
@@ -73,6 +79,18 @@ export function layerActions(
         shortcut: "Delete",
         onSelect: sprite.clearCel,
         disabled: !sprite.canPaint || !sprite.hasCel(sprite.frameId, layerId),
+      },
+    ],
+    [
+      {
+        label: "Turn into tiles…",
+        onSelect: () => tilemap?.(true),
+        hidden: !tilemap || layer?.kind !== "normal",
+      },
+      {
+        label: "Turn back into a normal layer",
+        onSelect: () => sprite.convertToNormal(layerId),
+        hidden: layer?.kind !== "tilemap",
       },
     ],
     [

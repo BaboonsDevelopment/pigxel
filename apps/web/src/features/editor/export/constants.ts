@@ -22,6 +22,29 @@ export const EXPORT_FORMATS = [
     description: "Every frame as a looping animation.",
   },
   {
+    id: "apng",
+    label: "Animated PNG",
+    extension: ".png",
+    mime: "image/apng",
+    description:
+      "Every frame as a looping animation with full transparency, so soft shadows stay soft.",
+  },
+  {
+    id: "webp",
+    label: "Animated WebP",
+    extension: ".webp",
+    mime: "image/webp",
+    description:
+      "Every frame as a looping animation with full transparency, lossless and smaller than PNG.",
+  },
+  {
+    id: "frames",
+    label: "PNG sequence",
+    extension: ".zip",
+    mime: "application/zip",
+    description: "Every frame as its own PNG, numbered, in one ZIP file.",
+  },
+  {
     id: "sheet",
     label: "Sprite sheet",
     extension: ".png",
@@ -52,9 +75,27 @@ export const SHEET_LAYOUTS = [
   { id: "row", label: "Row" },
   { id: "column", label: "Column" },
   { id: "grid", label: "Grid" },
+  { id: "packed", label: "Packed" },
 ] as const;
 
 export type SheetLayout = (typeof SHEET_LAYOUTS)[number]["id"];
+
+export const SHEET_SPLITS = [
+  { id: "none", label: "All frames" },
+  { id: "layers", label: "Each layer" },
+  { id: "tags", label: "Each tag" },
+] as const;
+
+export type SheetSplit = (typeof SHEET_SPLITS)[number]["id"];
+
+export const SHEET_JSONS = [
+  { id: "array", label: "Array" },
+  { id: "hash", label: "Hash" },
+] as const;
+
+export type SheetJson = (typeof SHEET_JSONS)[number]["id"];
+
+export const MAX_SHEET_PADDING = 32;
 
 export const TIMELAPSE_STYLES = [
   {
@@ -102,7 +143,18 @@ export type ExportSettings = {
   format: ExportFormat;
   scale: number;
   layout: SheetLayout;
+  partSelection: boolean;
+  partLayers: string[] | null;
+  partTag: string | null;
   sheetData: boolean;
+  sheetJson: SheetJson;
+  sheetSplit: SheetSplit;
+  sheetBorder: number;
+  sheetSpacing: number;
+  sheetInner: number;
+  sheetTrim: boolean;
+  sheetMerge: boolean;
+  sheetSkipEmpty: boolean;
   applyRatio: boolean;
   timelapseStyle: TimelapseStyle;
   timelapseShape: TimelapseShape;
@@ -113,7 +165,18 @@ export const DEFAULT_EXPORT: ExportSettings = {
   format: "png",
   scale: 1,
   layout: "row",
+  partSelection: false,
+  partLayers: null,
+  partTag: null,
   sheetData: false,
+  sheetJson: "array",
+  sheetSplit: "none",
+  sheetBorder: 0,
+  sheetSpacing: 0,
+  sheetInner: 0,
+  sheetTrim: false,
+  sheetMerge: false,
+  sheetSkipEmpty: false,
   applyRatio: true,
   timelapseStyle: "colors",
   timelapseShape: "vertical",

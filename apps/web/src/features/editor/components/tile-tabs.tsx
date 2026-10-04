@@ -51,7 +51,9 @@ export function TileTabs({
   current,
   revision,
   picture,
+  hidden,
 }: {
+  hidden?: boolean;
   userId: string;
   current: TabTile;
   revision: number;
@@ -91,6 +93,7 @@ export function TileTabs({
 
   return (
     <nav
+      hidden={hidden}
       aria-label="Open tiles"
       className="flex h-9 shrink-0 items-end gap-0.5 overflow-x-auto border-b bg-background px-2 [scrollbar-width:none]"
     >

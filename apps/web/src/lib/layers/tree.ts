@@ -1,5 +1,12 @@
+import { DEFAULT_TILE } from "@/lib/tilemap/tilemap";
 import { DEFAULT_NAMES, MAX_OPACITY } from "./constants";
-import type { GroupLayer, Layer, LayerKind, Place } from "./types";
+import type {
+  GroupLayer,
+  Layer,
+  LayerKind,
+  Place,
+  TilemapLayer,
+} from "./types";
 
 type Found = { layer: Layer; parent: GroupLayer | null; index: number };
 
@@ -42,10 +49,21 @@ function mapTree(tree: Layer[], change: (layer: Layer) => Layer): Layer[] {
 export function updateLayer(
   tree: Layer[],
   id: string,
-  patch: Partial<Omit<GroupLayer, "id" | "kind" | "children">>,
+  patch: Partial<Omit<GroupLayer, "id" | "kind" | "children">> &
+    Partial<Pick<TilemapLayer, "tiles" | "flips">>,
 ): Layer[] {
   return mapTree(tree, (layer) =>
     layer.id === id ? ({ ...layer, ...patch } as Layer) : layer,
+  );
+}
+
+export function replaceLayer(tree: Layer[], id: string, next: Layer): Layer[] {
+  return mapTree(tree, (layer) => (layer.id === id ? next : layer));
+}
+
+export function onlyLayers(tree: Layer[], ids: ReadonlySet<string>): Layer[] {
+  return mapTree(tree, (layer) =>
+    layer.kind === "group" ? layer : { ...layer, visible: ids.has(layer.id) },
   );
 }
 
@@ -192,7 +210,9 @@ export function canPaint(tree: Layer[], id: string | null) {
   const layer = id ? findLayer(tree, id)?.layer : undefined;
   return (
     !!layer &&
-    (layer.kind === "normal" || layer.kind === "background") &&
+    (layer.kind === "normal" ||
+      layer.kind === "background" ||
+      layer.kind === "tilemap") &&
     isShown(tree, layer.id) &&
     !isLocked(tree, layer.id)
   );
@@ -216,7 +236,9 @@ export function createLayer(kind: LayerKind, name: string): Layer {
     opacity: MAX_OPACITY,
     blend: "normal" as const,
   };
-  return kind === "group"
-    ? { ...base, kind, collapsed: false, children: [] }
-    : { ...base, kind };
+  if (kind === "group")
+    return { ...base, kind, collapsed: false, children: [] };
+  if (kind === "tilemap")
+    return { ...base, kind, tile: DEFAULT_TILE, tiles: [], flips: false };
+  return { ...base, kind };
 }

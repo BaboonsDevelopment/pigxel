@@ -93,7 +93,7 @@ describe("editor layout", () => {
       dock: "left",
       where: "start",
     });
-    expect(moved.hidden).toEqual([]);
+    expect(moved.hidden).toEqual(["tileset"]);
     expect(stacks(moved, "left")[0]).toEqual(["assistant"]);
   });
   it("leaves tools off the tool panel and brings them back", () => {
@@ -131,7 +131,7 @@ describe("editor layout", () => {
     expect(odd.docks.left.stacks.flatMap((s) => s.panels)).toContain("colors");
     expect(stacks(odd, "bottom")).toEqual([["timeline"]]);
     expect(odd.docks.bottom.size).toBe(BOTTOM_HEIGHT.min);
-    expect(odd.hidden).toEqual(["colors"]);
+    expect(odd.hidden).toEqual(["colors", "tileset"]);
     expect(odd.hiddenTools).toEqual(["blur"]);
     expect(odd.groupTools).toEqual({ select: "lasso" });
   });

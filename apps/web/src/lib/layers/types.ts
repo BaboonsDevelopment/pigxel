@@ -1,3 +1,4 @@
+import type { TileSize } from "@/lib/tilemap/tilemap";
 import type { BLEND_MODES, LAYER_KINDS } from "./constants";
 
 export type BlendMode = (typeof BLEND_MODES)[number]["id"];
@@ -15,7 +16,14 @@ type LayerBase = {
 };
 
 export type PixelLayer = LayerBase & {
-  kind: Exclude<LayerKind, "group">;
+  kind: Exclude<LayerKind, "group" | "tilemap">;
+};
+
+export type TilemapLayer = LayerBase & {
+  kind: "tilemap";
+  tile: TileSize;
+  tiles: Uint8ClampedArray[];
+  flips: boolean;
 };
 
 export type GroupLayer = LayerBase & {
@@ -24,7 +32,7 @@ export type GroupLayer = LayerBase & {
   children: Layer[];
 };
 
-export type Layer = PixelLayer | GroupLayer;
+export type Layer = PixelLayer | TilemapLayer | GroupLayer;
 
 export type Place = { parentId: string | null; index: number };
 

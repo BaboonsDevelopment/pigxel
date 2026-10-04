@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Axes, Symmetry, TiledMode } from "./paint";
 
 export type OnionSide = "both" | "before" | "after";
@@ -26,13 +27,45 @@ export const ONION_SIDES: { value: OnionSide; label: string }[] = [
   { value: "after", label: "Ahead only" },
 ];
 
+export type CanvasGrid = { w: number; h: number; x: number; y: number };
+
+export type GridLook = { color: string; opacity: number };
+
+export const DEFAULT_GRID_LOOK: GridLook = { color: "#3b82f6", opacity: 55 };
+
+export const MAX_GRID = 256;
+
+export const squareGrid = (n: number): CanvasGrid => ({
+  w: n,
+  h: n,
+  x: 0,
+  y: 0,
+});
+
+export function gridStyle(
+  grid: CanvasGrid,
+  look: GridLook,
+  scale: number,
+): CSSProperties {
+  const color = `color-mix(in srgb, ${look.color} ${look.opacity}%, transparent)`;
+  return {
+    backgroundImage: [
+      `linear-gradient(to right, ${color} 1px, transparent 1px)`,
+      `linear-gradient(to bottom, ${color} 1px, transparent 1px)`,
+    ].join(", "),
+    backgroundSize: `${grid.w * scale}px ${grid.h * scale}px`,
+    backgroundPosition: `${grid.x * scale}px ${grid.y * scale}px`,
+  };
+}
+
 export type CanvasView = {
   symmetry: Symmetry;
   axes: Axes | null;
   tiled: TiledMode;
   onion: number;
   onionSettings: OnionSettings;
-  gridSize: number;
+  grid: CanvasGrid | null;
+  gridLook: GridLook;
   pixelGrid: boolean;
   snap: boolean;
 };
@@ -43,7 +76,8 @@ export const DEFAULT_VIEW: CanvasView = {
   tiled: "none",
   onion: 0,
   onionSettings: DEFAULT_ONION,
-  gridSize: 0,
+  grid: null,
+  gridLook: DEFAULT_GRID_LOOK,
   pixelGrid: true,
   snap: false,
 };

@@ -25,9 +25,11 @@ type OpenMenu = { of: "layer" | "frame"; x: number; y: number };
 export function Timeline({
   sprite,
   playback,
+  onTilemap,
 }: {
   sprite: SpriteApi;
   playback: Playback;
+  onTilemap: (convert: boolean) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
@@ -275,6 +277,7 @@ export function Timeline({
                   sprite,
                   () => setRenaming(layerId),
                   () => setPropertiesId(layerId),
+                  onTilemap,
                 )
               : frameActions(sprite, playback)
           }

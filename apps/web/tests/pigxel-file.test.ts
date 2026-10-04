@@ -57,7 +57,7 @@ describe(".pigxel format", () => {
   it("writes a versioned document with frames, layer settings and cels", () => {
     expect(valid).toMatchObject({
       format: "pigxel",
-      version: 6,
+      version: 7,
       width: 2,
       height: 2,
       frames: [{ duration: 100 }],
@@ -143,7 +143,7 @@ describe(".pigxel format", () => {
     }
   });
   it("rejects files from a newer version", () => {
-    expect(() => parsePigxel(file({ ...valid, version: 7 }))).toThrow(
+    expect(() => parsePigxel(file({ ...valid, version: 8 }))).toThrow(
       "newer version",
     );
   });

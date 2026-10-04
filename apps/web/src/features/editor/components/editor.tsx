@@ -20,8 +20,12 @@ import {
   replacedColor,
   type AdjustKind,
 } from "../pixel-canvas/effects";
-import { rgbaOf, type Stamp } from "../pixel-canvas/paint";
-import { clampPenSize, type PenSettings } from "../pixel-canvas/pen";
+import { rgbaOf, type Axes, type Stamp } from "../pixel-canvas/paint";
+import {
+  clampPenSize,
+  type ColorSlot,
+  type PenSettings,
+} from "../pixel-canvas/pen";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
@@ -40,6 +44,7 @@ import {
 import {
   DEFAULT_VIEW,
   GRID_SIZES,
+  squareGrid,
   ONION_FRAMES,
   SYMMETRY_OPTIONS,
   TILED_OPTIONS,
@@ -49,11 +54,16 @@ import type { MenuSections } from "./menu/constants";
 import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
+import { TilesetPanel } from "./tileset/tileset-panel";
+import { PreviewWindow } from "./preview/preview-window";
+import { SecondView } from "./second-view";
+import { saveExport } from "../export/save";
+import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { allLayers, panelRows } from "@/lib/layers/tree";
+import { allLayers, isShown, panelRows } from "@/lib/layers/tree";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
@@ -94,7 +104,15 @@ import {
   type PanelId,
 } from "../layout";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
-import { isTyping, shortcutFor, sizeKey } from "../helpers";
+import { isTyping, sizeKey } from "../helpers";
+import {
+  actionFor,
+  keysLabel,
+  readKeymap,
+  writeKeymap,
+  type ActionId,
+  type Keymap,
+} from "../keymap";
 import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
@@ -151,7 +169,17 @@ const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
 const OutlineDialog = dynamic(() => import("./outline-dialog"), {
   ssr: false,
 });
+const ShortcutsDialog = dynamic(() => import("./shortcuts-dialog"), {
+  ssr: false,
+});
+const HistoryDialog = dynamic(() => import("./history-dialog"), {
+  ssr: false,
+});
+const GridDialog = dynamic(() => import("./grid-dialog"), { ssr: false });
 const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
+  ssr: false,
+});
+const TileSizeDialog = dynamic(() => import("./tileset/tile-size-dialog"), {
   ssr: false,
 });
 const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
@@ -233,6 +261,19 @@ export function Editor({
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [onionSettings, setOnionSettings] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [gridding, setGridding] = useState(false);
+  const [showingHistory, setShowingHistory] = useState(false);
+  const [editingKeys, setEditingKeys] = useState(false);
+  const [keymap, setKeymap] = useState(() => readKeymap(userId));
+  const changeKeymap = (next: Keymap) => {
+    setKeymap(next);
+    writeKeymap(userId, next);
+  };
+  const [canvasOnly, setCanvasOnly] = useState(false);
+  const [splitView, setSplitView] = useState(false);
+  const fullScreened = useRef(false);
+  const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
   const changeBrushes = (next: SavedBrush[]) => {
@@ -285,6 +326,16 @@ export function Editor({
           "timeline",
           false,
         ),
+      );
+  }
+  const tilemapKey =
+    sprite.activeLayer?.kind === "tilemap" ? sprite.layerId : null;
+  const [seenTilemap, setSeenTilemap] = useState(tilemapKey);
+  if (seenTilemap !== tilemapKey) {
+    setSeenTilemap(tilemapKey);
+    if (tilemapKey)
+      setLayout((l) =>
+        setPanelCollapsed(setPanelShown(l, "tileset", true), "tileset", false),
       );
   }
   const latestScale = useRef(scale);
@@ -398,6 +449,19 @@ export function Editor({
     nudgeLeft: () => void selection.nudge(-1, 0),
     nudgeRight: () => void selection.nudge(1, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
+    togglePreview: () => setPreviewing((on) => !on),
+    toggleCanvasOnly: () => setCanvasOnly((on) => !on),
+    toggleFullScreen: () => {
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+        return;
+      }
+      fullScreened.current = true;
+      setCanvasOnly(true);
+      void document.documentElement.requestFullscreen().catch(() => {
+        fullScreened.current = false;
+      });
+    },
   };
 
   const applyEffect = (
@@ -521,19 +585,38 @@ export function Editor({
     });
   };
 
+  const keyOf = (id: ActionId) => keysLabel(keymap, id, mod);
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
   const editMenu: MenuSections = [
     [
-      { label: "Undo", shortcut: `${mod}Z`, onSelect: commands.undo },
-      { label: "Redo", shortcut: `${mod}Y`, onSelect: commands.redo },
+      {
+        label: "Undo",
+        shortcut: keyOf("command:undo"),
+        onSelect: commands.undo,
+      },
+      {
+        label: "Redo",
+        shortcut: keyOf("command:redo"),
+        onSelect: commands.redo,
+      },
+      { label: "History…", onSelect: () => setShowingHistory(true) },
+      { label: "Keyboard shortcuts…", onSelect: () => setEditingKeys(true) },
     ],
     [
-      { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
-      { label: "Copy", shortcut: `${mod}C`, onSelect: commands.copy },
+      { label: "Cut", shortcut: keyOf("command:cut"), onSelect: commands.cut },
+      {
+        label: "Copy",
+        shortcut: keyOf("command:copy"),
+        onSelect: commands.copy,
+      },
       { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
       { label: "Paste as new layer", onSelect: pasteAsNewLayer },
       { label: "Paste as new tile", onSelect: pasteAsNewTile },
-      { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
+      {
+        label: "Delete",
+        shortcut: keyOf("command:clearLayer"),
+        onSelect: commands.clearLayer,
+      },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
@@ -543,12 +626,12 @@ export function Editor({
           [
             {
               label: "Flip horizontally",
-              shortcut: "Shift+H",
+              shortcut: keyOf("command:flipHorizontal"),
               onSelect: commands.flipHorizontal,
             },
             {
               label: "Flip vertically",
-              shortcut: "Shift+V",
+              shortcut: keyOf("command:flipVertical"),
               onSelect: commands.flipVertical,
             },
           ],
@@ -671,23 +754,23 @@ export function Editor({
     [
       {
         label: "Select all",
-        shortcut: `${mod}A`,
+        shortcut: keyOf("command:selectAll"),
         onSelect: commands.selectAll,
       },
       {
         label: "Deselect",
-        shortcut: `${mod}D`,
+        shortcut: keyOf("command:deselect"),
         onSelect: commands.deselect,
         disabled: !selection.mask,
       },
       {
         label: "Invert",
-        shortcut: `${mod}Shift+I`,
+        shortcut: keyOf("command:invertSelection"),
         onSelect: commands.invertSelection,
       },
       {
         label: "Reselect",
-        shortcut: `${mod}Shift+D`,
+        shortcut: keyOf("command:reselect"),
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
       },
@@ -802,8 +885,31 @@ export function Editor({
   const viewMenu: MenuSections = [
     [
       {
+        label: check(canvasOnly, "Canvas only"),
+        shortcut: keyOf("command:toggleCanvasOnly"),
+        onSelect: commands.toggleCanvasOnly,
+      },
+      {
+        label: "Full screen",
+        shortcut: keyOf("command:toggleFullScreen"),
+        onSelect: commands.toggleFullScreen,
+      },
+    ],
+    [
+      {
+        label: check(splitView, "Second view"),
+        onSelect: () => setSplitView((on) => !on),
+      },
+      {
+        label: check(previewing, "Preview window"),
+        shortcut: keyOf("command:togglePreview"),
+        onSelect: commands.togglePreview,
+      },
+    ],
+    [
+      {
         label: check(view.onion > 0, "Onion skin"),
-        shortcut: "F3",
+        shortcut: keyOf("command:toggleOnion"),
         onSelect: commands.toggleOnion,
       },
       {
@@ -836,20 +942,33 @@ export function Editor({
         submenu: [
           [
             {
-              label: check(view.gridSize === 0, "No grid"),
-              onSelect: () => setView((v) => ({ ...v, gridSize: 0 })),
+              label: check(!view.grid, "No grid"),
+              onSelect: () => setView((v) => ({ ...v, grid: null })),
             },
             ...GRID_SIZES.map((n) => ({
-              label: check(view.gridSize === n, `${n} × ${n}`),
-              onSelect: () => setView((v) => ({ ...v, gridSize: n })),
+              label: check(
+                !!view.grid &&
+                  view.grid.w === n &&
+                  view.grid.h === n &&
+                  !view.grid.x &&
+                  !view.grid.y,
+                `${n} × ${n}`,
+              ),
+              onSelect: () => setView((v) => ({ ...v, grid: squareGrid(n) })),
             })),
+          ],
+          [
+            {
+              label: "Custom…",
+              onSelect: () => setGridding(true),
+            },
           ],
         ],
       },
       {
-        label: check(view.snap && view.gridSize > 0, "Snap to grid"),
+        label: check(view.snap && !!view.grid, "Snap to grid"),
         onSelect: () => setView((v) => ({ ...v, snap: !v.snap })),
-        disabled: !view.gridSize,
+        disabled: !view.grid,
       },
     ],
     [
@@ -995,7 +1114,7 @@ export function Editor({
   }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    const shortcut = shortcutFor(e);
+    const shortcut = actionFor(e, keymap, isTyping(e.target));
     if (!shortcut) return;
     e.preventDefault();
     if ("tool" in shortcut) setTool(shortcut.tool);
@@ -1005,6 +1124,16 @@ export function Editor({
   useEffect(() => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => {
+      if (document.fullscreenElement || !fullScreened.current) return;
+      fullScreened.current = false;
+      setCanvasOnly(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
   const changePalette = (
@@ -1027,6 +1156,30 @@ export function Editor({
         secondary: p.secondary === edited.from ? edited.to : p.secondary,
       }));
   };
+  const canvasProps = {
+    tool: toolById(tool),
+    pen,
+    sprite,
+    selection,
+    view,
+    stamp,
+    highlight,
+    onTextPlaced: () => setTool("move"),
+    sliceId,
+    onSelectSlice: setSliceId,
+    onAxesChange: (axes: Axes | null) => setView((v) => ({ ...v, axes })),
+    onPickColor: (color: string, slot: ColorSlot) =>
+      setPen((p) =>
+        slot === "primary" ? { ...p, color } : { ...p, secondary: color },
+      ),
+    onUseColor: (color: string) =>
+      setPen((p) =>
+        p.recent[0] === color
+          ? p
+          : { ...p, recent: pushRecent(p.recent, color) },
+      ),
+  };
+
   const panels: Record<PanelId, PanelContent> = {
     tools: {
       body: (
@@ -1035,6 +1188,7 @@ export function Editor({
           onSelect={setTool}
           hiddenTools={layout.hiddenTools}
           groupTools={layout.groupTools}
+          keyOf={(id) => keyOf(`tool:${id}`)}
         />
       ),
     },
@@ -1059,9 +1213,25 @@ export function Editor({
         />
       ),
     },
+    tileset: {
+      body: (
+        <TilesetPanel
+          sprite={sprite}
+          onNewTilemap={(convert) => setTiling({ convert })}
+          onPickTile={() => setTool("tile")}
+          onExport={() => void saveExport(tilemapFiles(sprite, file.name))}
+        />
+      ),
+    },
     timeline: {
       fill: true,
-      body: <Timeline sprite={sprite} playback={playback} />,
+      body: (
+        <Timeline
+          sprite={sprite}
+          playback={playback}
+          onTilemap={(convert) => setTiling({ convert })}
+        />
+      ),
     },
     assistant: {
       fill: true,
@@ -1110,7 +1280,21 @@ export function Editor({
           </p>
         </div>
       )}
+      {canvasOnly && (
+        <button
+          type="button"
+          title="Show the menus and panels again (Tab)"
+          onClick={() => {
+            setCanvasOnly(false);
+            if (document.fullscreenElement) void document.exitFullscreen();
+          }}
+          className="absolute top-3 right-3 z-30 rounded-md border bg-background/90 px-2.5 py-1 text-xs text-muted-foreground shadow-sm hover:text-foreground"
+        >
+          Show panels · Tab
+        </button>
+      )}
       <EditorHeader
+        hidden={canvasOnly}
         draftId={draft.id}
         file={file}
         fileInput={fileInput}
@@ -1122,6 +1306,8 @@ export function Editor({
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         onImportSheet={() => sheetInput.current?.click()}
+        onTilemap={(convert) => setTiling({ convert })}
+        keyOf={keyOf}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "Select", sections: selectMenu },
@@ -1130,7 +1316,10 @@ export function Editor({
         ]}
         afterMenus={[{ label: "Window", sections: windowMenu }]}
       />
-      <div className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2">
+      <div
+        hidden={canvasOnly}
+        className="flex min-h-12 shrink-0 items-center border-b bg-background px-4 py-2"
+      >
         <ToolOptions
           tool={toolById(tool)}
           pen={pen}
@@ -1154,9 +1343,12 @@ export function Editor({
         />
       </div>
       <div className="flex min-h-0 flex-1">
-        <Dock side="left" {...dockProps} />
+        <div hidden={canvasOnly} className="contents">
+          <Dock side="left" {...dockProps} />
+        </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TileTabs
+            hidden={canvasOnly}
             userId={userId}
             current={{
               id: draft.id,
@@ -1172,7 +1364,9 @@ export function Editor({
             })}
           />
           <div className="flex min-h-0 flex-1">
-            <Dock side="innerLeft" {...dockProps} />
+            <div hidden={canvasOnly} className="contents">
+              <Dock side="innerLeft" {...dockProps} />
+            </div>
             <main
               ref={workspace}
               data-guide="canvas"
@@ -1184,46 +1378,31 @@ export function Editor({
               )}
             >
               <div className="m-auto">
-                <PixelCanvas
-                  ref={canvas}
-                  tool={toolById(tool)}
-                  pen={pen}
-                  scale={scale}
-                  sprite={sprite}
-                  selection={selection}
-                  view={view}
-                  stamp={stamp}
-                  highlight={highlight}
-                  onTextPlaced={() => setTool("move")}
-                  sliceId={sliceId}
-                  onSelectSlice={setSliceId}
-                  onAxesChange={(axes) => setView((v) => ({ ...v, axes }))}
-                  onPickColor={(color, slot) =>
-                    setPen((p) =>
-                      slot === "primary"
-                        ? { ...p, color }
-                        : { ...p, secondary: color },
-                    )
-                  }
-                  onUseColor={(color) =>
-                    setPen((p) =>
-                      p.recent[0] === color
-                        ? p
-                        : { ...p, recent: pushRecent(p.recent, color) },
-                    )
-                  }
-                />
+                <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
               </div>
             </main>
-            <Dock side="innerRight" {...dockProps} />
+            {splitView && (
+              <SecondView
+                canvas={canvasProps}
+                onClose={() => setSplitView(false)}
+              />
+            )}
+            <div hidden={canvasOnly} className="contents">
+              <Dock side="innerRight" {...dockProps} />
+            </div>
           </div>
-          <Dock side="bottom" {...dockProps} />
+          <div hidden={canvasOnly} className="contents">
+            <Dock side="bottom" {...dockProps} />
+          </div>
         </div>
-        <Dock side="right" {...dockProps} />
+        <div hidden={canvasOnly} className="contents">
+          <Dock side="right" {...dockProps} />
+        </div>
       </div>
       <DragOverlay drag={panelDrag} />
       {customizing && (
         <CustomizeToolsDialog
+          keyOf={(id) => keyOf(`tool:${id}`)}
           hiddenTools={layout.hiddenTools}
           onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
           onClose={() => setCustomizing(false)}
@@ -1327,6 +1506,48 @@ export function Editor({
           onClose={() => setReplacing(null)}
         />
       )}
+      {tiling && (
+        <TileSizeDialog
+          convert={tiling.convert}
+          onApply={(tile) => {
+            selection.deselect();
+            if (tiling.convert) sprite.convertToTilemap(sprite.layerId, tile);
+            else sprite.addTilemapLayer(tile);
+          }}
+          onClose={() => setTiling(null)}
+        />
+      )}
+      {editingKeys && (
+        <ShortcutsDialog
+          keymap={keymap}
+          mod={mod}
+          onChange={changeKeymap}
+          onClose={() => setEditingKeys(false)}
+        />
+      )}
+      {showingHistory && (
+        <HistoryDialog
+          {...sprite.historySteps()}
+          onPick={(index) => {
+            selection.cancel();
+            sprite.goToStep(index);
+          }}
+          onClose={() => setShowingHistory(false)}
+        />
+      )}
+      {gridding && (
+        <GridDialog
+          grid={view.grid}
+          look={view.gridLook}
+          onChange={(grid, gridLook) =>
+            setView((v) => ({ ...v, grid, gridLook }))
+          }
+          onClose={() => setGridding(false)}
+        />
+      )}
+      {previewing && (
+        <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
+      )}
       {onionSettings && (
         <OnionSettingsDialog
           settings={view.onionSettings}
@@ -1423,7 +1644,7 @@ export function Editor({
             color: pen.color,
             frames: sprite.frames.length,
             onion: view.onion,
-            grid: view.gridSize,
+            grid: view.grid?.w ?? 0,
             playing: playback.playing,
             exporting,
             floating: selection.floating,
@@ -1443,6 +1664,20 @@ export function Editor({
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),
             stages: (id) => sprite.buildUp(["reference"], id),
+            layers: allLayers(sprite.tree)
+              .filter(
+                (layer) =>
+                  layer.kind !== "group" &&
+                  layer.kind !== "reference" &&
+                  isShown(sprite.tree, layer.id),
+              )
+              .map((layer) => ({
+                id: layer.id,
+                name: layer.name,
+                picture: (id: string) => sprite.readCel(layer.id, id),
+              })),
+            compose: sprite.compositeOf,
+            selection: selection.mask,
             slices: sprite.slices,
           }}
           pixelRatio={sprite.pixelRatio}
