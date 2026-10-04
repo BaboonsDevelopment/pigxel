@@ -199,6 +199,22 @@ export function useSprite(
     );
   };
 
+  const buildUp = (skip: LayerKind[] = [], frame = frameId) => {
+    const shown = new Set<string>();
+    return layerTree.pixelLayerIds(tree).flatMap((layer) => {
+      if (!cels.get(frame, layer)) return [];
+      shown.add(layer);
+      return [
+        flatten(
+          tree,
+          (id) => (shown.has(id) ? cels.pixels(frame, id) : undefined),
+          size.w * size.h * 4,
+          skip,
+        ),
+      ];
+    });
+  };
+
   const touched = () => {
     const canvas = cels.get(frameId, layerId);
     if (canvas) {
@@ -1031,6 +1047,7 @@ export function useSprite(
     context,
     composite,
     previewComposite,
+    buildUp,
     touched,
     commit,
     revert,
