@@ -13,6 +13,7 @@ type DropPreview = {
 const DRAG_START = 4;
 const SIDE_ZONE = 0.25;
 const BESIDE = 8;
+const GAP_SLOT = 160;
 const CANVAS_ZONE = 0.2;
 const CANVAS_PANEL = 240;
 
@@ -32,10 +33,8 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
           : y < r.top + r.height / 2
             ? "above"
             : "below";
-    const half = { width: r.width / 2, height: r.height / 2 };
-    const column = (
-      panel.closest("[data-stack]") ?? panel
-    ).getBoundingClientRect();
+    const stack = panel.closest<HTMLElement>("[data-stack]");
+    const column = (stack ?? panel).getBoundingClientRect();
     const area =
       where === "left" || where === "right"
         ? {
@@ -45,15 +44,26 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
             height: column.height,
           }
         : where === "above"
-          ? { left: r.left, top: r.top, width: r.width, height: half.height }
-          : {
+          ? {
               left: r.left,
-              top: r.top + half.height,
+              top: r.top - BESIDE / 2,
               width: r.width,
-              height: half.height,
-            };
+              height: BESIDE,
+            }
+          : below(panel, stack, dragged);
     return { target: { kind: "panel", anchor, where }, area };
   }
+  const stack = under?.closest<HTMLElement>("[data-stack]");
+  const last = stack && lastPanel(stack, dragged);
+  if (stack && last)
+    return {
+      target: {
+        kind: "panel",
+        anchor: last.dataset.panel as PanelId,
+        where: "below",
+      },
+      area: below(last, stack, dragged),
+    };
   const canvas = under?.closest<HTMLElement>("[data-canvas-drop]");
   if (canvas) {
     const r = canvas.getBoundingClientRect();
@@ -90,8 +100,38 @@ function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
   return null;
 }
 
+function lastPanel(stack: HTMLElement, dragged: PanelId) {
+  return [...stack.querySelectorAll<HTMLElement>("[data-panel]")]
+    .filter((p) => p.dataset.panel !== dragged)
+    .at(-1);
+}
+
+function below(
+  panel: HTMLElement,
+  stack: HTMLElement | null,
+  dragged: PanelId,
+) {
+  const r = panel.getBoundingClientRect();
+  const column = stack?.getBoundingClientRect();
+  const room = column ? column.bottom - r.bottom : 0;
+  if (stack && lastPanel(stack, dragged) === panel && room > BESIDE * 2)
+    return {
+      left: r.left,
+      top: r.bottom,
+      width: r.width,
+      height: Math.min(room, GAP_SLOT),
+    };
+  return {
+    left: r.left,
+    top: r.bottom - BESIDE / 2,
+    width: r.width,
+    height: BESIDE,
+  };
+}
+
 export function usePanelDrag(
   onDrop: (id: PanelId, target: PanelTarget) => void,
+  changes: (id: PanelId, target: PanelTarget) => boolean,
 ) {
   const [dragging, setDragging] = useState<PanelId | null>(null);
   const [preview, setPreview] = useState<DropPreview | null>(null);
@@ -113,7 +153,8 @@ export function usePanelDrag(
         setDragging(id);
       }
       setPointer(at);
-      last = previewAt(at.x, at.y, id);
+      const found = previewAt(at.x, at.y, id);
+      last = found && changes(id, found.target) ? found : null;
       setPreview(last);
     };
     const end = () => {

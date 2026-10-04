@@ -30,6 +30,7 @@ export type PenSettings = {
   textFont: TextFont;
   textScale: number;
   stabilizer: number;
+  stampPattern: boolean;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -58,6 +59,7 @@ export const DEFAULT_PEN: PenSettings = {
   textFont: "tiny5",
   textScale: 1,
   stabilizer: 0,
+  stampPattern: false,
 };
 
 export const MAX_STABILIZER = 20;

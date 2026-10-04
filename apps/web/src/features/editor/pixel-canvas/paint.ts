@@ -153,12 +153,25 @@ export function paintPoints(
 
 export type Stamp = { w: number; h: number; pixels: Uint8ClampedArray };
 
+export function patternColor(stamp: Stamp, x: number, y: number): Rgba {
+  const px = ((x % stamp.w) + stamp.w) % stamp.w;
+  const py = ((y % stamp.h) + stamp.h) % stamp.h;
+  const j = (py * stamp.w + px) * 4;
+  return [
+    stamp.pixels[j]!,
+    stamp.pixels[j + 1]!,
+    stamp.pixels[j + 2]!,
+    stamp.pixels[j + 3]!,
+  ];
+}
+
 export function paintStamp(
   data: Uint8ClampedArray,
   points: Point[],
   stamp: Stamp,
   solid: Rgba | null,
   options: PaintOptions,
+  pattern = false,
 ) {
   const ox = Math.floor((stamp.w - 1) / 2);
   const oy = Math.floor((stamp.h - 1) / 2);
@@ -166,14 +179,13 @@ export function paintStamp(
     for (let y = 0; y < stamp.h; y++)
       for (let x = 0; x < stamp.w; x++) {
         const j = (y * stamp.w + x) * 4;
-        if (!stamp.pixels[j + 3]) continue;
-        const own = stamp.pixels.subarray(j, j + 4);
-        plot(
-          data,
-          { x: point.x - ox + x, y: point.y - oy + y },
-          solid ?? [own[0]!, own[1]!, own[2]!, own[3]!],
-          options,
-        );
+        if (!pattern && !stamp.pixels[j + 3]) continue;
+        const at = { x: point.x - ox + x, y: point.y - oy + y };
+        const own = pattern
+          ? patternColor(stamp, at.x, at.y)
+          : patternColor(stamp, x, y);
+        if (!own[3]) continue;
+        plot(data, at, solid ?? own, options);
       }
 }
 

@@ -2,14 +2,14 @@
 
 import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { PanelId } from "../../layout";
+import { MIN_PANEL, type PanelId } from "../../layout";
 
 export function Panel({
   id,
   title,
   collapsed,
-  fit,
-  weight,
+  fill,
+  height,
   dragging,
   onDragStart,
   onCollapse,
@@ -19,8 +19,8 @@ export function Panel({
   id: PanelId;
   title: string;
   collapsed: boolean;
-  fit?: boolean;
-  weight: number;
+  fill?: boolean;
+  height?: number;
   dragging: boolean;
   onDragStart: (id: PanelId, e: PointerEvent<HTMLElement>) => void;
   onCollapse: (collapsed: boolean) => void;
@@ -31,7 +31,16 @@ export function Panel({
     <section
       data-panel={id}
       aria-label={title}
-      style={{ flex: collapsed || fit ? "0 1 auto" : `${weight} 1 0` }}
+      style={{
+        flex: collapsed
+          ? "none"
+          : height
+            ? `0 1 ${height}px`
+            : fill
+              ? "1 1 0"
+              : "0 1 auto",
+        minHeight: collapsed ? undefined : MIN_PANEL,
+      }}
       className={cn(
         "flex min-h-0 flex-col overflow-hidden transition-opacity",
         dragging && "opacity-30",

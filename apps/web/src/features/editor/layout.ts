@@ -43,6 +43,7 @@ export type Layout = {
   hidden: PanelId[];
   hiddenTools: string[];
   groupTools: Record<string, string>;
+  heights: Partial<Record<PanelId, number>>;
 };
 
 const stack = (panels: PanelId[], weights: number[], size: number): Stack => ({
@@ -66,6 +67,7 @@ export const DEFAULT_LAYOUT: Layout = {
   hidden: [],
   hiddenTools: [],
   groupTools: {},
+  heights: {},
 };
 
 const HOME: Record<PanelId, DockSide> = {
@@ -142,6 +144,15 @@ export function readLayout(raw: unknown): Layout {
         ? Object.fromEntries(
             Object.entries(v.groupTools).filter(
               (e): e is [string, string] => typeof e[1] === "string",
+            ),
+          )
+        : {},
+    heights:
+      typeof v.heights === "object" && v.heights !== null
+        ? Object.fromEntries(
+            Object.entries(v.heights).filter(
+              (e): e is [PanelId, number] =>
+                isPanel(e[0]) && typeof e[1] === "number" && e[1] >= MIN_PANEL,
             ),
           )
         : {},
@@ -251,6 +262,30 @@ export function setPanelCollapsed(
   collapsed: boolean,
 ) {
   return { ...layout, collapsed: toggled(layout.collapsed, id, collapsed) };
+}
+
+export function movesPanel(
+  layout: Layout,
+  id: PanelId,
+  target: PanelTarget,
+): boolean {
+  const order = (l: Layout) =>
+    JSON.stringify(DOCKS.map((d) => l.docks[d].stacks.map((s) => s.panels)));
+  return order(movePanel(layout, id, target)) !== order(layout);
+}
+
+export function setPanelHeight(
+  layout: Layout,
+  id: PanelId,
+  height: number,
+): Layout {
+  return {
+    ...layout,
+    heights: {
+      ...layout.heights,
+      [id]: Math.max(MIN_PANEL, Math.round(height)),
+    },
+  };
 }
 
 export function setToolShown(layout: Layout, tool: string, shown: boolean) {

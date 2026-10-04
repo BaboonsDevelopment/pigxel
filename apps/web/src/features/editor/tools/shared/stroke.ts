@@ -138,6 +138,7 @@ export function drawStroke(
         stamp,
         stroke.secondary ? stroke.rgba : null,
         paintOptions,
+        props.pen.stampPattern,
       ),
   });
   ctx.putImageData(

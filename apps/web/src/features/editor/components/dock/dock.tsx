@@ -7,6 +7,7 @@ import {
   PANEL_LABELS,
   setBottomHeight,
   setPanelCollapsed,
+  setPanelHeight,
   setPanelShown,
   onLeft,
   shownStacks,
@@ -19,7 +20,7 @@ import { Panel } from "./panel";
 import { Splitter, shareBetween } from "./splitter";
 import type { PanelDrag } from "./use-panel-drag";
 
-export type PanelContent = { body: ReactNode; fit?: boolean };
+export type PanelContent = { body: ReactNode; fill?: boolean };
 
 type SetLayout = (change: (layout: Layout) => Layout) => void;
 
@@ -70,11 +71,10 @@ export function Dock({
 
   const widthTotal = stacks.reduce((sum, s) => sum + s.size, 0) || 1;
   const column = (stack: (typeof stacks)[number]) => {
-    const weightTotal = stack.items.reduce((sum, i) => sum + i.weight, 0) || 1;
     return (
       <div
         data-stack
-        className="flex min-h-0 min-w-0 flex-col"
+        className="flex min-h-0 min-w-0 flex-col overflow-y-auto"
         style={
           bottom
             ? { flex: `${stack.size / widthTotal} 1 0` }
@@ -84,27 +84,16 @@ export function Dock({
         {stack.items.map((item, i) => {
           const collapsed = layout.collapsed.includes(item.id);
           const next = stack.items[i + 1];
-          const fit = (id: PanelId) =>
-            layout.collapsed.includes(id) || panels[id].fit;
           const bar =
-            next && !fit(item.id) && !fit(next.id) ? (
+            next && !collapsed && !layout.collapsed.includes(next.id) ? (
               <Splitter
                 axis="y"
                 onStart={(el) => {
-                  const share = shareBetween(
-                    el,
-                    "y",
-                    [item.weight, next.weight],
-                    MIN_PANEL,
-                  );
+                  const from =
+                    el.previousElementSibling?.getBoundingClientRect().height ??
+                    MIN_PANEL;
                   return (delta) =>
-                    setLayout((l) => {
-                      const weights = [
-                        ...l.docks[side].stacks[stack.index]!.weights,
-                      ];
-                      [weights[item.at], weights[next.at]] = share(delta);
-                      return updateStack(l, side, stack.index, { weights });
-                    });
+                    setLayout((l) => setPanelHeight(l, item.id, from + delta));
                 }}
               />
             ) : (
@@ -116,8 +105,8 @@ export function Dock({
                 id={item.id}
                 title={PANEL_LABELS[item.id]}
                 collapsed={collapsed}
-                fit={panels[item.id].fit}
-                weight={item.weight / weightTotal}
+                fill={panels[item.id].fill}
+                height={layout.heights[item.id]}
                 dragging={drag.dragging === item.id}
                 onDragStart={drag.start}
                 onCollapse={(on) =>

@@ -79,6 +79,7 @@ import {
   PANELS,
   PANEL_LABELS,
   movePanel,
+  movesPanel,
   setPanelShown,
   setToolShown,
   type PanelId,
@@ -89,6 +90,12 @@ import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
+import {
+  readBrushes,
+  withBrush,
+  writeBrushes,
+  type SavedBrush,
+} from "../brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
@@ -170,8 +177,9 @@ export function Editor({
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
   const [layout, setLayout] = useEditorLayout(userId);
-  const panelDrag = usePanelDrag((id, target) =>
-    setLayout((l) => movePanel(l, id, target)),
+  const panelDrag = usePanelDrag(
+    (id, target) => setLayout((l) => movePanel(l, id, target)),
+    (id, target) => movesPanel(layout, id, target),
   );
   const [customizing, setCustomizing] = useState(false);
   const toolGroup = groupOf(tool)?.id;
@@ -183,6 +191,11 @@ export function Editor({
   const [pen, setPen] = useState<PenSettings>(() => readPen(userId));
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [stamp, setStamp] = useState<Stamp | null>(null);
+  const [brushes, setBrushes] = useState(() => readBrushes(userId));
+  const changeBrushes = (next: SavedBrush[]) => {
+    setBrushes(next);
+    writeBrushes(userId, next);
+  };
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
@@ -850,7 +863,6 @@ export function Editor({
 
   const panels: Record<PanelId, PanelContent> = {
     tools: {
-      fit: true,
       body: (
         <ToolBar
           tool={tool}
@@ -891,8 +903,12 @@ export function Editor({
         />
       ),
     },
-    timeline: { body: <Timeline sprite={sprite} playback={playback} /> },
+    timeline: {
+      fill: true,
+      body: <Timeline sprite={sprite} playback={playback} />,
+    },
     assistant: {
+      fill: true,
       body: (
         <EditorChat
           canvas={canvas}
@@ -967,6 +983,15 @@ export function Editor({
           stamp={stamp}
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
+          brushes={brushes}
+          onSaveBrush={() =>
+            stamp &&
+            changeBrushes(withBrush(brushes, stamp, crypto.randomUUID()))
+          }
+          onPickBrush={setStamp}
+          onRemoveBrush={(id) =>
+            changeBrushes(brushes.filter((b) => b.id !== id))
+          }
           slice={slice}
           onSliceChange={changeSlice}
           onSliceDelete={deleteSlice}

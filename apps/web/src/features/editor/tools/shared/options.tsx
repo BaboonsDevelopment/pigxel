@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button, IconButton } from "@pigxel/ui/components/button";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { Text } from "@pigxel/ui/components/typography";
@@ -11,19 +12,103 @@ import {
 } from "../../pixel-canvas/pen";
 import type { Transform } from "../../pixel-canvas/use-selection";
 import type { ToolOptionProps } from "../types";
+import { fitsLibrary, sameStamp, type SavedBrush } from "../../brush-library";
 import { NumberOption, OptionSelect, SizeField } from "./fields";
 
-export function StampOption({ tool, stamp, onClearStamp }: ToolOptionProps) {
-  if (!tool.stamp || !stamp) return null;
+export function StampOption({
+  tool,
+  pen,
+  onChange,
+  stamp,
+  onClearStamp,
+  brushes,
+  onSaveBrush,
+  onPickBrush,
+  onRemoveBrush,
+}: ToolOptionProps) {
+  if (!tool.stamp || (!stamp && !brushes.length)) return null;
+  const saved = stamp && brushes.some((b) => sameStamp(b.stamp, stamp));
   return (
     <span className="flex items-center gap-2">
       <Text as="span" tone="muted">
         Brush
       </Text>
-      <StampPreview stamp={stamp} />
-      <IconButton label="Back to the normal brush" onClick={onClearStamp}>
-        ✕
-      </IconButton>
+      {stamp && <StampPreview stamp={stamp} />}
+      {stamp && !saved && fitsLibrary(stamp) && (
+        <Button size="sm" variant="ghost" onClick={onSaveBrush}>
+          Save
+        </Button>
+      )}
+      <BrushLibrary
+        brushes={brushes}
+        onPick={onPickBrush}
+        onRemove={onRemoveBrush}
+      />
+      {stamp && (
+        <CheckboxField
+          label="Pattern"
+          title="Paints the brush as a texture fixed to the tile, so strokes join up seamlessly"
+          checked={pen.stampPattern}
+          onChange={(e) => onChange({ ...pen, stampPattern: e.target.checked })}
+        />
+      )}
+      {stamp && (
+        <IconButton label="Back to the normal brush" onClick={onClearStamp}>
+          ✕
+        </IconButton>
+      )}
+    </span>
+  );
+}
+
+function BrushLibrary({
+  brushes,
+  onPick,
+  onRemove,
+}: {
+  brushes: SavedBrush[];
+  onPick: (stamp: Stamp) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!brushes.length) return null;
+  return (
+    <span className="relative">
+      <Button
+        size="sm"
+        variant="secondary"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        Saved ({brushes.length}) ▾
+      </Button>
+      {open && (
+        <span className="absolute top-full left-0 z-50 mt-1 grid w-64 grid-cols-4 gap-1 rounded-lg border bg-background p-2 shadow-lg">
+          {brushes.map((brush) => (
+            <span key={brush.id} className="group relative">
+              <button
+                type="button"
+                aria-label={`Use brush ${brush.stamp.w} × ${brush.stamp.h}`}
+                onClick={() => {
+                  onPick(brush.stamp);
+                  setOpen(false);
+                }}
+                className="grid h-12 w-full place-items-center rounded-md border hover:bg-muted"
+              >
+                <StampPreview stamp={brush.stamp} />
+              </button>
+              <button
+                type="button"
+                aria-label="Remove this brush"
+                onClick={() => onRemove(brush.id)}
+                className="absolute -top-1 -right-1 hidden size-4 place-items-center rounded-full bg-foreground text-[10px] leading-none text-background group-hover:grid"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </span>
+      )}
     </span>
   );
 }

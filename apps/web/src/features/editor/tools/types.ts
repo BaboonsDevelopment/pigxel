@@ -10,6 +10,7 @@ import type { ColorSlot, PenSettings, Point } from "../pixel-canvas/pen";
 import type { SelectionApi } from "../pixel-canvas/use-selection";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import type { Slice } from "@/lib/slices/slices";
+import type { SavedBrush } from "../brush-library";
 
 export type ToolGroupId =
   "select" | "move" | "draw" | "shapes" | "fill" | "effects" | "text" | "pick";
@@ -28,6 +29,10 @@ export type ToolOptionProps = {
   stamp: Stamp | null;
   onClearStamp: () => void;
   onUseAsBrush: () => void;
+  brushes: SavedBrush[];
+  onSaveBrush: () => void;
+  onPickBrush: (stamp: Stamp) => void;
+  onRemoveBrush: (id: string) => void;
   slice: Slice | null;
   onSliceChange: (slice: Slice) => void;
   onSliceDelete: () => void;
