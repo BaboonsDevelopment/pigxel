@@ -1135,6 +1135,7 @@ export function Editor({
             frameId: sprite.frameId,
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),
+            stages: (id) => sprite.buildUp(["reference"], id),
             slices: sprite.slices,
           }}
           pixelRatio={sprite.pixelRatio}

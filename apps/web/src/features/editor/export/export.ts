@@ -18,6 +18,7 @@ import {
 } from "./constants";
 import { encodeGif } from "./gif";
 import { buildSheet, sheetData, sheetSize } from "./sheet";
+import { timelapseSize } from "./timelapse";
 
 export type ExportSource = {
   name: string;
@@ -26,6 +27,7 @@ export type ExportSource = {
   frameId: string;
   background: Background;
   picture: (frameId: string) => Uint8ClampedArray;
+  stages?: (frameId: string) => Uint8ClampedArray[];
   slices: Slice[];
 };
 
@@ -38,16 +40,14 @@ export function stretchedSource(
   ratio: PixelRatio,
 ): ExportSource {
   const size = { w: source.size.w * ratio.w, h: source.size.h * ratio.h };
+  const stretch = (rgba: Uint8ClampedArray) =>
+    scalePicture({ rgba, ...source.size }, size.w, size.h, "nearest");
+  const { stages } = source;
   return {
     ...source,
     size,
-    picture: (id) =>
-      scalePicture(
-        { rgba: source.picture(id), ...source.size },
-        size.w,
-        size.h,
-        "nearest",
-      ),
+    picture: (id) => stretch(source.picture(id)),
+    stages: stages && ((id) => stages(id).map(stretch)),
     slices: scaledSlices(source.slices, source.size, size),
   };
 }
@@ -73,6 +73,8 @@ export function exportSize(
 ): Size {
   const { scale } = settings;
   const frame = { w: tile.w * scale, h: tile.h * scale };
+  if (settings.format === "timelapse")
+    return timelapseSize(settings.timelapseShape);
   if (settings.format === "sheet")
     return sheetSize(frameCount, settings.layout, frame);
   if (settings.format === "slices") {
@@ -105,6 +107,8 @@ export function exportFiles(
   settings: ExportSettings,
 ): ExportFile[] {
   const { format, scale } = settings;
+  if (format === "timelapse")
+    throw new Error("Timelapses are rendered with renderTimelapse.");
   const { extension, mime } = EXPORT_FORMATS.find((f) => f.id === format)!;
   const base = safeFileBase(source.name);
   const tile = source.size;
