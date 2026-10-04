@@ -12,7 +12,13 @@ import {
 import { cn } from "@pigxel/ui/lib/utils";
 import { choiceDialog } from "@/components/ui/confirm-dialog";
 import type { Area } from "../pixel-canvas/constants";
-import { filledMask, outlined, replacedColor } from "../pixel-canvas/effects";
+import {
+  adjustedColors,
+  filledMask,
+  outlined,
+  replacedColor,
+  type AdjustKind,
+} from "../pixel-canvas/effects";
 import { rgbaOf, type Stamp } from "../pixel-canvas/paint";
 import { clampPenSize, type PenSettings } from "../pixel-canvas/pen";
 import {
@@ -140,6 +146,9 @@ const ReduceColorsDialog = dynamic(() => import("./reduce-colors-dialog"), {
 const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
   ssr: false,
 });
+const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
+  ssr: false,
+});
 const CustomizeToolsDialog = dynamic(() => import("./customize-tools-dialog"), {
   ssr: false,
 });
@@ -178,6 +187,11 @@ export function Editor({
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
   const [replacing, setReplacing] = useState<{
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
+  const [adjusting, setAdjusting] = useState<{
+    kind: AdjustKind;
     pixels: Uint8ClampedArray;
     mask: Uint8Array | null;
   } | null>(null);
@@ -366,6 +380,17 @@ export function Editor({
     sprite.editCel((pixels) => change(pixels, selection.mask));
   };
 
+  const adjust = (kind: AdjustKind) => {
+    selection.drop();
+    setAdjusting({
+      kind,
+      pixels: new Uint8ClampedArray(
+        sprite.readCel(sprite.layerId, sprite.frameId),
+      ),
+      mask: selection.mask,
+    });
+  };
+
   const pasteAsNewLayer = () => {
     const piece = copiedPiece();
     if (!piece) return;
@@ -543,6 +568,23 @@ export function Editor({
                   mask: selection.mask,
                 });
               },
+              disabled: !sprite.canPaint,
+            },
+          ],
+        ],
+      },
+      {
+        label: "Adjust",
+        submenu: [
+          [
+            {
+              label: "Hue / Saturation…",
+              onSelect: () => adjust("hueSaturation"),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Brightness / Contrast…",
+              onSelect: () => adjust("brightnessContrast"),
               disabled: !sprite.canPaint,
             },
           ],
@@ -1218,6 +1260,20 @@ export function Editor({
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {adjusting && (
+        <AdjustColorsDialog
+          kind={adjusting.kind}
+          size={sprite.size}
+          pixels={adjusting.pixels}
+          mask={adjusting.mask}
+          onApply={(values) =>
+            applyEffect((pixels, mask) =>
+              adjustedColors(adjusting.kind, pixels, mask, values),
+            )
+          }
+          onClose={() => setAdjusting(null)}
         />
       )}
       {reducing && (
