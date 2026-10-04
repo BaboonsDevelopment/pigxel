@@ -20,8 +20,12 @@ import {
   replacedColor,
   type AdjustKind,
 } from "../pixel-canvas/effects";
-import { rgbaOf, type Stamp } from "../pixel-canvas/paint";
-import { clampPenSize, type PenSettings } from "../pixel-canvas/pen";
+import { rgbaOf, type Axes, type Stamp } from "../pixel-canvas/paint";
+import {
+  clampPenSize,
+  type ColorSlot,
+  type PenSettings,
+} from "../pixel-canvas/pen";
 import {
   PixelCanvas,
   type PixelCanvasHandle,
@@ -52,6 +56,7 @@ import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
 import { PreviewWindow } from "./preview/preview-window";
+import { SecondView } from "./second-view";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
@@ -245,6 +250,7 @@ export function Editor({
   const [previewing, setPreviewing] = useState(false);
   const [gridding, setGridding] = useState(false);
   const [canvasOnly, setCanvasOnly] = useState(false);
+  const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
@@ -851,6 +857,10 @@ export function Editor({
     ],
     [
       {
+        label: check(splitView, "Second view"),
+        onSelect: () => setSplitView((on) => !on),
+      },
+      {
         label: check(previewing, "Preview window"),
         shortcut: "F7",
         onSelect: commands.togglePreview,
@@ -1106,6 +1116,30 @@ export function Editor({
         secondary: p.secondary === edited.from ? edited.to : p.secondary,
       }));
   };
+  const canvasProps = {
+    tool: toolById(tool),
+    pen,
+    sprite,
+    selection,
+    view,
+    stamp,
+    highlight,
+    onTextPlaced: () => setTool("move"),
+    sliceId,
+    onSelectSlice: setSliceId,
+    onAxesChange: (axes: Axes | null) => setView((v) => ({ ...v, axes })),
+    onPickColor: (color: string, slot: ColorSlot) =>
+      setPen((p) =>
+        slot === "primary" ? { ...p, color } : { ...p, secondary: color },
+      ),
+    onUseColor: (color: string) =>
+      setPen((p) =>
+        p.recent[0] === color
+          ? p
+          : { ...p, recent: pushRecent(p.recent, color) },
+      ),
+  };
+
   const panels: Record<PanelId, PanelContent> = {
     tools: {
       body: (
@@ -1302,37 +1336,15 @@ export function Editor({
               )}
             >
               <div className="m-auto">
-                <PixelCanvas
-                  ref={canvas}
-                  tool={toolById(tool)}
-                  pen={pen}
-                  scale={scale}
-                  sprite={sprite}
-                  selection={selection}
-                  view={view}
-                  stamp={stamp}
-                  highlight={highlight}
-                  onTextPlaced={() => setTool("move")}
-                  sliceId={sliceId}
-                  onSelectSlice={setSliceId}
-                  onAxesChange={(axes) => setView((v) => ({ ...v, axes }))}
-                  onPickColor={(color, slot) =>
-                    setPen((p) =>
-                      slot === "primary"
-                        ? { ...p, color }
-                        : { ...p, secondary: color },
-                    )
-                  }
-                  onUseColor={(color) =>
-                    setPen((p) =>
-                      p.recent[0] === color
-                        ? p
-                        : { ...p, recent: pushRecent(p.recent, color) },
-                    )
-                  }
-                />
+                <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
               </div>
             </main>
+            {splitView && (
+              <SecondView
+                canvas={canvasProps}
+                onClose={() => setSplitView(false)}
+              />
+            )}
             <div hidden={canvasOnly} className="contents">
               <Dock side="innerRight" {...dockProps} />
             </div>
