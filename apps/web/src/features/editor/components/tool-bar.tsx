@@ -23,11 +23,13 @@ export function ToolBar({
   onSelect,
   hiddenTools,
   groupTools,
+  keyOf,
 }: {
   tool: ToolId;
   onSelect: (tool: ToolId) => void;
   hiddenTools: string[];
   groupTools: Record<string, string>;
+  keyOf: (tool: ToolId) => string | undefined;
 }) {
   const [open, setOpen] = useState<{ group: string; at: Beside } | null>(null);
   const [tip, setTip] = useState<{ text: string; at: Beside } | null>(null);
@@ -104,7 +106,7 @@ export function ToolBar({
             onPointerEnter={(e) => {
               if (open) return;
               setTip({
-                text: `${toolTitle(entry)}${more ? " · hold for more" : ""}`,
+                text: `${toolTitle(entry.label, keyOf(entry.id))}${more ? " · hold for more" : ""}`,
                 at: beside(e.currentTarget),
               });
             }}
@@ -184,8 +186,7 @@ export function ToolBar({
                 </span>
                 <span className="flex-1">{entry.label}</span>
                 <span className="text-xs text-muted-foreground">
-                  {entry.shift ? "Shift+" : ""}
-                  {entry.shortcut}
+                  {keyOf(entry.id)}
                 </span>
               </button>
             );

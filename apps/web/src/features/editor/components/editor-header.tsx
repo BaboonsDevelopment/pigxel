@@ -15,7 +15,7 @@ import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
 import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
-import { useModifierLabel } from "@/lib/utils/use-modifier-label";
+import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "./menu/menu";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
@@ -38,6 +38,7 @@ export function EditorHeader({
   onPublish,
   onImportSheet,
   onTilemap,
+  keyOf,
   menus,
   afterMenus = [],
 }: {
@@ -54,12 +55,12 @@ export function EditorHeader({
   onPublish?: () => void;
   onImportSheet: () => void;
   onTilemap: (convert: boolean) => void;
+  keyOf: (id: ActionId) => string | undefined;
   menus: { label: string; sections: MenuSections }[];
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
   const framesInput = useRef<HTMLInputElement>(null);
-  const mod = useModifierLabel();
 
   return (
     <header
@@ -87,7 +88,7 @@ export function EditorHeader({
             },
             {
               label: "Open from your computer…",
-              shortcut: `${mod}O`,
+              shortcut: keyOf("command:open"),
               onSelect: file.openFromComputer,
             },
             {
@@ -121,7 +122,10 @@ export function EditorHeader({
                 file.location && file.location.kind !== "cloud"
                   ? "Move to Pigxel cloud"
                   : "Save to Pigxel cloud",
-              shortcut: file.location?.kind === "cloud" ? `${mod}S` : undefined,
+              shortcut:
+                file.location?.kind === "cloud"
+                  ? keyOf("command:save")
+                  : undefined,
               onSelect: file.saveToCloud,
             },
             {
@@ -130,20 +134,23 @@ export function EditorHeader({
                 : file.location && file.location.kind !== "drive"
                   ? "Move to Google Drive"
                   : "Save to Google Drive",
-              shortcut: file.location?.kind === "drive" ? `${mod}S` : undefined,
+              shortcut:
+                file.location?.kind === "drive"
+                  ? keyOf("command:save")
+                  : undefined,
               onSelect: drive.connected ? file.saveToDrive : onConnectDrive,
               hidden: !drive.available,
             },
             {
               label: "Download .pigxel",
-              shortcut: file.location ? undefined : `${mod}S`,
+              shortcut: file.location ? undefined : keyOf("command:save"),
               onSelect: file.download,
             },
           ],
           [
             {
               label: "Export…",
-              shortcut: `${mod}E`,
+              shortcut: keyOf("command:export"),
               onSelect: onExport,
             },
             {

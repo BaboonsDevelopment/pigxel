@@ -104,7 +104,15 @@ import {
   type PanelId,
 } from "../layout";
 import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
-import { isTyping, shortcutFor, sizeKey } from "../helpers";
+import { isTyping, sizeKey } from "../helpers";
+import {
+  actionFor,
+  keysLabel,
+  readKeymap,
+  writeKeymap,
+  type ActionId,
+  type Keymap,
+} from "../keymap";
 import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
@@ -159,6 +167,9 @@ const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
   ssr: false,
 });
 const OutlineDialog = dynamic(() => import("./outline-dialog"), {
+  ssr: false,
+});
+const ShortcutsDialog = dynamic(() => import("./shortcuts-dialog"), {
   ssr: false,
 });
 const HistoryDialog = dynamic(() => import("./history-dialog"), {
@@ -253,6 +264,12 @@ export function Editor({
   const [previewing, setPreviewing] = useState(false);
   const [gridding, setGridding] = useState(false);
   const [showingHistory, setShowingHistory] = useState(false);
+  const [editingKeys, setEditingKeys] = useState(false);
+  const [keymap, setKeymap] = useState(() => readKeymap(userId));
+  const changeKeymap = (next: Keymap) => {
+    setKeymap(next);
+    writeKeymap(userId, next);
+  };
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
@@ -568,20 +585,38 @@ export function Editor({
     });
   };
 
+  const keyOf = (id: ActionId) => keysLabel(keymap, id, mod);
   const check = (on: boolean, label: string) => `${on ? "✓ " : ""}${label}`;
   const editMenu: MenuSections = [
     [
-      { label: "Undo", shortcut: `${mod}Z`, onSelect: commands.undo },
-      { label: "Redo", shortcut: `${mod}Y`, onSelect: commands.redo },
+      {
+        label: "Undo",
+        shortcut: keyOf("command:undo"),
+        onSelect: commands.undo,
+      },
+      {
+        label: "Redo",
+        shortcut: keyOf("command:redo"),
+        onSelect: commands.redo,
+      },
       { label: "History…", onSelect: () => setShowingHistory(true) },
+      { label: "Keyboard shortcuts…", onSelect: () => setEditingKeys(true) },
     ],
     [
-      { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
-      { label: "Copy", shortcut: `${mod}C`, onSelect: commands.copy },
+      { label: "Cut", shortcut: keyOf("command:cut"), onSelect: commands.cut },
+      {
+        label: "Copy",
+        shortcut: keyOf("command:copy"),
+        onSelect: commands.copy,
+      },
       { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
       { label: "Paste as new layer", onSelect: pasteAsNewLayer },
       { label: "Paste as new tile", onSelect: pasteAsNewTile },
-      { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
+      {
+        label: "Delete",
+        shortcut: keyOf("command:clearLayer"),
+        onSelect: commands.clearLayer,
+      },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
     [
@@ -591,12 +626,12 @@ export function Editor({
           [
             {
               label: "Flip horizontally",
-              shortcut: "Shift+H",
+              shortcut: keyOf("command:flipHorizontal"),
               onSelect: commands.flipHorizontal,
             },
             {
               label: "Flip vertically",
-              shortcut: "Shift+V",
+              shortcut: keyOf("command:flipVertical"),
               onSelect: commands.flipVertical,
             },
           ],
@@ -719,23 +754,23 @@ export function Editor({
     [
       {
         label: "Select all",
-        shortcut: `${mod}A`,
+        shortcut: keyOf("command:selectAll"),
         onSelect: commands.selectAll,
       },
       {
         label: "Deselect",
-        shortcut: `${mod}D`,
+        shortcut: keyOf("command:deselect"),
         onSelect: commands.deselect,
         disabled: !selection.mask,
       },
       {
         label: "Invert",
-        shortcut: `${mod}Shift+I`,
+        shortcut: keyOf("command:invertSelection"),
         onSelect: commands.invertSelection,
       },
       {
         label: "Reselect",
-        shortcut: `${mod}Shift+D`,
+        shortcut: keyOf("command:reselect"),
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
       },
@@ -851,12 +886,12 @@ export function Editor({
     [
       {
         label: check(canvasOnly, "Canvas only"),
-        shortcut: "Tab",
+        shortcut: keyOf("command:toggleCanvasOnly"),
         onSelect: commands.toggleCanvasOnly,
       },
       {
         label: "Full screen",
-        shortcut: "F11",
+        shortcut: keyOf("command:toggleFullScreen"),
         onSelect: commands.toggleFullScreen,
       },
     ],
@@ -867,14 +902,14 @@ export function Editor({
       },
       {
         label: check(previewing, "Preview window"),
-        shortcut: "F7",
+        shortcut: keyOf("command:togglePreview"),
         onSelect: commands.togglePreview,
       },
     ],
     [
       {
         label: check(view.onion > 0, "Onion skin"),
-        shortcut: "F3",
+        shortcut: keyOf("command:toggleOnion"),
         onSelect: commands.toggleOnion,
       },
       {
@@ -1079,7 +1114,7 @@ export function Editor({
   }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    const shortcut = shortcutFor(e);
+    const shortcut = actionFor(e, keymap, isTyping(e.target));
     if (!shortcut) return;
     e.preventDefault();
     if ("tool" in shortcut) setTool(shortcut.tool);
@@ -1153,6 +1188,7 @@ export function Editor({
           onSelect={setTool}
           hiddenTools={layout.hiddenTools}
           groupTools={layout.groupTools}
+          keyOf={(id) => keyOf(`tool:${id}`)}
         />
       ),
     },
@@ -1271,6 +1307,7 @@ export function Editor({
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         onImportSheet={() => sheetInput.current?.click()}
         onTilemap={(convert) => setTiling({ convert })}
+        keyOf={keyOf}
         menus={[
           { label: "Edit", sections: editMenu },
           { label: "Select", sections: selectMenu },
@@ -1365,6 +1402,7 @@ export function Editor({
       <DragOverlay drag={panelDrag} />
       {customizing && (
         <CustomizeToolsDialog
+          keyOf={(id) => keyOf(`tool:${id}`)}
           hiddenTools={layout.hiddenTools}
           onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
           onClose={() => setCustomizing(false)}
@@ -1477,6 +1515,14 @@ export function Editor({
             else sprite.addTilemapLayer(tile);
           }}
           onClose={() => setTiling(null)}
+        />
+      )}
+      {editingKeys && (
+        <ShortcutsDialog
+          keymap={keymap}
+          mod={mod}
+          onChange={changeKeymap}
+          onClose={() => setEditingKeys(false)}
         />
       )}
       {showingHistory && (
