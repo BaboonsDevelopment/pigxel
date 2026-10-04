@@ -48,6 +48,7 @@ import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import { panelRows } from "@/lib/layers/tree";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
+import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import {
   readDraft,
@@ -132,6 +133,9 @@ const CanvasSizeDialog = dynamic(() => import("./canvas-size-dialog"), {
 const SpriteSizeDialog = dynamic(() => import("./sprite-size-dialog"), {
   ssr: false,
 });
+const ReduceColorsDialog = dynamic(() => import("./reduce-colors-dialog"), {
+  ssr: false,
+});
 const CustomizeToolsDialog = dynamic(() => import("./customize-tools-dialog"), {
   ssr: false,
 });
@@ -169,6 +173,10 @@ export function Editor({
   const [inserting, setInserting] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
+  const [reducing, setReducing] = useState<{
+    frames: Uint8ClampedArray[];
+    picture: Uint8ClampedArray;
+  } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [inserted, setInserted] = useState(0);
@@ -649,6 +657,16 @@ export function Editor({
       },
     ],
     [
+      {
+        label: "Reduce colours…",
+        onSelect: () =>
+          setReducing({
+            frames: sprite.frames.map((f) =>
+              sprite.composite(["reference"], f.id),
+            ),
+            picture: sprite.composite(["reference"]),
+          }),
+      },
       {
         label: "Colour mode",
         submenu: [
@@ -1158,6 +1176,22 @@ export function Editor({
             selection.select(next.some(Boolean) ? next : null);
           }}
           onClose={() => setModifying(null)}
+        />
+      )}
+      {reducing && (
+        <ReduceColorsDialog
+          size={sprite.size}
+          frames={reducing.frames}
+          picture={reducing.picture}
+          palette={sprite.palette}
+          onApply={({ palette, dither, replacePalette }) => {
+            selection.deselect();
+            sprite.mapAllCels(
+              (rgba) => mapToPalette(rgba, sprite.size.w, palette, dither),
+              replacePalette ? palette : undefined,
+            );
+          }}
+          onClose={() => setReducing(null)}
         />
       )}
       {scaling && (

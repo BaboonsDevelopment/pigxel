@@ -558,6 +558,18 @@ export function useSprite(
     finish({ size: next, slices: nextSlices });
   };
 
+  const mapAllCels = (
+    map: (rgba: Uint8ClampedArray) => Uint8ClampedArray,
+    nextPalette?: string[],
+  ) => {
+    for (const { frameId: frame, layerId: layer } of cels.list())
+      changed.current.add(
+        cels.set(frame, layer, size, map(cels.pixels(frame, layer)!)),
+      );
+    if (nextPalette) setPaletteState(nextPalette);
+    finish(nextPalette ? { palette: nextPalette } : {});
+  };
+
   const transformAll = (t: TileTransform) => {
     const next = turnsSideways(t) ? { w: size.h, h: size.w } : size;
     for (const { frameId: frame, layerId: layer } of cels.list()) {
@@ -638,6 +650,7 @@ export function useSprite(
     resize,
     rescale,
     transformAll,
+    mapAllCels,
     undo,
     redo,
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
