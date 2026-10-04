@@ -10,7 +10,9 @@ import {
   onColor,
   type ExportSource,
 } from "@/features/editor/export/export";
+import { encodeApng } from "@/features/editor/export/apng";
 import { encodeGif, toIndexed } from "@/features/editor/export/gif";
+import { encodeWebp } from "@/features/editor/export/webp";
 import {
   PLAIN_SHEET,
   packSheet,
@@ -531,5 +533,35 @@ describe("exporting a tile", () => {
         "#102030",
       ),
     ]).toEqual([16, 32, 48, 255, 0, 255, 0, 255]);
+  });
+});
+
+describe("animated PNG and WebP", () => {
+  const frames = [
+    { rgba: solid(2, 2, [255, 0, 0, 128]), duration: 100 },
+    { rgba: solid(2, 2, [0, 0, 255, 255]), duration: 250 },
+  ];
+  const text = (bytes: Uint8Array, at: number) =>
+    String.fromCharCode(...bytes.subarray(at, at + 4));
+  const count = (bytes: Uint8Array, tag: string) => {
+    let n = 0;
+    for (let i = 0; i < bytes.length - 3; i++) if (text(bytes, i) === tag) n++;
+    return n;
+  };
+
+  it("writes an APNG with a control chunk per frame", () => {
+    const png = encodeApng(frames, 2, 2);
+    expect([...png.subarray(1, 4)]).toEqual([80, 78, 71]);
+    expect(count(png, "acTL")).toBe(1);
+    expect(count(png, "fcTL")).toBe(2);
+    expect(count(png, "fdAT")).toBe(1);
+  });
+
+  it("writes a lossless animated WebP with one frame chunk per frame", () => {
+    const webp = encodeWebp(frames, 2, 2);
+    expect(text(webp, 0)).toBe("RIFF");
+    expect(text(webp, 8)).toBe("WEBP");
+    expect(count(webp, "ANMF")).toBe(2);
+    expect(count(webp, "VP8L")).toBe(2);
   });
 });

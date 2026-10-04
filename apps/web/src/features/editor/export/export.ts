@@ -17,7 +17,9 @@ import {
   MIN_EXPORT_SCALE,
   type ExportSettings,
 } from "./constants";
+import { encodeApng } from "./apng";
 import { encodeGif } from "./gif";
+import { encodeWebp } from "./webp";
 import {
   packSheet,
   sheetData,
@@ -239,6 +241,24 @@ export function exportFiles(
         ),
       };
     });
+  }
+
+  if (format === "apng" || format === "webp") {
+    const encode = format === "apng" ? encodeApng : encodeWebp;
+    return [
+      {
+        name: `${base}-animated${extension}`,
+        mime,
+        data: encode(
+          source.frames.map((f) => ({
+            rgba: scaled(f.id).rgba,
+            duration: f.duration,
+          })),
+          frame.w,
+          frame.h,
+        ),
+      },
+    ];
   }
 
   if (format === "gif")

@@ -106,7 +106,7 @@ export default function ExportDialog({
   const stretch = !isSquare(pixelRatio) && settings.applyRatio;
   const source = stretch ? stretchedSource(tile, pixelRatio!) : tile;
   const { size, frames } = source;
-  const animated = settings.format === "gif" || settings.format === "sheet";
+  const animated = ["gif", "apng", "webp", "sheet"].includes(settings.format);
   const timelapse = settings.format === "timelapse";
   const style = TIMELAPSE_STYLES.find((s) => s.id === settings.timelapseStyle)!;
   const seconds = Math.round(
@@ -208,7 +208,8 @@ export default function ExportDialog({
           {!animated && frames.length > 1 && (
             <FormMessage className="text-xs">
               Exports frame {frameIndex(frames, source.frameId) + 1} of{" "}
-              {frames.length}. GIF and Sprite sheet export every frame.
+              {frames.length}. GIF, Animated PNG, Animated WebP and Sprite sheet
+              export every frame.
             </FormMessage>
           )}
         </fieldset>

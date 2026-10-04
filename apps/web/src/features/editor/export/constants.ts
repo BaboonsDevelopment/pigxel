@@ -22,6 +22,22 @@ export const EXPORT_FORMATS = [
     description: "Every frame as a looping animation.",
   },
   {
+    id: "apng",
+    label: "Animated PNG",
+    extension: ".png",
+    mime: "image/apng",
+    description:
+      "Every frame as a looping animation with full transparency, so soft shadows stay soft.",
+  },
+  {
+    id: "webp",
+    label: "Animated WebP",
+    extension: ".webp",
+    mime: "image/webp",
+    description:
+      "Every frame as a looping animation with full transparency, lossless and smaller than PNG.",
+  },
+  {
     id: "sheet",
     label: "Sprite sheet",
     extension: ".png",
