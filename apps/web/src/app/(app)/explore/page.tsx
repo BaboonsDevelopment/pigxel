@@ -13,20 +13,24 @@ export default async function Explore({ searchParams }: Props) {
   const user = await getUser();
   const params = await searchParams;
   const period = PERIODS.find((p) => p.value === params.period) ?? PERIODS[0];
-  const { tiles, count } = await listPublicTiles(
+  const first = await listPublicTiles(
     0,
     PAGE_SIZE,
     period.days,
     user?.id ?? null,
-  );
+  ).catch((error: unknown) => {
+    console.error(error);
+    return null;
+  });
 
   return (
     <PopularFeed
       key={period.value}
       period={period.value}
-      initial={tiles}
-      count={count}
+      initial={first?.tiles ?? []}
+      count={first?.count ?? 0}
       guest={!user}
+      failed={!first}
     />
   );
 }

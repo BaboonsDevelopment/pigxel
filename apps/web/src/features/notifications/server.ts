@@ -59,7 +59,7 @@ export async function listNotifications(
       .order("created_at", { ascending: false })
       .limit(SHOWN),
   ]);
-  if (error || !data) return [];
+  if (error) throw new Error(`Couldn’t load notifications: ${error.message}`);
   const now = Date.now();
   return (
     data as unknown as { created_at: string; follower: ProfileRow | null }[]

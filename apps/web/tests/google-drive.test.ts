@@ -42,7 +42,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 import { GET as google } from "@/app/auth/google/route";
 import { GET as callback } from "@/app/auth/callback/route";
 import { POST as token } from "@/app/api/google-drive/token/route";
-import { safeNext, withParam } from "@/lib/auth/routes";
+import { loginUrl, safeNext, withParam } from "@/lib/auth/routes";
 import { DRIVE_SCOPE } from "@/lib/google-drive/server";
 
 const emailUser = {
@@ -133,6 +133,18 @@ describe("connecting Google", () => {
     );
     expect(safeNext("//evil.example")).toBe("/home");
     expect(safeNext(null)).toBe("/home");
+    expect(safeNext("/pricing")).toBe("/pricing");
+    expect(safeNext("/u/pixel_pig")).toBe("/u/pixel_pig");
+    expect(safeNext("/u/Not-A-Name")).toBe("/home");
+    expect(safeNext("/u/pixel_pig/extra")).toBe("/home");
+  });
+  it("builds login links that return to a safe page", () => {
+    expect(loginUrl()).toBe("/login");
+    expect(loginUrl("signup")).toBe("/login?mode=signup");
+    expect(loginUrl("signup", "/pricing")).toBe(
+      "/login?mode=signup&next=%2Fpricing",
+    );
+    expect(loginUrl("login", "/pricing")).toBe("/login?next=%2Fpricing");
   });
   it("hides Google sign-in when it isn't set up", async () => {
     vi.stubEnv("GOOGLE_CLIENT_ID", "");

@@ -95,7 +95,7 @@ export async function listProfileTiles(
     .order("pin_order", { ascending: true, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(120);
-  if (error || !data) return { tiles: [], count: 0 };
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
   return {
     count: count ?? data.length,
     tiles: (data as TileRow[]).map(toProfileTile),
@@ -153,8 +153,7 @@ export async function listPublicTiles(
   const { data, count, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).range(from, from + limit - 1);
-  if (error) console.error("Couldn’t load public arts:", error.message);
-  if (error || !data) return { tiles: [], count: 0 };
+  if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
   return {
     count: count ?? rows.length,
@@ -174,20 +173,23 @@ export async function listPublicTiles(
 
 export async function getFollowStats(
   profileId: string,
-  viewerId: string,
+  viewerId: string | null,
 ): Promise<{ followers: number; following: boolean }> {
   const supabase = await createClient();
   const [all, mine] = await Promise.all([
+    // Guests may only read followee_id, which is enough to count.
     supabase
       .from("follows")
-      .select("follower_id", { count: "exact", head: true })
+      .select("followee_id", { count: "exact", head: true })
       .eq("followee_id", profileId),
-    supabase
-      .from("follows")
-      .select("follower_id")
-      .eq("followee_id", profileId)
-      .eq("follower_id", viewerId)
-      .maybeSingle(),
+    viewerId
+      ? supabase
+          .from("follows")
+          .select("follower_id")
+          .eq("followee_id", profileId)
+          .eq("follower_id", viewerId)
+          .maybeSingle()
+      : { data: null },
   ]);
   return { followers: all.count ?? 0, following: Boolean(mine.data) };
 }

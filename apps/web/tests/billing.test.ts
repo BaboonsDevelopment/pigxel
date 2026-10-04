@@ -1,7 +1,10 @@
 import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  canChangePlan,
   currentPlan,
+  formatMoney,
+  planChange,
   subscriptionRecord,
   type SubscriptionEvent,
   type SubscriptionRecord,
@@ -16,6 +19,8 @@ vi.mock("@/features/billing/server", () => ({
 
 const USER = "0b6f7c0e-4b8a-4c56-9a4e-3f1f2d6c9a11";
 const pro = TIERS.find((tier) => tier.name === "Pro")!;
+const starter = TIERS.find((tier) => tier.name === "Starter")!;
+const advanced = TIERS.find((tier) => tier.name === "Advanced")!;
 
 function event(
   overrides: Partial<SubscriptionEvent["data"]> = {},
@@ -85,9 +90,22 @@ describe("current plan", () => {
     expect(currentPlan([record({ priceId: pro.priceId.year })])).toEqual({
       name: "Pro",
       cycle: "year",
+      subscriptionId: "sub_1",
+      customerId: "ctm_1",
+      priceId: pro.priceId.year,
       status: "active",
       renewsAt: "2026-11-01T12:00:00Z",
       cancelsAt: null,
+      switchesTo: null,
+    });
+  });
+
+  it("shows a downgrade waiting for renewal", () => {
+    const plan = currentPlan([
+      record({ pendingPriceId: starter.priceId.month }),
+    ]);
+    expect(plan).toMatchObject({
+      switchesTo: { name: "Starter", cycle: "month" },
     });
   });
 
@@ -97,6 +115,46 @@ describe("current plan", () => {
       renewsAt: null,
       cancelsAt: "2026-11-01T12:00:00Z",
     });
+  });
+});
+
+describe("plan changes", () => {
+  it("treats a higher tier or yearly billing as an upgrade", () => {
+    expect(planChange(starter.priceId.month, pro.priceId.month)).toBe(
+      "upgrade",
+    );
+    expect(planChange(pro.priceId.month, pro.priceId.year)).toBe("upgrade");
+    expect(planChange(pro.priceId.year, advanced.priceId.month)).toBe(
+      "upgrade",
+    );
+  });
+
+  it("treats a lower tier or monthly billing as a downgrade", () => {
+    expect(planChange(pro.priceId.month, starter.priceId.year)).toBe(
+      "downgrade",
+    );
+    expect(planChange(pro.priceId.year, pro.priceId.month)).toBe("downgrade");
+  });
+
+  it("knows staying put and rejects unknown prices", () => {
+    expect(planChange(pro.priceId.month, pro.priceId.month)).toBe("same");
+    expect(planChange(pro.priceId.month, "pri_unknown")).toBeNull();
+  });
+
+  it("allows changes only on a healthy plan that isn't ending", () => {
+    const plan = (overrides: Partial<SubscriptionRecord>) =>
+      currentPlan([record(overrides)]);
+    expect(canChangePlan(plan({}))).toBe(true);
+    expect(canChangePlan(plan({ status: "past_due" }))).toBe(false);
+    expect(canChangePlan(plan({ cancelsAt: "2026-11-01T12:00:00Z" }))).toBe(
+      false,
+    );
+    expect(canChangePlan({ name: "Free" })).toBe(false);
+  });
+
+  it("formats Paddle amounts in minor units", () => {
+    expect(formatMoney("1234", "USD")).toBe("$12.34");
+    expect(formatMoney("1234", "JPY")).toBe("¥1,234");
   });
 });
 

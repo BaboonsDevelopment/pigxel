@@ -10,7 +10,7 @@ import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { ProfileGallery } from "@/features/profile/components/profile-gallery";
 import { ProfileHeader } from "@/features/profile/components/profile-header";
 import { ProfileStats } from "@/features/profile/components/profile-stats";
-import { requireUser } from "@/lib/auth/session";
+import { getUser } from "@/lib/auth/session";
 import {
   findProfile,
   getFollowStats,
@@ -31,10 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ArtistProfilePage({ params }: Props) {
   const username = usernameIn((await params).username);
   if (usernameError(username)) notFound();
-  const [user, lookup] = await Promise.all([
-    requireUser(),
-    findProfile(username),
-  ]);
+  const [user, lookup] = await Promise.all([getUser(), findProfile(username)]);
   if (lookup.kind === "missing") notFound();
   if (lookup.kind === "private")
     return (
@@ -47,10 +44,13 @@ export default async function ArtistProfilePage({ params }: Props) {
     );
 
   const { profile } = lookup;
-  const isOwner = profile.id === user.id;
-  const [{ tiles, count }, follows, activity] = await Promise.all([
-    listProfileTiles(profile.id),
-    getFollowStats(profile.id, user.id),
+  const isOwner = profile.id === user?.id;
+  const [arts, follows, activity] = await Promise.all([
+    listProfileTiles(profile.id).catch((error: unknown) => {
+      console.error(error);
+      return null;
+    }),
+    getFollowStats(profile.id, user?.id ?? null),
     getProfileActivity(profile.id),
   ]);
 
@@ -65,49 +65,66 @@ export default async function ArtistProfilePage({ params }: Props) {
         </Notice>
       )}
 
-      <ProfileHeader profile={profile} isOwner={isOwner} follows={follows} />
+      <ProfileHeader
+        profile={profile}
+        isOwner={isOwner}
+        guest={!user}
+        follows={follows}
+      />
 
-      <ProfileGallery tiles={tiles} isOwner={isOwner}>
-        <ProfileStats
-          activity={activity}
-          artCount={count}
-          publishedCount={
-            isOwner
-              ? tiles.filter((tile) => tile.visibility === "public").length
-              : undefined
-          }
-        />
-      </ProfileGallery>
-
-      {tiles.length === 0 ? (
-        <EmptyState
-          className="mt-12"
-          title={
-            isOwner ? "Your arts will show up here" : "No published arts yet"
-          }
-          description={
-            isOwner
-              ? "Save a tile to Pigxel cloud, then publish it from this page so others can see it."
-              : undefined
-          }
-          action={
-            isOwner && (
-              <Link
-                href="/tiles/new"
-                className={buttonVariants({ size: "lg" })}
-              >
-                Create tile
-              </Link>
-            )
-          }
-        />
+      {!arts ? (
+        <Notice tone="error" className="mt-8">
+          Couldn’t load {isOwner ? "your" : "these"} arts. Refresh the page to
+          try again.
+        </Notice>
       ) : (
-        isOwner && (
-          <FormMessage className="mt-8 text-xs">
-            Only tiles saved to Pigxel cloud appear here. Private arts are
-            visible to you alone; publish them to show them on your profile.
-          </FormMessage>
-        )
+        <>
+          <ProfileGallery tiles={arts.tiles} isOwner={isOwner}>
+            <ProfileStats
+              activity={activity}
+              artCount={arts.count}
+              publishedCount={
+                isOwner
+                  ? arts.tiles.filter((tile) => tile.visibility === "public")
+                      .length
+                  : undefined
+              }
+            />
+          </ProfileGallery>
+
+          {arts.tiles.length === 0 ? (
+            <EmptyState
+              className="mt-12"
+              title={
+                isOwner
+                  ? "Your arts will show up here"
+                  : "No published arts yet"
+              }
+              description={
+                isOwner
+                  ? "Save a tile to Pigxel cloud, then publish it from this page so others can see it."
+                  : undefined
+              }
+              action={
+                isOwner && (
+                  <Link
+                    href="/tiles/new"
+                    className={buttonVariants({ size: "lg" })}
+                  >
+                    Create tile
+                  </Link>
+                )
+              }
+            />
+          ) : (
+            isOwner && (
+              <FormMessage className="mt-8 text-xs">
+                Only tiles saved to Pigxel cloud appear here. Private arts are
+                visible to you alone; publish them to show them on your profile.
+              </FormMessage>
+            )
+          )}
+        </>
       )}
     </Page>
   );
