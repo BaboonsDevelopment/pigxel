@@ -15,6 +15,7 @@ import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
 import { readFrameTags, type FrameTag } from "@/lib/sprite/tags";
+import { readCelLinks, type CelLink } from "@/lib/sprite/cel-links";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
@@ -40,6 +41,7 @@ export type PigxelDocument = {
   layers: Layer[];
   frames: Frame[];
   tags?: FrameTag[];
+  links?: CelLink[];
   cels: Cels;
   palette: string[];
   slices: Slice[];
@@ -74,6 +76,7 @@ export function blankDocument(
     layers,
     frames: [frame],
     tags: [],
+    links: [],
     cels: new Map([[frame.id, frameCels]]),
     palette: [...DEFAULT_PALETTE],
     slices: [],
@@ -153,6 +156,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     background: doc.background,
     frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
     tags: doc.tags ?? [],
+    links: doc.links ?? [],
     layers: doc.layers.map(toFile),
     cels,
     palette: doc.palette,
@@ -235,6 +239,11 @@ export function parsePigxel(text: string): PigxelDocument {
     layers,
     frames,
     tags: readFrameTags(file.tags, frames.length),
+    links: readCelLinks(
+      file.links,
+      frames.map((frame) => frame.id),
+      pixelLayerIds(layers),
+    ),
     cels,
     palette,
     slices,

@@ -24,6 +24,8 @@ import {
 import * as history from "@/lib/sprite/history";
 import type { Cels, Frame, History } from "@/lib/sprite/types";
 import { insertAt, removeAt, type FrameTag } from "@/lib/sprite/tags";
+import * as celLinks from "@/lib/sprite/cel-links";
+import type { CelLink } from "@/lib/sprite/cel-links";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
 
@@ -59,6 +61,7 @@ type Snapshot = {
   background: PigxelDocument["background"];
   frames: Frame[];
   tags: FrameTag[];
+  links: CelLink[];
   size: Size;
   cels: Cels;
   palette: string[];
@@ -87,6 +90,7 @@ export function useSprite(
   const [soloId, setSoloId] = useState<string | null>(null);
   const [frames, setFrames] = useState(initial.frames);
   const [tags, setTags] = useState(initial.tags ?? []);
+  const [links, setLinks] = useState(initial.links ?? []);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
   const [colorMode, setColorModeState] = useState<ColorMode>(
@@ -125,6 +129,7 @@ export function useSprite(
         background: initial.background,
         frames: initial.frames,
         tags: initial.tags ?? [],
+        links: initial.links ?? [],
         size,
         cels: initial.cels,
         palette: initial.palette,
@@ -190,6 +195,7 @@ export function useSprite(
       background?: PigxelDocument["background"];
       frames?: Frame[];
       tags?: FrameTag[];
+      links?: CelLink[];
       size?: Size;
       palette?: string[];
       slices?: Slice[];
@@ -218,11 +224,59 @@ export function useSprite(
         );
         cels.invalidate(canvas);
       }
+    const { present } = past.current;
+    const validLinks = celLinks.pruneCelLinks(
+      next.links ?? links,
+      (next.frames ?? frames).map((frame) => frame.id),
+      layerTree.pixelLayerIds(next.tree ?? tree),
+    );
+    const samePixels = (
+      a: Uint8ClampedArray | undefined,
+      b: Uint8ClampedArray | undefined,
+    ) =>
+      a === b ||
+      (!!a &&
+        !!b &&
+        a.length === b.length &&
+        a.every((value, index) => value === b[index]));
+    const keptLinks = validLinks.filter((link) => {
+      const modified = link.frameIds.filter((frame) => {
+        const canvas = cels.get(frame, link.layerId);
+        const before = frameList.celOf(present.cels, frame, link.layerId);
+        return (canvas && changed.current.has(canvas)) || !!canvas !== !!before;
+      });
+      if (modified.length === 1) {
+        const source = cels.pixels(modified[0]!, link.layerId);
+        for (const frame of link.frameIds) {
+          if (frame === modified[0]) continue;
+          if (source)
+            changed.current.add(
+              cels.set(
+                frame,
+                link.layerId,
+                next.size ?? size,
+                new Uint8ClampedArray(source),
+              ),
+            );
+          else cels.delete(frame, link.layerId);
+        }
+      } else if (modified.length > 1) {
+        const first = cels.pixels(link.frameIds[0]!, link.layerId);
+        if (
+          link.frameIds.some(
+            (frame) => !samePixels(first, cels.pixels(frame, link.layerId)),
+          )
+        )
+          return false;
+      }
+      return true;
+    });
     const snapshot: Snapshot = {
       tree: next.tree ?? tree,
       background: next.background ?? background,
       frames: next.frames ?? frames,
       tags: next.tags ?? tags,
+      links: keptLinks,
       size: next.size ?? size,
       cels: new Map(),
       palette: next.palette ?? palette,
@@ -232,7 +286,6 @@ export function useSprite(
     };
     const layerIds = new Set(layerTree.pixelLayerIds(snapshot.tree));
     for (const frame of snapshot.frames) snapshot.cels.set(frame.id, new Map());
-    const { present } = past.current;
     for (const cel of cels.list()) {
       const frameCels = snapshot.cels.get(cel.frameId);
       const drawn = changed.current.has(cel.canvas);
@@ -248,6 +301,7 @@ export function useSprite(
       else frameCels.set(cel.layerId, pixels);
     }
     changed.current.clear();
+    setLinks(keptLinks);
     past.current = history.record(past.current, snapshot, MAX_UNDO);
     repaint();
     onChange();
@@ -346,6 +400,7 @@ export function useSprite(
     setBackground(snapshot.background);
     setFrames(snapshot.frames);
     setTags(snapshot.tags);
+    setLinks(snapshot.links);
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
@@ -382,12 +437,48 @@ export function useSprite(
 
   const putCels = (
     id: string,
-    next: Iterable<[string, Uint8ClampedArray | null]>,
+    next: Iterable<readonly [string, Uint8ClampedArray | null]>,
   ) => {
     for (const [frame, pixels] of next) {
       if (pixels) changed.current.add(addCel(frame, id, pixels));
       else cels.delete(frame, id);
     }
+  };
+
+  const linkCelRange = (
+    layer: string,
+    sourceFrame: string,
+    frameIds: string[],
+  ) => {
+    const selected = new Set(frameIds);
+    const members = frames
+      .map((frame) => frame.id)
+      .filter((id) => selected.has(id));
+    const target = layerTree.findLayer(tree, layer)?.layer;
+    if (
+      !target ||
+      target.kind === "group" ||
+      members.length < 2 ||
+      !members.includes(sourceFrame)
+    )
+      return;
+    const source = cels.pixels(sourceFrame, layer);
+    putCels(
+      layer,
+      members.map(
+        (id) => [id, source ? new Uint8ClampedArray(source) : null] as const,
+      ),
+    );
+    const next = celLinks.linkCels(links, layer, members);
+    setLinks(next);
+    finish({ links: next });
+  };
+
+  const unlinkCel = (layer: string, frame: string) => {
+    const next = celLinks.unlinkCel(links, layer, frame);
+    if (next === links) return;
+    setLinks(next);
+    finish({ links: next });
   };
 
   const addLayer = (kind: Exclude<LayerKind, "background">, layer?: NewLayer) =>
@@ -780,6 +871,7 @@ export function useSprite(
       setSoloId((current) => (current === id ? null : id)),
     frames,
     tags,
+    links,
     saveTag,
     removeTag,
     background,
@@ -812,6 +904,10 @@ export function useSprite(
     undo,
     redo,
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
+    isCelLinked: (layer: string, frame: string) =>
+      !!celLinks.linkOf(links, layer, frame),
+    linkCelRange,
+    unlinkCel,
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
@@ -862,6 +958,7 @@ export function useSprite(
       layers: tree,
       frames,
       tags,
+      links,
       cels: new Map(
         frames.map((frame) => [
           frame.id,

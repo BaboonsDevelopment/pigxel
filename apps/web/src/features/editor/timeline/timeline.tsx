@@ -10,6 +10,7 @@ import { FrameHeader } from "./components/frame-header";
 import { LayerRow } from "./components/layer-row";
 import { LayerPropertiesDialog } from "./components/layer-properties-dialog";
 import { TagDialog } from "./components/tag-dialog";
+import { LinkCelsDialog } from "./components/link-cels-dialog";
 import { TimelineToolbar } from "./components/timeline-toolbar";
 import { LAYER_COLUMN, type DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
@@ -37,20 +38,33 @@ export function Timeline({
     x: number;
     y: number;
   } | null>(null);
+  const [celMenu, setCelMenu] = useState<{
+    layerId: string;
+    frameId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [linking, setLinking] = useState<{
+    layerId: string;
+    frameId: string;
+  } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
   const closeTagMenu = useCallback(() => setTagMenu(null), []);
+  const closeCelMenu = useCallback(() => setCelMenu(null), []);
   const rows = panelRows(sprite.tree);
   const { layerId, frameId, frames } = sprite;
 
   const openMenu = (of: OpenMenu["of"], e: React.MouseEvent) => {
     e.preventDefault();
     setTagMenu(null);
+    setCelMenu(null);
     setMenu({ of, x: e.clientX, y: e.clientY });
   };
 
   const openTagMenu = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     setMenu(null);
+    setCelMenu(null);
     setTagMenu({
       id,
       x: e.clientX,
@@ -203,9 +217,22 @@ export function Timeline({
                   frameId={frameId}
                   activeLayer={row.layer.id === layerId}
                   hasCel={(frame) => sprite.hasCel(frame, row.layer.id)}
+                  isLinked={(frame) => sprite.isCelLinked(row.layer.id, frame)}
                   onSelect={(frame) => {
                     sprite.selectLayer(row.layer.id);
                     sprite.selectFrame(frame);
+                  }}
+                  onContextMenu={(frame, event) => {
+                    sprite.selectLayer(row.layer.id);
+                    sprite.selectFrame(frame);
+                    setMenu(null);
+                    setTagMenu(null);
+                    setCelMenu({
+                      layerId: row.layer.id,
+                      frameId: frame,
+                      x: event.clientX,
+                      y: event.clientY,
+                    });
                   }}
                 />
               </LayerRow>
@@ -254,6 +281,49 @@ export function Timeline({
             />
           ) : null;
         })()}
+      {celMenu && (
+        <ContextMenu
+          x={celMenu.x}
+          y={celMenu.y}
+          sections={[
+            [
+              {
+                label: "Link cels…",
+                onSelect: () =>
+                  setLinking({
+                    layerId: celMenu.layerId,
+                    frameId: celMenu.frameId,
+                  }),
+                disabled: frames.length < 2,
+              },
+              {
+                label: "Unlink cel",
+                onSelect: () =>
+                  sprite.unlinkCel(celMenu.layerId, celMenu.frameId),
+                disabled: !sprite.isCelLinked(celMenu.layerId, celMenu.frameId),
+              },
+            ],
+          ]}
+          onClose={closeCelMenu}
+        />
+      )}
+      {linking && (
+        <LinkCelsDialog
+          key={`${linking.layerId}:${linking.frameId}`}
+          frameCount={frames.length}
+          sourceIndex={frames.findIndex(
+            (frame) => frame.id === linking.frameId,
+          )}
+          onApply={(from, to) =>
+            sprite.linkCelRange(
+              linking.layerId,
+              linking.frameId,
+              frames.slice(from, to + 1).map((frame) => frame.id),
+            )
+          }
+          onClose={() => setLinking(null)}
+        />
+      )}
       {propertiesId &&
         (() => {
           const layer = rows.find(
