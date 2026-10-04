@@ -31,6 +31,7 @@ export type PenSettings = {
   textScale: number;
   stabilizer: number;
   stampPattern: boolean;
+  cornerRadius: number;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -60,7 +61,10 @@ export const DEFAULT_PEN: PenSettings = {
   textScale: 1,
   stabilizer: 0,
   stampPattern: false,
+  cornerRadius: 0,
 };
+
+export const MAX_CORNER_RADIUS = 32;
 
 export const MAX_STABILIZER = 20;
 

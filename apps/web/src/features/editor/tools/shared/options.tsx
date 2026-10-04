@@ -5,6 +5,7 @@ import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Stamp } from "../../pixel-canvas/paint";
 import {
+  MAX_CORNER_RADIUS,
   MAX_STABILIZER,
   clampOpacity,
   clampPenSize,
@@ -237,6 +238,27 @@ export function FilledOption({ pen, onChange }: ToolOptionProps) {
       label="Filled"
       checked={pen.fillShapes}
       onChange={(e) => onChange({ ...pen, fillShapes: e.target.checked })}
+    />
+  );
+}
+
+export function CornerRadiusOption({ pen, onChange }: ToolOptionProps) {
+  return (
+    <NumberOption
+      label="Corners"
+      title="Rounds the corners by this many pixels; 0 keeps them square"
+      min={0}
+      max={MAX_CORNER_RADIUS}
+      value={pen.cornerRadius}
+      onChange={(value) =>
+        onChange({
+          ...pen,
+          cornerRadius: Math.min(
+            MAX_CORNER_RADIUS,
+            Math.max(0, Math.round(value) || 0),
+          ),
+        })
+      }
     />
   );
 }

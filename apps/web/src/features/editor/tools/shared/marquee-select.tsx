@@ -6,7 +6,7 @@ import { squareFrom, type Point } from "../../pixel-canvas/pen";
 import {
   ellipseMask,
   isSelected,
-  rectMask,
+  roundedRectMask,
   selectModeOf,
   type SelectMode,
 } from "../../pixel-canvas/selection";
@@ -51,7 +51,11 @@ export function MarqueeSelect({
       selection.select(
         ellipse
           ? ellipseMask(size, boxBetween(from, to))
-          : rectMask(size, areaBetween(from, to, size)),
+          : roundedRectMask(
+              size,
+              areaBetween(from, to, size),
+              props.pen.cornerRadius,
+            ),
         mode,
       );
     },
@@ -73,7 +77,14 @@ export function MarqueeSelect({
             {...GUIDE}
           />
         ) : (
-          <rect x={box.x} y={box.y} width={box.w} height={box.h} {...GUIDE} />
+          <rect
+            x={box.x}
+            y={box.y}
+            width={box.w}
+            height={box.h}
+            rx={Math.min(props.pen.cornerRadius, box.w / 2, box.h / 2)}
+            {...GUIDE}
+          />
         )}
       </ToolSvg>
       <SizeLabel box={box} scale={scale} />

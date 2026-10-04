@@ -1,5 +1,5 @@
 import { SELECT_HINT } from "../shared/hints";
-import { SelectionActions } from "../shared/options";
+import { CornerRadiusOption, SelectionActions } from "../shared/options";
 import { defineTool } from "../types";
 import { MarqueeCanvas } from "./canvas";
 import { icon } from "./icon";
@@ -14,6 +14,6 @@ export const marqueeTool = defineTool({
   selects: true,
   cursor: "selection",
   anyLayer: true,
-  options: [SelectionActions],
+  options: [CornerRadiusOption, SelectionActions],
   canvas: MarqueeCanvas,
 });
