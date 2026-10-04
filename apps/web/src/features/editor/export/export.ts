@@ -18,7 +18,13 @@ import {
   type ExportSettings,
 } from "./constants";
 import { encodeGif } from "./gif";
-import { buildSheet, sheetData, sheetSize } from "./sheet";
+import {
+  packSheet,
+  sheetData,
+  sheetSize,
+  type SheetItem,
+  type SheetOptions,
+} from "./sheet";
 import { timelapseSize } from "./timelapse";
 
 export type ExportSource = {
@@ -30,6 +36,7 @@ export type ExportSource = {
   background: Background;
   picture: (frameId: string) => Uint8ClampedArray;
   stages?: (frameId: string) => Uint8ClampedArray[];
+  layers?: { name: string; picture: (frameId: string) => Uint8ClampedArray }[];
   slices: Slice[];
 };
 
@@ -44,12 +51,16 @@ export function stretchedSource(
   const size = { w: source.size.w * ratio.w, h: source.size.h * ratio.h };
   const stretch = (rgba: Uint8ClampedArray) =>
     scalePicture({ rgba, ...source.size }, size.w, size.h, "nearest");
-  const { stages } = source;
+  const { stages, layers } = source;
   return {
     ...source,
     size,
     picture: (id) => stretch(source.picture(id)),
     stages: stages && ((id) => stages(id).map(stretch)),
+    layers: layers?.map((layer) => ({
+      ...layer,
+      picture: (id: string) => stretch(layer.picture(id)),
+    })),
     slices: scaledSlices(source.slices, source.size, size),
   };
 }
@@ -67,6 +78,58 @@ function slicesOnTile(slices: Slice[], tile: Size) {
   });
 }
 
+const sheetOptions = (settings: ExportSettings): SheetOptions => ({
+  layout: settings.layout,
+  border: settings.sheetBorder,
+  spacing: settings.sheetSpacing,
+  inner: settings.sheetInner,
+  trim: settings.sheetTrim,
+  merge: settings.sheetMerge,
+  skipEmpty: settings.sheetSkipEmpty,
+});
+
+export function sheetItems(
+  source: ExportSource,
+  split: ExportSettings["sheetSplit"],
+): SheetItem[] {
+  const base = safeFileBase(source.name);
+  const bitmap = (rgba: Uint8ClampedArray) => ({ rgba, ...source.size });
+  if (split === "layers" && source.layers?.length)
+    return source.layers.flatMap((layer, group) =>
+      source.frames.map((frame, n) => ({
+        name: `${base} (${layer.name}) ${n}.png`,
+        image: bitmap(layer.picture(frame.id)),
+        duration: frame.duration,
+        group,
+      })),
+    );
+  if (split === "tags" && source.tags?.length)
+    return source.tags.flatMap((tag, group) =>
+      source.frames.slice(tag.from, tag.to + 1).map((frame, n) => ({
+        name: `${base} #${tag.name} ${n}.png`,
+        image: bitmap(source.picture(frame.id)),
+        duration: frame.duration,
+        group,
+      })),
+    );
+  return source.frames.map((frame, n) => ({
+    name: `${base} ${n}.png`,
+    image: bitmap(source.picture(frame.id)),
+    duration: frame.duration,
+    group: 0,
+  }));
+}
+
+export const exactSheetSize = (
+  source: ExportSource,
+  settings: ExportSettings,
+) =>
+  sheetSize(
+    sheetItems(source, settings.sheetSplit),
+    sheetOptions(settings),
+    settings.scale,
+  );
+
 export function exportSize(
   settings: ExportSettings,
   tile: Size,
@@ -77,8 +140,24 @@ export function exportSize(
   const frame = { w: tile.w * scale, h: tile.h * scale };
   if (settings.format === "timelapse")
     return timelapseSize(settings.timelapseShape);
-  if (settings.format === "sheet")
-    return sheetSize(frameCount, settings.layout, frame);
+  if (settings.format === "sheet") {
+    const blank = { rgba: new Uint8ClampedArray(4), w: tile.w, h: tile.h };
+    return sheetSize(
+      Array.from({ length: frameCount }, () => ({
+        name: "",
+        image: blank,
+        duration: 0,
+        group: 0,
+      })),
+      {
+        ...sheetOptions(settings),
+        trim: false,
+        merge: false,
+        skipEmpty: false,
+      },
+      scale,
+    );
+  }
   if (settings.format === "slices") {
     const areas = slicesOnTile(slices, tile).map((s) => s.area);
     return {
@@ -179,24 +258,21 @@ export function exportFiles(
     ];
 
   const name = `${base}-sheet${extension}`;
-  const sheet: ExportFile = {
-    name,
-    mime,
-    image: buildSheet(
-      source.frames.map((f) => scaled(f.id)),
-      settings.layout,
-    ),
-  };
+  const packed = packSheet(
+    sheetItems(source, settings.sheetSplit),
+    sheetOptions(settings),
+    scale,
+  );
+  const sheet: ExportFile = { name, mime, image: packed.image };
   if (!settings.sheetData) return [sheet];
   const data = sheetData({
-    name: base,
     image: name,
-    durations: source.frames.map((f) => f.duration),
-    layout: settings.layout,
-    frame,
+    size: { w: packed.image.w, h: packed.image.h },
+    frames: packed.frames,
+    json: settings.sheetJson,
     scale,
     slices: source.slices,
-    tags: source.tags,
+    tags: settings.sheetSplit === "none" ? source.tags : [],
   });
   return [
     sheet,

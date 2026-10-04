@@ -12,9 +12,11 @@ import {
 } from "@/features/editor/export/export";
 import { encodeGif, toIndexed } from "@/features/editor/export/gif";
 import {
-  buildSheet,
+  PLAIN_SHEET,
+  packSheet,
   sheetData,
   sheetGrid,
+  type SheetItem,
 } from "@/features/editor/export/sheet";
 
 const solid = (w: number, h: number, rgba: number[]) => {
@@ -143,15 +145,24 @@ describe("sprite sheets", () => {
     expect(sheetGrid(1, "grid")).toEqual({ cols: 1, rows: 1 });
   });
 
+  const items = (colors: number[][], w = 2, h = 3): SheetItem[] =>
+    colors.map((c, n) => ({
+      name: `Hero ${n}.png`,
+      image: { rgba: solid(w, h, c), w, h },
+      duration: 100 * (n + 1),
+      group: 0,
+    }));
+
   it("puts each frame in its cell", () => {
     const colors = [
       [255, 0, 0, 255],
       [0, 255, 0, 255],
       [0, 0, 255, 255],
     ];
-    const sheet = buildSheet(
-      colors.map((c) => ({ rgba: solid(2, 3, c), w: 2, h: 3 })),
-      "grid",
+    const { image: sheet } = packSheet(
+      items(colors),
+      { ...PLAIN_SHEET, layout: "grid" },
+      1,
     );
     expect(sheet.w).toBe(4);
     expect(sheet.h).toBe(6);
@@ -162,26 +173,118 @@ describe("sprite sheets", () => {
   });
 
   it("describes the frames in Aseprite's JSON", () => {
+    const packed = packSheet(
+      items(
+        [
+          [1, 1, 1, 255],
+          [2, 2, 2, 255],
+          [3, 3, 3, 255],
+        ],
+        16,
+        8,
+      ),
+      PLAIN_SHEET,
+      2,
+    );
     const data = sheetData({
-      name: "Hero",
       image: "Hero-sheet.png",
-      durations: [100, 250, 80],
-      layout: "row",
-      frame: { w: 32, h: 16 },
+      size: packed.image,
+      frames: packed.frames,
+      json: "array",
       scale: 2,
     });
+    if (!Array.isArray(data.frames)) throw new Error("expected an array");
     expect(data.frames.map((f) => f.frame)).toEqual([
       { x: 0, y: 0, w: 32, h: 16 },
       { x: 32, y: 0, w: 32, h: 16 },
       { x: 64, y: 0, w: 32, h: 16 },
     ]);
-    expect(data.frames.map((f) => f.duration)).toEqual([100, 250, 80]);
+    expect(data.frames.map((f) => f.duration)).toEqual([100, 200, 300]);
     expect(data.frames[1]!.filename).toBe("Hero 1.png");
     expect(data.meta).toMatchObject({
       image: "Hero-sheet.png",
       size: { w: 96, h: 16 },
       scale: "2",
     });
+  });
+
+  it("adds a border, gaps between frames and padding inside each one", () => {
+    const packed = packSheet(
+      items(
+        [
+          [1, 1, 1, 255],
+          [2, 2, 2, 255],
+        ],
+        2,
+        2,
+      ),
+      { ...PLAIN_SHEET, border: 1, spacing: 2, inner: 1 },
+      1,
+    );
+    expect([packed.image.w, packed.image.h]).toEqual([12, 6]);
+    expect(packed.frames.map((f) => f.frame)).toEqual([
+      { x: 2, y: 2, w: 2, h: 2 },
+      { x: 8, y: 2, w: 2, h: 2 },
+    ]);
+  });
+
+  it("trims empty edges, merges equal frames and skips empty ones", () => {
+    const dot = new Uint8ClampedArray(4 * 4 * 4);
+    dot.set([9, 9, 9, 255], (1 * 4 + 2) * 4);
+    const list: SheetItem[] = [dot, dot, new Uint8ClampedArray(64)].map(
+      (rgba, n) => ({
+        name: `f${n}`,
+        image: { rgba, w: 4, h: 4 },
+        duration: 100,
+        group: 0,
+      }),
+    );
+    const packed = packSheet(
+      list,
+      { ...PLAIN_SHEET, trim: true, merge: true, skipEmpty: true },
+      1,
+    );
+    expect([packed.image.w, packed.image.h]).toEqual([1, 1]);
+    expect(packed.frames).toHaveLength(2);
+    expect(packed.frames[1]!.frame).toEqual(packed.frames[0]!.frame);
+    expect(packed.frames[0]).toMatchObject({
+      trimmed: true,
+      source: { x: 2, y: 1, w: 1, h: 1 },
+      sourceSize: { w: 4, h: 4 },
+    });
+  });
+
+  it("puts each group on its own row and packs tightly", () => {
+    const list = items([
+      [1, 1, 1, 255],
+      [2, 2, 2, 255],
+      [3, 3, 3, 255],
+    ]).map((item, n) => ({ ...item, group: n === 2 ? 1 : 0 }));
+    const rows = packSheet(list, PLAIN_SHEET, 1);
+    expect([rows.image.w, rows.image.h]).toEqual([4, 6]);
+    const packed = packSheet(
+      items([
+        [1, 1, 1, 255],
+        [2, 2, 2, 255],
+        [3, 3, 3, 255],
+        [4, 4, 4, 255],
+      ]),
+      { ...PLAIN_SHEET, layout: "packed" },
+      1,
+    );
+    expect(packed.image.w * packed.image.h).toBe(24);
+  });
+
+  it("writes JSON hash keyed by file name", () => {
+    const packed = packSheet(items([[1, 1, 1, 255]]), PLAIN_SHEET, 1);
+    const data = sheetData({
+      image: "a.png",
+      size: packed.image,
+      frames: packed.frames,
+      json: "hash",
+      scale: 1,
+    });
+    expect(Object.keys(data.frames)).toEqual(["Hero 0.png"]);
   });
 });
 

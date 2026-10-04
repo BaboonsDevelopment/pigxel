@@ -63,7 +63,7 @@ import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { allLayers, panelRows } from "@/lib/layers/tree";
+import { allLayers, isShown, panelRows } from "@/lib/layers/tree";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
@@ -1603,6 +1603,17 @@ export function Editor({
             background: sprite.background,
             picture: (id) => sprite.composite(["reference"], id),
             stages: (id) => sprite.buildUp(["reference"], id),
+            layers: allLayers(sprite.tree)
+              .filter(
+                (layer) =>
+                  layer.kind !== "group" &&
+                  layer.kind !== "reference" &&
+                  isShown(sprite.tree, layer.id),
+              )
+              .map((layer) => ({
+                name: layer.name,
+                picture: (id: string) => sprite.readCel(layer.id, id),
+              })),
             slices: sprite.slices,
           }}
           pixelRatio={sprite.pixelRatio}

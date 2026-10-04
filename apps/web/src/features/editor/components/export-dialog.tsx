@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
 import {
@@ -21,7 +21,10 @@ import {
   MAX_EXPORT_SCALE,
   MAX_EXPORT_SIDE,
   MIN_EXPORT_SCALE,
+  MAX_SHEET_PADDING,
+  SHEET_JSONS,
   SHEET_LAYOUTS,
+  SHEET_SPLITS,
   TIMELAPSE_FPS,
   TIMELAPSE_LENGTHS,
   TIMELAPSE_SHAPES,
@@ -30,6 +33,7 @@ import {
 } from "../export/constants";
 import {
   clampScale,
+  exactSheetSize,
   exportFiles,
   exportSize,
   fitsCanvas,
@@ -108,7 +112,13 @@ export default function ExportDialog({
   const seconds = Math.round(
     timelapseTiming(settings.timelapseLength).total / TIMELAPSE_FPS,
   );
-  const output = exportSize(settings, size, frames.length, source.slices);
+  const sheetOutput = useMemo(
+    () =>
+      settings.format === "sheet" ? exactSheetSize(source, settings) : null,
+    [source, settings],
+  );
+  const output =
+    sheetOutput ?? exportSize(settings, size, frames.length, source.slices);
   const fits = fitsCanvas(output);
   const noSlices = settings.format === "slices" && !output.w;
 
@@ -212,6 +222,86 @@ export default function ExportDialog({
               value={settings.layout}
               onChange={(layout) => set({ layout })}
             />
+            <div className="space-y-2 pt-1">
+              <p className="text-sm font-medium">Frames</p>
+              <Options
+                name="export-split"
+                options={SHEET_SPLITS.filter(
+                  (option) =>
+                    option.id === "none" ||
+                    (option.id === "layers"
+                      ? (source.layers?.length ?? 0) > 1
+                      : !!source.tags?.length),
+                )}
+                value={settings.sheetSplit}
+                onChange={(sheetSplit) => set({ sheetSplit })}
+              />
+              {settings.sheetSplit !== "none" && (
+                <FormMessage className="text-xs">
+                  {settings.sheetSplit === "layers"
+                    ? "Every layer gets its own frames, each on its own row in Row or Column layout."
+                    : "Only frames inside tags are saved, each tag on its own row in Row or Column layout."}
+                </FormMessage>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              {(
+                [
+                  [
+                    "sheetBorder",
+                    "Border",
+                    "Empty space around the whole sheet",
+                  ],
+                  ["sheetSpacing", "Spacing", "Empty space between frames"],
+                  [
+                    "sheetInner",
+                    "Inner",
+                    "Empty space inside each frame’s cell",
+                  ],
+                ] as const
+              ).map(([key, label, hint]) => (
+                <label key={key} className="space-y-1 text-sm" title={hint}>
+                  <span className="block">{label}, px</span>
+                  <NumericInput
+                    min={0}
+                    max={MAX_SHEET_PADDING}
+                    value={settings[key]}
+                    onValueChange={(next) =>
+                      set({
+                        [key]: Math.min(
+                          MAX_SHEET_PADDING,
+                          Math.max(0, Math.round(next) || 0),
+                        ),
+                      })
+                    }
+                    className="h-8 w-full rounded-md border bg-background px-2 tabular-nums"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="space-y-1.5 pt-1 text-sm">
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetTrim}
+                  onChange={(e) => set({ sheetTrim: e.target.checked })}
+                />
+                Trim empty edges of each frame
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetMerge}
+                  onChange={(e) => set({ sheetMerge: e.target.checked })}
+                />
+                Save identical frames once
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetSkipEmpty}
+                  onChange={(e) => set({ sheetSkipEmpty: e.target.checked })}
+                />
+                Leave out empty frames
+              </label>
+            </div>
             <label className="flex items-center gap-2 pt-1 text-sm">
               <Checkbox
                 checked={settings.sheetData}
@@ -220,6 +310,17 @@ export default function ExportDialog({
               Also save JSON data (frame positions and durations, in Aseprite’s
               format)
             </label>
+            {settings.sheetData && (
+              <div className="flex items-center gap-3 pl-6 text-sm">
+                <span className="text-muted-foreground">JSON frames as</span>
+                <Options
+                  name="export-json"
+                  options={SHEET_JSONS}
+                  value={settings.sheetJson}
+                  onChange={(sheetJson) => set({ sheetJson })}
+                />
+              </div>
+            )}
           </fieldset>
         )}
 
