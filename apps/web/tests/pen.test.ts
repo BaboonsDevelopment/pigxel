@@ -14,6 +14,7 @@ import {
   strokePixels,
   DEFAULT_PEN,
   type Point,
+  followRope,
 } from "@/features/editor/pixel-canvas/pen";
 
 const p = (x: number, y: number): Point => ({ x, y });
@@ -199,5 +200,14 @@ describe("pixelColor", () => {
     expect(pixelColor(img, p(0, 0))).toBe("#ff0000");
     expect(pixelColor(img, p(1, 0))).toBe("#0000ff");
     expect(pixelColor(img, p(2, 0))).toBeNull();
+  });
+});
+
+describe("stabilizer", () => {
+  it("follows the pointer on a string, standing still while it is slack", () => {
+    const at = { x: 0, y: 0 };
+    expect(followRope(at, { x: 3, y: 0 }, 5)).toBe(at);
+    expect(followRope(at, { x: 10, y: 0 }, 4)).toEqual({ x: 6, y: 0 });
+    expect(followRope(at, { x: 2, y: 0 }, 0)).toEqual({ x: 2, y: 0 });
   });
 });

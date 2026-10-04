@@ -29,6 +29,7 @@ export type PenSettings = {
   gradientDither: GradientDither;
   textFont: TextFont;
   textScale: number;
+  stabilizer: number;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -56,7 +57,26 @@ export const DEFAULT_PEN: PenSettings = {
   gradientDither: "bayer4",
   textFont: "tiny5",
   textScale: 1,
+  stabilizer: 0,
 };
+
+export const MAX_STABILIZER = 20;
+
+export const clampStabilizer = (value: number) =>
+  Math.min(MAX_STABILIZER, Math.max(0, Math.round(value) || 0));
+
+export function followRope(
+  at: { x: number; y: number },
+  target: Point,
+  length: number,
+): { x: number; y: number } {
+  const dx = target.x - at.x;
+  const dy = target.y - at.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= length) return at;
+  const pull = (distance - length) / distance;
+  return { x: at.x + dx * pull, y: at.y + dy * pull };
+}
 
 export const MIN_SPRAY_SPEED = 1;
 export const MAX_SPRAY_SPEED = 100;

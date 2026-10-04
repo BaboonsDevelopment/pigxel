@@ -3,8 +3,10 @@ import { CheckboxField } from "@pigxel/ui/components/choice";
 import { Text } from "@pigxel/ui/components/typography";
 import type { Stamp } from "../../pixel-canvas/paint";
 import {
+  MAX_STABILIZER,
   clampOpacity,
   clampPenSize,
+  clampStabilizer,
   clampTolerance,
 } from "../../pixel-canvas/pen";
 import type { Transform } from "../../pixel-canvas/use-selection";
@@ -135,6 +137,21 @@ export function ContiguousOption({ pen, onChange }: ToolOptionProps) {
       title="Off: takes every pixel of the clicked colour, connected or not"
       checked={pen.contiguous}
       onChange={(e) => onChange({ ...pen, contiguous: e.target.checked })}
+    />
+  );
+}
+
+export function StabilizerOption({ pen, onChange }: ToolOptionProps) {
+  return (
+    <NumberOption
+      label="Stabilizer"
+      title="The line follows the pointer on a string this many pixels long, smoothing out a shaky hand. 0 is off"
+      min={0}
+      max={MAX_STABILIZER}
+      value={pen.stabilizer}
+      onChange={(value) =>
+        onChange({ ...pen, stabilizer: clampStabilizer(value) })
+      }
     />
   );
 }
