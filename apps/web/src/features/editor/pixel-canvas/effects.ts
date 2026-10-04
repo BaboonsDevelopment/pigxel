@@ -33,6 +33,71 @@ export function outlined(
   return out;
 }
 
+export type OutlinePlace = "outside" | "inside";
+export type OutlineShape = "round" | "square";
+export type OutlineSettings = {
+  place: OutlinePlace;
+  shape: OutlineShape;
+  width: number;
+};
+
+export const MAX_OUTLINE = 8;
+
+export function outlinedWith(
+  pixels: Uint8ClampedArray,
+  size: Size,
+  rgba: Rgba,
+  mask: Uint8Array | null,
+  { place, shape, width }: OutlineSettings,
+): Uint8ClampedArray {
+  const square = shape === "square";
+  if (place === "outside") {
+    let out = pixels;
+    for (let n = 0; n < width; n++)
+      out = outlined(out, size, rgba, mask, square);
+    return out === pixels ? new Uint8ClampedArray(pixels) : out;
+  }
+  const out = new Uint8ClampedArray(pixels);
+  const inner = new Uint8Array(size.w * size.h);
+  for (let i = 0; i < inner.length; i++)
+    inner[i] = pixels[i * 4 + 3]! > 0 ? 1 : 0;
+  const around = square
+    ? [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => [dx, dy] as const))
+    : ([
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ] as const);
+  for (let n = 0; n < width; n++) {
+    const edge: number[] = [];
+    for (let y = 0; y < size.h; y++)
+      for (let x = 0; x < size.w; x++) {
+        const i = y * size.w + x;
+        if (!inner[i]) continue;
+        if (
+          around.some(([dx, dy]) => {
+            const nx = x + dx;
+            const ny = y + dy;
+            return (
+              nx < 0 ||
+              ny < 0 ||
+              nx >= size.w ||
+              ny >= size.h ||
+              !inner[ny * size.w + nx]
+            );
+          })
+        )
+          edge.push(i);
+      }
+    for (const i of edge) {
+      inner[i] = 0;
+      if (!mask || mask[i]) out.set(rgba, i * 4);
+    }
+  }
+  return out;
+}
+
 export function replacedColor(
   pixels: Uint8ClampedArray,
   from: Rgba,

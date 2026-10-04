@@ -16,7 +16,7 @@ import {
   adjustedColors,
   filledMask,
   invertedColors,
-  outlined,
+  outlinedWith,
   replacedColor,
   type AdjustKind,
 } from "../pixel-canvas/effects";
@@ -147,6 +147,9 @@ const ReduceColorsDialog = dynamic(() => import("./reduce-colors-dialog"), {
 const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
   ssr: false,
 });
+const OutlineDialog = dynamic(() => import("./outline-dialog"), {
+  ssr: false,
+});
 const AdjustColorsDialog = dynamic(() => import("./adjust-colors-dialog"), {
   ssr: false,
 });
@@ -188,6 +191,10 @@ export function Editor({
   const [resizing, setResizing] = useState(false);
   const [scaling, setScaling] = useState(false);
   const [replacing, setReplacing] = useState<{
+    pixels: Uint8ClampedArray;
+    mask: Uint8Array | null;
+  } | null>(null);
+  const [outlining, setOutlining] = useState<{
     pixels: Uint8ClampedArray;
     mask: Uint8Array | null;
   } | null>(null);
@@ -552,11 +559,17 @@ export function Editor({
           ],
           [
             {
-              label: "Outline in primary colour",
-              onSelect: () =>
-                applyEffect((pixels, mask) =>
-                  outlined(pixels, sprite.size, rgbaOf(pen.color), mask),
-                ),
+              label: "Outline…",
+              onSelect: () => {
+                selection.drop();
+                setOutlining({
+                  pixels: new Uint8ClampedArray(
+                    sprite.readCel(sprite.layerId, sprite.frameId),
+                  ),
+                  mask: selection.mask,
+                });
+              },
+              disabled: !sprite.canPaint,
             },
             {
               label: "Replace colour…",
@@ -1278,6 +1291,21 @@ export function Editor({
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {outlining && (
+        <OutlineDialog
+          size={sprite.size}
+          pixels={outlining.pixels}
+          mask={outlining.mask}
+          palette={sprite.palette}
+          color={pen.color}
+          onApply={({ color, ...settings }) =>
+            applyEffect((pixels, mask) =>
+              outlinedWith(pixels, sprite.size, rgbaOf(color), mask, settings),
+            )
+          }
+          onClose={() => setOutlining(null)}
         />
       )}
       {adjusting && (
