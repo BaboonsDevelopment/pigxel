@@ -65,6 +65,15 @@ function copyToSystem(piece: Floating) {
     .catch(() => {});
 }
 
+export function copiedPiece(): Floating | null {
+  if (!clipboard) return null;
+  const pixels = new Uint8ClampedArray(clipboard.pixels);
+  clipboard.mask.forEach((selected, i) => {
+    if (!selected) pixels.fill(0, i * 4, i * 4 + 4);
+  });
+  return { ...clipboard, pixels };
+}
+
 export function pasteSource(image: Floating | null): Floating | null {
   if (!image) return clipboard;
   if (clipboard && clipboard.w === image.w && clipboard.h === image.h)

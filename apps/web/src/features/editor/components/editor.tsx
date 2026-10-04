@@ -25,7 +25,11 @@ import {
   expandMask,
   maskBounds,
 } from "../pixel-canvas/selection";
-import { pasteSource, useSelection } from "../pixel-canvas/use-selection";
+import {
+  copiedPiece,
+  pasteSource,
+  useSelection,
+} from "../pixel-canvas/use-selection";
 import {
   DEFAULT_VIEW,
   GRID_SIZES,
@@ -52,6 +56,7 @@ import {
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
 import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
@@ -332,6 +337,42 @@ export function Editor({
     sprite.editCel((pixels) => change(pixels, selection.mask));
   };
 
+  const pasteAsNewLayer = () => {
+    const piece = copiedPiece();
+    if (!piece) return;
+    selection.drop();
+    const { w, h } = sprite.size;
+    const keepIn = (pos: number, len: number, max: number) =>
+      len >= max ? 0 : Math.max(0, Math.min(max - len, pos));
+    const left = keepIn(piece.x, piece.w, w);
+    const top = keepIn(piece.y, piece.h, h);
+    const pixels = new Uint8ClampedArray(w * h * 4);
+    const mask = new Uint8Array(w * h);
+    for (let y = 0; y < piece.h && top + y < h; y++)
+      for (let x = 0; x < piece.w && left + x < w; x++) {
+        const j = y * piece.w + x;
+        const i = (top + y) * w + left + x;
+        pixels.set(piece.pixels.subarray(j * 4, j * 4 + 4), i * 4);
+        mask[i] = piece.mask[j]!;
+      }
+    sprite.addLayer("normal", { cels: new Map([[sprite.frameId, pixels]]) });
+    selection.select(mask);
+    setTool("move");
+  };
+
+  const pasteAsNewTile = () => {
+    const piece = copiedPiece();
+    if (!piece) return;
+    file.openDocument(
+      documentFromFrames({
+        w: piece.w,
+        h: piece.h,
+        frames: [{ rgba: piece.pixels, duration: DEFAULT_FRAME_DURATION }],
+      }),
+      `${file.name} pasted`,
+    );
+  };
+
   const useAsBrush = () => {
     const piece = selection.selectedPiece();
     if (!piece) return;
@@ -406,6 +447,8 @@ export function Editor({
       { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
       { label: "Copy", shortcut: `${mod}C`, onSelect: commands.copy },
       { label: "Paste", shortcut: `${mod}V`, onSelect: commands.paste },
+      { label: "Paste as new layer", onSelect: pasteAsNewLayer },
+      { label: "Paste as new tile", onSelect: pasteAsNewTile },
       { label: "Delete", shortcut: "Del", onSelect: commands.clearLayer },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
