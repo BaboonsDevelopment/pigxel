@@ -71,6 +71,22 @@ export const MAX_STABILIZER = 20;
 export const clampStabilizer = (value: number) =>
   Math.min(MAX_STABILIZER, Math.max(0, Math.round(value) || 0));
 
+export function snapSpan(
+  start: Point,
+  point: Point,
+  grid: number,
+): { from: Point; to: Point } {
+  if (grid <= 0) return { from: start, to: point };
+  const axis = (a: number, b: number) => {
+    const first = Math.floor(a / grid) * grid;
+    const last = Math.floor(b / grid) * grid;
+    return b >= a ? [first, last + grid - 1] : [first + grid - 1, last];
+  };
+  const [fx, tx] = axis(start.x, point.x);
+  const [fy, ty] = axis(start.y, point.y);
+  return { from: { x: fx!, y: fy! }, to: { x: tx!, y: ty! } };
+}
+
 export function followRope(
   at: { x: number; y: number },
   target: Point,

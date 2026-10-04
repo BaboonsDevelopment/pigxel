@@ -7,6 +7,7 @@ export type CanvasView = {
   onion: number;
   gridSize: number;
   pixelGrid: boolean;
+  snap: boolean;
 };
 
 export const DEFAULT_VIEW: CanvasView = {
@@ -16,6 +17,7 @@ export const DEFAULT_VIEW: CanvasView = {
   onion: 0,
   gridSize: 0,
   pixelGrid: true,
+  snap: false,
 };
 
 export const GRID_SIZES = [8, 16, 32];

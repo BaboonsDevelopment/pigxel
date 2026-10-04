@@ -58,6 +58,7 @@ export type ToolContext = {
   stamp: Stamp | null;
   scale: number;
   stretch: { x: number; y: number };
+  snap: number;
   paintOptions: PaintOptions;
   paused: boolean;
   lastPointRef: RefObject<Point | null>;

@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import type { Point } from "../../pixel-canvas/pen";
 import type { CanvasPointer, ToolContext } from "../types";
 
-export function useSelectionMove({ sprite, selection }: ToolContext) {
+export function useSelectionMove({ sprite, selection, snap }: ToolContext) {
   const from = useRef<Point>(null);
 
   const end = () => {
@@ -24,7 +24,7 @@ export function useSelectionMove({ sprite, selection }: ToolContext) {
     move(point: Point) {
       const start = from.current;
       if (!start) return false;
-      selection.moveTo(point.x - start.x, point.y - start.y);
+      selection.moveTo(point.x - start.x, point.y - start.y, snap);
       return true;
     },
     end,

@@ -15,6 +15,7 @@ import {
   DEFAULT_PEN,
   type Point,
   followRope,
+  snapSpan,
 } from "@/features/editor/pixel-canvas/pen";
 
 const p = (x: number, y: number): Point => ({ x, y });
@@ -209,5 +210,22 @@ describe("stabilizer", () => {
     expect(followRope(at, { x: 3, y: 0 }, 5)).toBe(at);
     expect(followRope(at, { x: 10, y: 0 }, 4)).toEqual({ x: 6, y: 0 });
     expect(followRope(at, { x: 2, y: 0 }, 0)).toEqual({ x: 2, y: 0 });
+  });
+});
+
+describe("snap to grid", () => {
+  it("covers whole cells whichever way the drag goes", () => {
+    expect(snapSpan({ x: 5, y: 17 }, { x: 20, y: 40 }, 16)).toEqual({
+      from: { x: 0, y: 16 },
+      to: { x: 31, y: 47 },
+    });
+    expect(snapSpan({ x: 20, y: 40 }, { x: 5, y: 17 }, 16)).toEqual({
+      from: { x: 31, y: 47 },
+      to: { x: 0, y: 16 },
+    });
+    expect(snapSpan({ x: 5, y: 17 }, { x: 9, y: 2 }, 0)).toEqual({
+      from: { x: 5, y: 17 },
+      to: { x: 9, y: 2 },
+    });
   });
 });

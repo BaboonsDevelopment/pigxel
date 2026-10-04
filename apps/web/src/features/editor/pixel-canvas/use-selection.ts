@@ -223,9 +223,13 @@ export function useSelection(sprite: SpriteApi) {
       setLifted(current);
       return true;
     },
-    moveTo(dx: number, dy: number) {
+    moveTo(dx: number, dy: number, grid = 0) {
       const from = dragFrom.current;
       if (!from || !lifted) return;
+      if (grid > 0) {
+        dx = Math.round((from.x + dx) / grid) * grid - from.x;
+        dy = Math.round((from.y + dy) / grid) * grid - from.y;
+      }
       const { piece } = lifted;
       if (piece.x === from.x + dx && piece.y === from.y + dy) return;
       if (lifted.source && from.t)

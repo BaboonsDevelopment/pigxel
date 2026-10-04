@@ -2,7 +2,7 @@
 
 import { useImperativeHandle, useState } from "react";
 import { areaBetween, boxBetween } from "../../pixel-canvas/helpers";
-import { squareFrom, type Point } from "../../pixel-canvas/pen";
+import { snapSpan, squareFrom, type Point } from "../../pixel-canvas/pen";
 import {
   ellipseMask,
   isSelected,
@@ -14,7 +14,13 @@ import type { ToolCanvasProps } from "../types";
 import { GUIDE, SizeLabel, ToolSvg } from "./overlays";
 import { useSelectionMove } from "./use-selection-move";
 
-type Drag = { from: Point; to: Point; mode: SelectMode };
+type Drag = {
+  origin: Point;
+  from: Point;
+  to: Point;
+  mode: SelectMode;
+  moved?: boolean;
+};
 
 export function MarqueeSelect({
   ref,
@@ -33,21 +39,29 @@ export function MarqueeSelect({
       if (mode === "replace" && isSelected(selection.mask, size, point))
         return moving.start(e, point, false);
       e.currentTarget.setPointerCapture(e.pointerId);
-      setDrag({ from: point, to: point, mode });
+      const { from, to } = snapSpan(point, point, props.snap);
+      setDrag({ origin: point, from, to, mode });
     },
     move(e, passed) {
       const point = passed.at(-1);
       if (!point || moving.move(point) || !drag) return;
-      const to = ellipse ? squareFrom(drag.from, point, e.shiftKey) : point;
-      if (to.x !== drag.to.x || to.y !== drag.to.y) setDrag({ ...drag, to });
+      const span = snapSpan(drag.origin, point, props.snap);
+      const to = ellipse ? squareFrom(span.from, span.to, e.shiftKey) : span.to;
+      if (
+        to.x !== drag.to.x ||
+        to.y !== drag.to.y ||
+        span.from.x !== drag.from.x ||
+        span.from.y !== drag.from.y
+      )
+        setDrag({ ...drag, from: span.from, to, moved: true });
     },
     up() {
       if (moving.end()) return;
       setDrag(null);
       if (!drag) return;
-      const { from, to, mode } = drag;
-      if (from.x === to.x && from.y === to.y && mode === "replace")
-        return selection.deselect();
+      const { from, to, mode, moved } = drag;
+      const clicked = props.snap ? !moved : from.x === to.x && from.y === to.y;
+      if (clicked && mode === "replace") return selection.deselect();
       selection.select(
         ellipse
           ? ellipseMask(size, boxBetween(from, to))

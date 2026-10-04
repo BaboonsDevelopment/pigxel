@@ -712,6 +712,11 @@ export function Editor({
           ],
         ],
       },
+      {
+        label: check(view.snap && view.gridSize > 0, "Snap to grid"),
+        onSelect: () => setView((v) => ({ ...v, snap: !v.snap })),
+        disabled: !view.gridSize,
+      },
     ],
     [
       {

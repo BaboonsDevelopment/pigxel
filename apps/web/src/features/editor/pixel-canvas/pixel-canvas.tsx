@@ -513,6 +513,7 @@ export function PixelCanvas({
         stamp={stamp}
         scale={scale}
         stretch={stretch}
+        snap={view.snap ? view.gridSize : 0}
         paintOptions={paintOptions}
         paused={selecting || !!frame}
         lastPointRef={lastPoint}
