@@ -40,6 +40,7 @@ import {
 import {
   DEFAULT_VIEW,
   GRID_SIZES,
+  squareGrid,
   ONION_FRAMES,
   SYMMETRY_OPTIONS,
   TILED_OPTIONS,
@@ -155,6 +156,7 @@ const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
 const OutlineDialog = dynamic(() => import("./outline-dialog"), {
   ssr: false,
 });
+const GridDialog = dynamic(() => import("./grid-dialog"), { ssr: false });
 const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
   ssr: false,
 });
@@ -241,6 +243,7 @@ export function Editor({
   const [view, setView] = useState<CanvasView>(DEFAULT_VIEW);
   const [onionSettings, setOnionSettings] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [gridding, setGridding] = useState(false);
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
@@ -863,20 +866,33 @@ export function Editor({
         submenu: [
           [
             {
-              label: check(view.gridSize === 0, "No grid"),
-              onSelect: () => setView((v) => ({ ...v, gridSize: 0 })),
+              label: check(!view.grid, "No grid"),
+              onSelect: () => setView((v) => ({ ...v, grid: null })),
             },
             ...GRID_SIZES.map((n) => ({
-              label: check(view.gridSize === n, `${n} × ${n}`),
-              onSelect: () => setView((v) => ({ ...v, gridSize: n })),
+              label: check(
+                !!view.grid &&
+                  view.grid.w === n &&
+                  view.grid.h === n &&
+                  !view.grid.x &&
+                  !view.grid.y,
+                `${n} × ${n}`,
+              ),
+              onSelect: () => setView((v) => ({ ...v, grid: squareGrid(n) })),
             })),
+          ],
+          [
+            {
+              label: "Custom…",
+              onSelect: () => setGridding(true),
+            },
           ],
         ],
       },
       {
-        label: check(view.snap && view.gridSize > 0, "Snap to grid"),
+        label: check(view.snap && !!view.grid, "Snap to grid"),
         onSelect: () => setView((v) => ({ ...v, snap: !v.snap })),
-        disabled: !view.gridSize,
+        disabled: !view.grid,
       },
     ],
     [
@@ -1382,6 +1398,16 @@ export function Editor({
           onClose={() => setTiling(null)}
         />
       )}
+      {gridding && (
+        <GridDialog
+          grid={view.grid}
+          look={view.gridLook}
+          onChange={(grid, gridLook) =>
+            setView((v) => ({ ...v, grid, gridLook }))
+          }
+          onClose={() => setGridding(false)}
+        />
+      )}
       {previewing && (
         <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
       )}
@@ -1481,7 +1507,7 @@ export function Editor({
             color: pen.color,
             frames: sprite.frames.length,
             onion: view.onion,
-            grid: view.gridSize,
+            grid: view.grid?.w ?? 0,
             playing: playback.playing,
             exporting,
             floating: selection.floating,

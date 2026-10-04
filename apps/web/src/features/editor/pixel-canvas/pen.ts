@@ -71,19 +71,31 @@ export const MAX_STABILIZER = 20;
 export const clampStabilizer = (value: number) =>
   Math.min(MAX_STABILIZER, Math.max(0, Math.round(value) || 0));
 
+export type SnapGrid = { w: number; h: number; x: number; y: number };
+
+export const snapGridOf = (grid: number | SnapGrid | null): SnapGrid | null =>
+  typeof grid === "number"
+    ? grid > 0
+      ? { w: grid, h: grid, x: 0, y: 0 }
+      : null
+    : grid && grid.w > 0 && grid.h > 0
+      ? grid
+      : null;
+
 export function snapSpan(
   start: Point,
   point: Point,
-  grid: number,
+  snap: number | SnapGrid | null,
 ): { from: Point; to: Point } {
-  if (grid <= 0) return { from: start, to: point };
-  const axis = (a: number, b: number) => {
-    const first = Math.floor(a / grid) * grid;
-    const last = Math.floor(b / grid) * grid;
-    return b >= a ? [first, last + grid - 1] : [first + grid - 1, last];
+  const grid = snapGridOf(snap);
+  if (!grid) return { from: start, to: point };
+  const axis = (a: number, b: number, size: number, offset: number) => {
+    const first = Math.floor((a - offset) / size) * size + offset;
+    const last = Math.floor((b - offset) / size) * size + offset;
+    return b >= a ? [first, last + size - 1] : [first + size - 1, last];
   };
-  const [fx, tx] = axis(start.x, point.x);
-  const [fy, ty] = axis(start.y, point.y);
+  const [fx, tx] = axis(start.x, point.x, grid.w, grid.x);
+  const [fy, ty] = axis(start.y, point.y, grid.h, grid.y);
   return { from: { x: fx!, y: fy! }, to: { x: tx!, y: ty! } };
 }
 

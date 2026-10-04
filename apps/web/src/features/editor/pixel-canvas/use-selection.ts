@@ -6,6 +6,7 @@ import {
   transformFloating,
   type FreeTransform,
 } from "./free-transform";
+import type { SnapGrid } from "./pen";
 import { rgbaOf } from "./paint";
 import {
   combineMasks,
@@ -223,12 +224,18 @@ export function useSelection(sprite: SpriteApi) {
       setLifted(current);
       return true;
     },
-    moveTo(dx: number, dy: number, grid = 0) {
+    moveTo(dx: number, dy: number, grid: SnapGrid | null = null) {
       const from = dragFrom.current;
       if (!from || !lifted) return;
-      if (grid > 0) {
-        dx = Math.round((from.x + dx) / grid) * grid - from.x;
-        dy = Math.round((from.y + dy) / grid) * grid - from.y;
+      if (grid) {
+        dx =
+          Math.round((from.x + dx - grid.x) / grid.w) * grid.w +
+          grid.x -
+          from.x;
+        dy =
+          Math.round((from.y + dy - grid.y) / grid.h) * grid.h +
+          grid.y -
+          from.y;
       }
       const { piece } = lifted;
       if (piece.x === from.x + dx && piece.y === from.y + dy) return;

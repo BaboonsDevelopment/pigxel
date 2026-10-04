@@ -228,4 +228,9 @@ describe("snap to grid", () => {
       to: { x: 9, y: 2 },
     });
   });
+  it("follows a rectangular grid with a shift", () => {
+    expect(
+      snapSpan({ x: 5, y: 5 }, { x: 30, y: 20 }, { w: 24, h: 16, x: 4, y: 2 }),
+    ).toEqual({ from: { x: 4, y: 2 }, to: { x: 51, y: 33 } });
+  });
 });

@@ -58,7 +58,7 @@ import {
 import { isSelected, maskOutline } from "./selection";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
-import { onionFrames, type CanvasView } from "./view";
+import { gridStyle, onionFrames, type CanvasView } from "./view";
 
 export type PixelCanvasHandle = {
   readTile: (area: Area) => Uint8ClampedArray;
@@ -469,14 +469,11 @@ export function PixelCanvas({
           style={{ ...GRID_STYLE, backgroundSize: `${scale}px ${scale}px` }}
         />
       )}
-      {view.gridSize > 0 && (
+      {view.grid && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
-          style={{
-            ...MAJOR_GRID_STYLE,
-            backgroundSize: `${view.gridSize * scale}px ${view.gridSize * scale}px`,
-          }}
+          style={gridStyle(view.grid, view.gridLook, scale)}
         />
       )}
 
@@ -537,7 +534,7 @@ export function PixelCanvas({
         stamp={stamp}
         scale={scale}
         stretch={stretch}
-        snap={view.snap ? view.gridSize : 0}
+        snap={view.snap ? view.grid : null}
         paintOptions={paintOptions}
         paused={selecting || !!frame}
         lastPointRef={lastPoint}
