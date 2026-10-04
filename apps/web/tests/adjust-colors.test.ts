@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  STRAIGHT_CURVE,
   adjustedBrightnessContrast,
   adjustedHueSaturation,
+  curveTable,
+  despeckled,
+  invertedColors,
 } from "@/features/editor/pixel-canvas/effects";
 
 const pixels = () =>
@@ -60,5 +64,37 @@ describe("brightness / contrast", () => {
     });
     expect(contrast[0]).toBe(255);
     expect(contrast[4]).toBe(128);
+  });
+});
+
+describe("invert, despeckle, curve", () => {
+  it("inverts colours but not alpha", () => {
+    const out = invertedColors(pixels(), null);
+    expect([...out.slice(0, 8)]).toEqual([
+      0, 255, 255, 255, 127, 127, 127, 255,
+    ]);
+  });
+  it("removes a lone stray pixel", () => {
+    const grey = [50, 50, 50, 255];
+    const tile = new Uint8ClampedArray(
+      Array.from({ length: 9 }, (_, i) =>
+        i === 4 ? [255, 0, 0, 255] : grey,
+      ).flat(),
+    );
+    const out = despeckled(tile, null, { w: 3, h: 3 }, 1);
+    expect([...out.slice(16, 20)]).toEqual(grey);
+  });
+  it("keeps a straight curve and follows its points", () => {
+    expect([...curveTable(STRAIGHT_CURVE)]).toEqual(
+      Array.from({ length: 256 }, (_, i) => i),
+    );
+    const table = curveTable([
+      [0, 0],
+      [128, 200],
+      [255, 255],
+    ]);
+    expect(table[128]).toBe(200);
+    for (let i = 1; i < 256; i++)
+      expect(table[i]).toBeGreaterThanOrEqual(table[i - 1]!);
   });
 });

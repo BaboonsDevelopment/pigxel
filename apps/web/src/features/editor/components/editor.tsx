@@ -15,6 +15,7 @@ import type { Area } from "../pixel-canvas/constants";
 import {
   adjustedColors,
   filledMask,
+  invertedColors,
   outlined,
   replacedColor,
   type AdjustKind,
@@ -585,6 +586,23 @@ export function Editor({
             {
               label: "Brightness / Contrast…",
               onSelect: () => adjust("brightnessContrast"),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Colour curve…",
+              onSelect: () => adjust("curve"),
+              disabled: !sprite.canPaint,
+            },
+          ],
+          [
+            {
+              label: "Invert colours",
+              onSelect: () => applyEffect(invertedColors),
+              disabled: !sprite.canPaint,
+            },
+            {
+              label: "Despeckle…",
+              onSelect: () => adjust("despeckle"),
               disabled: !sprite.canPaint,
             },
           ],
@@ -1268,9 +1286,15 @@ export function Editor({
           size={sprite.size}
           pixels={adjusting.pixels}
           mask={adjusting.mask}
-          onApply={(values) =>
+          onApply={(settings) =>
             applyEffect((pixels, mask) =>
-              adjustedColors(adjusting.kind, pixels, mask, values),
+              adjustedColors(
+                adjusting.kind,
+                pixels,
+                mask,
+                sprite.size,
+                settings,
+              ),
             )
           }
           onClose={() => setAdjusting(null)}

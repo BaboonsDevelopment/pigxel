@@ -4,26 +4,50 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
-import { adjustedColors, type AdjustKind } from "../pixel-canvas/effects";
+import {
+  STRAIGHT_CURVE,
+  adjustedColors,
+  type AdjustKind,
+  type AdjustSettings,
+} from "../pixel-canvas/effects";
+import { CurveEditor } from "./curve-editor";
 
 type Size = { w: number; h: number };
 
 const SLIDERS = {
   hueSaturation: [
-    { key: "hue", label: "Hue", max: 180 },
-    { key: "saturation", label: "Saturation", max: 100 },
-    { key: "lightness", label: "Lightness", max: 100 },
+    { key: "hue", label: "Hue", min: -180, max: 180, initial: 0 },
+    { key: "saturation", label: "Saturation", min: -100, max: 100, initial: 0 },
+    { key: "lightness", label: "Lightness", min: -100, max: 100, initial: 0 },
   ],
   brightnessContrast: [
-    { key: "brightness", label: "Brightness", max: 100 },
-    { key: "contrast", label: "Contrast", max: 100 },
+    { key: "brightness", label: "Brightness", min: -100, max: 100, initial: 0 },
+    { key: "contrast", label: "Contrast", min: -100, max: 100, initial: 0 },
   ],
+  despeckle: [{ key: "radius", label: "Radius", min: 1, max: 5, initial: 1 }],
+  curve: [],
 } as const;
 
 const TITLES = {
   hueSaturation: "Hue / Saturation",
   brightnessContrast: "Brightness / Contrast",
+  despeckle: "Despeckle",
+  curve: "Colour curve",
 };
+
+const HINTS = {
+  hueSaturation: "Double-click a slider to reset it.",
+  brightnessContrast: "Double-click a slider to reset it.",
+  despeckle:
+    "Each pixel takes the middle colour of its neighbours, so lone stray pixels disappear.",
+  curve:
+    "Click the curve to add a point and drag it. Double-click or right-click a point to remove it.",
+};
+
+const initialValues = (kind: AdjustKind) =>
+  Object.fromEntries(
+    SLIDERS[kind].map(({ key, initial }) => [key, initial as number]),
+  );
 
 const PREVIEW = { w: 320, h: 180 };
 
@@ -39,19 +63,34 @@ export default function AdjustColorsDialog({
   size: Size;
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
-  onApply: (values: Record<string, number>) => void;
+  onApply: (settings: AdjustSettings) => void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const preview = useRef<HTMLCanvasElement>(null);
-  const [values, setValues] = useState<Record<string, number>>({});
+  const [values, setValues] = useState(() => initialValues(kind));
+  const [curve, setCurve] = useState(STRAIGHT_CURVE);
   useEffect(() => dialog.current?.showModal(), []);
 
   const result = useMemo(
-    () => adjustedColors(kind, pixels, mask, values),
-    [kind, pixels, mask, values],
+    () => adjustedColors(kind, pixels, mask, size, { values, curve }),
+    [kind, pixels, mask, size, values, curve],
   );
-  const untouched = SLIDERS[kind].every(({ key }) => !values[key]);
+  const changed = useMemo(() => {
+    let n = 0;
+    for (let i = 0; i < result.length; i += 4)
+      if (
+        result[i] !== pixels[i] ||
+        result[i + 1] !== pixels[i + 1] ||
+        result[i + 2] !== pixels[i + 2] ||
+        result[i + 3] !== pixels[i + 3]
+      )
+        n++;
+    return n;
+  }, [result, pixels]);
+  const untouched =
+    curve === STRAIGHT_CURVE &&
+    SLIDERS[kind].every(({ key, initial }) => values[key] === initial);
   const fit = Math.min(PREVIEW.w / size.w, PREVIEW.h / size.h);
   const zoom = fit >= 1 ? Math.floor(fit) : fit;
 
@@ -103,8 +142,8 @@ export default function AdjustColorsDialog({
         className="space-y-5 p-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (untouched) return;
-          onApply(values);
+          if (!changed) return;
+          onApply({ values, curve });
           dialog.current?.close();
         }}
       >
@@ -120,29 +159,38 @@ export default function AdjustColorsDialog({
           </div>
         </div>
 
+        {kind === "curve" && (
+          <div className="flex justify-center">
+            <CurveEditor points={curve} onChange={setCurve} />
+          </div>
+        )}
+
         <div className="space-y-3">
-          {SLIDERS[kind].map(({ key, label, max }) => {
-            const value = values[key] ?? 0;
+          {SLIDERS[kind].map(({ key, label, min, max, initial }) => {
+            const value = values[key] ?? initial;
             const set = (next: number) =>
               setValues((v) => ({
                 ...v,
-                [key]: Math.min(max, Math.max(-max, Math.round(next) || 0)),
+                [key]: Math.min(
+                  max,
+                  Math.max(min, Math.round(next) || initial),
+                ),
               }));
             return (
               <label key={key} className="flex items-center gap-3 text-sm">
                 <span className="w-20 font-medium">{label}</span>
                 <input
                   type="range"
-                  min={-max}
+                  min={min}
                   max={max}
                   value={value}
                   onChange={(e) => set(Number(e.target.value))}
-                  onDoubleClick={() => set(0)}
+                  onDoubleClick={() => set(initial)}
                   className="min-w-0 flex-1 accent-primary"
                 />
                 <input
                   type="number"
-                  min={-max}
+                  min={min}
                   max={max}
                   value={value}
                   onChange={(e) => set(Number(e.target.value))}
@@ -153,8 +201,11 @@ export default function AdjustColorsDialog({
           })}
         </div>
 
-        <FormMessage tone="muted">
-          Double-click a slider to reset it.
+        <FormMessage tone="muted" className="tabular-nums">
+          {HINTS[kind]}{" "}
+          {changed
+            ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
+            : "Nothing changes yet."}
         </FormMessage>
 
         <div className="flex justify-between gap-2 border-t pt-4">
@@ -162,7 +213,10 @@ export default function AdjustColorsDialog({
             type="button"
             variant="ghost"
             disabled={untouched}
-            onClick={() => setValues({})}
+            onClick={() => {
+              setValues(initialValues(kind));
+              setCurve(STRAIGHT_CURVE);
+            }}
           >
             Reset
           </Button>
@@ -174,7 +228,7 @@ export default function AdjustColorsDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={untouched}>
+            <Button type="submit" disabled={!changed}>
               Apply
             </Button>
           </span>

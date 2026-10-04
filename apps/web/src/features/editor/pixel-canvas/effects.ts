@@ -158,14 +158,133 @@ export function adjustedBrightnessContrast(
   );
 }
 
-export type AdjustKind = "hueSaturation" | "brightnessContrast";
+export function invertedColors(
+  pixels: Uint8ClampedArray,
+  mask: Uint8Array | null,
+): Uint8ClampedArray {
+  return adjusted(pixels, mask, (...rgb) => rgb.map((v) => 255 - v));
+}
+
+export function despeckled(
+  pixels: Uint8ClampedArray,
+  mask: Uint8Array | null,
+  size: Size,
+  radius: number,
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(pixels);
+  const { w, h } = size;
+  const half = ((2 * radius + 1) ** 2) >> 1;
+  const hist = new Uint32Array(256);
+  const at = (x: number, y: number, c: number) =>
+    pixels[
+      (Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))) *
+        4 +
+        c
+    ]!;
+  for (let y = 0; y < h; y++) {
+    if (mask && !mask.subarray(y * w, y * w + w).some(Boolean)) continue;
+    for (let c = 0; c < 4; c++) {
+      hist.fill(0);
+      for (let dy = -radius; dy <= radius; dy++)
+        for (let dx = -radius; dx <= radius; dx++) hist[at(dx, y + dy, c)]!++;
+      let median = 0;
+      let below = 0;
+      while (below + hist[median]! <= half) below += hist[median++]!;
+      for (let x = 0; x < w; x++) {
+        if (x > 0)
+          for (let dy = -radius; dy <= radius; dy++) {
+            const gone = at(x - radius - 1, y + dy, c);
+            const come = at(x + radius, y + dy, c);
+            hist[gone]!--;
+            hist[come]!++;
+            if (gone < median) below--;
+            if (come < median) below++;
+          }
+        while (below > half) below -= hist[--median]!;
+        while (below + hist[median]! <= half) below += hist[median++]!;
+        const i = y * w + x;
+        if (!mask || mask[i]) out[i * 4 + c] = median;
+      }
+    }
+  }
+  return out;
+}
+
+export type CurvePoint = [number, number];
+
+export const STRAIGHT_CURVE: CurvePoint[] = [
+  [0, 0],
+  [255, 255],
+];
+
+export function curveTable(points: CurvePoint[]): Uint8ClampedArray {
+  const n = points.length;
+  const slopes = points.slice(0, -1).map(([x, y], i) => {
+    const [nx, ny] = points[i + 1]!;
+    return (ny - y) / (nx - x || 1);
+  });
+  const tangents = points.map((_, i) => {
+    if (i === 0) return slopes[0] ?? 0;
+    if (i === n - 1) return slopes[n - 2] ?? 0;
+    const a = slopes[i - 1]!;
+    const b = slopes[i]!;
+    return a * b <= 0 ? 0 : (2 * a * b) / (a + b);
+  });
+  const table = new Uint8ClampedArray(256);
+  let k = 0;
+  for (let x = 0; x < 256; x++) {
+    if (x <= points[0]![0]) {
+      table[x] = Math.round(points[0]![1]);
+      continue;
+    }
+    if (x >= points[n - 1]![0]) {
+      table[x] = Math.round(points[n - 1]![1]);
+      continue;
+    }
+    while (points[k + 1]![0] < x) k++;
+    const [x0, y0] = points[k]!;
+    const [x1, y1] = points[k + 1]!;
+    const h = x1 - x0;
+    const t = (x - x0) / h;
+    const t2 = t * t;
+    const t3 = t2 * t;
+    table[x] = Math.round(
+      (2 * t3 - 3 * t2 + 1) * y0 +
+        (t3 - 2 * t2 + t) * h * tangents[k]! +
+        (-2 * t3 + 3 * t2) * y1 +
+        (t3 - t2) * h * tangents[k + 1]!,
+    );
+  }
+  return table;
+}
+
+export function curvedColors(
+  pixels: Uint8ClampedArray,
+  mask: Uint8Array | null,
+  points: CurvePoint[],
+): Uint8ClampedArray {
+  const table = curveTable(points);
+  return adjusted(pixels, mask, (...rgb) => rgb.map((v) => table[v]!));
+}
+
+export type AdjustKind =
+  "hueSaturation" | "brightnessContrast" | "despeckle" | "curve";
+
+export type AdjustSettings = {
+  values: Record<string, number>;
+  curve: CurvePoint[];
+};
 
 export function adjustedColors(
   kind: AdjustKind,
   pixels: Uint8ClampedArray,
   mask: Uint8Array | null,
-  values: Record<string, number>,
+  size: Size,
+  { values, curve }: AdjustSettings,
 ): Uint8ClampedArray {
+  if (kind === "despeckle")
+    return despeckled(pixels, mask, size, values.radius ?? 1);
+  if (kind === "curve") return curvedColors(pixels, mask, curve);
   return kind === "hueSaturation"
     ? adjustedHueSaturation(pixels, mask, {
         hue: values.hue ?? 0,
