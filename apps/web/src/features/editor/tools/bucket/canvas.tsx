@@ -2,13 +2,19 @@
 
 import { useImperativeHandle } from "react";
 import {
+  blendInk,
   inPattern,
   mirrored,
   patternColor,
   wrapPixel,
   type Rgba,
 } from "../../pixel-canvas/paint";
-import { clampTolerance, fillPoints, type Point } from "../../pixel-canvas/pen";
+import {
+  clampOpacity,
+  clampTolerance,
+  fillPoints,
+  type Point,
+} from "../../pixel-canvas/pen";
 import { isSelected } from "../../pixel-canvas/selection";
 import { inkColor, slotOf } from "../shared/stroke";
 import type { ToolCanvasProps, ToolContext } from "../types";
@@ -31,6 +37,15 @@ function fillAt(
       )
     : image;
   const texture = pen.stampPattern ? stamp : null;
+  const opacity = clampOpacity(pen.opacity);
+  const blend =
+    color && opacity < 255
+      ? blendInk(
+          new Uint8ClampedArray(image.data),
+          [rgba[0], rgba[1], rgba[2], opacity],
+          "simple",
+        )
+      : null;
   let changed = false;
   for (const copy of mirrored(point, size, symmetry, axes)) {
     const at = wrapPixel(copy.x, copy.y, size, tiled);
@@ -52,7 +67,9 @@ function fillAt(
       if (!inPattern(i % size.w, Math.floor(i / size.w), pen.density)) continue;
       const fill = texture
         ? patternColor(texture, i % size.w, Math.floor(i / size.w))
-        : rgba;
+        : typeof blend === "function"
+          ? (blend(i) ?? rgba)
+          : rgba;
       if (fill.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
       image.data.set(fill, i * 4);
     }

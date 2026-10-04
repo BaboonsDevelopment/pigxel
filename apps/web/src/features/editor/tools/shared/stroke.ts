@@ -44,7 +44,12 @@ export type StrokeRender = (canvas: StrokeCanvas) => void;
 export const slotOf = (e: CanvasPointer): ColorSlot =>
   e.button === 2 ? "secondary" : "primary";
 
-export const colorInk: StrokeInk = (stroke) => stroke.rgba;
+export const colorInk: StrokeInk = (stroke, { pen }) => {
+  const opacity = clampOpacity(pen.opacity);
+  if (!stroke.color || opacity === 255) return stroke.rgba;
+  const [r, g, b] = stroke.rgba;
+  return blendInk(stroke.before, [r, g, b, opacity], "simple");
+};
 
 export const penInk: StrokeInk = (stroke, { pen, sprite }) =>
   pen.ink === "shading"

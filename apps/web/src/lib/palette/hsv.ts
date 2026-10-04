@@ -36,3 +36,28 @@ export function readHex(text: string): string | null {
   if (/^[0-9a-f]{3}$/.test(v)) return `#${[...v].map((c) => c + c).join("")}`;
   return /^[0-9a-f]{6}$/.test(v) ? `#${v}` : null;
 }
+
+export type Hsl = { h: number; s: number; l: number };
+
+export function hsvToHsl({ h, s, v }: Hsv): Hsl {
+  const l = v * (1 - s / 2);
+  return { h, s: l === 0 || l === 1 ? 0 : (v - l) / Math.min(l, 1 - l), l };
+}
+
+export function hslToHsv({ h, s, l }: Hsl): Hsv {
+  const v = l + s * Math.min(l, 1 - l);
+  return { h, s: v === 0 ? 0 : 2 * (1 - l / v), v };
+}
+
+export function shadesOf(hex: string, steps = 3): string[] {
+  const { h, s, l } = hsvToHsl(hexToHsv(hex));
+  const out: string[] = [];
+  for (let i = -steps; i <= steps; i++) {
+    const shade = Math.min(
+      1,
+      Math.max(0, l + (i / (steps + 1)) * (i < 0 ? l : 1 - l)),
+    );
+    out.push(hsvToHex(hslToHsv({ h, s, l: shade })));
+  }
+  return out;
+}

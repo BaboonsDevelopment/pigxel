@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { Button } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ColorSlot } from "../../pixel-canvas/pen";
 import type { PenSettings } from "../../pixel-canvas/pen";
@@ -15,6 +16,7 @@ import {
 import { MAX_PALETTE, PALETTE_PRESETS, colorsOf } from "@/lib/palette/presets";
 import { safeFileBase } from "@/lib/pigxel-file/format";
 
+import { ColorPicker } from "./color-picker";
 import { swatchProps, withColor } from "./helpers";
 
 type PaletteChange = {
@@ -41,35 +43,31 @@ export function PalettePanel({
   const [dragged, setDragged] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const editInput = useRef<HTMLInputElement>(null);
-  const editing = useRef<string | null>(null);
-  const latest = useRef({ palette, onPaletteChange });
-  useEffect(() => {
-    latest.current = { palette, onPaletteChange };
-  });
-  useEffect(() => {
-    const input = editInput.current;
-    if (!input) return;
-    const onPicked = () => {
-      const from = editing.current;
-      const to = input.value;
-      const { palette, onPaletteChange } = latest.current;
-      editing.current = null;
-      if (!from || from === to) return;
-      const next = palette.includes(to)
-        ? palette.filter((c) => c !== from)
-        : palette.map((c) => (c === from ? to : c));
-      onPaletteChange(next, { edited: { from, to } });
-    };
-    input.addEventListener("change", onPicked);
-    return () => input.removeEventListener("change", onPicked);
-  }, []);
-  const editSwatch = (color: string) => {
-    const input = editInput.current;
-    if (!input) return;
-    editing.current = color;
-    input.value = color;
-    input.click();
+  const [editing, setEditing] = useState<{
+    from: string;
+    to: string;
+    at: { left: number; top: number };
+  } | null>(null);
+  const editSwatch = (color: string, button: HTMLElement) => {
+    const box = button.getBoundingClientRect();
+    setEditing({
+      from: color,
+      to: color,
+      at: {
+        left: Math.min(box.right + 8, window.innerWidth - 248),
+        top: Math.max(8, Math.min(box.top, window.innerHeight - 440)),
+      },
+    });
+  };
+  const finishEdit = () => {
+    if (!editing) return;
+    const { from, to } = editing;
+    setEditing(null);
+    if (from === to) return;
+    const next = palette.includes(to)
+      ? palette.filter((c) => c !== from)
+      : palette.map((c) => (c === from ? to : c));
+    onPaletteChange(next, { edited: { from, to } });
   };
 
   const importFile = async (chosen: File | undefined) => {
@@ -179,13 +177,6 @@ export function PalettePanel({
         </option>
       </select>
       <input
-        ref={editInput}
-        type="color"
-        aria-hidden="true"
-        tabIndex={-1}
-        className="pointer-events-none absolute size-0 opacity-0"
-      />
-      <input
         ref={fileInput}
         type="file"
         accept={`${PALETTE_FILE_TYPES},image/*`}
@@ -218,7 +209,7 @@ export function PalettePanel({
               aria-label={color}
               {...swatchProps(color, pick)}
               title={`${color} · click: primary, right-click: secondary, double-click: change`}
-              onDoubleClick={() => editSwatch(color)}
+              onDoubleClick={(e) => editSwatch(color, e.currentTarget)}
               className={cn(
                 "relative block aspect-square w-full rounded-[2px] ring-1 ring-black/10",
                 color === pen.color &&
@@ -237,6 +228,31 @@ export function PalettePanel({
           </li>
         ))}
       </ul>
+      {editing && (
+        <div
+          role="dialog"
+          aria-label={`Change ${editing.from}`}
+          style={editing.at}
+          className="fixed z-50 flex w-60 flex-col gap-2 rounded-lg border bg-background p-3 shadow-lg"
+        >
+          <ColorPicker
+            color={editing.to}
+            onChange={(to) => setEditing({ ...editing, to })}
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </Button>
+            <Button size="sm" onClick={finishEdit}>
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -51,7 +51,12 @@ export function ColorsPanel({
         </div>
       </div>
 
-      <ColorPicker color={edited} onChange={(color) => pick(color, editing)} />
+      <ColorPicker
+        color={edited}
+        onChange={(color) => pick(color, editing)}
+        alpha={pen.opacity}
+        onAlpha={(opacity) => onChange({ ...pen, opacity })}
+      />
 
       {pen.recent.length > 0 && (
         <div>
