@@ -161,6 +161,9 @@ const ReplaceColorDialog = dynamic(() => import("./replace-color-dialog"), {
 const OutlineDialog = dynamic(() => import("./outline-dialog"), {
   ssr: false,
 });
+const HistoryDialog = dynamic(() => import("./history-dialog"), {
+  ssr: false,
+});
 const GridDialog = dynamic(() => import("./grid-dialog"), { ssr: false });
 const OnionSettingsDialog = dynamic(() => import("./onion-settings-dialog"), {
   ssr: false,
@@ -249,6 +252,7 @@ export function Editor({
   const [onionSettings, setOnionSettings] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [gridding, setGridding] = useState(false);
+  const [showingHistory, setShowingHistory] = useState(false);
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
@@ -569,6 +573,7 @@ export function Editor({
     [
       { label: "Undo", shortcut: `${mod}Z`, onSelect: commands.undo },
       { label: "Redo", shortcut: `${mod}Y`, onSelect: commands.redo },
+      { label: "History…", onSelect: () => setShowingHistory(true) },
     ],
     [
       { label: "Cut", shortcut: `${mod}X`, onSelect: commands.cut },
@@ -1472,6 +1477,16 @@ export function Editor({
             else sprite.addTilemapLayer(tile);
           }}
           onClose={() => setTiling(null)}
+        />
+      )}
+      {showingHistory && (
+        <HistoryDialog
+          {...sprite.historySteps()}
+          onPick={(index) => {
+            selection.cancel();
+            sprite.goToStep(index);
+          }}
+          onClose={() => setShowingHistory(false)}
         />
       )}
       {gridding && (

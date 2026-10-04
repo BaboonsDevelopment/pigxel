@@ -46,6 +46,7 @@ import {
 } from "@/lib/sprite/cel-settings";
 import { CelCanvases, contextOf, isTransparent } from "./cel-canvases";
 import { MAX_UNDO, type Area, type Size } from "./constants";
+import { describeStep } from "./history-steps";
 
 export type LayerPatch = Partial<
   Pick<
@@ -148,6 +149,7 @@ export function useSprite(
   const [version, setVersion] = useState(0);
   const [cels] = useState(() => new CelCanvases(initial.cels, size));
   const changed = useRef(new Set<HTMLCanvasElement>());
+  const [stepLabels] = useState(() => new WeakMap<Snapshot, string>());
   const past = useRef<History<Snapshot>>(
     kept?.history ??
       history.startHistory({
@@ -605,6 +607,36 @@ export function useSprite(
     restore(back.present);
     past.current = back;
     return true;
+  };
+
+  const historySteps = () => {
+    const { past: before, present, future } = past.current;
+    const all = [...before, present, ...future];
+    return {
+      current: before.length,
+      steps: all.map((step, i) => {
+        if (!i) return "Start";
+        let label = stepLabels.get(step);
+        if (label === undefined) {
+          label = describeStep(all[i - 1]!, step);
+          stepLabels.set(step, label);
+        }
+        return label;
+      }),
+    };
+  };
+
+  const goToStep = (index: number) => {
+    const { past: before, present, future } = past.current;
+    const all = [...before, present, ...future];
+    const target = all[index];
+    if (!target || index === before.length) return;
+    restore(target);
+    past.current = {
+      past: all.slice(0, index),
+      present: target,
+      future: all.slice(index + 1),
+    };
   };
 
   const redo = () => {
@@ -1320,6 +1352,8 @@ export function useSprite(
     mapAllCels,
     undo,
     redo,
+    historySteps,
+    goToStep,
     hasCel: (frame: string, layer: string) => !!cels.get(frame, layer),
     isCelLinked: (layer: string, frame: string) =>
       !!celLinks.linkOf(links, layer, frame),
