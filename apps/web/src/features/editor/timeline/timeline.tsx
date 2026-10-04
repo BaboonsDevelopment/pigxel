@@ -11,6 +11,7 @@ import { LayerRow } from "./components/layer-row";
 import { LayerPropertiesDialog } from "./components/layer-properties-dialog";
 import { TagDialog } from "./components/tag-dialog";
 import { LinkCelsDialog } from "./components/link-cels-dialog";
+import { CelPropertiesDialog } from "./components/cel-properties-dialog";
 import { TimelineToolbar } from "./components/timeline-toolbar";
 import { LAYER_COLUMN, type DropZone } from "./constants";
 import { dropPlace, zoneAt } from "./helpers";
@@ -45,6 +46,10 @@ export function Timeline({
     y: number;
   } | null>(null);
   const [linking, setLinking] = useState<{
+    layerId: string;
+    frameId: string;
+  } | null>(null);
+  const [celProperties, setCelProperties] = useState<{
     layerId: string;
     frameId: string;
   } | null>(null);
@@ -288,6 +293,14 @@ export function Timeline({
           sections={[
             [
               {
+                label: "Cel properties…",
+                onSelect: () =>
+                  setCelProperties({
+                    layerId: celMenu.layerId,
+                    frameId: celMenu.frameId,
+                  }),
+              },
+              {
                 label: "Link cels…",
                 onSelect: () =>
                   setLinking({
@@ -324,6 +337,37 @@ export function Timeline({
           onClose={() => setLinking(null)}
         />
       )}
+      {celProperties &&
+        (() => {
+          const layer = rows.find(
+            (row) => row.layer.id === celProperties.layerId,
+          )?.layer;
+          const appearance = sprite.celAppearance(
+            celProperties.layerId,
+            celProperties.frameId,
+          );
+          return layer && appearance ? (
+            <CelPropertiesDialog
+              key={`${celProperties.layerId}:${celProperties.frameId}`}
+              layerName={layer.name}
+              frameNumber={
+                frames.findIndex(
+                  (frame) => frame.id === celProperties.frameId,
+                ) + 1
+              }
+              {...appearance}
+              onSave={(opacity, zIndex) =>
+                sprite.setCelAppearance(
+                  celProperties.layerId,
+                  celProperties.frameId,
+                  opacity,
+                  zIndex,
+                )
+              }
+              onClose={() => setCelProperties(null)}
+            />
+          ) : null;
+        })()}
       {propertiesId &&
         (() => {
           const layer = rows.find(

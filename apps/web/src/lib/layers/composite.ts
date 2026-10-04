@@ -1,6 +1,24 @@
 import { blend, channelBlend } from "./blend";
 import { MAX_OPACITY } from "./constants";
 import type { BlendMode, Layer, LayerKind, PixelsOf } from "./types";
+import type { CelSetting } from "@/lib/sprite/cel-settings";
+
+export function orderedLayers(
+  tree: Layer[],
+  appearance: (id: string) => CelSetting | undefined,
+): Layer[] {
+  return tree
+    .map((layer, index) => ({ layer, index }))
+    .sort((a, b) => {
+      if (a.layer.kind === "background") return -1;
+      if (b.layer.kind === "background") return 1;
+      return (
+        (appearance(a.layer.id)?.zIndex ?? a.index) -
+          (appearance(b.layer.id)?.zIndex ?? b.index) || a.index - b.index
+      );
+    })
+    .map(({ layer }) => layer);
+}
 
 export function compositeOver(
   dst: Uint8ClampedArray,
@@ -48,15 +66,25 @@ export function flatten(
   pixelsOf: PixelsOf,
   length: number,
   skip: LayerKind[] = [],
+  appearance: (id: string) => CelSetting | undefined = () => undefined,
 ): Uint8ClampedArray {
   const out = new Uint8ClampedArray(length);
-  for (const layer of tree) {
+  for (const layer of orderedLayers(tree, appearance)) {
     if (!layer.visible || skip.includes(layer.kind)) continue;
     const pixels =
       layer.kind === "group"
-        ? flatten(layer.children, pixelsOf, length, skip)
+        ? flatten(layer.children, pixelsOf, length, skip, appearance)
         : pixelsOf(layer.id);
-    if (pixels) compositeOver(out, pixels, layer.opacity, layer.blend);
+    if (pixels)
+      compositeOver(
+        out,
+        pixels,
+        layer.kind === "group"
+          ? layer.opacity
+          : (layer.opacity * (appearance(layer.id)?.opacity ?? MAX_OPACITY)) /
+              MAX_OPACITY,
+        layer.blend,
+      );
   }
   return out;
 }

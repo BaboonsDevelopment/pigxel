@@ -9,13 +9,18 @@ import {
   type PixelRatio,
 } from "@/lib/sprite/pixel-ratio";
 import { flatten } from "@/lib/layers/composite";
-import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
+import { allLayers, createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
 import { readFrameTags, type FrameTag } from "@/lib/sprite/tags";
 import { readCelLinks, type CelLink } from "@/lib/sprite/cel-links";
+import {
+  readCelSettings,
+  settingsForFrame,
+  type CelSetting,
+} from "@/lib/sprite/cel-settings";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
@@ -42,6 +47,7 @@ export type PigxelDocument = {
   frames: Frame[];
   tags?: FrameTag[];
   links?: CelLink[];
+  celSettings?: CelSetting[];
   cels: Cels;
   palette: string[];
   slices: Slice[];
@@ -77,6 +83,7 @@ export function blankDocument(
     frames: [frame],
     tags: [],
     links: [],
+    celSettings: [],
     cels: new Map([[frame.id, frameCels]]),
     palette: [...DEFAULT_PALETTE],
     slices: [],
@@ -88,11 +95,13 @@ export function flattenDocument(
   skip: LayerKind[] = ["reference"],
   frameId = doc.frames[0]!.id,
 ): Uint8ClampedArray {
+  const appearance = settingsForFrame(doc.celSettings ?? [], frameId);
   return flatten(
     doc.layers,
     (id) => celOf(doc.cels, frameId, id),
     doc.width * doc.height * 4,
     skip,
+    (id) => appearance.get(id),
   );
 }
 
@@ -157,6 +166,7 @@ export function serializePigxel(doc: PigxelDocument): string {
     frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
     tags: doc.tags ?? [],
     links: doc.links ?? [],
+    celSettings: doc.celSettings ?? [],
     layers: doc.layers.map(toFile),
     cels,
     palette: doc.palette,
@@ -243,6 +253,11 @@ export function parsePigxel(text: string): PigxelDocument {
       file.links,
       frames.map((frame) => frame.id),
       pixelLayerIds(layers),
+    ),
+    celSettings: readCelSettings(
+      file.celSettings,
+      frames.map((frame) => frame.id),
+      allLayers(layers).map((layer) => layer.id),
     ),
     cels,
     palette,
