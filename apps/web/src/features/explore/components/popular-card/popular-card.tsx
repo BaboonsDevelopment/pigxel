@@ -9,6 +9,7 @@ import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { LikeButton } from "./components/like-button";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { formatCount } from "./helpers";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
 
@@ -105,7 +106,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
               >
                 <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
               </svg>
-              0
+              {formatCount(tile.downloads)}
             </span>
           </div>
         </div>

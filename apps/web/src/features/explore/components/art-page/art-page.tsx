@@ -49,6 +49,7 @@ export function ArtPage({
           viewerId={viewer?.id ?? null}
           following={following}
           file={file}
+          picture={picture}
           palette={picture ? paletteOf(picture.frames[0]!.pixels) : []}
         />
         <CommunityCard viewer={viewer} />

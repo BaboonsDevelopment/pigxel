@@ -13,6 +13,9 @@ import type { PublicTile } from "@/features/profile/profile";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
+import { recordDownload, setTileLiked } from "../../../actions";
+import { downloadPicture } from "../download";
+import type { Picture } from "../helpers";
 
 const TAGS = ["Buildings", "Environment"];
 
@@ -24,12 +27,14 @@ export function ArtDetails({
   viewerId,
   following,
   file,
+  picture,
   palette,
 }: {
   tile: PublicTile;
   viewerId: string | null;
   following: boolean;
   file: string | null;
+  picture: Picture | null;
   palette: string[];
 }) {
   const { author } = tile;
@@ -39,7 +44,31 @@ export function ArtDetails({
   const [copied, setCopied] = useState<string | null>(null);
   const [follows, setFollows] = useState(following);
   const [followPending, startFollow] = useTransition();
+  const [downloads, setDownloads] = useState(tile.downloads);
+  const [like, setLike] = useState({ liked: tile.liked, count: tile.likes });
+  const [likePending, startLike] = useTransition();
   const own = viewerId === author.id;
+
+  const download = async () => {
+    if (!picture) return;
+    downloadPicture(picture, tile.name);
+    const counted = await recordDownload(tile.id);
+    if (counted !== null) setDownloads(counted);
+  };
+
+  const toggleLike = () => {
+    if (!viewerId) return router.push("/login");
+    startLike(async () => {
+      const before = like;
+      const next = !before.liked;
+      setLike({ liked: next, count: before.count + (next ? 1 : -1) });
+      const result = await setTileLiked(tile.id, next);
+      if (result.error) {
+        setLike(before);
+        setError(result.error);
+      }
+    });
+  };
 
   const remix = async () => {
     if (!viewerId) return router.push("/login");
@@ -168,11 +197,21 @@ export function ArtDetails({
       </p>
 
       <dl className="mt-4 grid grid-cols-2 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
-        <div className="flex items-center gap-3 border-r border-[#f6dbe4] px-4">
+        <button
+          type="button"
+          aria-pressed={like.liked}
+          aria-label={like.liked ? "Unlike" : "Like"}
+          disabled={likePending}
+          onClick={toggleLike}
+          className={cn(
+            "flex cursor-pointer items-center gap-3 border-r border-[#f6dbe4] px-4 text-left transition-colors hover:text-primary",
+            like.liked && "text-primary",
+          )}
+        >
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            fill="none"
+            fill={like.liked ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth="1.6"
             strokeLinejoin="round"
@@ -182,11 +221,11 @@ export function ArtDetails({
           </svg>
           <div>
             <dd className="text-sm font-semibold tabular-nums">
-              {formatCount(tile.likes)}
+              {formatCount(like.count)}
             </dd>
             <dt className="text-[10px] text-muted-foreground">likes</dt>
           </div>
-        </div>
+        </button>
         <div className="flex items-center justify-end gap-3 px-4">
           <svg
             aria-hidden="true"
@@ -201,7 +240,9 @@ export function ArtDetails({
             <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
           </svg>
           <div className="text-right">
-            <dd className="text-sm font-semibold tabular-nums">0</dd>
+            <dd className="text-sm font-semibold tabular-nums">
+              {formatCount(downloads)}
+            </dd>
             <dt className="text-[10px] text-muted-foreground">downloads</dt>
           </div>
         </div>
@@ -237,7 +278,27 @@ export function ArtDetails({
         </FormMessage>
       )}
 
-      <div className="mt-3 flex justify-center gap-3">
+      <div className="mt-3 flex flex-wrap justify-center gap-3">
+        <button
+          type="button"
+          disabled={!picture}
+          onClick={() => void download()}
+          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+          >
+            <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
+          </svg>
+          Download
+        </button>
         <button
           type="button"
           disabled

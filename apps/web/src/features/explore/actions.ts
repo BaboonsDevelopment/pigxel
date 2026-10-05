@@ -56,3 +56,16 @@ export async function loadUnpublishedTiles(): Promise<ProfileTile[]> {
   const { tiles } = await listProfileTiles(user.id);
   return tiles.filter((tile) => tile.visibility === "private");
 }
+
+export async function recordDownload(tileId: string): Promise<number | null> {
+  if (!UUID.test(tileId)) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("record_tile_download", {
+      tile: tileId,
+    });
+    return error ? null : Number(data);
+  } catch {
+    return null;
+  }
+}

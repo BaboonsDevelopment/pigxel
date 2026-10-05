@@ -155,10 +155,25 @@ export async function listPublicTiles(
   ).range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
+  const downloads = await downloadCounts(rows.map((row) => row.id));
   return {
     count: count ?? rows.length,
-    tiles: rows.map(toPublicTile),
+    tiles: rows.map((row) => ({
+      ...toPublicTile(row),
+      downloads: downloads.get(row.id) ?? 0,
+    })),
   };
+}
+
+async function downloadCounts(ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tile_downloads")
+    .select("tile_id, total")
+    .in("tile_id", ids);
+  if (error) return new Map();
+  return new Map(data.map((row) => [row.tile_id, Number(row.total)]));
 }
 
 const toPublicTile = (row: PublicTileRow): PublicTile => ({
@@ -171,6 +186,7 @@ const toPublicTile = (row: PublicTileRow): PublicTile => ({
   },
   likes: row.likes[0]?.count ?? 0,
   liked: Boolean(row.mine?.length),
+  downloads: 0,
 });
 
 export async function getPublicTile(
@@ -191,7 +207,10 @@ export async function getPublicTile(
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).maybeSingle();
   if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
-  return data ? toPublicTile(data as unknown as PublicTileRow) : null;
+  if (!data) return null;
+  const tile = toPublicTile(data as unknown as PublicTileRow);
+  const downloads = await downloadCounts([tile.id]);
+  return { ...tile, downloads: downloads.get(tile.id) ?? 0 };
 }
 
 export async function getFollowStats(
