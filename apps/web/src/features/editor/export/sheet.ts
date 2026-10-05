@@ -32,7 +32,7 @@ export const PLAIN_SHEET: SheetOptions = {
   skipEmpty: false,
 };
 
-export type PlacedFrame = {
+type PlacedFrame = {
   item: SheetItem;
   frame: Rect;
   source: Rect;

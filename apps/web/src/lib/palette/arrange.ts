@@ -1,6 +1,6 @@
 import { alphaOf, hexToHsv, hsvToHsl, opaqueHex, withAlpha } from "./hsv";
 
-export type PaletteSort = "hue" | "saturation" | "brightness" | "luminance";
+type PaletteSort = "hue" | "saturation" | "brightness" | "luminance";
 
 export const PALETTE_SORTS: { value: PaletteSort; label: string }[] = [
   { value: "hue", label: "Sort by hue" },

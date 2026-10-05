@@ -33,6 +33,8 @@ export function EditorSelect({
     width: 160,
     maxHeight: 240,
   });
+  // Inside a modal dialog the list must render in it to stay clickable.
+  const [container, setContainer] = useState<Element | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -41,6 +43,7 @@ export function EditorSelect({
   const show = () => {
     const rect = trigger.current?.getBoundingClientRect();
     if (!rect) return;
+    setContainer(trigger.current?.closest("dialog") ?? document.body);
     const width = Math.max(160, rect.width);
     const height = Math.min(240, options.length * 36 + 8);
     const above =
@@ -172,6 +175,7 @@ export function EditorSelect({
         </svg>
       </button>
       {open &&
+        container &&
         createPortal(
           <div
             ref={popup}
@@ -206,7 +210,7 @@ export function EditorSelect({
               </button>
             ))}
           </div>,
-          trigger.current?.closest("dialog") ?? document.body,
+          container,
         )}
     </>
   );

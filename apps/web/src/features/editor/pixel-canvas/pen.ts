@@ -73,7 +73,7 @@ export const clampStabilizer = (value: number) =>
 
 export type SnapGrid = { w: number; h: number; x: number; y: number };
 
-export const snapGridOf = (grid: number | SnapGrid | null): SnapGrid | null =>
+const snapGridOf = (grid: number | SnapGrid | null): SnapGrid | null =>
   typeof grid === "number"
     ? grid > 0
       ? { w: grid, h: grid, x: 0, y: 0 }
