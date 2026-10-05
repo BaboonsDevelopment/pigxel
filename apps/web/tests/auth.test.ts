@@ -49,6 +49,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "" }),
   Geist_Pixel: () => ({ variable: "" }),
+  Pixelify_Sans: () => ({ className: "" }),
+  Manrope: () => ({ className: "" }),
+  Inter: () => ({ className: "" }),
 }));
 
 import { authenticate, signOut, updatePassword } from "@/features/auth/actions";
@@ -374,7 +377,9 @@ describe("email callbacks and route guards", () => {
     await expect(
       AccountSettings({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
-    await expect(Tiles()).rejects.toThrow("REDIRECT:/login");
+    await expect(Tiles({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      "REDIRECT:/login",
+    );
     await expect(
       NewTile({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
@@ -471,8 +476,10 @@ describe("proxy", () => {
 });
 
 describe("tiles", () => {
-  it("shows a Create tile button to signed-in users", async () => {
-    const html = renderToStaticMarkup(await Tiles());
-    expect(html).toMatch(/<a[^>]*href="\/tiles\/new"[^>]*>Create tile<\/a>/);
+  it("shows My projects to signed-in users", async () => {
+    const html = renderToStaticMarkup(
+      await Tiles({ searchParams: Promise.resolve({}) }),
+    );
+    expect(html).toMatch(/<h1[^>]*>My projects<\/h1>/);
   });
 });

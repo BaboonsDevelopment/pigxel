@@ -1,8 +1,8 @@
 "use server";
 
 import { getUser, requireUser } from "@/lib/auth/session";
-import type { PublicTile } from "@/features/profile/profile";
-import { listPublicTiles } from "@/features/profile/server";
+import type { ProfileTile, PublicTile } from "@/features/profile/profile";
+import { listProfileTiles, listPublicTiles } from "@/features/profile/server";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE, PERIODS, type Period } from "./constants";
 
@@ -49,4 +49,10 @@ export async function setTileLiked(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
+}
+
+export async function loadUnpublishedTiles(): Promise<ProfileTile[]> {
+  const user = await requireUser();
+  const { tiles } = await listProfileTiles(user.id);
+  return tiles.filter((tile) => tile.visibility === "private");
 }

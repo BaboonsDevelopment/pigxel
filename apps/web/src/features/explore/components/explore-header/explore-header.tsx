@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
 import {
   InputGroup,
   InputGroupInput,
@@ -11,6 +10,7 @@ import {
 import { Heading } from "@pigxel/ui/components/typography";
 import { CATEGORIES, type Sort } from "../../constants";
 import mascot from "../../../../../public/art/pigxel-maskot-searching.png";
+import { PublishButton } from "./components/publish-button";
 import { SortMenu } from "./components/sort-menu";
 
 export function ExploreHeader({
@@ -18,11 +18,13 @@ export function ExploreHeader({
   onSortChange,
   query,
   onQueryChange,
+  guest,
 }: {
   sort: Sort;
   onSortChange: (sort: Sort) => void;
   query: string;
   onQueryChange: (query: string) => void;
+  guest: boolean;
 }) {
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   return (
@@ -39,6 +41,7 @@ export function ExploreHeader({
           src={mascot}
           alt=""
           width={140}
+          height={116}
           priority
           className="-mt-6 -mb-11 h-auto w-[140px] shrink-0"
         />
@@ -67,20 +70,7 @@ export function ExploreHeader({
             onChange={(e) => onQueryChange(e.target.value)}
           />
         </InputGroup>
-        <Button type="button" className="h-10 px-5">
-          Upload
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            className="size-4"
-          >
-            <path d="M8 3v10M3 8h10" />
-          </svg>
-        </Button>
+        <PublishButton guest={guest} />
       </div>
       <div className="mt-6 flex flex-wrap items-center gap-x-7 gap-y-3">
         <div

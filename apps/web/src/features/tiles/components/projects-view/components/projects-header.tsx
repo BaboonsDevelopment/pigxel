@@ -51,6 +51,7 @@ export function ProjectsHeader({
           src={mascot}
           alt=""
           width={237}
+          height={158}
           priority
           className="-mt-[30px] -mb-[16px] hidden h-auto w-[237px] md:block"
         />

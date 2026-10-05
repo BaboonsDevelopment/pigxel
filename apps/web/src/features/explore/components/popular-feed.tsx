@@ -108,6 +108,7 @@ export function PopularFeed({
         onSortChange={setSort}
         query={query}
         onQueryChange={setQuery}
+        guest={guest}
       />
       {shown.length ? (
         <ul className={styles.grid}>
