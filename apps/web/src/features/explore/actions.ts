@@ -19,15 +19,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function loadPopularTiles(
   period: Period,
   from: number,
+  tag: string | null = null,
 ): Promise<PublicTile[]> {
   const days = PERIODS.find((p) => p.value === period)?.days;
   if (!days || !Number.isInteger(from) || from < 0) return [];
+  if (tag !== null && !(TAGS as readonly string[]).includes(tag)) return [];
   const user = await getUser();
   const { tiles } = await listPublicTiles(
     from,
     PAGE_SIZE,
     days,
     user?.id ?? null,
+    tag,
   );
   return tiles;
 }

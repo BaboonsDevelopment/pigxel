@@ -16,12 +16,14 @@ const PRELOAD = "1500px";
 
 export function PopularFeed({
   period,
+  tag,
   initial,
   count,
   guest,
   failed = false,
 }: {
   period: Period;
+  tag: string | null;
   initial: PublicTile[];
   count: number;
   guest: boolean;
@@ -46,7 +48,7 @@ export function PopularFeed({
       if (loading.current) return;
       loading.current = true;
       try {
-        const more = await loadPopularTiles(period, offset);
+        const more = await loadPopularTiles(period, offset, tag);
         if (!more.length || offset + more.length >= count) setDone(true);
         setOffset(offset + more.length);
         if (guest) setAllowed(false);
@@ -73,7 +75,7 @@ export function PopularFeed({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [period, offset, count, done, guest, allowed, moreFailed]);
+  }, [period, tag, offset, count, done, guest, allowed, moreFailed]);
 
   useEffect(() => {
     if (!banner) return;
@@ -104,6 +106,8 @@ export function PopularFeed({
   return (
     <section aria-labelledby="popular-heading" className={styles.gallery}>
       <ExploreHeader
+        period={period}
+        tag={tag}
         sort={sort}
         onSortChange={setSort}
         query={query}
@@ -138,8 +142,14 @@ export function PopularFeed({
         />
       ) : (
         <EmptyState
-          title="No tiles in this period"
-          description="Try a different period to discover more from the community."
+          title={
+            tag ? `No ${tag.toLowerCase()} arts yet` : "No tiles in this period"
+          }
+          description={
+            tag
+              ? "Try another tag to discover more from the community."
+              : "Try a different period to discover more from the community."
+          }
           className="border-solid bg-[#faf9fa]"
         />
       )}

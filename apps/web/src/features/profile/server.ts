@@ -137,9 +137,10 @@ export async function listPublicTiles(
   limit: number,
   days: number,
   viewerId: string | null,
+  tag: string | null = null,
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
-  const query = supabase
+  const base = supabase
     .rpc(
       "popular_tiles",
       { since: new Date(Date.now() - days * DAY).toISOString() },
@@ -150,6 +151,7 @@ export async function listPublicTiles(
         ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
         : PUBLIC_TILE_COLUMNS,
     );
+  const query = tag ? base.contains("tags", [tag]) : base;
   const { data, count, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).range(from, from + limit - 1);
