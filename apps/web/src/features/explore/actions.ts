@@ -69,3 +69,30 @@ export async function recordDownload(tileId: string): Promise<number | null> {
     return null;
   }
 }
+
+export async function setTileSaved(
+  tileId: string,
+  saved: boolean,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = saved
+      ? await supabase
+          .from("saved_tiles")
+          .upsert(
+            { tile_id: tileId },
+            { onConflict: "user_id,tile_id", ignoreDuplicates: true },
+          )
+      : await supabase
+          .from("saved_tiles")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("tile_id", tileId);
+    if (error) return { error: "Couldn’t change that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}

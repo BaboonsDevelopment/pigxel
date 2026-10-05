@@ -14,10 +14,12 @@ export function ArtPage({
   tile,
   viewer,
   following,
+  saved,
 }: {
   tile: PublicTile;
   viewer: { id: string; name: string; avatarUrl: string | null } | null;
   following: boolean;
+  saved: boolean;
 }) {
   const [file, setFile] = useState<string | null>(null);
   const [picture, setPicture] = useState<Picture | null>(null);
@@ -48,6 +50,7 @@ export function ArtPage({
           tile={tile}
           viewerId={viewer?.id ?? null}
           following={following}
+          saved={saved}
           file={file}
           picture={picture}
           palette={picture ? paletteOf(picture.frames[0]!.pixels) : []}

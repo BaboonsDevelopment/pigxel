@@ -6,6 +6,7 @@ import {
   getOwnProfile,
   getPublicTile,
 } from "@/features/profile/server";
+import { isTileSaved } from "@/features/explore/server";
 import { getUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +29,12 @@ export default async function ArtDetailPage({ params }: Props) {
   const user = await getUser();
   const tile = await getPublicTile(id, user?.id ?? null);
   if (!tile) notFound();
-  const [profile, follow] = await Promise.all([
+  const [profile, follow, saved] = await Promise.all([
     user ? getOwnProfile(user.id) : null,
     user && user.id !== tile.author.id
       ? getFollowStats(tile.author.id, user.id).catch(() => null)
       : null,
+    user ? isTileSaved(user.id, tile.id).catch(() => false) : false,
   ]);
   return (
     <ArtPage
@@ -47,6 +49,7 @@ export default async function ArtDetailPage({ params }: Props) {
           : null
       }
       following={follow?.following ?? false}
+      saved={saved}
     />
   );
 }

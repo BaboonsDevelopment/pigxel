@@ -19,6 +19,8 @@ import {
 } from "../../tile-actions";
 import { ProjectCard } from "../project-card/project-card";
 import { TileThumbnail } from "../tile-thumbnail";
+import type { SavedArt } from "@/features/explore/server";
+import { Favourites } from "./components/favourites";
 import { FolderCard } from "./components/folder-card";
 import { FolderHeader } from "./components/folder-header";
 import { FolderNameDialog } from "./components/folder-name-dialog";
@@ -38,11 +40,13 @@ export function ProjectsView({
   initial,
   folders,
   folder,
+  saved,
 }: {
   userId: string;
   initial: CloudTileSummary[];
   folders: Folder[];
   folder: Folder | null;
+  saved: SavedArt[];
 }) {
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
@@ -139,7 +143,10 @@ export function ProjectsView({
           }
         />
       )}
-      {(filter === "Shared" || filter === "Favourite") && (
+      {filter === "Favourite" && (
+        <Favourites saved={saved} query={query} grid={GRID} />
+      )}
+      {filter === "Shared" && (
         <EmptyState
           title="Nothing here yet"
           description="This section is coming soon."

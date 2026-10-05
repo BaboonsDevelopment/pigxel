@@ -13,7 +13,7 @@ import type { PublicTile } from "@/features/profile/profile";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
-import { recordDownload, setTileLiked } from "../../../actions";
+import { recordDownload, setTileLiked, setTileSaved } from "../../../actions";
 import { downloadPicture } from "../download";
 import type { Picture } from "../helpers";
 
@@ -26,6 +26,7 @@ export function ArtDetails({
   tile,
   viewerId,
   following,
+  saved,
   file,
   picture,
   palette,
@@ -33,6 +34,7 @@ export function ArtDetails({
   tile: PublicTile;
   viewerId: string | null;
   following: boolean;
+  saved: boolean;
   file: string | null;
   picture: Picture | null;
   palette: string[];
@@ -47,6 +49,8 @@ export function ArtDetails({
   const [downloads, setDownloads] = useState(tile.downloads);
   const [like, setLike] = useState({ liked: tile.liked, count: tile.likes });
   const [likePending, startLike] = useTransition();
+  const [isSaved, setIsSaved] = useState(saved);
+  const [savePending, startSave] = useTransition();
   const own = viewerId === author.id;
 
   const download = async () => {
@@ -65,6 +69,19 @@ export function ArtDetails({
       const result = await setTileLiked(tile.id, next);
       if (result.error) {
         setLike(before);
+        setError(result.error);
+      }
+    });
+  };
+
+  const toggleSave = () => {
+    if (!viewerId) return router.push("/login");
+    startSave(async () => {
+      const next = !isSaved;
+      setIsSaved(next);
+      const result = await setTileSaved(tile.id, next);
+      if (result.error) {
+        setIsSaved(!next);
         setError(result.error);
       }
     });
@@ -196,7 +213,7 @@ export function ArtDetails({
         {DESCRIPTION}
       </p>
 
-      <dl className="mt-4 grid grid-cols-2 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
+      <div className="mt-4 grid grid-cols-2 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
         <button
           type="button"
           aria-pressed={like.liked}
@@ -220,10 +237,10 @@ export function ArtDetails({
             <path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z" />
           </svg>
           <div>
-            <dd className="text-sm font-semibold tabular-nums">
+            <p className="text-sm font-semibold tabular-nums">
               {formatCount(like.count)}
-            </dd>
-            <dt className="text-[10px] text-muted-foreground">likes</dt>
+            </p>
+            <p className="text-[10px] text-muted-foreground">likes</p>
           </div>
         </button>
         <div className="flex items-center justify-end gap-3 px-4">
@@ -240,13 +257,13 @@ export function ArtDetails({
             <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
           </svg>
           <div className="text-right">
-            <dd className="text-sm font-semibold tabular-nums">
+            <p className="text-sm font-semibold tabular-nums">
               {formatCount(downloads)}
-            </dd>
-            <dt className="text-[10px] text-muted-foreground">downloads</dt>
+            </p>
+            <p className="text-[10px] text-muted-foreground">downloads</p>
           </div>
         </div>
-      </dl>
+      </div>
 
       <button
         type="button"
@@ -301,14 +318,18 @@ export function ArtDetails({
         </button>
         <button
           type="button"
-          disabled
-          title="Coming soon"
-          className="flex h-8 items-center gap-2 rounded-lg border bg-background px-3 text-xs disabled:opacity-60"
+          aria-pressed={isSaved}
+          disabled={savePending}
+          onClick={toggleSave}
+          className={cn(
+            "flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted",
+            isSaved && "border-primary-soft bg-pastel-pink-soft text-primary",
+          )}
         >
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"
-            fill="none"
+            fill={isSaved ? "currentColor" : "none"}
             stroke="currentColor"
             strokeWidth="1.4"
             strokeLinejoin="round"
@@ -316,7 +337,7 @@ export function ArtDetails({
           >
             <path d="M4 2.5h8v11L8 10.5l-4 3Z" />
           </svg>
-          Save project
+          {isSaved ? "Saved" : "Save project"}
         </button>
         <button
           type="button"
