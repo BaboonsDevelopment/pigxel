@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { setTileLiked } from "../../../actions";
+import { formatCount } from "../helpers";
 
 export function LikeButton({
   tileId,
@@ -33,24 +34,22 @@ export function LikeButton({
       disabled={pending}
       onClick={toggle}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium tabular-nums transition-colors hover:bg-muted",
-        state.liked
-          ? "text-primary"
-          : "text-muted-foreground hover:text-foreground",
+        "flex shrink-0 items-center gap-1 rounded-md py-0.5 tabular-nums transition-colors hover:text-primary",
+        state.liked && "text-primary",
       )}
     >
       <svg
         aria-hidden="true"
-        viewBox="0 0 24 24"
+        viewBox="3.4 4.9 17.2 16.2"
         fill={state.liked ? "currentColor" : "none"}
         stroke="currentColor"
         strokeWidth={1.8}
         strokeLinejoin="round"
-        className="size-5"
+        className="h-2 w-[8.5px]"
       >
         <path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z" />
       </svg>
-      {state.count}
+      {formatCount(state.count)}
     </button>
   );
 }

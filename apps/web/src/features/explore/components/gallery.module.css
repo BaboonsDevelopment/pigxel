@@ -5,12 +5,7 @@
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  column-gap: 20px;
-  row-gap: 32px;
-}
-
-.density {
-  display: none;
+  gap: 20px;
 }
 
 @container (min-width: 360px) {
@@ -23,25 +18,19 @@
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     column-gap: 24px;
-    row-gap: 36px;
   }
+}
 
-  .grid[data-density="compact"] {
+@container (min-width: 900px) {
+  .grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    column-gap: 16px;
-  }
-
-  .density {
-    display: flex;
   }
 }
 
 @container (min-width: 1100px) {
   .grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .grid[data-density="compact"] {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+    column-gap: 36px;
+    row-gap: 28px;
   }
 }

@@ -13,6 +13,9 @@ vi.mock("next/font/google", () => ({
   DotGothic16: () => ({ style: {} }),
   Silkscreen: () => ({ style: {} }),
   Press_Start_2P: () => ({ style: {} }),
+  Pixelify_Sans: () => ({ className: "" }),
+  Manrope: () => ({ className: "" }),
+  Inter: () => ({ className: "" }),
 }));
 vi.mock("next/navigation", () => ({
   notFound: () => {

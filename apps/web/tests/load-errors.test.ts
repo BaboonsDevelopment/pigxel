@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("next/font/google", () => ({
+  Pixelify_Sans: () => ({ className: "" }),
+  Manrope: () => ({ className: "" }),
+  Inter: () => ({ className: "" }),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/",

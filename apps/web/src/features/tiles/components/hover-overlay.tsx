@@ -1,3 +1,7 @@
+import type { CSSProperties } from "react";
+import { cn } from "@pigxel/ui/lib/utils";
+import { pixelifySans } from "@/lib/fonts/pixelify";
+
 export function HoverOverlay({
   label,
   force = false,
@@ -11,54 +15,54 @@ export function HoverOverlay({
       data-force={force || undefined}
       className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100 data-force:opacity-100"
     >
-      <span className="absolute inset-0 bg-[linear-gradient(rgb(255_255_255/0.28)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.28)_1px,transparent_1px)] bg-[size:14px_14px]" />
-      {SPARKLES.map(([top, left, size], i) => (
-        <span
-          key={i}
-          className="absolute rotate-12 bg-white/90 motion-safe:animate-pulse"
-          style={{
-            top,
-            left,
-            width: size,
-            height: size,
-            animationDelay: `${i * 180}ms`,
-          }}
-        />
+      <span className="absolute inset-0 bg-[#4a1f35]/25" />
+      <span className="absolute inset-0 bg-[linear-gradient(rgb(255_255_255/0.45)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.45)_1px,transparent_1px)] bg-[size:18px_18px]" />
+      {SPARKLES.map((sparkle, i) => (
+        <Sparkle key={i} {...sparkle} />
       ))}
-      <span className="absolute bottom-3 left-1/2 flex -translate-x-1/2 translate-y-1 items-center gap-1.5 rounded-full bg-pastel-pink-soft py-1 pr-2.5 pl-3.5 font-mono text-xs text-foreground shadow-sm transition-transform duration-200 group-hover:translate-y-0">
-        {label}
-        <svg viewBox="0 0 16 16" className="size-3" fill="none">
-          <path
-            d="m6 3 5 5-5 5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <PixelHeart className="absolute -top-1.5 -right-1.5 w-3" />
+      <span
+        className={cn(
+          pixelifySans.className,
+          "absolute bottom-3.5 left-1/2 flex -translate-x-1/2 translate-y-1 rounded-[7px] border-[1.5px] border-[#fde7ef] bg-[#fffcfd] px-2.5 py-[7px] text-[11px] leading-[13px] whitespace-nowrap text-foreground transition-transform duration-200 group-hover:translate-y-0",
+        )}
+      >
+        {label} →
+        <Sparkle top="-7px" right="22px" size={8} rotate={-18} />
+        <Sparkle top="-9px" right="10px" size={10} rotate={32} />
       </span>
     </span>
   );
 }
 
-const SPARKLES: [string, string, number][] = [
-  ["8%", "6%", 7],
-  ["16%", "15%", 4],
-  ["6%", "84%", 6],
-  ["18%", "91%", 4],
-  ["38%", "88%", 5],
-  ["52%", "80%", 3],
-  ["60%", "8%", 4],
+type SparkleProps = {
+  top: string;
+  left?: string;
+  right?: string;
+  size: number;
+  rotate: number;
+};
+
+const SPARKLES: SparkleProps[] = [
+  { top: "7%", left: "4%", size: 11, rotate: 20 },
+  { top: "11%", left: "13%", size: 6, rotate: -12 },
+  { top: "18%", left: "5%", size: 8, rotate: 35 },
+  { top: "9%", left: "90%", size: 10, rotate: 30 },
+  { top: "21%", left: "85%", size: 9, rotate: 14 },
+  { top: "28%", left: "90%", size: 7, rotate: 45 },
+  { top: "70%", left: "88%", size: 11, rotate: 8 },
+  { top: "83%", left: "80%", size: 12, rotate: -14 },
 ];
 
-function PixelHeart({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 7 6" className={className} shapeRendering="crispEdges">
-      <path
-        d="M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z"
-        fill="#f3a3bb"
-      />
-    </svg>
-  );
+function Sparkle({ top, left, right, size, rotate }: SparkleProps) {
+  const style: CSSProperties = {
+    top,
+    left,
+    right,
+    width: size,
+    height: size,
+    transform: `rotate(${rotate}deg)`,
+    background: "radial-gradient(circle, #f7b8ce 0%, #fde3ec 40%, #ffffff 75%)",
+    boxShadow: "inset 0 0 0 0.7px #f7b8ce",
+  };
+  return <span className="absolute" style={style} />;
 }
