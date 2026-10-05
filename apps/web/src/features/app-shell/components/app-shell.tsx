@@ -66,17 +66,12 @@ export function AppShell({
         </div>
       )}
 
-      <div
-        className={cn(
-          "flex min-w-0 flex-1 flex-col",
-          isExplore && "bg-background",
-        )}
-      >
+      <div className="flex min-w-0 flex-1 flex-col">
         <header
           className={cn(
             "flex shrink-0 items-center gap-3 px-4 md:px-8",
             isExplore
-              ? "h-12 bg-background"
+              ? "h-12"
               : "h-16 border-b border-border bg-sidebar md:border-0 md:bg-transparent",
           )}
         >
