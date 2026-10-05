@@ -17,6 +17,10 @@ export const CATEGORIES = [
   "Icons",
 ] as const;
 
+export const TAGS = CATEGORIES.filter((c) => c !== "All");
+
+export const DESCRIPTION_MAX = 500;
+
 export const SORTS = [
   { value: "popular", label: "Popular" },
   { value: "recent", label: "Recent" },

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Page } from "@pigxel/ui/components/page";
 import { ProjectsView } from "@/features/tiles/components/projects-view/projects-view";
 import { listFolders } from "@/features/tiles/server";
+import { listSavedArts } from "@/features/explore/server";
 import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
 import { PAGE_SIZE } from "@/features/tiles/constants";
@@ -13,10 +14,16 @@ type Props = { searchParams: Promise<{ folder?: string }> };
 
 export default async function Tiles({ searchParams }: Props) {
   const [user, params] = await Promise.all([requireUser(), searchParams]);
-  const folders = await listFolders(user.id).catch((error: unknown) => {
-    console.error(error);
-    return [];
-  });
+  const [folders, saved] = await Promise.all([
+    listFolders(user.id).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    }),
+    listSavedArts(user.id).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    }),
+  ]);
   const folder = folders.find((f) => f.id === params.folder) ?? null;
   const cloudTiles = await listCloudTilesOnServer(
     user.id,
@@ -33,6 +40,7 @@ export default async function Tiles({ searchParams }: Props) {
           initial={cloudTiles}
           folders={folders}
           folder={folder}
+          saved={saved}
         />
       </Page>
     </div>

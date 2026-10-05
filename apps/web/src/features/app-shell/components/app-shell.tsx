@@ -90,6 +90,7 @@ export function AppShell({
               Pigxel
             </span>
           </Link>
+          <div id="app-header-start" className="hidden min-w-0 md:flex" />
           <div className="ml-auto flex items-center gap-2.5">
             <SearchButton userId={userId} />
             <NotificationBell unread={unreadNotifications} />

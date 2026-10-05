@@ -137,9 +137,10 @@ export async function listPublicTiles(
   limit: number,
   days: number,
   viewerId: string | null,
+  tag: string | null = null,
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
-  const query = supabase
+  const base = supabase
     .rpc(
       "popular_tiles",
       { since: new Date(Date.now() - days * DAY).toISOString() },
@@ -150,24 +151,81 @@ export async function listPublicTiles(
         ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
         : PUBLIC_TILE_COLUMNS,
     );
+  const query = tag ? base.contains("tags", [tag]) : base;
   const { data, count, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
+  const downloads = await downloadCounts(rows.map((row) => row.id));
   return {
     count: count ?? rows.length,
     tiles: rows.map((row) => ({
-      ...toProfileTile(row),
-      author: {
-        id: row.user_id,
-        username: row.author.username,
-        name: row.author.display_name,
-        avatarUrl: avatarUrlOf(row.author),
-      },
-      likes: row.likes[0]?.count ?? 0,
-      liked: Boolean(row.mine?.length),
+      ...toPublicTile(row),
+      downloads: downloads.get(row.id) ?? 0,
     })),
+  };
+}
+
+async function downloadCounts(ids: string[]): Promise<Map<string, number>> {
+  if (!ids.length) return new Map();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tile_downloads")
+    .select("tile_id, total")
+    .in("tile_id", ids);
+  if (error) return new Map();
+  return new Map(data.map((row) => [row.tile_id, Number(row.total)]));
+}
+
+const toPublicTile = (row: PublicTileRow): PublicTile => ({
+  ...toProfileTile(row),
+  author: {
+    id: row.user_id,
+    username: row.author.username,
+    name: row.author.display_name,
+    avatarUrl: avatarUrlOf(row.author),
+  },
+  likes: row.likes[0]?.count ?? 0,
+  liked: Boolean(row.mine?.length),
+  downloads: 0,
+  tags: [],
+  description: null,
+});
+
+export async function getPublicTile(
+  id: string,
+  viewerId: string | null,
+): Promise<PublicTile | null> {
+  const supabase = await createClient();
+  const query = supabase
+    .from("tiles")
+    .select(
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    )
+    .eq("id", id)
+    .eq("visibility", "public");
+  const { data, error } = await (
+    viewerId ? query.eq("mine.user_id", viewerId) : query
+  ).maybeSingle();
+  if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
+  if (!data) return null;
+  const tile = toPublicTile(data as unknown as PublicTileRow);
+  const [downloads, details] = await Promise.all([
+    downloadCounts([tile.id]),
+    supabase
+      .from("tiles")
+      .select("tags, description")
+      .eq("id", tile.id)
+      .maybeSingle<{ tags: string[]; description: string | null }>(),
+  ]);
+  return {
+    ...tile,
+    downloads: downloads.get(tile.id) ?? 0,
+    tags: details.data?.tags ?? [],
+    description: details.data?.description ?? null,
   };
 }
 

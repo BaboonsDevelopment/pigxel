@@ -1,32 +1,42 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import Link from "next/link";
 import {
   InputGroup,
   InputGroupInput,
   InputGroupText,
 } from "@pigxel/ui/components/input";
 import { Heading } from "@pigxel/ui/components/typography";
-import { CATEGORIES, type Sort } from "../../constants";
+import { CATEGORIES, PERIODS, type Period, type Sort } from "../../constants";
 import mascot from "../../../../../public/art/pigxel-maskot-searching.png";
 import { PublishButton } from "./components/publish-button";
 import { SortMenu } from "./components/sort-menu";
 
 export function ExploreHeader({
+  period,
+  tag,
   sort,
   onSortChange,
   query,
   onQueryChange,
   guest,
 }: {
+  period: Period;
+  tag: string | null;
   sort: Sort;
   onSortChange: (sort: Sort) => void;
   query: string;
   onQueryChange: (query: string) => void;
   guest: boolean;
 }) {
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const hrefFor = (name: string) => {
+    const params = new URLSearchParams();
+    if (period !== PERIODS[0].value) params.set("period", period);
+    if (name !== CATEGORIES[0]) params.set("tag", name);
+    const query = params.toString();
+    return query ? `/explore?${query}` : "/explore";
+  };
   return (
     <header className="mb-12">
       <div className="flex items-center gap-1">
@@ -79,15 +89,17 @@ export function ExploreHeader({
           className="flex flex-wrap gap-3"
         >
           {CATEGORIES.map((name) => (
-            <button
+            <Link
               key={name}
-              type="button"
-              aria-pressed={category === name}
-              onClick={() => setCategory(name)}
-              className="h-9 rounded-lg border bg-background px-5 text-xs transition-colors hover:bg-muted aria-pressed:border-transparent aria-pressed:bg-pastel-pink"
+              href={hrefFor(name)}
+              scroll={false}
+              aria-current={
+                (tag ?? CATEGORIES[0]) === name ? "page" : undefined
+              }
+              className="flex h-9 items-center rounded-lg border bg-background px-5 text-xs transition-colors hover:bg-muted aria-[current]:border-transparent aria-[current]:bg-pastel-pink"
             >
               {name}
-            </button>
+            </Link>
           ))}
         </div>
         <div>
