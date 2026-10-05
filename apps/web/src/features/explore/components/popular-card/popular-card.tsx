@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { PublicTile } from "@/features/profile/profile";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { LikeButton } from "./components/like-button";
-import { PreviewDialog } from "./components/preview-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
@@ -17,15 +15,12 @@ import { manrope } from "@/lib/fonts/manrope";
 export function PopularCard({ tile }: { tile: PublicTile }) {
   const { author } = tile;
   const router = useRouter();
-  const [previewing, setPreviewing] = useState(false);
-  const picture = useRef<HTMLButtonElement>(null);
+  const href = `/explore/${tile.id}`;
   return (
     <li className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
-      <button
-        type="button"
-        ref={picture}
-        aria-label={`Preview ${tile.name}`}
-        onClick={() => setPreviewing(true)}
+      <Link
+        href={href}
+        aria-label={`Open ${tile.name}`}
         className="relative block w-full outline-none"
       >
         <span className="relative block aspect-[5/4] overflow-hidden bg-checker">
@@ -45,7 +40,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
           </span>
           <HoverOverlay label="Open project" />
         </span>
-      </button>
+      </Link>
       <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="truncate text-xl leading-tight" title={tile.name}>
@@ -65,7 +60,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
               </svg>
             }
             items={[
-              { label: "Preview", onSelect: () => setPreviewing(true) },
+              { label: "Open", onSelect: () => router.push(href) },
               {
                 label: "View profile",
                 onSelect: () => router.push(`/u/${author.username}`),
@@ -115,13 +110,6 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
           </div>
         </div>
       </div>
-      {previewing && (
-        <PreviewDialog
-          tile={tile}
-          origin={() => picture.current?.getBoundingClientRect()}
-          onClose={() => setPreviewing(false)}
-        />
-      )}
     </li>
   );
 }

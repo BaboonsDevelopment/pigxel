@@ -157,18 +157,41 @@ export async function listPublicTiles(
   const rows = data as unknown as PublicTileRow[];
   return {
     count: count ?? rows.length,
-    tiles: rows.map((row) => ({
-      ...toProfileTile(row),
-      author: {
-        id: row.user_id,
-        username: row.author.username,
-        name: row.author.display_name,
-        avatarUrl: avatarUrlOf(row.author),
-      },
-      likes: row.likes[0]?.count ?? 0,
-      liked: Boolean(row.mine?.length),
-    })),
+    tiles: rows.map(toPublicTile),
   };
+}
+
+const toPublicTile = (row: PublicTileRow): PublicTile => ({
+  ...toProfileTile(row),
+  author: {
+    id: row.user_id,
+    username: row.author.username,
+    name: row.author.display_name,
+    avatarUrl: avatarUrlOf(row.author),
+  },
+  likes: row.likes[0]?.count ?? 0,
+  liked: Boolean(row.mine?.length),
+});
+
+export async function getPublicTile(
+  id: string,
+  viewerId: string | null,
+): Promise<PublicTile | null> {
+  const supabase = await createClient();
+  const query = supabase
+    .from("tiles")
+    .select(
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    )
+    .eq("id", id)
+    .eq("visibility", "public");
+  const { data, error } = await (
+    viewerId ? query.eq("mine.user_id", viewerId) : query
+  ).maybeSingle();
+  if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
+  return data ? toPublicTile(data as unknown as PublicTileRow) : null;
 }
 
 export async function getFollowStats(
