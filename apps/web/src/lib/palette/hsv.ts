@@ -56,7 +56,7 @@ export function readHex(text: string): string | null {
   return null;
 }
 
-export type Hsl = { h: number; s: number; l: number };
+type Hsl = { h: number; s: number; l: number };
 
 export function hsvToHsl({ h, s, v }: Hsv): Hsl {
   const l = v * (1 - s / 2);

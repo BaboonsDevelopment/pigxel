@@ -35,7 +35,7 @@ export function outlined(
 
 export type OutlinePlace = "outside" | "inside";
 export type OutlineShape = "round" | "square";
-export type OutlineSettings = {
+type OutlineSettings = {
   place: OutlinePlace;
   shape: OutlineShape;
   width: number;
@@ -134,13 +134,13 @@ export function filledMask(
   return out;
 }
 
-export type HueSaturation = {
+type HueSaturation = {
   hue: number;
   saturation: number;
   lightness: number;
 };
 
-export type BrightnessContrast = { brightness: number; contrast: number };
+type BrightnessContrast = { brightness: number; contrast: number };
 
 function rgbToHsl(r: number, g: number, b: number) {
   const max = Math.max(r, g, b);
@@ -323,7 +323,7 @@ export function curveTable(points: CurvePoint[]): Uint8ClampedArray {
   return table;
 }
 
-export function curvedColors(
+function curvedColors(
   pixels: Uint8ClampedArray,
   mask: Uint8Array | null,
   points: CurvePoint[],

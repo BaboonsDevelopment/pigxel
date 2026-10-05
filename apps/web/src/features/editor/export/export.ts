@@ -166,7 +166,7 @@ const sheetOptions = (settings: ExportSettings): SheetOptions => ({
   skipEmpty: settings.sheetSkipEmpty,
 });
 
-export function sheetItems(
+function sheetItems(
   source: ExportSource,
   split: ExportSettings["sheetSplit"],
 ): SheetItem[] {

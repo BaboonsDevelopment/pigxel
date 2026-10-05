@@ -34,7 +34,7 @@ export const gridOf = (size: Size, tile: TileSize) => ({
 
 export const isSquareTile = (tile: TileSize) => tile.w === tile.h;
 
-export const isNoFlip = (flip: TileFlip) => !flip.d && !flip.h && !flip.v;
+const isNoFlip = (flip: TileFlip) => !flip.d && !flip.h && !flip.v;
 
 export function readCell(
   pixels: Cel,
@@ -76,12 +76,12 @@ export function writeCell(
   }
 }
 
-export function isEmptyTile(tile: Uint8ClampedArray) {
+function isEmptyTile(tile: Uint8ClampedArray) {
   for (let i = 3; i < tile.length; i += 4) if (tile[i]) return false;
   return true;
 }
 
-export function sameTile(a: Uint8ClampedArray, b: Uint8ClampedArray) {
+function sameTile(a: Uint8ClampedArray, b: Uint8ClampedArray) {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
@@ -111,7 +111,7 @@ const ALL_FLIPS: TileFlip[] = [false, true].flatMap((d) =>
   [false, true].flatMap((h) => [false, true].map((v) => ({ d, h, v }))),
 );
 
-export const flipsFor = (tile: TileSize, enabled: boolean): TileFlip[] =>
+const flipsFor = (tile: TileSize, enabled: boolean): TileFlip[] =>
   !enabled
     ? [NO_FLIP]
     : ALL_FLIPS.filter((flip) => !flip.d || isSquareTile(tile));
@@ -174,6 +174,7 @@ function eachCell(
     for (let col = 0; col < cols; col++) visit(col, row);
 }
 
+/** @public Not used yet. */
 export function tileIndex(
   tiles: Uint8ClampedArray[],
   content: Uint8ClampedArray,
@@ -221,7 +222,7 @@ export function uniqueTiles(
   return out;
 }
 
-export function usedTiles(
+function usedTiles(
   tiles: Uint8ClampedArray[],
   cels: Cel[],
   size: Size,

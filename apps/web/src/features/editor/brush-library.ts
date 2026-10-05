@@ -3,7 +3,7 @@ import type { Stamp } from "./pixel-canvas/paint";
 export type SavedBrush = { id: string; stamp: Stamp };
 
 export const MAX_BRUSHES = 24;
-export const MAX_BRUSH_SIDE = 128;
+const MAX_BRUSH_SIDE = 128;
 
 const brushesKey = (userId: string) => `pigxel:brushes:v1:${userId}`;
 
