@@ -14,11 +14,13 @@ export function ProjectMenu({
   items,
   disabled,
   icon,
+  placement = "up",
 }: {
   label: string;
   items: ProjectMenuItem[];
   disabled?: boolean;
   icon?: ReactNode;
+  placement?: "up" | "down";
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -64,7 +66,10 @@ export function ProjectMenu({
         <ul
           id={menuId}
           role="menu"
-          className="absolute right-0 bottom-full z-20 mb-1 min-w-40 rounded-lg border bg-popover p-1 text-sm shadow-lg"
+          className={cn(
+            "absolute right-0 z-20 min-w-40 rounded-lg border bg-popover p-1 text-sm shadow-lg",
+            placement === "up" ? "bottom-full mb-1" : "top-full mt-1",
+          )}
         >
           {items.map((item) => (
             <li key={item.label} role="none">

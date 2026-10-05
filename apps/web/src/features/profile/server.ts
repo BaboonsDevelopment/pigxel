@@ -187,6 +187,8 @@ const toPublicTile = (row: PublicTileRow): PublicTile => ({
   likes: row.likes[0]?.count ?? 0,
   liked: Boolean(row.mine?.length),
   downloads: 0,
+  tags: [],
+  description: null,
 });
 
 export async function getPublicTile(
@@ -209,8 +211,20 @@ export async function getPublicTile(
   if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
   if (!data) return null;
   const tile = toPublicTile(data as unknown as PublicTileRow);
-  const downloads = await downloadCounts([tile.id]);
-  return { ...tile, downloads: downloads.get(tile.id) ?? 0 };
+  const [downloads, details] = await Promise.all([
+    downloadCounts([tile.id]),
+    supabase
+      .from("tiles")
+      .select("tags, description")
+      .eq("id", tile.id)
+      .maybeSingle<{ tags: string[]; description: string | null }>(),
+  ]);
+  return {
+    ...tile,
+    downloads: downloads.get(tile.id) ?? 0,
+    tags: details.data?.tags ?? [],
+    description: details.data?.description ?? null,
+  };
 }
 
 export async function getFollowStats(

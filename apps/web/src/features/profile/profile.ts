@@ -59,6 +59,8 @@ export type PublicTile = ProfileTile & {
   likes: number;
   liked: boolean;
   downloads: number;
+  tags: string[];
+  description: string | null;
 };
 
 export const AVATAR_BUCKET = "avatars";

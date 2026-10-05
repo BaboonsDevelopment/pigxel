@@ -16,11 +16,7 @@ import { formatCount } from "../../popular-card/helpers";
 import { recordDownload, setTileLiked, setTileSaved } from "../../../actions";
 import { downloadPicture } from "../download";
 import type { Picture } from "../helpers";
-
-const TAGS = ["Buildings", "Environment"];
-
-const DESCRIPTION =
-  "A tiny pixel world made with love. Open it in the editor to explore every frame and color up close.";
+import { EditDetailsDialog } from "./edit-details-dialog";
 
 export function ArtDetails({
   tile,
@@ -52,6 +48,11 @@ export function ArtDetails({
   const [isSaved, setIsSaved] = useState(saved);
   const [savePending, startSave] = useTransition();
   const own = viewerId === author.id;
+  const [details, setDetails] = useState({
+    tags: tile.tags,
+    description: tile.description,
+  });
+  const [editing, setEditing] = useState(false);
 
   const download = async () => {
     if (!picture) return;
@@ -138,7 +139,7 @@ export function ArtDetails({
     >
       <div className="flex items-center justify-between gap-3">
         <ul aria-label="Tags" className="flex flex-wrap gap-2">
-          {TAGS.map((tag) => (
+          {details.tags.map((tag) => (
             <li
               key={tag}
               className="rounded-md bg-pastel-pink-soft px-2 py-0.5 text-[10px] text-primary"
@@ -156,7 +157,11 @@ export function ArtDetails({
               <circle cx="18" cy="2" r="2" fill="currentColor" />
             </svg>
           }
+          placement="down"
           items={[
+            ...(own
+              ? [{ label: "Edit details", onSelect: () => setEditing(true) }]
+              : []),
             {
               label: "Copy link",
               onSelect: () => copy(window.location.href, "link"),
@@ -168,6 +173,15 @@ export function ArtDetails({
           ]}
         />
       </div>
+      {editing && (
+        <EditDetailsDialog
+          tileId={tile.id}
+          tags={details.tags}
+          description={details.description}
+          onSaved={setDetails}
+          onClose={() => setEditing(false)}
+        />
+      )}
 
       <Heading
         as="h1"
@@ -209,9 +223,11 @@ export function ArtDetails({
         )}
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {DESCRIPTION}
-      </p>
+      {details.description && (
+        <p className="mt-3 text-xs leading-relaxed break-words whitespace-pre-line text-muted-foreground">
+          {details.description}
+        </p>
+      )}
 
       <div className="mt-4 grid grid-cols-2 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
         <button

@@ -4,7 +4,13 @@ import { getUser, requireUser } from "@/lib/auth/session";
 import type { ProfileTile, PublicTile } from "@/features/profile/profile";
 import { listProfileTiles, listPublicTiles } from "@/features/profile/server";
 import { createClient } from "@/lib/supabase/server";
-import { PAGE_SIZE, PERIODS, type Period } from "./constants";
+import {
+  DESCRIPTION_MAX,
+  PAGE_SIZE,
+  PERIODS,
+  TAGS,
+  type Period,
+} from "./constants";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
 import { toComment } from "./server";
 
@@ -140,4 +146,59 @@ export async function deleteComment(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
+}
+
+async function saveArtDetails(
+  tileId: string,
+  tags: string[],
+  description: string,
+  publish: boolean,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  const text = description.trim();
+  const chosen = [...new Set(tags)];
+  if (
+    !UUID.test(tileId) ||
+    chosen.some((tag) => !(TAGS as readonly string[]).includes(tag))
+  )
+    return { error: "Invalid request." };
+  if (text.length > DESCRIPTION_MAX)
+    return {
+      error: `Keep the description under ${DESCRIPTION_MAX} characters.`,
+    };
+  try {
+    const supabase = await createClient();
+    const query = supabase
+      .from("tiles")
+      .update({
+        ...(publish ? { visibility: "public" } : {}),
+        tags: chosen,
+        description: text || null,
+      })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+    const { error } = await (publish
+      ? query
+      : query.eq("visibility", "public"));
+    if (error) return { error: "Couldn’t save this art. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function publishArt(
+  tileId: string,
+  tags: string[],
+  description: string,
+): Promise<{ error?: string }> {
+  return saveArtDetails(tileId, tags, description, true);
+}
+
+export async function updateArtDetails(
+  tileId: string,
+  tags: string[],
+  description: string,
+): Promise<{ error?: string }> {
+  return saveArtDetails(tileId, tags, description, false);
 }
