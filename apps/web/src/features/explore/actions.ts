@@ -5,6 +5,8 @@ import type { ProfileTile, PublicTile } from "@/features/profile/profile";
 import { listProfileTiles, listPublicTiles } from "@/features/profile/server";
 import { createClient } from "@/lib/supabase/server";
 import { PAGE_SIZE, PERIODS, type Period } from "./constants";
+import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
+import { toComment } from "./server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,6 +93,49 @@ export async function setTileSaved(
           .eq("user_id", user.id)
           .eq("tile_id", tileId);
     if (error) return { error: "Couldn’t change that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function postComment(
+  tileId: string,
+  body: string,
+): Promise<{ comment?: ArtComment; error?: string }> {
+  await requireUser();
+  const text = body.trim();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  if (!text || text.length > COMMENT_MAX)
+    return { error: `Keep it between 1 and ${COMMENT_MAX} characters.` };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("tile_comments")
+      .insert({ tile_id: tileId, body: text })
+      .select(COMMENT_COLUMNS)
+      .single();
+    if (error) return { error: "Couldn’t post that. Try again." };
+    return {
+      comment: toComment(data as unknown as Parameters<typeof toComment>[0]),
+    };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+}
+
+export async function deleteComment(
+  commentId: string,
+): Promise<{ error?: string }> {
+  await requireUser();
+  if (!UUID.test(commentId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tile_comments")
+      .delete()
+      .eq("id", commentId);
+    if (error) return { error: "Couldn’t delete that. Try again." };
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }

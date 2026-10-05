@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import type { PublicTile } from "@/features/profile/profile";
+import type { ArtComment } from "../../comments";
 import { Breadcrumb } from "./components/breadcrumb";
 import { ArtDetails } from "./components/art-details";
 import { ArtPreview } from "./components/art-preview";
@@ -15,11 +16,13 @@ export function ArtPage({
   viewer,
   following,
   saved,
+  comments,
 }: {
   tile: PublicTile;
   viewer: { id: string; name: string; avatarUrl: string | null } | null;
   following: boolean;
   saved: boolean;
+  comments: { comments: ArtComment[]; count: number };
 }) {
   const [file, setFile] = useState<string | null>(null);
   const [picture, setPicture] = useState<Picture | null>(null);
@@ -55,7 +58,13 @@ export function ArtPage({
           picture={picture}
           palette={picture ? paletteOf(picture.frames[0]!.pixels) : []}
         />
-        <CommunityCard viewer={viewer} />
+        <CommunityCard
+          tileId={tile.id}
+          ownerId={tile.author.id}
+          viewer={viewer}
+          initial={comments.comments}
+          total={comments.count}
+        />
         <InspiredCard />
       </div>
     </div>

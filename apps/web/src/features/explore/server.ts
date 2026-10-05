@@ -1,6 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { avatarUrlOf, type ProfileRow } from "@/features/profile/profile";
+import { COMMENT_COLUMNS, type ArtComment } from "./comments";
 
 export type SavedArt = {
   id: string;
@@ -60,4 +62,48 @@ export async function listSavedArts(userId: string): Promise<SavedArt[]> {
     author: row.tile.author.username,
     savedAt: row.created_at,
   }));
+}
+
+type CommentRow = {
+  id: string;
+  body: string;
+  created_at: string;
+  user_id: string;
+  author: Pick<
+    ProfileRow,
+    | "username"
+    | "display_name"
+    | "avatar_kind"
+    | "avatar_path"
+    | "provider_avatar_url"
+  > | null;
+};
+
+export function toComment(row: CommentRow): ArtComment {
+  return {
+    id: row.id,
+    body: row.body,
+    createdAt: row.created_at,
+    author: {
+      id: row.user_id,
+      username: row.author?.username ?? null,
+      name: row.author?.display_name ?? "Someone",
+      avatarUrl: row.author ? avatarUrlOf(row.author) : null,
+    },
+  };
+}
+
+export async function listComments(
+  tileId: string,
+): Promise<{ comments: ArtComment[]; count: number }> {
+  const supabase = await createClient();
+  const { data, count, error } = await supabase
+    .from("tile_comments")
+    .select(COMMENT_COLUMNS, { count: "exact" })
+    .eq("tile_id", tileId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(`Couldn’t load comments: ${error.message}`);
+  const rows = data as unknown as CommentRow[];
+  return { comments: rows.map(toComment), count: count ?? rows.length };
 }
