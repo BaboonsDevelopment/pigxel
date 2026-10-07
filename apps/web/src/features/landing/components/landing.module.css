@@ -197,6 +197,14 @@
   letter-spacing: -0.055em;
 }
 
+.heroBrand {
+  display: block;
+  margin-bottom: 18px;
+  font: 400 clamp(18px, 2vw, 24px)/1 var(--pixel);
+  letter-spacing: 0.04em;
+  color: var(--pink);
+}
+
 .heroLine {
   display: block;
 }

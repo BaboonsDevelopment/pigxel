@@ -111,6 +111,11 @@ const FAQ = [
       "In Pigxel cloud by default, or in your own Google Drive, where every change saves itself. You can also keep a tile in your browser and download it as a .pigxel file.",
   },
   {
+    question: "How does Pigxel use my Google account?",
+    answer:
+      "You can sign in to Pigxel with Google; we use your name, email and profile picture to create your account. If you choose to save to Google Drive, Pigxel can only see the files it creates or that you open with it, never the rest of your Drive. See the Privacy Policy for details.",
+  },
+  {
     question: "What can I export?",
     answer:
       "PNG and JPEG pictures scaled up to 20× with sharp pixels, looping GIFs of every frame, and sprite sheets, optionally with a JSON file in Aseprite’s format that game engines read.",
@@ -152,6 +157,12 @@ export function Landing() {
             <Arrow />
           </a>
           <h1 id="hero-heading" className={styles.heroTitle}>
+            <span
+              className={`${styles.heroBrand} ${styles.rise}`}
+              style={delay(0.05)}
+            >
+              Pigxel
+            </span>
             <span className={styles.heroLine}>
               <Words text="Small pixels." start={0.1} />
             </span>
@@ -160,8 +171,10 @@ export function Landing() {
             </span>
           </h1>
           <p className={`${styles.heroText} ${styles.rise}`} style={delay(0.5)}>
-            Make pixel art, animate tiny characters and build little worlds. A
-            whole creative studio, right in your browser.
+            Pigxel is a pixel art editor that runs in your browser. Draw,
+            animate tiny characters and build little worlds, then sign in with
+            Google to save your projects to Pigxel cloud or your own Google
+            Drive.
           </p>
           <div
             className={`${styles.heroActions} ${styles.rise}`}
