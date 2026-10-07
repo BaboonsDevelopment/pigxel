@@ -91,6 +91,7 @@ export async function saveCloudTile(
     width: image.width,
     height: image.height,
     background: image.background,
+    frame_count: image.frames.length,
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };

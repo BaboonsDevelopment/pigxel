@@ -2,14 +2,20 @@
 
 import { getUser, requireUser } from "@/lib/auth/session";
 import type { ProfileTile, PublicTile } from "@/features/profile/profile";
-import { listProfileTiles, listPublicTiles } from "@/features/profile/server";
+import {
+  countPublicTilesByTag,
+  listProfileTiles,
+  listPublicTiles,
+} from "@/features/profile/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   DESCRIPTION_MAX,
   PAGE_SIZE,
   PERIODS,
+  SIZES,
   TAGS,
   type Period,
+  type Size,
 } from "./constants";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
 import { toComment } from "./server";
@@ -19,20 +25,36 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function loadPopularTiles(
   period: Period,
   from: number,
-  tag: string | null = null,
-): Promise<PublicTile[]> {
+  tags: string[] = [],
+  size: Size = "any",
+  animated = false,
+): Promise<{ tiles: PublicTile[]; count: number }> {
+  const none = { tiles: [], count: 0 };
+  const range = SIZES.find((s) => s.value === size);
+  if (!range || typeof animated !== "boolean") return none;
   const days = PERIODS.find((p) => p.value === period)?.days;
-  if (!days || !Number.isInteger(from) || from < 0) return [];
-  if (tag !== null && !(TAGS as readonly string[]).includes(tag)) return [];
+  if (!days || !Number.isInteger(from) || from < 0) return none;
+  if (
+    !Array.isArray(tags) ||
+    tags.some((tag) => !(TAGS as readonly string[]).includes(tag))
+  )
+    return none;
   const user = await getUser();
-  const { tiles } = await listPublicTiles(
-    from,
-    PAGE_SIZE,
-    days,
-    user?.id ?? null,
-    tag,
-  );
-  return tiles;
+  return listPublicTiles(from, PAGE_SIZE, days, user?.id ?? null, tags, {
+    ...range,
+    animated,
+  });
+}
+
+export async function loadTagCounts(
+  period: Period,
+  size: Size,
+  animated: boolean,
+): Promise<Record<string, number> | null> {
+  const days = PERIODS.find((p) => p.value === period)?.days;
+  const range = SIZES.find((s) => s.value === size);
+  if (!days || !range || typeof animated !== "boolean") return null;
+  return countPublicTilesByTag(days, TAGS, { ...range, animated });
 }
 
 export async function setTileLiked(

@@ -129,6 +129,8 @@ type PublicTileRow = TileRow & {
   mine?: { user_id: string }[];
 };
 
+export type ArtFilter = { min?: number; max?: number; animated?: boolean };
+
 const PUBLIC_TILE_COLUMNS =
   "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
 
@@ -137,7 +139,8 @@ export async function listPublicTiles(
   limit: number,
   days: number,
   viewerId: string | null,
-  tag: string | null = null,
+  tags: string[] = [],
+  filter: ArtFilter = {},
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
   const base = supabase
@@ -151,7 +154,12 @@ export async function listPublicTiles(
         ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
         : PUBLIC_TILE_COLUMNS,
     );
-  const query = tag ? base.contains("tags", [tag]) : base;
+  let query = tags.length ? base.overlaps("tags", tags) : base;
+  if (filter.max)
+    query = query.lte("width", filter.max).lte("height", filter.max);
+  if (filter.min)
+    query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
+  if (filter.animated) query = query.gt("frame_count", 1);
   const { data, count, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).range(from, from + limit - 1);
@@ -165,6 +173,33 @@ export async function listPublicTiles(
       downloads: downloads.get(row.id) ?? 0,
     })),
   };
+}
+
+export async function countPublicTilesByTag(
+  days: number,
+  tags: readonly string[],
+  filter: ArtFilter = {},
+): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - days * DAY).toISOString();
+  const counts = await Promise.all(
+    [null, ...tags].map(async (tag) => {
+      let query = supabase
+        .rpc("popular_tiles", { since }, { count: "exact", head: true })
+        .select("id, author:profiles!tiles_user_id_profiles_fkey!inner(id)");
+      if (tag) query = query.contains("tags", [tag]);
+      if (filter.max)
+        query = query.lte("width", filter.max).lte("height", filter.max);
+      if (filter.min)
+        query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
+      if (filter.animated) query = query.gt("frame_count", 1);
+      const { count, error } = await query;
+      if (error)
+        throw new Error(`Couldn’t count public arts: ${error.message}`);
+      return [tag ?? "All", count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(counts);
 }
 
 async function downloadCounts(ids: string[]): Promise<Map<string, number>> {

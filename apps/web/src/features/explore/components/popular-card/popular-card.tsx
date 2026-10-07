@@ -13,12 +13,21 @@ import { formatCount } from "./helpers";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
 
-export function PopularCard({ tile }: { tile: PublicTile }) {
+export function PopularCard({
+  tile,
+  delay = 0,
+}: {
+  tile: PublicTile;
+  delay?: number;
+}) {
   const { author } = tile;
   const router = useRouter();
   const href = `/explore/${tile.id}`;
   return (
-    <li className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
+    <li
+      style={{ animationDelay: `${delay}ms` }}
+      className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow [animation-fill-mode:both] hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300"
+    >
       <Link
         href={href}
         aria-label={`Open ${tile.name}`}

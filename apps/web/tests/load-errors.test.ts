@@ -34,6 +34,7 @@ vi.mock("@/features/feedback/server", () => ({
 vi.mock("@/features/assets/server", () => ({ listAssets: mocks.listAssets }));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
+  countPublicTilesByTag: async () => ({}),
 }));
 
 import Feedback from "@/app/(app)/feedback/page";
