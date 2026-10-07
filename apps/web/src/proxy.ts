@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isSupabaseConfigured, supabaseConfig } from "@/lib/supabase/config";
-import { HOME_PATH, isProtectedPath } from "@/lib/auth/routes";
+import { HOME_PATH, isProtectedPath, safeNext } from "@/lib/auth/routes";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -33,12 +33,13 @@ export async function proxy(request: NextRequest) {
       pathname === "/auth/update-password"
         ? "/login?mode=forgot&error=expired"
         : "/login";
+  } else if (signedIn && pathname === "/login") {
+    destination = safeNext(searchParams.get("next"));
   } else if (
     signedIn &&
-    (pathname === "/login" ||
-      (pathname === "/" &&
-        !searchParams.has("code") &&
-        !searchParams.has("error")))
+    pathname === "/" &&
+    !searchParams.has("code") &&
+    !searchParams.has("error")
   ) {
     destination = HOME_PATH;
   }

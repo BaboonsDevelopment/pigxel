@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
+import { Notice } from "@pigxel/ui/components/notice";
 import { PageHeader } from "@pigxel/ui/components/typography";
 import {
   AssetLibrary,
@@ -16,17 +17,21 @@ import { ScaledPage } from "@/components/layout/scaled-page";
 import { ASSET_CATEGORIES } from "@/features/assets/assets";
 import { listAssets } from "@/features/assets/server";
 import { isAdmin, requireUser } from "@/lib/auth/session";
+import { shownFrom } from "@/lib/utils/shown";
 
 export const metadata: Metadata = { title: "Assets · Pigxel" };
 export const dynamic = "force-dynamic";
 
 const PREVIEW = 12;
-const FULL = 240;
+const STEP = 240;
 
-type Props = { searchParams: Promise<{ type?: string }> };
+type Props = { searchParams: Promise<{ type?: string; shown?: string }> };
 
 export default async function Assets({ searchParams }: Props) {
-  const [{ type }, user] = await Promise.all([searchParams, requireUser()]);
+  const [{ type, shown: shownParam }, user] = await Promise.all([
+    searchParams,
+    requireUser(),
+  ]);
   const tab: AssetTab =
     ASSET_TABS.find((t) => t.value === type)?.value ?? "all";
   const admin = isAdmin(user);
@@ -34,16 +39,25 @@ export default async function Assets({ searchParams }: Props) {
   const categories = ASSET_CATEGORIES.filter(
     (c) => tab === "all" || c.id === tab,
   );
-  const sections: AssetSection[] =
+  const shown = tab === "all" ? PREVIEW : shownFrom(shownParam, STEP);
+  const sections: AssetSection[] | null =
     tab === "palettes"
       ? []
       : await Promise.all(
-          categories.map(async (category) => ({
-            category,
-            ...(await listAssets(category.id, tab === "all" ? PREVIEW : FULL)),
-          })),
-        );
-  const empty = tab !== "palettes" && sections.every((s) => s.total === 0);
+          categories.map(async (category) => {
+            const list = await listAssets(category.id, shown);
+            const more =
+              tab !== "all" && list.total > list.assets.length
+                ? `/assets?type=${category.id}&shown=${shown + STEP}`
+                : undefined;
+            return { category, ...list, more };
+          }),
+        ).catch((error: unknown) => {
+          console.error(error);
+          return null;
+        });
+  const empty =
+    tab !== "palettes" && !!sections && sections.every((s) => s.total === 0);
 
   return (
     <ScaledPage>
@@ -52,7 +66,11 @@ export default async function Assets({ searchParams }: Props) {
         description="Sprites, seamless tiles and palettes to start a tile from or drop into yours."
         actions={<AssetTabs active={tab} />}
       />
-      {empty ? (
+      {!sections ? (
+        <Notice tone="error" className="mt-8">
+          Couldn’t load assets. Refresh the page to try again.
+        </Notice>
+      ) : empty ? (
         <EmptyState
           className="mt-12"
           title={tab === "all" ? "No assets yet" : "Nothing here yet"}

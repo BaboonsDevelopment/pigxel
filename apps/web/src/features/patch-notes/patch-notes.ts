@@ -40,7 +40,7 @@ export const PATCH_NOTES: PatchNote[] = [
         changes: [
           "Primary and secondary colours, and your recent colours.",
           "A palette saved with each tile, with PICO-8, Sweetie 16 and Endesga 32 to start from.",
-          "Import and save palettes as .gpl, .hex or Paint.NET files.",
+          "Import palettes from .gpl, .hex or Paint.NET files, and save them as .gpl.",
         ],
       },
       {

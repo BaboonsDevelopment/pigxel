@@ -5,7 +5,7 @@ import { cn } from "@pigxel/ui/lib/utils";
 import type { ColorSlot } from "../../pixel-canvas/pen";
 import type { PenSettings } from "../../pixel-canvas/pen";
 import { ColorPicker } from "./color-picker";
-import { swatchProps, withColor } from "./helpers";
+import { swatchProps, swatchStyle, withColor } from "./helpers";
 
 export function ColorsPanel({
   pen,
@@ -66,7 +66,7 @@ export function ColorsPanel({
                   aria-label={color}
                   {...swatchProps(color, pick)}
                   className="block aspect-square w-full rounded-[2px] ring-1 ring-black/10"
-                  style={{ backgroundColor: color }}
+                  style={swatchStyle(color)}
                 />
               </li>
             ))}
@@ -102,7 +102,7 @@ function ColorWell({
         active && "ring-2 ring-foreground",
         className,
       )}
-      style={{ backgroundColor: color }}
+      style={swatchStyle(color)}
     />
   );
 }

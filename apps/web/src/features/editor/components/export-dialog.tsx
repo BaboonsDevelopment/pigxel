@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
 import {
   Checkbox,
@@ -20,20 +21,60 @@ import {
   MAX_EXPORT_SCALE,
   MAX_EXPORT_SIDE,
   MIN_EXPORT_SCALE,
+  MAX_SHEET_PADDING,
+  SHEET_JSONS,
   SHEET_LAYOUTS,
+  SHEET_SPLITS,
+  TIMELAPSE_FPS,
+  TIMELAPSE_LENGTHS,
+  TIMELAPSE_SHAPES,
+  TIMELAPSE_STYLES,
   type ExportSettings,
 } from "../export/constants";
 import {
   clampScale,
+  exactSheetSize,
   exportFiles,
   exportSize,
   fitsCanvas,
+  partialSource,
   stretchedSource,
   type ExportSource,
 } from "../export/export";
 import { isSquare, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import { saveExport } from "../export/save";
+import { timelapseTiming } from "../export/timelapse";
+import { renderTimelapse } from "../export/timelapse-video";
 import { frameIndex } from "@/lib/sprite/frames";
+import { EditorSelect } from "./editor-select";
+
+function Options<T extends string | number>({
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  name: string;
+  options: readonly { id: T; label: string }[];
+  value: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-x-5 gap-y-2">
+      {options.map((option) => (
+        <label key={option.id} className="flex items-center gap-2 text-sm">
+          <Radio
+            name={name}
+            className="mt-0"
+            checked={value === option.id}
+            onChange={() => onChange(option.id)}
+          />
+          {option.label}
+        </label>
+      ))}
+    </div>
+  );
+}
 
 export default function ExportDialog({
   source: tile,
@@ -51,8 +92,13 @@ export default function ExportDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
+  const rendering = useRef<AbortController | null>(null);
 
-  useEffect(() => dialog.current?.showModal(), []);
+  useEffect(() => {
+    dialog.current?.showModal();
+    return () => rendering.current?.abort();
+  }, []);
 
   const set = (patch: Partial<ExportSettings>) => {
     setError(null);
@@ -60,10 +106,28 @@ export default function ExportDialog({
   };
 
   const stretch = !isSquare(pixelRatio) && settings.applyRatio;
-  const source = stretch ? stretchedSource(tile, pixelRatio!) : tile;
+  const animated = ["gif", "apng", "webp", "frames", "sheet"].includes(
+    settings.format,
+  );
+  const timelapse = settings.format === "timelapse";
+  const part = timelapse
+    ? tile
+    : partialSource(tile, animated ? settings : { ...settings, partTag: null });
+  const source = stretch ? stretchedSource(part, pixelRatio!) : part;
+  const chosenLayers = settings.partLayers ?? [];
+  const noLayers = !timelapse && !!settings.partLayers && !chosenLayers.length;
   const { size, frames } = source;
-  const animated = settings.format === "gif" || settings.format === "sheet";
-  const output = exportSize(settings, size, frames.length, source.slices);
+  const style = TIMELAPSE_STYLES.find((s) => s.id === settings.timelapseStyle)!;
+  const seconds = Math.round(
+    timelapseTiming(settings.timelapseLength).total / TIMELAPSE_FPS,
+  );
+  const sheetOutput = useMemo(
+    () =>
+      settings.format === "sheet" ? exactSheetSize(source, settings) : null,
+    [source, settings],
+  );
+  const output =
+    sheetOutput ?? exportSize(settings, size, frames.length, source.slices);
   const fits = fitsCanvas(output);
   const noSlices = settings.format === "slices" && !output.w;
 
@@ -72,11 +136,25 @@ export default function ExportDialog({
     setError(null);
     await new Promise((resolve) => setTimeout(resolve));
     try {
-      await saveExport(exportFiles(source, settings));
+      if (timelapse) {
+        rendering.current = new AbortController();
+        setProgress(0);
+        const video = await renderTimelapse(
+          source,
+          settings,
+          (done) => setProgress(Math.floor(done * 100)),
+          rendering.current.signal,
+        );
+        await saveExport([video]);
+      } else await saveExport(exportFiles(source, settings));
       dialog.current?.close();
     } catch (e) {
+      if (rendering.current?.signal.aborted) return;
       setError(e instanceof Error ? e.message : "Couldn’t export the tile.");
       setBusy(false);
+      setProgress(null);
+    } finally {
+      rendering.current = null;
     }
   };
 
@@ -130,6 +208,11 @@ export default function ExportDialog({
               </ChoiceCard>
             ))}
           </div>
+          {noLayers && (
+            <FormMessage tone="error" className="text-xs">
+              Pick at least one layer under Export only.
+            </FormMessage>
+          )}
           {noSlices && (
             <FormMessage tone="error" className="text-xs">
               This tile has no slices yet. Mark parts of it with the Slice tool
@@ -139,29 +222,180 @@ export default function ExportDialog({
           {!animated && frames.length > 1 && (
             <FormMessage className="text-xs">
               Exports frame {frameIndex(frames, source.frameId) + 1} of{" "}
-              {frames.length}. GIF and Sprite sheet export every frame.
+              {frames.length}. GIF, Animated PNG, Animated WebP, PNG sequence
+              and Sprite sheet export every frame.
             </FormMessage>
           )}
         </fieldset>
 
+        {!timelapse && (
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-sm font-medium">Export only</legend>
+            {tile.selection && (
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox
+                  checked={settings.partSelection}
+                  onChange={(e) => set({ partSelection: e.target.checked })}
+                />
+                The selection, cut to its size
+              </label>
+            )}
+            {(tile.layers?.length ?? 0) > 1 && (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={!!settings.partLayers}
+                    onChange={(e) =>
+                      set({
+                        partLayers: e.target.checked
+                          ? (tile.layers ?? []).map((layer) => layer.id)
+                          : null,
+                      })
+                    }
+                  />
+                  These layers:
+                </label>
+                {settings.partLayers && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 pl-6">
+                    {tile.layers!.map((layer) => (
+                      <label
+                        key={layer.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <Checkbox
+                          checked={chosenLayers.includes(layer.id)}
+                          onChange={(e) =>
+                            set({
+                              partLayers: e.target.checked
+                                ? [...chosenLayers, layer.id]
+                                : chosenLayers.filter((id) => id !== layer.id),
+                            })
+                          }
+                        />
+                        {layer.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {animated && !!tile.tags?.length && (
+              <label className="flex items-center gap-3 text-sm">
+                Frames
+                <EditorSelect
+                  ariaLabel="Frames to export"
+                  value={settings.partTag ?? ""}
+                  onChange={(value) => set({ partTag: value || null })}
+                  options={[
+                    { value: "", label: "All frames" },
+                    ...tile.tags.map((tag) => ({
+                      value: tag.id,
+                      label: `${tag.name} (${tag.from + 1}–${tag.to + 1})`,
+                    })),
+                  ]}
+                  className="h-8 w-48 px-2 text-sm"
+                />
+              </label>
+            )}
+            {!tile.selection &&
+              (tile.layers?.length ?? 0) < 2 &&
+              !(animated && tile.tags?.length) && (
+                <FormMessage className="text-xs">
+                  Select an area, add layers or tag frames to export just a
+                  part.
+                </FormMessage>
+              )}
+          </fieldset>
+        )}
+
         {settings.format === "sheet" && (
           <fieldset className="space-y-2">
             <legend className="mb-2 text-sm font-medium">Layout</legend>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {SHEET_LAYOUTS.map((layout) => (
-                <label
-                  key={layout.id}
-                  className="flex items-center gap-2 text-sm"
-                >
-                  <Radio
-                    name="export-layout"
-                    className="mt-0"
-                    checked={settings.layout === layout.id}
-                    onChange={() => set({ layout: layout.id })}
+            <Options
+              name="export-layout"
+              options={SHEET_LAYOUTS}
+              value={settings.layout}
+              onChange={(layout) => set({ layout })}
+            />
+            <div className="space-y-2 pt-1">
+              <p className="text-sm font-medium">Frames</p>
+              <Options
+                name="export-split"
+                options={SHEET_SPLITS.filter(
+                  (option) =>
+                    option.id === "none" ||
+                    (option.id === "layers"
+                      ? (source.layers?.length ?? 0) > 1
+                      : !!source.tags?.length),
+                )}
+                value={settings.sheetSplit}
+                onChange={(sheetSplit) => set({ sheetSplit })}
+              />
+              {settings.sheetSplit !== "none" && (
+                <FormMessage className="text-xs">
+                  {settings.sheetSplit === "layers"
+                    ? "Every layer gets its own frames, each on its own row in Row or Column layout."
+                    : "Only frames inside tags are saved, each tag on its own row in Row or Column layout."}
+                </FormMessage>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              {(
+                [
+                  [
+                    "sheetBorder",
+                    "Border",
+                    "Empty space around the whole sheet",
+                  ],
+                  ["sheetSpacing", "Spacing", "Empty space between frames"],
+                  [
+                    "sheetInner",
+                    "Inner",
+                    "Empty space inside each frame’s cell",
+                  ],
+                ] as const
+              ).map(([key, label, hint]) => (
+                <label key={key} className="space-y-1 text-sm" title={hint}>
+                  <span className="block">{label}, px</span>
+                  <NumericInput
+                    min={0}
+                    max={MAX_SHEET_PADDING}
+                    value={settings[key]}
+                    onValueChange={(next) =>
+                      set({
+                        [key]: Math.min(
+                          MAX_SHEET_PADDING,
+                          Math.max(0, Math.round(next) || 0),
+                        ),
+                      })
+                    }
+                    className="h-8 w-full rounded-md border bg-background px-2 tabular-nums"
                   />
-                  {layout.label}
                 </label>
               ))}
+            </div>
+            <div className="space-y-1.5 pt-1 text-sm">
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetTrim}
+                  onChange={(e) => set({ sheetTrim: e.target.checked })}
+                />
+                Trim empty edges of each frame
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetMerge}
+                  onChange={(e) => set({ sheetMerge: e.target.checked })}
+                />
+                Save identical frames once
+              </label>
+              <label className="flex items-center gap-2">
+                <Checkbox
+                  checked={settings.sheetSkipEmpty}
+                  onChange={(e) => set({ sheetSkipEmpty: e.target.checked })}
+                />
+                Leave out empty frames
+              </label>
             </div>
             <label className="flex items-center gap-2 pt-1 text-sm">
               <Checkbox
@@ -171,7 +405,64 @@ export default function ExportDialog({
               Also save JSON data (frame positions and durations, in Aseprite’s
               format)
             </label>
+            {settings.sheetData && (
+              <div className="flex items-center gap-3 pl-6 text-sm">
+                <span className="text-muted-foreground">JSON frames as</span>
+                <Options
+                  name="export-json"
+                  options={SHEET_JSONS}
+                  value={settings.sheetJson}
+                  onChange={(sheetJson) => set({ sheetJson })}
+                />
+              </div>
+            )}
           </fieldset>
+        )}
+
+        {timelapse && (
+          <>
+            <fieldset className="space-y-2">
+              <legend className="mb-2 text-sm font-medium">
+                Drawing style
+              </legend>
+              <Options
+                name="timelapse-style"
+                options={TIMELAPSE_STYLES}
+                value={settings.timelapseStyle}
+                onChange={(timelapseStyle) => set({ timelapseStyle })}
+              />
+              <FormMessage className="text-xs">{style.description}</FormMessage>
+            </fieldset>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-medium">Shape</legend>
+                <Options
+                  name="timelapse-shape"
+                  options={TIMELAPSE_SHAPES}
+                  value={settings.timelapseShape}
+                  onChange={(timelapseShape) => set({ timelapseShape })}
+                />
+              </fieldset>
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-sm font-medium">
+                  Drawing time
+                </legend>
+                <Options
+                  name="timelapse-length"
+                  options={TIMELAPSE_LENGTHS.map((id) => ({
+                    id,
+                    label: `${id} s`,
+                  }))}
+                  value={settings.timelapseLength}
+                  onChange={(timelapseLength) => set({ timelapseLength })}
+                />
+              </fieldset>
+            </div>
+            <FormMessage className="tabular-nums">
+              {output.w} × {output.h} px · {seconds} s video, ending with the
+              Pigxel logo
+            </FormMessage>
+          </>
         )}
 
         {!isSquare(pixelRatio) && (
@@ -184,38 +475,52 @@ export default function ExportDialog({
           </label>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="export-scale" className="block">
-            Scale
-          </Label>
-          <div className="flex items-center gap-3">
-            <InputGroup className="h-8 w-24">
-              <InputGroupInput
-                id="export-scale"
-                type="number"
-                min={MIN_EXPORT_SCALE}
-                max={MAX_EXPORT_SCALE}
-                value={settings.scale}
-                onChange={(e) =>
-                  set({ scale: clampScale(Number(e.target.value)) })
-                }
-                aria-describedby="export-scale-hint"
-                className="px-2 tabular-nums"
-              />
-              <InputGroupText className="pr-2 pl-0">×</InputGroupText>
-            </InputGroup>
-            <FormMessage
-              id="export-scale-hint"
-              tone={fits ? "muted" : "error"}
-              className="tabular-nums"
-            >
-              {settings.format === "slices" && "Largest "}
-              {output.w} × {output.h} px
-              {!fits &&
-                ` — too big; each side can be at most ${MAX_EXPORT_SIDE} px`}
-            </FormMessage>
+        {!timelapse && (
+          <div className="space-y-1.5">
+            <Label htmlFor="export-scale" className="block">
+              Scale
+            </Label>
+            <div className="flex items-center gap-3">
+              <InputGroup className="h-8 w-24">
+                <NumericInput
+                  as={InputGroupInput}
+                  id="export-scale"
+                  min={MIN_EXPORT_SCALE}
+                  max={MAX_EXPORT_SCALE}
+                  value={settings.scale}
+                  onValueChange={(next) => set({ scale: clampScale(next) })}
+                  aria-describedby="export-scale-hint"
+                  className="px-2 tabular-nums"
+                />
+                <InputGroupText className="pr-2 pl-0">×</InputGroupText>
+              </InputGroup>
+              <FormMessage
+                id="export-scale-hint"
+                tone={fits ? "muted" : "error"}
+                className="tabular-nums"
+              >
+                {settings.format === "slices" && "Largest "}
+                {output.w} × {output.h} px
+                {!fits &&
+                  ` — too big; each side can be at most ${MAX_EXPORT_SIDE} px`}
+              </FormMessage>
+            </div>
           </div>
-        </div>
+        )}
+
+        {progress !== null && (
+          <div
+            role="progressbar"
+            aria-label="Rendering the timelapse"
+            aria-valuenow={progress}
+            className="h-1.5 overflow-hidden rounded-full bg-muted"
+          >
+            <div
+              className="h-full bg-primary transition-[width]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
 
         {error && <FormMessage tone="error">{error}</FormMessage>}
 
@@ -227,8 +532,15 @@ export default function ExportDialog({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={busy || !fits || noSlices}>
-            {busy ? "Exporting…" : "Export"}
+          <Button
+            type="submit"
+            disabled={busy || !fits || noSlices || noLayers}
+          >
+            {progress !== null
+              ? `Rendering ${progress}%…`
+              : busy
+                ? "Exporting…"
+                : "Export"}
           </Button>
         </div>
       </form>

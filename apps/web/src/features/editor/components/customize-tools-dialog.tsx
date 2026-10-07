@@ -4,14 +4,16 @@ import { useEffect, useRef } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
-import { TOOL_GROUPS, toolById } from "../tools";
+import { TOOL_GROUPS, toolById, type ToolId } from "../tools";
 
 export default function CustomizeToolsDialog({
   hiddenTools,
+  keyOf,
   onChange,
   onClose,
 }: {
   hiddenTools: string[];
+  keyOf: (tool: ToolId) => string | undefined;
   onChange: (tool: string, shown: boolean) => void;
   onClose: () => void;
 }) {
@@ -49,8 +51,7 @@ export default function CustomizeToolsDialog({
                     </span>
                     <span className="flex-1">{tool.label}</span>
                     <span className="text-xs text-muted-foreground">
-                      {tool.shift ? "Shift+" : ""}
-                      {tool.shortcut}
+                      {keyOf(id)}
                     </span>
                   </label>
                 );

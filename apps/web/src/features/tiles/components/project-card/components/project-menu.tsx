@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
 type ProjectMenuItem = {
@@ -13,10 +13,14 @@ export function ProjectMenu({
   label,
   items,
   disabled,
+  icon,
+  placement = "up",
 }: {
   label: string;
   items: ProjectMenuItem[];
   disabled?: boolean;
+  icon?: ReactNode;
+  placement?: "up" | "down";
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -50,17 +54,22 @@ export function ProjectMenu({
         onClick={() => setOpen(!open)}
         className="flex h-7 w-8 items-center justify-center rounded-md text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
       >
-        <svg aria-hidden="true" viewBox="0 0 16 4" className="w-3.5">
-          <rect x="0" y="0.5" width="3" height="3" fill="currentColor" />
-          <rect x="6.5" y="0.5" width="3" height="3" fill="currentColor" />
-          <rect x="13" y="0.5" width="3" height="3" fill="currentColor" />
-        </svg>
+        {icon ?? (
+          <svg aria-hidden="true" viewBox="0 0 16 4" className="w-3.5">
+            <rect x="0" y="0.5" width="3" height="3" fill="currentColor" />
+            <rect x="6.5" y="0.5" width="3" height="3" fill="currentColor" />
+            <rect x="13" y="0.5" width="3" height="3" fill="currentColor" />
+          </svg>
+        )}
       </button>
       {open && (
         <ul
           id={menuId}
           role="menu"
-          className="absolute right-0 bottom-full z-20 mb-1 min-w-40 rounded-lg border bg-popover p-1 text-sm shadow-lg"
+          className={cn(
+            "absolute right-0 z-20 min-w-40 rounded-lg border bg-popover p-1 text-sm shadow-lg",
+            placement === "up" ? "bottom-full mb-1" : "top-full mt-1",
+          )}
         >
           {items.map((item) => (
             <li key={item.label} role="none">

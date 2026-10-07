@@ -24,6 +24,8 @@ export type AssetSection = {
   category: { id: AssetCategory; label: string };
   assets: Asset[];
   total: number;
+  /** Link to the next batch, on a category's own page. */
+  more?: string;
 };
 
 export function AssetLibrary({
@@ -37,7 +39,7 @@ export function AssetLibrary({
 
   return (
     <>
-      {sections.map(({ category, assets, total }) =>
+      {sections.map(({ category, assets, total, more }) =>
         assets.length === 0 ? null : (
           <section
             key={category.id}
@@ -65,6 +67,17 @@ export function AssetLibrary({
                 </li>
               ))}
             </ul>
+            {more && (
+              <p className="mt-6 text-center">
+                <Link
+                  href={more}
+                  scroll={false}
+                  className={linkVariants({ variant: "accent" })}
+                >
+                  Show more ({assets.length} of {total})
+                </Link>
+              </p>
+            )}
           </section>
         ),
       )}

@@ -15,7 +15,7 @@ import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
 import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
-import { useModifierLabel } from "@/lib/utils/use-modifier-label";
+import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "./menu/menu";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
@@ -25,6 +25,7 @@ import { frameActions, layerActions } from "../timeline/actions";
 import type { Playback } from "../timeline/use-playback";
 
 export function EditorHeader({
+  hidden,
   draftId,
   file,
   fileInput,
@@ -36,9 +37,12 @@ export function EditorHeader({
   onExport,
   onPublish,
   onImportSheet,
+  onTilemap,
+  keyOf,
   menus,
   afterMenus = [],
 }: {
+  hidden?: boolean;
   draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
@@ -50,15 +54,19 @@ export function EditorHeader({
   onExport: () => void;
   onPublish?: () => void;
   onImportSheet: () => void;
+  onTilemap: (convert: boolean) => void;
+  keyOf: (id: ActionId) => string | undefined;
   menus: { label: string; sections: MenuSections }[];
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
   const router = useRouter();
   const framesInput = useRef<HTMLInputElement>(null);
-  const mod = useModifierLabel();
 
   return (
-    <header className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2">
+    <header
+      hidden={hidden}
+      className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2"
+    >
       <Link
         href="/tiles"
         className={buttonVariants({
@@ -80,7 +88,7 @@ export function EditorHeader({
             },
             {
               label: "Open from your computer…",
-              shortcut: `${mod}O`,
+              shortcut: keyOf("command:open"),
               onSelect: file.openFromComputer,
             },
             {
@@ -114,7 +122,10 @@ export function EditorHeader({
                 file.location && file.location.kind !== "cloud"
                   ? "Move to Pigxel cloud"
                   : "Save to Pigxel cloud",
-              shortcut: file.location?.kind === "cloud" ? `${mod}S` : undefined,
+              shortcut:
+                file.location?.kind === "cloud"
+                  ? keyOf("command:save")
+                  : undefined,
               onSelect: file.saveToCloud,
             },
             {
@@ -123,20 +134,23 @@ export function EditorHeader({
                 : file.location && file.location.kind !== "drive"
                   ? "Move to Google Drive"
                   : "Save to Google Drive",
-              shortcut: file.location?.kind === "drive" ? `${mod}S` : undefined,
+              shortcut:
+                file.location?.kind === "drive"
+                  ? keyOf("command:save")
+                  : undefined,
               onSelect: drive.connected ? file.saveToDrive : onConnectDrive,
               hidden: !drive.available,
             },
             {
               label: "Download .pigxel",
-              shortcut: file.location ? undefined : `${mod}S`,
+              shortcut: file.location ? undefined : keyOf("command:save"),
               onSelect: file.download,
             },
           ],
           [
             {
               label: "Export…",
-              shortcut: `${mod}E`,
+              shortcut: keyOf("command:export"),
               onSelect: onExport,
             },
             {
@@ -150,7 +164,10 @@ export function EditorHeader({
       {menus.map((menu) => (
         <Menu key={menu.label} label={menu.label} sections={menu.sections} />
       ))}
-      <Menu label="Layer" sections={layerActions(sprite)} />
+      <Menu
+        label="Layer"
+        sections={layerActions(sprite, undefined, undefined, onTilemap)}
+      />
       <Menu label="Frame" sections={frameActions(sprite, playback)} />
       {afterMenus.map((menu) => (
         <Menu key={menu.label} label={menu.label} sections={menu.sections} />

@@ -1,4 +1,4 @@
-import { DitherOption, SizeOption } from "../shared/options";
+import { DitherOption, SizeOption, StabilizerOption } from "../shared/options";
 import { squareTip } from "../shared/tips";
 import { defineTool } from "../types";
 import { EraserCanvas } from "./canvas";
@@ -13,6 +13,6 @@ export const eraserTool = defineTool({
   hint: "Reveals the background · Shift+click erases a line · Alt+click picks a colour",
   size: { key: "eraserSize" },
   tip: squareTip("eraserSize", true),
-  options: [SizeOption, DitherOption],
+  options: [SizeOption, StabilizerOption, DitherOption],
   canvas: EraserCanvas,
 });

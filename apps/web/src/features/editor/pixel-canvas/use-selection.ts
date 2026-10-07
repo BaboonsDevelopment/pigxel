@@ -6,6 +6,7 @@ import {
   transformFloating,
   type FreeTransform,
 } from "./free-transform";
+import type { SnapGrid } from "./pen";
 import { rgbaOf } from "./paint";
 import {
   combineMasks,
@@ -63,6 +64,15 @@ function copyToSystem(piece: Floating) {
   navigator.clipboard
     .write([new ClipboardItem({ "image/png": pngOf(piece).then((b) => b!) })])
     .catch(() => {});
+}
+
+export function copiedPiece(): Floating | null {
+  if (!clipboard) return null;
+  const pixels = new Uint8ClampedArray(clipboard.pixels);
+  clipboard.mask.forEach((selected, i) => {
+    if (!selected) pixels.fill(0, i * 4, i * 4 + 4);
+  });
+  return { ...clipboard, pixels };
 }
 
 export function pasteSource(image: Floating | null): Floating | null {
@@ -214,9 +224,19 @@ export function useSelection(sprite: SpriteApi) {
       setLifted(current);
       return true;
     },
-    moveTo(dx: number, dy: number) {
+    moveTo(dx: number, dy: number, grid: SnapGrid | null = null) {
       const from = dragFrom.current;
       if (!from || !lifted) return;
+      if (grid) {
+        dx =
+          Math.round((from.x + dx - grid.x) / grid.w) * grid.w +
+          grid.x -
+          from.x;
+        dy =
+          Math.round((from.y + dy - grid.y) / grid.h) * grid.h +
+          grid.y -
+          from.y;
+      }
       const { piece } = lifted;
       if (piece.x === from.x + dx && piece.y === from.y + dy) return;
       if (lifted.source && from.t)

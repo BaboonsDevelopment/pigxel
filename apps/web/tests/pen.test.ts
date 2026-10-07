@@ -14,6 +14,8 @@ import {
   strokePixels,
   DEFAULT_PEN,
   type Point,
+  followRope,
+  snapSpan,
 } from "@/features/editor/pixel-canvas/pen";
 
 const p = (x: number, y: number): Point => ({ x, y });
@@ -199,5 +201,36 @@ describe("pixelColor", () => {
     expect(pixelColor(img, p(0, 0))).toBe("#ff0000");
     expect(pixelColor(img, p(1, 0))).toBe("#0000ff");
     expect(pixelColor(img, p(2, 0))).toBeNull();
+  });
+});
+
+describe("stabilizer", () => {
+  it("follows the pointer on a string, standing still while it is slack", () => {
+    const at = { x: 0, y: 0 };
+    expect(followRope(at, { x: 3, y: 0 }, 5)).toBe(at);
+    expect(followRope(at, { x: 10, y: 0 }, 4)).toEqual({ x: 6, y: 0 });
+    expect(followRope(at, { x: 2, y: 0 }, 0)).toEqual({ x: 2, y: 0 });
+  });
+});
+
+describe("snap to grid", () => {
+  it("covers whole cells whichever way the drag goes", () => {
+    expect(snapSpan({ x: 5, y: 17 }, { x: 20, y: 40 }, 16)).toEqual({
+      from: { x: 0, y: 16 },
+      to: { x: 31, y: 47 },
+    });
+    expect(snapSpan({ x: 20, y: 40 }, { x: 5, y: 17 }, 16)).toEqual({
+      from: { x: 31, y: 47 },
+      to: { x: 0, y: 16 },
+    });
+    expect(snapSpan({ x: 5, y: 17 }, { x: 9, y: 2 }, 0)).toEqual({
+      from: { x: 5, y: 17 },
+      to: { x: 9, y: 2 },
+    });
+  });
+  it("follows a rectangular grid with a shift", () => {
+    expect(
+      snapSpan({ x: 5, y: 5 }, { x: 30, y: 20 }, { w: 24, h: 16, x: 4, y: 2 }),
+    ).toEqual({ from: { x: 4, y: 2 }, to: { x: 51, y: 33 } });
   });
 });

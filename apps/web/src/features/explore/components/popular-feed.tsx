@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "@pigxel/ui/components/badge";
-import { IconButton } from "@pigxel/ui/components/button";
+import { Button } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
-import { Heading } from "@pigxel/ui/components/typography";
-import { cn } from "@pigxel/ui/lib/utils";
 import { loadPopularTiles } from "../actions";
-import { PERIODS, type Period } from "../constants";
-import { TabLinks } from "@/components/ui/tab-links";
+import type { Period, Sort } from "../constants";
 import type { PublicTile } from "@/features/profile/profile";
 import { scrollParent } from "@/lib/utils/scroll-parent";
+import { ExploreHeader } from "./explore-header/explore-header";
 import { PopularCard } from "./popular-card/popular-card";
 import { SignInBanner } from "./sign-in-banner";
 import styles from "./gallery.module.css";
@@ -19,34 +16,39 @@ const PRELOAD = "1500px";
 
 export function PopularFeed({
   period,
+  tag,
   initial,
   count,
   guest,
+  failed = false,
 }: {
   period: Period;
+  tag: string | null;
   initial: PublicTile[];
   count: number;
   guest: boolean;
+  /** The first page couldn't be loaded. */
+  failed?: boolean;
 }) {
   const [tiles, setTiles] = useState(initial);
-  const [density, setDensity] = useState<"comfortable" | "compact">(
-    "comfortable",
-  );
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<Sort>("popular");
   const [offset, setOffset] = useState(initial.length);
   const [done, setDone] = useState(initial.length >= count);
   const [banner, setBanner] = useState(false);
   const [allowed, setAllowed] = useState(!guest);
+  const [moreFailed, setMoreFailed] = useState(false);
   const loading = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const target = sentinel.current;
-    if (done || !target) return;
+    if (done || moreFailed || !target) return;
     const loadMore = async () => {
       if (loading.current) return;
       loading.current = true;
       try {
-        const more = await loadPopularTiles(period, offset);
+        const more = await loadPopularTiles(period, offset, tag);
         if (!more.length || offset + more.length >= count) setDone(true);
         setOffset(offset + more.length);
         if (guest) setAllowed(false);
@@ -54,6 +56,8 @@ export function PopularFeed({
           const shown = new Set(all.map((t) => t.id));
           return [...all, ...more.filter((t) => !shown.has(t.id))];
         });
+      } catch {
+        setMoreFailed(true);
       } finally {
         loading.current = false;
       }
@@ -71,7 +75,7 @@ export function PopularFeed({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [period, offset, count, done, guest, allowed]);
+  }, [period, tag, offset, count, done, guest, allowed, moreFailed]);
 
   useEffect(() => {
     if (!banner) return;
@@ -86,86 +90,66 @@ export function PopularFeed({
     };
   }, [banner]);
 
+  const search = query.trim().toLowerCase();
+  const found = tiles.filter(
+    (t) =>
+      (!search || t.name.toLowerCase().includes(search)) &&
+      (sort !== "liked" || t.liked),
+  );
+  const shown =
+    sort === "recent"
+      ? [...found].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      : sort === "az"
+        ? [...found].sort((a, b) => a.name.localeCompare(b.name))
+        : found;
+
   return (
     <section aria-labelledby="popular-heading" className={styles.gallery}>
-      <div className="sticky top-0 z-20 mb-4 flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-b bg-background/95 py-2 backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <Heading as="h1" id="popular-heading">
-            Popular tiles
-          </Heading>
-          <Badge
-            tone="muted"
-            className="text-xs text-primary-soft-foreground tabular-nums"
-          >
-            {count}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-4">
-          <TabLinks
-            label="Period"
-            variant="segmented"
-            tabs={PERIODS.map((p) => ({
-              href: `/explore?period=${p.value}`,
-              label: p.label,
-              active: p.value === period,
-            }))}
-          />
-          <div
-            aria-label="Gallery density"
-            role="group"
-            className={cn(styles.density, "gap-1 border-l pl-4")}
-          >
-            {(["comfortable", "compact"] as const).map((value) => (
-              <IconButton
-                key={value}
-                label={
-                  value === "comfortable" ? "Larger previews" : "Compact grid"
-                }
-                size="md"
-                aria-pressed={density === value}
-                onClick={() => setDensity(value)}
-                className="size-9"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className="size-4"
-                >
-                  {Array.from(
-                    { length: value === "comfortable" ? 4 : 9 },
-                    (_, i) => {
-                      const columns = value === "comfortable" ? 2 : 3;
-                      const size = columns === 2 ? 7 : 4;
-                      const step = columns === 2 ? 10 : 6.5;
-                      return (
-                        <rect
-                          key={i}
-                          x={1.5 + (i % columns) * step}
-                          y={1.5 + Math.floor(i / columns) * step}
-                          width={size}
-                          height={size}
-                          rx="0"
-                        />
-                      );
-                    },
-                  )}
-                </svg>
-              </IconButton>
-            ))}
-          </div>
-        </div>
-      </div>
-      {tiles.length ? (
-        <ul className={styles.grid} data-density={density}>
-          {tiles.map((tile) => (
+      <ExploreHeader
+        period={period}
+        tag={tag}
+        sort={sort}
+        onSortChange={setSort}
+        query={query}
+        onQueryChange={setQuery}
+        guest={guest}
+      />
+      {shown.length ? (
+        <ul className={styles.grid}>
+          {shown.map((tile) => (
             <PopularCard key={tile.id} tile={tile} />
           ))}
         </ul>
+      ) : tiles.length ? (
+        <EmptyState
+          title={
+            sort === "liked" && !search
+              ? "No liked arts yet"
+              : "Nothing matches your search"
+          }
+          description={
+            sort === "liked" && !search
+              ? "Tap the heart on any art to keep it here."
+              : "Try a different name."
+          }
+          className="border-solid bg-[#faf9fa]"
+        />
+      ) : failed ? (
+        <EmptyState
+          title="Couldn’t load popular tiles"
+          description="Refresh the page to try again."
+          className="border-solid bg-[#faf9fa]"
+        />
       ) : (
         <EmptyState
-          title="No tiles in this period"
-          description="Try a different period to discover more from the community."
+          title={
+            tag ? `No ${tag.toLowerCase()} arts yet` : "No tiles in this period"
+          }
+          description={
+            tag
+              ? "Try another tag to discover more from the community."
+              : "Try a different period to discover more from the community."
+          }
           className="border-solid bg-[#faf9fa]"
         />
       )}
@@ -177,7 +161,21 @@ export function PopularFeed({
           }}
         />
       )}
-      {!done && <div ref={sentinel} aria-hidden="true" className="h-px" />}
+      {moreFailed && (
+        <p role="alert" className="mt-6 text-center text-sm">
+          Couldn’t load more tiles.{" "}
+          <Button
+            variant="link"
+            className="text-sm"
+            onClick={() => setMoreFailed(false)}
+          >
+            Try again
+          </Button>
+        </p>
+      )}
+      {!done && !moreFailed && (
+        <div ref={sentinel} aria-hidden="true" className="h-px" />
+      )}
     </section>
   );
 }

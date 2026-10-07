@@ -2,7 +2,7 @@ import "server-only";
 import { safeNext } from "./routes";
 
 export const OAUTH_PROVIDER_PARAM = "provider";
-export type OAuthProvider = "google" | "apple";
+type OAuthProvider = "google" | "apple";
 
 /** Keep the provider on the return URL so OAuth errors don't look like recovery errors. */
 export function oauthCallbackUrl(provider: OAuthProvider, next: string) {

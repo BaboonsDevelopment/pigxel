@@ -4,6 +4,8 @@ import {
   DEFAULT_LAYOUT,
   STACK_WIDTH,
   movePanel,
+  movesPanel,
+  setPanelHeight,
   readLayout,
   setPanelShown,
   setToolShown,
@@ -91,7 +93,7 @@ describe("editor layout", () => {
       dock: "left",
       where: "start",
     });
-    expect(moved.hidden).toEqual([]);
+    expect(moved.hidden).toEqual(["tileset"]);
     expect(stacks(moved, "left")[0]).toEqual(["assistant"]);
   });
   it("leaves tools off the tool panel and brings them back", () => {
@@ -129,9 +131,36 @@ describe("editor layout", () => {
     expect(odd.docks.left.stacks.flatMap((s) => s.panels)).toContain("colors");
     expect(stacks(odd, "bottom")).toEqual([["timeline"]]);
     expect(odd.docks.bottom.size).toBe(BOTTOM_HEIGHT.min);
-    expect(odd.hidden).toEqual(["colors"]);
+    expect(odd.hidden).toEqual(["colors", "tileset"]);
     expect(odd.hiddenTools).toEqual(["blur"]);
     expect(odd.groupTools).toEqual({ select: "lasso" });
+  });
+});
+
+describe("panel moves and heights", () => {
+  it("tells a drop that changes nothing from one that does", () => {
+    expect(
+      movesPanel(DEFAULT_LAYOUT, "colors", {
+        kind: "panel",
+        anchor: "tools",
+        where: "below",
+      }),
+    ).toBe(false);
+    expect(
+      movesPanel(DEFAULT_LAYOUT, "colors", {
+        kind: "panel",
+        anchor: "tools",
+        where: "above",
+      }),
+    ).toBe(true);
+  });
+  it("keeps a height set by hand, never below the least", () => {
+    expect(setPanelHeight(DEFAULT_LAYOUT, "palette", 240).heights).toEqual({
+      palette: 240,
+    });
+    expect(setPanelHeight(DEFAULT_LAYOUT, "palette", 3).heights.palette).toBe(
+      56,
+    );
   });
 });
 

@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useEffectEvent, useImperativeHandle, useRef } from "react";
-import { snapLine, squareFrom } from "../../pixel-canvas/pen";
+import {
+  snapLine,
+  snapSpan,
+  squareFrom,
+  type Point,
+} from "../../pixel-canvas/pen";
 import type { ToolCanvasProps } from "../types";
 import {
   colorInk,
@@ -29,6 +34,7 @@ export function DragStroke({
   continuesFromEnd?: boolean;
 }) {
   const stroke = useRef<Stroke>(null);
+  const origin = useRef<Point>(null);
   const draw = (current: Stroke) => drawStroke(props, current, ink, render);
 
   const finish = () => {
@@ -46,7 +52,13 @@ export function DragStroke({
 
   useImperativeHandle(ref, () => ({
     down(e, point) {
-      const current = startStroke(props, e, point, { keepsColor });
+      origin.current = point;
+      const current = startStroke(
+        props,
+        e,
+        snapSpan(point, point, props.snap).from,
+        { keepsColor },
+      );
       if (!current) return;
       stroke.current = current;
       draw(current);
@@ -55,12 +67,15 @@ export function DragStroke({
       const current = stroke.current;
       const point = passed.at(-1);
       if (!current || !point) return;
+      const span = snapSpan(origin.current ?? point, point, props.snap);
+      if (props.snap) current.points[0] = span.from;
       const from = current.points[0]!;
+      const to = span.to;
       const end = square
-        ? squareFrom(from, point, e.shiftKey)
+        ? squareFrom(from, to, e.shiftKey)
         : e.shiftKey
-          ? snapLine(from, point)
-          : point;
+          ? snapLine(from, to)
+          : to;
       if (end.x === current.end.x && end.y === current.end.y) return;
       current.end = end;
       draw(current);

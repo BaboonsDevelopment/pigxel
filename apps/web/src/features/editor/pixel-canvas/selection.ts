@@ -1,4 +1,8 @@
-import { ellipsePoints, linePoints } from "@/lib/edit/raster";
+import {
+  ellipsePoints,
+  linePoints,
+  roundedRectPoints,
+} from "@/lib/edit/raster";
 import type { Area, Size } from "./constants";
 import type { Rgba } from "./paint";
 import { fillPoints, type Point } from "./pen";
@@ -22,6 +26,14 @@ export function rectMask(size: Size, area: Area): Mask {
       y * size.w + Math.max(0, area.x),
       y * size.w + Math.min(size.w, area.x + area.w),
     );
+  return mask;
+}
+
+export function roundedRectMask(size: Size, area: Area, radius: number): Mask {
+  if (radius <= 0) return rectMask(size, area);
+  const mask = new Uint8Array(size.w * size.h);
+  for (const { x, y } of roundedRectPoints(area, true, radius))
+    if (x >= 0 && y >= 0 && x < size.w && y < size.h) mask[y * size.w + x] = 1;
   return mask;
 }
 

@@ -14,6 +14,20 @@ export function MenuList({
   sections: MenuSections;
   onDone: () => void;
 }) {
+  const [active, setActive] = useState<string | null>(null);
+  const timer = useRef<number | null>(null);
+  const openOnly = (label: string | null) => {
+    if (timer.current) window.clearTimeout(timer.current);
+    setActive(label);
+  };
+  const closeSoon = (label: string) => {
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(
+      () => setActive((open) => (open === label ? null : open)),
+      150,
+    );
+  };
+
   return sections
     .map((items) => items.filter((item) => !item.hidden))
     .filter((items) => items.length > 0)
@@ -25,7 +39,14 @@ export function MenuList({
       >
         {items.map((item) =>
           item.submenu ? (
-            <Submenu key={item.label} item={item} onDone={onDone} />
+            <Submenu
+              key={item.label}
+              item={item}
+              open={active === item.label}
+              onOpen={(open) => openOnly(open ? item.label : null)}
+              onLeave={() => closeSoon(item.label)}
+              onDone={onDone}
+            />
           ) : (
             <button
               key={item.label}
@@ -33,6 +54,7 @@ export function MenuList({
               role="menuitem"
               disabled={item.disabled}
               className={ITEM}
+              onPointerEnter={() => openOnly(null)}
               onClick={() => {
                 onDone();
                 item.onSelect?.();
@@ -51,24 +73,29 @@ export function MenuList({
     ));
 }
 
-function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
-  const [open, setOpen] = useState(false);
+function Submenu({
+  item,
+  open,
+  onOpen,
+  onLeave,
+  onDone,
+}: {
+  item: MenuItem;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  onLeave: () => void;
+  onDone: () => void;
+}) {
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
-  const timer = useRef<number | null>(null);
 
   const show = (focus = false) => {
-    if (timer.current) window.clearTimeout(timer.current);
-    setOpen(true);
+    onOpen(true);
     if (focus)
       requestAnimationFrame(() =>
         list.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus(),
       );
-  };
-  const hideSoon = () => {
-    if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setOpen(false), 150);
   };
 
   useLayoutEffect(() => {
@@ -86,7 +113,7 @@ function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
   }, [open]);
 
   return (
-    <div onPointerEnter={() => show()} onPointerLeave={hideSoon}>
+    <div onPointerEnter={() => show()} onPointerLeave={onLeave}>
       <button
         ref={button}
         type="button"
@@ -95,7 +122,7 @@ function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
         aria-expanded={open}
         disabled={item.disabled}
         className={cn(ITEM, open && "bg-muted")}
-        onClick={() => (open ? setOpen(false) : show())}
+        onClick={() => (open ? onOpen(false) : show())}
         onKeyDown={(e) => {
           if (e.key === "ArrowRight" || e.key === "Enter") {
             e.preventDefault();
@@ -118,7 +145,7 @@ function Submenu({ item, onDone }: { item: MenuItem; onDone: () => void }) {
             if (e.key === "ArrowLeft" || e.key === "Escape") {
               e.preventDefault();
               e.stopPropagation();
-              setOpen(false);
+              onOpen(false);
               button.current?.focus();
             }
           }}

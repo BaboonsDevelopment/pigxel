@@ -9,15 +9,23 @@ import {
   type PixelRatio,
 } from "@/lib/sprite/pixel-ratio";
 import { flatten } from "@/lib/layers/composite";
-import { createLayer, pixelLayerIds } from "@/lib/layers/tree";
+import { allLayers, createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
+import { MAX_TILE, MIN_TILE, type TileSize } from "@/lib/tilemap/tilemap";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
 import type { Cels, Frame } from "@/lib/sprite/types";
+import { readFrameTags, type FrameTag } from "@/lib/sprite/tags";
+import { readCelLinks, type CelLink } from "@/lib/sprite/cel-links";
+import {
+  readCelSettings,
+  settingsForFrame,
+  type CelSetting,
+} from "@/lib/sprite/cel-settings";
 
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
-const PIGXEL_VERSION = 6;
+const PIGXEL_VERSION = 7;
 export const MAX_PIGXEL_SIZE = 256;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
@@ -38,6 +46,9 @@ export type PigxelDocument = {
   background: Background;
   layers: Layer[];
   frames: Frame[];
+  tags?: FrameTag[];
+  links?: CelLink[];
+  celSettings?: CelSetting[];
   cels: Cels;
   palette: string[];
   slices: Slice[];
@@ -71,6 +82,9 @@ export function blankDocument(
     background,
     layers,
     frames: [frame],
+    tags: [],
+    links: [],
+    celSettings: [],
     cels: new Map([[frame.id, frameCels]]),
     palette: [...DEFAULT_PALETTE],
     slices: [],
@@ -82,11 +96,13 @@ export function flattenDocument(
   skip: LayerKind[] = ["reference"],
   frameId = doc.frames[0]!.id,
 ): Uint8ClampedArray {
+  const appearance = settingsForFrame(doc.celSettings ?? [], frameId);
   return flatten(
     doc.layers,
     (id) => celOf(doc.cels, frameId, id),
     doc.width * doc.height * 4,
     skip,
+    (id) => appearance.get(id),
   );
 }
 
@@ -98,8 +114,12 @@ type FileLayer = {
   locked: boolean;
   opacity: number;
   blend: string;
+  labelColor?: string;
   collapsed?: boolean;
   children?: FileLayer[];
+  tile?: TileSize;
+  tiles?: string[];
+  flips?: boolean;
 };
 
 export class PigxelFileError extends Error {}
@@ -110,8 +130,25 @@ const DAMAGED = () => new PigxelFileError("This Pigxel file is damaged.");
 
 export function serializePigxel(doc: PigxelDocument): string {
   const toFile = (layer: Layer): FileLayer => {
-    const { id, name, kind, visible, locked, opacity, blend } = layer;
-    const base = { id, name, kind, visible, locked, opacity, blend };
+    const { id, name, kind, visible, locked, opacity, blend, labelColor } =
+      layer;
+    const base = {
+      id,
+      name,
+      kind,
+      visible,
+      locked,
+      opacity,
+      blend,
+      ...(labelColor && { labelColor }),
+    };
+    if (layer.kind === "tilemap")
+      return {
+        ...base,
+        tile: layer.tile,
+        tiles: layer.tiles.map(encodeCel),
+        ...(layer.flips && { flips: true }),
+      };
     return layer.kind === "group"
       ? {
           ...base,
@@ -138,6 +175,9 @@ export function serializePigxel(doc: PigxelDocument): string {
     height: doc.height,
     background: doc.background,
     frames: doc.frames.map(({ id, duration }) => ({ id, duration })),
+    tags: doc.tags ?? [],
+    links: doc.links ?? [],
+    celSettings: doc.celSettings ?? [],
     layers: doc.layers.map(toFile),
     cels,
     palette: doc.palette,
@@ -219,6 +259,17 @@ export function parsePigxel(text: string): PigxelDocument {
     background,
     layers,
     frames,
+    tags: readFrameTags(file.tags, frames.length),
+    links: readCelLinks(
+      file.links,
+      frames.map((frame) => frame.id),
+      pixelLayerIds(layers),
+    ),
+    celSettings: readCelSettings(
+      file.celSettings,
+      frames.map((frame) => frame.id),
+      allLayers(layers).map((layer) => layer.id),
+    ),
     cels,
     palette,
     slices,
@@ -280,6 +331,11 @@ function readLayers(
       blend: isBackground
         ? ("normal" as const)
         : (BLEND_MODES.find((m) => m.id === entry.blend)?.id ?? "normal"),
+      labelColor:
+        typeof entry.labelColor === "string" &&
+        /^#[0-9a-fA-F]{6}$/.test(entry.labelColor)
+          ? entry.labelColor
+          : undefined,
     };
     if (layer.kind === "group")
       return {
@@ -289,6 +345,18 @@ function readLayers(
         children: readLayers(entry.children, ids, false, onPixelLayer),
       };
     onPixelLayer?.(id, entry);
+    if (layer.kind === "tilemap") {
+      const tile = readTileSize(entry.tile);
+      return {
+        ...layer,
+        ...settings,
+        tile,
+        flips: entry.flips === true,
+        tiles: Array.isArray(entry.tiles)
+          ? entry.tiles.map((value) => readTile(value, tile.w * tile.h * 4))
+          : [],
+      };
+    }
     return { ...layer, ...settings };
   });
 }
@@ -322,6 +390,28 @@ function readCels(
       frameCels.set(layer, readPixels(entry.pixels));
   }
   return cels;
+}
+
+function readTileSize(value: unknown): TileSize {
+  const side = (v: unknown) =>
+    Number.isInteger(v) &&
+    (v as number) >= MIN_TILE &&
+    (v as number) <= MAX_TILE;
+  if (!isObject(value) || !side(value.w) || !side(value.h)) throw DAMAGED();
+  return { w: value.w as number, h: value.h as number };
+}
+
+function readTile(value: unknown, length: number) {
+  if (typeof value !== "string") throw DAMAGED();
+  let data: Uint8ClampedArray;
+  try {
+    const bytes = fromBase64(value);
+    data = new Uint8ClampedArray(inflateSync(new Uint8Array(bytes.buffer)));
+  } catch {
+    throw DAMAGED();
+  }
+  if (data.length !== length) throw DAMAGED();
+  return data;
 }
 
 function uniqueId(value: unknown, ids: Set<string>, fresh: string) {

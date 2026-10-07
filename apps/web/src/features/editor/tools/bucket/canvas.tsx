@@ -2,24 +2,26 @@
 
 import { useImperativeHandle } from "react";
 import {
+  blendInk,
   inPattern,
   mirrored,
+  patternColor,
   wrapPixel,
   type Rgba,
 } from "../../pixel-canvas/paint";
 import { clampTolerance, fillPoints, type Point } from "../../pixel-canvas/pen";
 import { isSelected } from "../../pixel-canvas/selection";
-import { inkColor, slotOf } from "../shared/stroke";
+import { inkAlpha, inkColor, slotOf } from "../shared/stroke";
 import type { ToolCanvasProps, ToolContext } from "../types";
 
 function fillAt(
-  { pen, sprite, paintOptions, onUseColor }: ToolContext,
+  { pen, sprite, stamp, paintOptions, onUseColor }: ToolContext,
   ctx: CanvasRenderingContext2D,
   point: Point,
   rgba: Rgba,
   color: string | null,
 ) {
-  const { size, symmetry, tiled, mask } = paintOptions;
+  const { size, symmetry, axes, tiled, mask } = paintOptions;
   const image = ctx.getImageData(0, 0, size.w, size.h);
   const allLayers = pen.fillFrom === "all";
   const bounds = allLayers
@@ -29,12 +31,26 @@ function fillAt(
         size.h,
       )
     : image;
+  const texture = pen.stampPattern ? stamp : null;
+  const opacity = inkAlpha(rgba, pen.opacity);
+  const blend =
+    color && opacity < 255
+      ? blendInk(
+          new Uint8ClampedArray(image.data),
+          [rgba[0], rgba[1], rgba[2], opacity],
+          "simple",
+        )
+      : null;
   let changed = false;
-  for (const copy of mirrored(point, size, symmetry)) {
+  for (const copy of mirrored(point, size, symmetry, axes)) {
     const at = wrapPixel(copy.x, copy.y, size, tiled);
     if (!at || (mask && !isSelected(mask, size, at))) continue;
     const start = (at.y * size.w + at.x) * 4;
-    if (!allLayers && rgba.every((v, c) => image.data[start + c] === v))
+    if (
+      !texture &&
+      !allLayers &&
+      rgba.every((v, c) => image.data[start + c] === v)
+    )
       continue;
     for (const i of fillPoints(
       bounds,
@@ -44,14 +60,19 @@ function fillAt(
     )) {
       if (mask && !mask[i]) continue;
       if (!inPattern(i % size.w, Math.floor(i / size.w), pen.density)) continue;
-      if (rgba.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
-      image.data.set(rgba, i * 4);
+      const fill = texture
+        ? patternColor(texture, i % size.w, Math.floor(i / size.w))
+        : typeof blend === "function"
+          ? (blend(i) ?? rgba)
+          : rgba;
+      if (fill.some((v, c) => image.data[i * 4 + c] !== v)) changed = true;
+      image.data.set(fill, i * 4);
     }
   }
   if (!changed) return;
   ctx.putImageData(image, 0, 0);
   sprite.commit();
-  if (color) onUseColor?.(color);
+  if (color && !texture) onUseColor?.(color);
 }
 
 export function BucketCanvas({ ref, ...props }: ToolCanvasProps) {

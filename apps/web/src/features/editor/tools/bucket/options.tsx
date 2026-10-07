@@ -1,4 +1,5 @@
 import type { ToolOptionProps } from "../types";
+import { CheckboxField } from "@pigxel/ui/components/choice";
 import { OptionSelect } from "../shared/fields";
 
 export function FillFromOption({ pen, onChange }: ToolOptionProps) {
@@ -12,6 +13,18 @@ export function FillFromOption({ pen, onChange }: ToolOptionProps) {
         ["all", "All layers"],
       ]}
       onChange={(fillFrom) => onChange({ ...pen, fillFrom })}
+    />
+  );
+}
+
+export function TextureOption({ pen, onChange, stamp }: ToolOptionProps) {
+  if (!stamp) return null;
+  return (
+    <CheckboxField
+      label="Fill with brush pattern"
+      title="Fills with the picture brush repeated as a texture instead of a colour"
+      checked={pen.stampPattern}
+      onChange={(e) => onChange({ ...pen, stampPattern: e.target.checked })}
     />
   );
 }

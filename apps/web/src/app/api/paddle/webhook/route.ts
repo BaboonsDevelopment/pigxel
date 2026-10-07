@@ -36,11 +36,13 @@ export async function POST(request: Request) {
   if (!SUBSCRIPTION_EVENTS.has(event.eventType))
     return NextResponse.json({ ok: true });
 
-  const record = subscriptionRecord(
-    event as Parameters<typeof subscriptionRecord>[0],
-  );
+  const subscription = event as Parameters<typeof subscriptionRecord>[0];
+  const record = subscriptionRecord(subscription);
   if (!record) {
-    console.warn(`Paddle ${event.eventType} without a Pigxel userId.`);
+    const { id, customerId } = subscription.data;
+    console.warn(
+      `Paddle ${event.eventType} without a Pigxel userId (subscription ${id}, customer ${customerId}). Link it to an account by hand.`,
+    );
     return NextResponse.json({ ok: true });
   }
 

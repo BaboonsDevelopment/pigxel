@@ -49,6 +49,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/font/google", () => ({
   Geist: () => ({ variable: "" }),
   Geist_Pixel: () => ({ variable: "" }),
+  Pixelify_Sans: () => ({ className: "" }),
+  Manrope: () => ({ className: "" }),
+  Inter: () => ({ className: "" }),
 }));
 
 import { authenticate, signOut, updatePassword } from "@/features/auth/actions";
@@ -114,6 +117,19 @@ describe("email/password authentication", () => {
       password: "test-password",
     });
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+  });
+  it("returns to a safe page after logging in or signing up", async () => {
+    const values = { email: "person@example.com", password: "test-password" };
+    await expect(
+      authenticate("signup", {}, form({ ...values, next: "/pricing" })),
+    ).rejects.toThrow("REDIRECT:/pricing");
+    await expect(
+      authenticate(
+        "login",
+        {},
+        form({ ...values, next: "https://evil.example" }),
+      ),
+    ).rejects.toThrow("REDIRECT:/home");
   });
   it("keeps rejected credentials on the login form", async () => {
     mocks.auth.signInWithPassword.mockResolvedValue({
@@ -361,7 +377,9 @@ describe("email callbacks and route guards", () => {
     await expect(
       AccountSettings({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
-    await expect(Tiles()).rejects.toThrow("REDIRECT:/login");
+    await expect(Tiles({ searchParams: Promise.resolve({}) })).rejects.toThrow(
+      "REDIRECT:/login",
+    );
     await expect(
       NewTile({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow("REDIRECT:/login");
@@ -373,6 +391,9 @@ describe("email callbacks and route guards", () => {
     await expect(Login({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       "REDIRECT:/home",
     );
+    await expect(
+      Login({ searchParams: Promise.resolve({ next: "/pricing" }) }),
+    ).rejects.toThrow("REDIRECT:/pricing");
   });
   it("renders account settings after Supabase verifies the user", async () => {
     const html = renderToStaticMarkup(
@@ -410,7 +431,6 @@ describe("proxy", () => {
       "/settings/account",
       "/settings/profile",
       "/profile",
-      "/u/someone",
     ]) {
       expect((await visit(path)).headers.get("location")).toBe(
         "http://localhost:3000/login",
@@ -422,7 +442,7 @@ describe("proxy", () => {
   });
   it("lets signed-out visitors see public pages", async () => {
     signedOut();
-    for (const path of ["/", "/login", "/login?mode=signup"]) {
+    for (const path of ["/", "/login", "/login?mode=signup", "/u/someone"]) {
       expect((await visit(path)).headers.get("location")).toBeNull();
     }
   });
@@ -433,6 +453,16 @@ describe("proxy", () => {
       );
     }
     expect((await visit("/tiles")).headers.get("location")).toBeNull();
+  });
+  it("sends signed-in visitors of login back to where they were going", async () => {
+    expect(
+      (await visit("/login?next=%2Fpricing")).headers.get("location"),
+    ).toBe("http://localhost:3000/pricing");
+    expect(
+      (await visit("/login?next=https%3A%2F%2Fevil.example")).headers.get(
+        "location",
+      ),
+    ).toBe("http://localhost:3000/home");
   });
   it("still forwards auth codes on the landing page", async () => {
     expect((await visit("/?code=test")).headers.get("location")).toBeNull();
@@ -446,8 +476,10 @@ describe("proxy", () => {
 });
 
 describe("tiles", () => {
-  it("shows a Create tile button to signed-in users", async () => {
-    const html = renderToStaticMarkup(await Tiles());
-    expect(html).toMatch(/<a[^>]*href="\/tiles\/new"[^>]*>Create tile<\/a>/);
+  it("shows My projects to signed-in users", async () => {
+    const html = renderToStaticMarkup(
+      await Tiles({ searchParams: Promise.resolve({}) }),
+    );
+    expect(html).toMatch(/<h1[^>]*>My projects<\/h1>/);
   });
 });

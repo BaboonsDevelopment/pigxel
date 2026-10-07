@@ -1,29 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { cn } from "@pigxel/ui/lib/utils";
 import type { PublicTile } from "@/features/profile/profile";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
+import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { LikeButton } from "./components/like-button";
-import { PreviewDialog } from "./components/preview-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { formatCount } from "./helpers";
+import { inter } from "@/lib/fonts/inter";
+import { manrope } from "@/lib/fonts/manrope";
 
 export function PopularCard({ tile }: { tile: PublicTile }) {
   const { author } = tile;
-  const [previewing, setPreviewing] = useState(false);
-  const picture = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+  const href = `/explore/${tile.id}`;
   return (
-    <li className="min-w-0">
-      <button
-        type="button"
-        ref={picture}
-        aria-label={`Preview ${tile.name}`}
-        onClick={() => setPreviewing(true)}
-        className="group relative block w-full overflow-hidden rounded-xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow outline-none hover:shadow-md"
+    <li className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
+      <Link
+        href={href}
+        aria-label={`Open ${tile.name}`}
+        className="relative block w-full outline-none"
       >
-        <span className="relative block aspect-[16/10] overflow-hidden bg-checker">
-          <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-focus-visible:scale-105 group-focus-visible:blur-[2px] motion-reduce:transition-none">
+        <span className="relative block aspect-[5/4] overflow-hidden bg-checker">
+          <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-has-[:focus-visible]:scale-105 group-has-[:focus-visible]:blur-[2px] motion-reduce:transition-none">
             {tile.thumbnail ? (
               <PixelImage
                 src={tile.thumbnail}
@@ -37,35 +39,78 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
               </span>
             )}
           </span>
-          <HoverOverlay label="Preview" />
+          <HoverOverlay label="Open project" />
         </span>
-      </button>
-      <div className="pt-3">
+      </Link>
+      <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="truncate font-mono text-sm" title={tile.name}>
+          <h3 className="truncate text-xl leading-tight" title={tile.name}>
             {tile.name}
           </h3>
-          <LikeButton tileId={tile.id} count={tile.likes} liked={tile.liked} />
-        </div>
-        <Link
-          href={`/u/${author.username}`}
-          className="mt-0.5 flex w-fit max-w-full items-center gap-1.5 rounded-sm text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          <ProfileAvatar
-            name={author.name}
-            url={author.avatarUrl}
-            className="size-5 shrink-0 text-[9px]"
+          <ProjectMenu
+            label={`More for ${tile.name}`}
+            icon={
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 4"
+                className="w-4 text-[#4a1f35]"
+              >
+                <circle cx="2" cy="2" r="2" fill="currentColor" />
+                <circle cx="10" cy="2" r="2" fill="currentColor" />
+                <circle cx="18" cy="2" r="2" fill="currentColor" />
+              </svg>
+            }
+            items={[
+              { label: "Open", onSelect: () => router.push(href) },
+              {
+                label: "View profile",
+                onSelect: () => router.push(`/u/${author.username}`),
+              },
+            ]}
           />
-          <span className="truncate">{author.username}</span>
-        </Link>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <Link
+            href={`/u/${author.username}`}
+            className="flex min-w-0 items-center gap-1 rounded-sm text-xs transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <ProfileAvatar
+              name={author.name}
+              url={author.avatarUrl}
+              className="size-3.5 shrink-0 text-[7px]"
+            />
+            <span className="truncate">{author.username}</span>
+          </Link>
+          <div
+            className={cn(
+              inter.className,
+              "flex shrink-0 items-center gap-1 text-[10px] leading-[1.25] tabular-nums",
+            )}
+          >
+            <LikeButton
+              tileId={tile.id}
+              count={tile.likes}
+              liked={tile.liked}
+            />
+            <span aria-hidden="true">·</span>
+            <span aria-label="Downloads" className="flex items-center gap-1">
+              <svg
+                aria-hidden="true"
+                viewBox="1.25 1.25 13.5 13"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-2 w-2"
+              >
+                <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
+              </svg>
+              {formatCount(tile.downloads)}
+            </span>
+          </div>
+        </div>
       </div>
-      {previewing && (
-        <PreviewDialog
-          tile={tile}
-          origin={() => picture.current?.getBoundingClientRect()}
-          onClose={() => setPreviewing(false)}
-        />
-      )}
     </li>
   );
 }

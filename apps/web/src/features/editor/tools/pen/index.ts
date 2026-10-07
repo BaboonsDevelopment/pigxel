@@ -4,6 +4,7 @@ import {
   InkOption,
   PixelPerfectOption,
   SizeOption,
+  StabilizerOption,
   StampOption,
 } from "../shared/options";
 import { squareTip } from "../shared/tips";
@@ -25,6 +26,7 @@ export const penTool = defineTool({
     StampOption,
     SizeOption,
     PixelPerfectOption,
+    StabilizerOption,
     InkOption,
     DitherOption,
   ],

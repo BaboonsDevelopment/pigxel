@@ -14,6 +14,7 @@ import {
 import { frameIndex } from "@/lib/sprite/frames";
 import { tipRects } from "../tools/shared/tips";
 import type { Tool, ToolHandlers } from "../tools";
+import { SymmetryAxes } from "./components/symmetry-axes";
 import { FrameEditor } from "./components/frame-editor";
 import { SelectionOverlay } from "./components/selection-overlay";
 import {
@@ -38,8 +39,11 @@ import {
   tileSnapshot,
 } from "./helpers";
 import {
+  centreAxes,
   mirrored,
+  rgbaOf,
   wrapPixel,
+  type Axes,
   type PaintOptions,
   type Stamp,
   type TiledMode,
@@ -54,7 +58,7 @@ import {
 import { isSelected, maskOutline } from "./selection";
 import type { SelectionApi } from "./use-selection";
 import type { SpriteApi } from "./use-sprite";
-import { onionFrames, type CanvasView } from "./view";
+import { gridStyle, onionFrames, type CanvasView } from "./view";
 
 export type PixelCanvasHandle = {
   readTile: (area: Area) => Uint8ClampedArray;
@@ -87,6 +91,7 @@ export function PixelCanvas({
   onTextPlaced,
   sliceId = null,
   onSelectSlice,
+  onAxesChange,
   ref,
 }: {
   tool: Tool;
@@ -102,10 +107,12 @@ export function PixelCanvas({
   onTextPlaced?: () => void;
   sliceId?: string | null;
   onSelectSlice?: (id: string | null) => void;
+  onAxesChange?: (axes: Axes | null) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
   const { symmetry, tiled } = view;
+  const axes = view.axes ?? centreAxes(sprite.size);
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -129,6 +136,7 @@ export function PixelCanvas({
   const paintOptions: PaintOptions = {
     size,
     symmetry,
+    axes,
     tiled,
     mask,
     density: pen.density,
@@ -146,24 +154,33 @@ export function PixelCanvas({
     if (!ctx) return;
     ctx.clearRect(0, 0, size.w, size.h);
     const { frames } = sprite;
+    const at = frameIndex(frames, sprite.frameId);
+    const settings = view.onionSettings;
+    const tag = settings.inTag
+      ? sprite.tags.find((t) => t.from <= at && at <= t.to)
+      : undefined;
     const around = onionFrames(
       view.onion,
-      frameIndex(frames, sprite.frameId),
+      at,
       frames.length,
+      settings.side,
+      tag,
     );
     if (!around.length) return;
     const out = new Uint8ClampedArray(size.w * size.h * 4);
     for (const { index, before, strength } of around.reverse()) {
-      const pixels = sprite.composite(
+      const pixels = sprite.previewComposite(
         ["reference", "background"],
         frames[index]!.id,
       );
-      const tint = before ? [255, 70, 90] : [60, 130, 255];
+      const tint = rgbaOf(before ? settings.before : settings.after);
       for (let i = 0; i < pixels.length; i += 4) {
         if (!pixels[i + 3]) continue;
         for (let c = 0; c < 3; c++)
-          out[i + c] = (pixels[i + c]! + tint[c]!) / 2;
-        out[i + 3] = pixels[i + 3]! * 0.4 * strength;
+          out[i + c] = settings.tint
+            ? (pixels[i + c]! + tint[c]!) / 2
+            : pixels[i + c]!;
+        out[i + 3] = pixels[i + 3]! * (settings.opacity / 100) * strength;
       }
     }
     ctx.putImageData(
@@ -178,7 +195,7 @@ export function PixelCanvas({
       ?.getContext("2d")
       ?.putImageData(
         new ImageData(
-          sprite.composite() as Uint8ClampedArray<ArrayBuffer>,
+          sprite.previewComposite() as Uint8ClampedArray<ArrayBuffer>,
           size.w,
           size.h,
         ),
@@ -193,10 +210,13 @@ export function PixelCanvas({
     [
       sprite.version,
       sprite.tree,
+      sprite.soloId,
       sprite.frameId,
       sprite.frames,
       size,
       view.onion,
+      view.onionSettings,
+      sprite.tags,
     ],
   );
 
@@ -407,7 +427,7 @@ export function PixelCanvas({
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden"
         >
-          {mirrored(hover, size, symmetry).flatMap((at, copy) =>
+          {mirrored(hover, size, symmetry, axes).flatMap((at, copy) =>
             stampTip ? (
               <div
                 key={copy}
@@ -449,29 +469,32 @@ export function PixelCanvas({
           style={{ ...GRID_STYLE, backgroundSize: `${scale}px ${scale}px` }}
         />
       )}
-      {view.gridSize > 0 && (
+      {view.grid && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={gridStyle(view.grid, view.gridLook, scale)}
+        />
+      )}
+
+      {sprite.activeLayer?.kind === "tilemap" && (
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
           style={{
             ...MAJOR_GRID_STYLE,
-            backgroundSize: `${view.gridSize * scale}px ${view.gridSize * scale}px`,
+            backgroundSize: `${sprite.activeLayer.tile.w * scale}px ${sprite.activeLayer.tile.h * scale}px`,
           }}
         />
       )}
 
-      {(symmetry === "horizontal" || symmetry === "both") && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 border-l border-dashed border-fuchsia-500"
-          style={{ left: (size.w / 2) * scale }}
-        />
-      )}
-      {(symmetry === "vertical" || symmetry === "both") && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 border-t border-dashed border-fuchsia-500"
-          style={{ top: (size.h / 2) * scale }}
+      {symmetry !== "none" && (
+        <SymmetryAxes
+          symmetry={symmetry}
+          axes={axes}
+          size={size}
+          scale={scale}
+          onChange={onAxesChange}
         />
       )}
 
@@ -511,6 +534,7 @@ export function PixelCanvas({
         stamp={stamp}
         scale={scale}
         stretch={stretch}
+        snap={view.snap ? view.grid : null}
         paintOptions={paintOptions}
         paused={selecting || !!frame}
         lastPointRef={lastPoint}

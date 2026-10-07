@@ -12,6 +12,7 @@ import { Notice } from "@pigxel/ui/components/notice";
 import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
 import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "../pricing";
+import { loginUrl } from "@/lib/auth/routes";
 import { annualComparison, type PriceQuote } from "../pricing-comparison";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Heading, Text } from "@pigxel/ui/components/typography";
@@ -27,7 +28,9 @@ type Props = {
   environment: Environments;
   token: string;
   country?: string;
-  customer?: { id: string; email: string };
+  customer?: { id: string; email?: string };
+  /** The subscriber's current price; they change plans instead of buying another. */
+  currentPriceId?: string;
   heading: ReactNode;
 };
 
@@ -36,6 +39,7 @@ export function PricingPlans({
   token,
   country,
   customer,
+  currentPriceId,
   heading,
 }: Props) {
   const [cycle, setCycle] = useState<BillingCycle>("month");
@@ -87,12 +91,11 @@ export function PricingPlans({
   }, [environment, token, country]);
 
   function subscribe(tier: Tier) {
+    if (!customer) return;
     paddle?.Checkout.open({
       items: [{ priceId: tier.priceId[cycle], quantity: 1 }],
-      ...(customer && {
-        customer: { email: customer.email },
-        customData: { userId: customer.id },
-      }),
+      ...(customer.email && { customer: { email: customer.email } }),
+      customData: { userId: customer.id },
       settings: {
         displayMode: "overlay",
         variant: "one-page",
@@ -158,7 +161,7 @@ export function PricingPlans({
               }
               action={
                 <Link
-                  href="/login?mode=signup"
+                  href={loginUrl("signup")}
                   className={buttonVariants({
                     variant: "primary",
                     size: "lg",
@@ -210,16 +213,49 @@ export function PricingPlans({
                     )
                   }
                   action={
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      variant="primary"
-                      disabled={!paddle || !quote}
-                      aria-label={`Subscribe to ${tier.name}, billed ${cycle === "year" ? "yearly" : "monthly"}`}
-                      onClick={() => subscribe(tier)}
-                    >
-                      Subscribe
-                    </Button>
+                    currentPriceId === tier.priceId[cycle] ? (
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        variant="secondary"
+                        disabled
+                      >
+                        Your plan
+                      </Button>
+                    ) : currentPriceId ? (
+                      <Link
+                        href={`/settings/subscription?plan=${tier.priceId[cycle]}`}
+                        className={buttonVariants({
+                          variant: "primary",
+                          size: "lg",
+                          className: "w-full",
+                        })}
+                      >
+                        Change plan
+                      </Link>
+                    ) : customer ? (
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        variant="primary"
+                        disabled={!paddle || !quote}
+                        aria-label={`Subscribe to ${tier.name}, billed ${cycle === "year" ? "yearly" : "monthly"}`}
+                        onClick={() => subscribe(tier)}
+                      >
+                        Subscribe
+                      </Button>
+                    ) : (
+                      <Link
+                        href={loginUrl("signup", "/pricing")}
+                        className={buttonVariants({
+                          variant: "primary",
+                          size: "lg",
+                          className: "w-full",
+                        })}
+                      >
+                        Sign up to subscribe
+                      </Link>
+                    )
                   }
                 />
               </li>

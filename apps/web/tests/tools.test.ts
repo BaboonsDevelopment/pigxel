@@ -321,3 +321,15 @@ describe("onion skin", () => {
     expect(onionFrames(0, 1, 4)).toEqual([]);
   });
 });
+
+describe("onion skin settings", () => {
+  it("shows only one side when asked", () => {
+    expect(onionFrames(1, 2, 5, "before").map((f) => f.index)).toEqual([1]);
+    expect(onionFrames(1, 2, 5, "after").map((f) => f.index)).toEqual([3]);
+  });
+  it("stays inside the tag", () => {
+    expect(
+      onionFrames(2, 2, 6, "both", { from: 2, to: 3 }).map((f) => f.index),
+    ).toEqual([3]);
+  });
+});

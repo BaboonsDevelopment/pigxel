@@ -5,6 +5,7 @@ import { Page } from "@pigxel/ui/components/page";
 import { PageTransition } from "@/components/layout/page-transition";
 import { PricingPlans } from "@/features/billing/components/pricing-plans";
 import { getUser } from "@/lib/auth/session";
+import { getCurrentPlan } from "@/features/billing/server";
 import { LEGAL } from "@/features/legal/legal";
 import {
   countryFromHeaders,
@@ -34,7 +35,10 @@ export default async function Pricing() {
   const country = countryFromHeaders(await headers());
   const { environment, token } = paddleClientConfig();
   const user = await getUser();
-  const customer = user?.email ? { id: user.id, email: user.email } : undefined;
+  const customer = user && { id: user.id, email: user.email };
+  const plan = user ? await getCurrentPlan(user.id) : null;
+  const currentPriceId =
+    plan && plan.name !== "Free" ? plan.priceId : undefined;
 
   return (
     <PageTransition>
@@ -43,7 +47,8 @@ export default async function Pricing() {
           environment={environment}
           token={token}
           country={country}
-          customer={customer}
+          customer={customer ?? undefined}
+          currentPriceId={currentPriceId}
           heading={
             <div>
               <Heading

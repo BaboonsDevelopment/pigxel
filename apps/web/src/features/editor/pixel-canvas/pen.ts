@@ -29,6 +29,9 @@ export type PenSettings = {
   gradientDither: GradientDither;
   textFont: TextFont;
   textScale: number;
+  stabilizer: number;
+  stampPattern: boolean;
+  cornerRadius: number;
 };
 
 export const MIN_PEN_SIZE = 1;
@@ -56,7 +59,58 @@ export const DEFAULT_PEN: PenSettings = {
   gradientDither: "bayer4",
   textFont: "tiny5",
   textScale: 1,
+  stabilizer: 0,
+  stampPattern: false,
+  cornerRadius: 0,
 };
+
+export const MAX_CORNER_RADIUS = 32;
+
+export const MAX_STABILIZER = 20;
+
+export const clampStabilizer = (value: number) =>
+  Math.min(MAX_STABILIZER, Math.max(0, Math.round(value) || 0));
+
+export type SnapGrid = { w: number; h: number; x: number; y: number };
+
+const snapGridOf = (grid: number | SnapGrid | null): SnapGrid | null =>
+  typeof grid === "number"
+    ? grid > 0
+      ? { w: grid, h: grid, x: 0, y: 0 }
+      : null
+    : grid && grid.w > 0 && grid.h > 0
+      ? grid
+      : null;
+
+export function snapSpan(
+  start: Point,
+  point: Point,
+  snap: number | SnapGrid | null,
+): { from: Point; to: Point } {
+  const grid = snapGridOf(snap);
+  if (!grid) return { from: start, to: point };
+  const axis = (a: number, b: number, size: number, offset: number) => {
+    const first = Math.floor((a - offset) / size) * size + offset;
+    const last = Math.floor((b - offset) / size) * size + offset;
+    return b >= a ? [first, last + size - 1] : [first + size - 1, last];
+  };
+  const [fx, tx] = axis(start.x, point.x, grid.w, grid.x);
+  const [fy, ty] = axis(start.y, point.y, grid.h, grid.y);
+  return { from: { x: fx!, y: fy! }, to: { x: tx!, y: ty! } };
+}
+
+export function followRope(
+  at: { x: number; y: number },
+  target: Point,
+  length: number,
+): { x: number; y: number } {
+  const dx = target.x - at.x;
+  const dy = target.y - at.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= length) return at;
+  const pull = (distance - length) / distance;
+  return { x: at.x + dx * pull, y: at.y + dy * pull };
+}
 
 export const MIN_SPRAY_SPEED = 1;
 export const MAX_SPRAY_SPEED = 100;
@@ -268,8 +322,8 @@ export function fillPoints(
 export function pixelColor(image: ImageData, point: Point): string | null {
   const i = (point.y * image.width + point.x) * 4;
   if (!image.data[i + 3]) return null;
-  const hex = [0, 1, 2].map((c) =>
-    image.data[i + c]!.toString(16).padStart(2, "0"),
-  );
+  const hex = [0, 1, 2, 3]
+    .slice(0, image.data[i + 3] === 255 ? 3 : 4)
+    .map((c) => image.data[i + c]!.toString(16).padStart(2, "0"));
   return `#${hex.join("")}`;
 }

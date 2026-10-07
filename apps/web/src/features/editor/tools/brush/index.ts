@@ -3,6 +3,7 @@ import {
   DitherOption,
   InkOption,
   SizeOption,
+  StabilizerOption,
   StampOption,
 } from "../shared/options";
 import { defineTool } from "../types";
@@ -24,6 +25,13 @@ export const brushTool = defineTool({
     shape: pen.brushShape === "line" ? "line" : "round",
     outline: false,
   }),
-  options: [StampOption, SizeOption, BrushShapeOption, InkOption, DitherOption],
+  options: [
+    StampOption,
+    SizeOption,
+    BrushShapeOption,
+    StabilizerOption,
+    InkOption,
+    DitherOption,
+  ],
   canvas: BrushCanvas,
 });

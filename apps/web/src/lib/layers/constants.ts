@@ -27,6 +27,7 @@ export const LAYER_KINDS = [
   "background",
   "group",
   "reference",
+  "tilemap",
 ] as const;
 
 export const DEFAULT_NAMES = {
@@ -34,4 +35,5 @@ export const DEFAULT_NAMES = {
   background: "Background",
   group: "Group",
   reference: "Reference",
+  tilemap: "Tilemap",
 } as const;
