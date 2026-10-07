@@ -100,4 +100,7 @@ export const REFERENCE_QUALITY = 0.9;
 
 export const FRAMES_SHEET_SIDE = 1024;
 
+export const MIN_MOVING_SHARE = 0.05;
+export const FRAMES_PER_PICTURE = 8;
+
 export const REVIEW_MARGIN = 4;

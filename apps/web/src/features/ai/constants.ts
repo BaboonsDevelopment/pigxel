@@ -20,7 +20,6 @@ export const TEXT_MODELS = [
 export const IMAGE_MODELS = [
   "gemini-3.1-flash-lite-image",
   "gemini-2.5-flash-image",
-  "gemini-3.1-flash-image",
 ];
 export const SIZED_IMAGE_MODELS = ["gemini-3.1-flash-image"];
 export const SMALL_IMAGE_SIZE = "512";
@@ -73,9 +72,13 @@ For animate also set frames: the number of frames they asked for, 0 when
 they did not say.
 Otherwise leave where and name empty, items empty, count 1 and frames 0.
 A message ending in ${REFERENCES_NOTE} came with pictures to draw from
-("draw this", "in this style", "make him like this"): drawing something from
-them is generate, and subject says what to take from them ("the fox from the
-reference picture", "a knight in the style of the reference picture").`;
+("draw this", "in this style", "make him like this"): it is always generate,
+never edit, even when something is already drawn, and subject says what to
+take from them ("the fox from the reference picture", "a knight in the style
+of the reference picture"). Wishes about how close to the reference it must
+be ("identical", "pixel for pixel", "exactly like this") are instructions for
+the new picture: keep them in subject together with the earlier request they
+refine ("the pig from the reference picture, identical to it, cooking food").`;
 
 export const CHAT_PROMPT =
   "You are the assistant of Pigxel, a pixel art editor. Answer briefly in plain " +
@@ -202,32 +205,38 @@ duration: how long each frame shows, in milliseconds: about 100 for most
 actions, 60-80 for fast ones, 150-250 for slow ones.
 name: a short Title Case name for the animation ("Monkey Throws Grenade").
 
-tracks: exactly one track: the whole animation is ONE layer, drawn frame by
-frame as one sprite sheet (one picture). It shows everything that moves in
-the request together — the character and whatever it throws, shoots, casts or
-makes happen (a frost bolt, a thrown grenade, sparks, an explosion) — drawn
-in the frames where they are, never as separate things.
+tracks: exactly one track. There are two kinds of animation:
+- Animating what is already drawn ("make her turn the pages", "make the cat
+  blink", "the flag waves"): every frame redraws the current picture as
+  closely as possible, with only the moving parts posed differently. Set
+  reuse to the layer it is drawn on.
+- Drawing something new that moves (a monkey throwing a grenade on an empty
+  tile): the frames are drawn as one sprite sheet on a new layer. Set reuse
+  to -1. It shows everything that moves together — the character and whatever
+  it throws, shoots, casts or makes happen — drawn in the frames where they
+  are, never as separate things.
 - name: a short Title Case name for the layer.
-- subject: a full visual description of everything the animation shows that
-  stays the same in every frame (the character: what it is, colours, clothes,
-  what it holds; and what its spell or projectile looks like). Do not
-  describe the motion here.
-- poses: exactly frameCount short descriptions, one per frame, of the whole
-  scene in that frame: the character's pose and where everything else is
-  ("the mage raises the staff, a small frost bolt forms at its tip"; "the
-  bolt halfway to the right edge, the mage lowering the staff"). Moving
-  things follow a believable path with even spacing.
-- box: one rectangle in tile pixels that holds the whole action in every
-  frame (the character and the full path of what it throws or casts), inside
-  the tile. Every frame is drawn into this same box, as by a fixed camera.
-- reuse: when the request animates something already drawn (from LAYERS),
-  that layer's number, so its look is kept and it is replaced by the
-  animation; otherwise -1. A thing already drawn on that layer that moves (a
-  skull in his hand that he throws) is part of the frames too.
+- subject: a full visual description of what the animation shows. When
+  animating what is drawn, describe the picture inside box as it is now
+  (what it is, colours, what is around it). Do not describe the motion here.
+- poses: exactly frameCount short descriptions, one per frame, of what
+  changes in that frame ("the right hoof lifts the corner of the page"; "the
+  page is halfway turned, standing up"). When animating what is drawn, name
+  only the moving parts and say how they differ from the picture now; one
+  frame may be the picture as it is. Moving things follow a believable path
+  with even spacing.
+- box: one rectangle in tile pixels, inside the tile.
+  When animating what is drawn: around the parts that move and the room they
+  move in; the whole drawing on that layer is redrawn with it anyway.
+  When drawing something new: it holds the whole action in every frame (the
+  character and the full path of what it throws or casts); every frame is
+  drawn into this same box, as by a fixed camera.
+- reuse: as above, the number from LAYERS of the layer the moving thing is
+  drawn on, or -1.
 
-Never add a new thing for something already drawn: animate it (reuse). Show
-only what the request asks for; no extra effects, trails or objects unless
-asked.
+Never add a new thing for something already drawn: animate it (reuse). Change
+only what the request asks to move; no extra effects, trails or objects unless
+asked, and never a new look, size, framing or style.
 
 Keep everything inside the tile, where it fits the scene. Motion is smooth:
 neighbouring frames differ a little. A looping action (walk, idle, waving)

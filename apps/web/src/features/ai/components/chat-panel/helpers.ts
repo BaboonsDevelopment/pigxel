@@ -23,6 +23,33 @@ export const paint = (
 export const drawnBox = (cel: Uint8ClampedArray, size: Size): Area | null =>
   opaqueBox({ rgba: cel, ...size });
 
+export function opaqueIn(
+  cel: Uint8ClampedArray,
+  size: Size,
+  area: Area,
+): number {
+  let n = 0;
+  for (let y = area.y; y < area.y + area.h; y++)
+    for (let x = area.x; x < area.x + area.w; x++)
+      if (cel[(y * size.w + x) * 4 + 3]) n++;
+  return n;
+}
+
+export function replaceArea(
+  cel: Uint8ClampedArray,
+  size: Size,
+  art: Bitmap,
+  area: Area,
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(cel);
+  for (let y = 0; y < area.h; y++)
+    out.set(
+      art.rgba.subarray(y * area.w * 4, (y + 1) * area.w * 4),
+      ((area.y + y) * size.w + area.x) * 4,
+    );
+  return out;
+}
+
 function protectedMask(
   cel: Uint8ClampedArray,
   size: Size,
