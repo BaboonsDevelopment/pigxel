@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy · Pigxel",
   description:
     "How Pigxel collects, uses, stores and shares account, artwork and Google Drive data, and how to disconnect or request deletion.",
+  robots: { nosnippet: true },
 };
 
 export default function Privacy() {
