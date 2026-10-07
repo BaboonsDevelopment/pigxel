@@ -161,7 +161,7 @@ export function Landing() {
               className={`${styles.heroBrand} ${styles.rise}`}
               style={delay(0.05)}
             >
-              Pigxel
+              Pigxel Studio
             </span>
             <span className={styles.heroLine}>
               <Words text="Small pixels." start={0.1} />
@@ -171,7 +171,7 @@ export function Landing() {
             </span>
           </h1>
           <p className={`${styles.heroText} ${styles.rise}`} style={delay(0.5)}>
-            Pigxel is a pixel art editor that runs in your browser. Draw,
+            Pigxel Studio is a pixel art editor that runs in your browser. Draw,
             animate tiny characters and build little worlds, then sign in with
             Google to save your projects to Pigxel cloud or your own Google
             Drive.
@@ -430,7 +430,7 @@ export function Landing() {
           </nav>
         </div>
         <div className={styles.footerBottom}>
-          <span>© {new Date().getFullYear()} Pigxel</span>
+          <span>© {new Date().getFullYear()} Pigxel Studio</span>
           <span>Small pixels. Big heart.</span>
         </div>
         <p className={styles.wordmark} aria-hidden="true">
