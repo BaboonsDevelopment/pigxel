@@ -23,6 +23,7 @@ import {
 } from "../../../actions";
 import { DESCRIPTION_MAX } from "../../../constants";
 import { removeFromExplore } from "../../../remove-from-explore";
+import { RemixToggle } from "./remix-toggle";
 import { TagPicker } from "./tag-picker";
 
 export type PublishTile = Pick<
@@ -49,6 +50,7 @@ export function PublishDialog({
   );
   const [tags, setTags] = useState<string[]>([]);
   const [description, setDescription] = useState("");
+  const [allowRemix, setAllowRemix] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
   const [loaded, setLoaded] = useState(!tile);
@@ -64,6 +66,7 @@ export function PublishDialog({
           }
           setTags(details.tags);
           setDescription(details.description);
+          setAllowRemix(details.allowRemix);
           setPublished(details.published);
           setLoaded(true);
         })
@@ -79,7 +82,7 @@ export function PublishDialog({
     if (!selected) return;
     setPublishing(true);
     setError(null);
-    const result = await publishArt(selected.id, tags, description);
+    const result = await publishArt(selected.id, tags, description, allowRemix);
     setPublishing(false);
     if (result.error) setError(result.error);
     else if (tile) {
@@ -197,6 +200,7 @@ export function PublishDialog({
                   placeholder="A cozy cottage tucked between mountains…"
                 />
               </label>
+              <RemixToggle value={allowRemix} onChange={setAllowRemix} />
             </div>
           </div>
         ) : !tiles ? (

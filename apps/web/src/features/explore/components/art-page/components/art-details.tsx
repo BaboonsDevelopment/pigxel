@@ -14,7 +14,8 @@ import { ProjectMenu } from "@/features/tiles/components/project-card/components
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
 import { recordDownload, setTileLiked, setTileSaved } from "../../../actions";
-import { downloadPicture } from "../download";
+import { downloadPicture, type DownloadFormat } from "../download";
+import { DownloadMenu } from "./download-menu";
 import type { Picture } from "../helpers";
 import { EditDetailsDialog } from "./edit-details-dialog";
 
@@ -51,12 +52,14 @@ export function ArtDetails({
   const [details, setDetails] = useState({
     tags: tile.tags,
     description: tile.description,
+    allowRemix: tile.allowRemix ?? true,
   });
+  const canRemix = own || details.allowRemix;
   const [editing, setEditing] = useState(false);
 
-  const download = async () => {
+  const download = async (format: DownloadFormat, scale: number) => {
     if (!picture) return;
-    downloadPicture(picture, tile.name);
+    downloadPicture(picture, tile.name, format, scale);
     const counted = await recordDownload(tile.id);
     if (counted !== null) setDownloads(counted);
   };
@@ -176,8 +179,10 @@ export function ArtDetails({
       {editing && (
         <EditDetailsDialog
           tileId={tile.id}
+          name={tile.name}
           tags={details.tags}
           description={details.description}
+          allowRemix={details.allowRemix}
           onSaved={setDetails}
           onClose={() => setEditing(false)}
         />
@@ -289,30 +294,38 @@ export function ArtDetails({
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={remixing || (!!viewerId && !file)}
-        onClick={() => void remix()}
-        className="relative mt-4 flex h-10 w-full cursor-pointer items-center justify-center rounded-xl bg-[#d9558a] text-[13px] font-medium text-white shadow-[0_8px_18px_-10px_#d9558a] transition-colors hover:bg-[#c94a7d] disabled:cursor-default disabled:opacity-60"
-      >
-        {remixing ? "Opening…" : "Open & remix in editor"}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="absolute right-4 size-4"
-        >
-          <path d="M4 12 12 4M6 4h6v6" />
-        </svg>
-      </button>
-      <p className="mt-2 text-center text-[10px] leading-snug text-muted-foreground">
-        Make it your own. A copy will be added to My projects, with credit to{" "}
-        {author.username}.
-      </p>
+      {canRemix ? (
+        <>
+          <button
+            type="button"
+            disabled={remixing || (!!viewerId && !file)}
+            onClick={() => void remix()}
+            className="relative mt-4 flex h-10 w-full cursor-pointer items-center justify-center rounded-xl bg-[#d9558a] text-[13px] font-medium text-white shadow-[0_8px_18px_-10px_#d9558a] transition-colors hover:bg-[#c94a7d] disabled:cursor-default disabled:opacity-60"
+          >
+            {remixing ? "Opening…" : "Open & remix in editor"}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute right-4 size-4"
+            >
+              <path d="M4 12 12 4M6 4h6v6" />
+            </svg>
+          </button>
+          <p className="mt-2 text-center text-[10px] leading-snug text-muted-foreground">
+            Make it your own. A copy will be added to My projects, with credit
+            to {author.username}.
+          </p>
+        </>
+      ) : (
+        <p className="mt-4 rounded-xl border border-dashed px-3 py-2.5 text-center text-[11px] text-muted-foreground">
+          {author.username} turned off remixing for this art.
+        </p>
+      )}
       {error && (
         <FormMessage tone="error" className="mt-2 text-center">
           {error}
@@ -320,26 +333,13 @@ export function ArtDetails({
       )}
 
       <div className="mt-3 flex flex-wrap justify-center gap-3">
-        <button
-          type="button"
+        <DownloadMenu
+          width={tile.width}
+          height={tile.height}
+          animated={!!picture?.animated}
           disabled={!picture}
-          onClick={() => void download()}
-          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
-          >
-            <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
-          </svg>
-          Download
-        </button>
+          onDownload={(format, scale) => void download(format, scale)}
+        />
         <button
           type="button"
           aria-pressed={isSaved}
@@ -449,7 +449,9 @@ export function ArtDetails({
           <path d="M1.8 8h12.4M8 1.8c1.8 1.8 2.6 3.9 2.6 6.2S9.8 12.4 8 14.2C6.2 12.4 5.4 10.3 5.4 8S6.2 3.6 8 1.8Z" />
         </svg>
         <div>
-          <p className="text-[11px]">Public project · Remix enabled</p>
+          <p className="text-[11px]">
+            Public project · Remix {details.allowRemix ? "enabled" : "disabled"}
+          </p>
           <p className="text-[10px] text-muted-foreground">
             Original creation by {author.username}
           </p>

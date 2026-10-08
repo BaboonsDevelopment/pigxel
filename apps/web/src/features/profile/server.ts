@@ -316,15 +316,20 @@ export async function getPublicTile(
     downloadCounts([tile.id]),
     supabase
       .from("tiles")
-      .select("tags, description")
+      .select("tags, description, allow_remix")
       .eq("id", tile.id)
-      .maybeSingle<{ tags: string[]; description: string | null }>(),
+      .maybeSingle<{
+        tags: string[];
+        description: string | null;
+        allow_remix: boolean;
+      }>(),
   ]);
   return {
     ...tile,
     downloads: downloads.get(tile.id) ?? 0,
     tags: details.data?.tags ?? [],
     description: details.data?.description ?? null,
+    allowRemix: details.data?.allow_remix ?? true,
   };
 }
 

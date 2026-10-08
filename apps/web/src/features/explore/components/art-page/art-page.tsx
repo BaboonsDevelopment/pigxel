@@ -73,7 +73,9 @@ export function ArtPage({
           initial={comments.comments}
           total={comments.count}
         />
-        <InspiredCard />
+        {(tile.allowRemix !== false || viewer?.id === tile.author.id) && (
+          <InspiredCard />
+        )}
       </div>
     </div>
   );

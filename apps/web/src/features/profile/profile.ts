@@ -63,6 +63,7 @@ export type PublicTile = ProfileTile & {
   downloads: number;
   tags: string[];
   description: string | null;
+  allowRemix?: boolean;
 };
 
 export const AVATAR_BUCKET = "avatars";
