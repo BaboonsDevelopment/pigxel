@@ -98,17 +98,53 @@ export function NotificationBell({
                 {items.map((item) => (
                   <li key={item.id}>
                     <Link
-                      href={`/u/${item.username}`}
+                      href={
+                        item.kind === "follow"
+                          ? `/u/${item.username}`
+                          : "/tiles"
+                      }
                       onClick={() => setOpen(false)}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary",
                         item.unread && "bg-primary-soft/35",
                       )}
                     >
-                      <ProfileAvatar name={item.name} url={item.avatarUrl} />
+                      {item.kind === "follow" ? (
+                        <ProfileAvatar name={item.name} url={item.avatarUrl} />
+                      ) : (
+                        <span
+                          aria-hidden="true"
+                          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+                        >
+                          <svg
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="size-4"
+                          >
+                            <path d="M8 2.5 14 13H2Z" />
+                            <path d="M8 6.5v3M8 11.3v.2" />
+                          </svg>
+                        </span>
+                      )}
                       <span className="min-w-0 flex-1 text-sm">
-                        <span className="font-semibold">{item.name}</span>{" "}
-                        started following you
+                        {item.kind === "follow" ? (
+                          <>
+                            <span className="font-semibold">{item.name}</span>{" "}
+                            started following you
+                          </>
+                        ) : (
+                          <>
+                            <span className="block font-semibold">
+                              “{item.tileName}” wasn’t published
+                            </span>
+                            It didn’t pass our content check, so only you can
+                            see it. Explore doesn’t allow adult content.
+                          </>
+                        )}
                         <span className="block text-xs text-muted-foreground">
                           {item.ago}
                         </span>

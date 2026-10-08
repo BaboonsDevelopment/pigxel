@@ -43,6 +43,7 @@ export type ProfileTile = {
   height: number;
   thumbnail: string | null;
   visibility: Visibility;
+  inReview?: boolean;
   pinOrder: number | null;
   updatedAt: string;
 };
@@ -52,6 +53,7 @@ export type TileAuthor = {
   username: string;
   name: string;
   avatarUrl: string | null;
+  bio?: string;
 };
 
 export type PublicTile = ProfileTile & {
@@ -61,6 +63,13 @@ export type PublicTile = ProfileTile & {
   downloads: number;
   tags: string[];
   description: string | null;
+  allowRemix?: boolean;
+  remixes?: number;
+  views?: number;
+  remixOf?: {
+    username: string;
+    tile: { id: string; name: string } | null;
+  } | null;
 };
 
 export const AVATAR_BUCKET = "avatars";

@@ -4,6 +4,7 @@ import { refresh } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { MAX_PINS, type Visibility } from "./profile";
 import { createClient } from "@/lib/supabase/server";
+import { requestReview } from "@/features/moderation/request";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Result = { error?: string };
@@ -22,12 +23,15 @@ export async function setTileVisibility(
     return { error: "Invalid request." };
   try {
     const supabase = await createClient();
-    const { error } = await supabase
-      .from("tiles")
-      .update({ visibility })
-      .eq("id", tileId)
-      .eq("user_id", user.id);
-    if (error) return { error: "Couldn’t change this art. Try again." };
+    if (visibility === "public") await requestReview(supabase, tileId, user.id);
+    else {
+      const { error } = await supabase
+        .from("tiles")
+        .update({ visibility, review: null })
+        .eq("id", tileId)
+        .eq("user_id", user.id);
+      if (error) return { error: "Couldn’t change this art. Try again." };
+    }
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }

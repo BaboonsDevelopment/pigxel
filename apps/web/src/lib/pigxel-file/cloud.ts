@@ -13,6 +13,7 @@ export type CloudTileSummary = CloudTile & {
   height: number;
   thumbnail: string | null;
   updatedAt: string;
+  published?: boolean;
 };
 
 export class CloudError extends Error {}
@@ -25,6 +26,8 @@ type TileRow = {
   height: number;
   thumbnail: string | null;
   updated_at: string;
+  visibility?: string;
+  review?: string | null;
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -54,6 +57,9 @@ export function toSummary(row: TileRow): CloudTileSummary {
     height: row.height,
     thumbnail: row.thumbnail,
     updatedAt: row.updated_at,
+    ...(row.visibility && {
+      published: row.visibility === "public" || row.review === "pending",
+    }),
   };
 }
 
@@ -91,6 +97,7 @@ export async function saveCloudTile(
     width: image.width,
     height: image.height,
     background: image.background,
+    frame_count: image.frames.length,
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };

@@ -5,6 +5,7 @@ import {
   getFollowStats,
   getOwnProfile,
   getPublicTile,
+  listMoreByAuthor,
 } from "@/features/profile/server";
 import { isTileSaved, listComments } from "@/features/explore/server";
 import { getUser } from "@/lib/auth/session";
@@ -20,7 +21,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tile = UUID.test(id)
     ? await getPublicTile(id, null).catch(() => null)
     : null;
-  return { title: `${tile?.name ?? "Art"} · Pigxel` };
+  if (!tile) return { title: "Art · Pigxel" };
+  const title = `${tile.name} by @${tile.author.username} · Pigxel`;
+  const description =
+    tile.description?.trim().slice(0, 200) ||
+    `Pixel art by ${tile.author.name} on Pigxel. Open it, remix it and make your own.`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "article", siteName: "Pigxel" },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 export default async function ArtDetailPage({ params }: Props) {
@@ -29,7 +40,7 @@ export default async function ArtDetailPage({ params }: Props) {
   const user = await getUser();
   const tile = await getPublicTile(id, user?.id ?? null);
   if (!tile) notFound();
-  const [profile, follow, saved, comments] = await Promise.all([
+  const [profile, follow, saved, comments, moreArts] = await Promise.all([
     user ? getOwnProfile(user.id) : null,
     user && user.id !== tile.author.id
       ? getFollowStats(tile.author.id, user.id).catch(() => null)
@@ -39,6 +50,7 @@ export default async function ArtDetailPage({ params }: Props) {
       console.error(error);
       return { comments: [], count: 0 };
     }),
+    listMoreByAuthor(tile.author.id, tile.id).catch(() => []),
   ]);
   return (
     <ArtPage
@@ -55,6 +67,7 @@ export default async function ArtDetailPage({ params }: Props) {
       following={follow?.following ?? false}
       saved={saved}
       comments={comments}
+      moreArts={moreArts}
     />
   );
 }

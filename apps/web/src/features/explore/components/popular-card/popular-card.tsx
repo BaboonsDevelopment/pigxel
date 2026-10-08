@@ -7,18 +7,30 @@ import type { PublicTile } from "@/features/profile/profile";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
+import { Highlighted } from "./components/highlighted";
 import { LikeButton } from "./components/like-button";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { formatCount } from "./helpers";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
 
-export function PopularCard({ tile }: { tile: PublicTile }) {
+export function PopularCard({
+  tile,
+  words = [],
+  delay = 0,
+}: {
+  tile: PublicTile;
+  words?: string[];
+  delay?: number;
+}) {
   const { author } = tile;
   const router = useRouter();
   const href = `/explore/${tile.id}`;
   return (
-    <li className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
+    <li
+      style={{ animationDelay: `${delay}ms` }}
+      className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow [animation-fill-mode:both] hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300"
+    >
       <Link
         href={href}
         aria-label={`Open ${tile.name}`}
@@ -31,7 +43,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
                 src={tile.thumbnail}
                 alt=""
                 loading="lazy"
-                className="size-full object-contain"
+                className="size-full object-cover"
               />
             ) : (
               <span className="flex size-full items-center justify-center font-mono text-xs text-muted-foreground">
@@ -45,7 +57,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
       <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="truncate text-xl leading-tight" title={tile.name}>
-            {tile.name}
+            <Highlighted text={tile.name} words={words} />
           </h3>
           <ProjectMenu
             label={`More for ${tile.name}`}
@@ -79,7 +91,9 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
               url={author.avatarUrl}
               className="size-3.5 shrink-0 text-[7px]"
             />
-            <span className="truncate">{author.username}</span>
+            <span className="truncate">
+              <Highlighted text={author.username} words={words} />
+            </span>
           </Link>
           <div
             className={cn(
