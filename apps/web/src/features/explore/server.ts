@@ -11,6 +11,8 @@ export type SavedArt = {
   height: number;
   thumbnail: string | null;
   author: string;
+  authorId: string;
+  allowRemix: boolean;
   savedAt: string;
 };
 
@@ -22,6 +24,8 @@ type SavedRow = {
     width: number;
     height: number;
     thumbnail: string | null;
+    user_id: string;
+    allow_remix: boolean;
     author: { username: string };
   };
 };
@@ -42,32 +46,43 @@ export async function isTileSaved(
 
 export async function listSavedArts(
   userId: string,
-  match: string | null = null,
-): Promise<SavedArt[]> {
-  if (!isSupabaseConfigured()) return [];
+  {
+    match = null,
+    from = 0,
+    limit,
+  }: { match?: string | null; from?: number; limit: number },
+): Promise<{ arts: SavedArt[]; count: number | null }> {
+  if (!isSupabaseConfigured()) return { arts: [], count: 0 };
   const supabase = await createClient();
   const base = supabase
     .from("saved_tiles")
     .select(
-      "created_at, tile:tiles!inner(id, name, width, height, thumbnail, author:profiles!tiles_user_id_profiles_fkey!inner(username))",
+      "created_at, tile:tiles!inner(id, name, width, height, thumbnail, user_id, allow_remix, author:profiles!tiles_user_id_profiles_fkey!inner(username))",
+      from === 0 ? { count: "exact" } : undefined,
     )
     .eq("user_id", userId)
     .eq("tile.visibility", "public");
-  const { data, error } = await (
+  const { data, error, count } = await (
     match ? base.or(match, { referencedTable: "tile" }) : base
   )
     .order("created_at", { ascending: false })
-    .limit(120);
+    .order("tile_id")
+    .range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load saved arts: ${error.message}`);
-  return (data as unknown as SavedRow[]).map((row) => ({
-    id: row.tile.id,
-    name: row.tile.name,
-    width: row.tile.width,
-    height: row.tile.height,
-    thumbnail: row.tile.thumbnail,
-    author: row.tile.author.username,
-    savedAt: row.created_at,
-  }));
+  return {
+    count: from === 0 ? (count ?? data.length) : null,
+    arts: (data as unknown as SavedRow[]).map((row) => ({
+      id: row.tile.id,
+      name: row.tile.name,
+      width: row.tile.width,
+      height: row.tile.height,
+      thumbnail: row.tile.thumbnail,
+      author: row.tile.author.username,
+      authorId: row.tile.user_id,
+      allowRemix: row.tile.allow_remix,
+      savedAt: row.created_at,
+    })),
+  };
 }
 
 type CommentRow = {

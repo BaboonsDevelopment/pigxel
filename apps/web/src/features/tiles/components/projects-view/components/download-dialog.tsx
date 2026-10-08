@@ -11,7 +11,7 @@ import {
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
 import { pigxelFileName, PIGXEL_MIME_TYPE } from "@/lib/pigxel-file/format";
-import { readCloudTile } from "@/lib/pigxel-file/cloud";
+import { readCloudTile, readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { downloadBlob } from "@/lib/utils/download";
 import {
   defaultScale,
@@ -31,11 +31,17 @@ export function DownloadDialog({
   name,
   file: localFile,
   tileId,
+  authorId,
+  onDownload,
+  withFile = true,
   onClose,
 }: {
   name: string;
   file?: string;
   tileId?: string;
+  authorId?: string;
+  onDownload?: () => void;
+  withFile?: boolean;
   onClose: () => void;
 }) {
   const [file, setFile] = useState<{ text: string; picture: Picture } | null>(
@@ -48,7 +54,9 @@ export function DownloadDialog({
     let stale = false;
     (localFile !== undefined
       ? Promise.resolve(localFile)
-      : readCloudTile(tileId ?? "")
+      : authorId
+        ? readPublishedTile({ id: tileId ?? "", userId: authorId })
+        : readCloudTile(tileId ?? "")
     )
       .then((text) => {
         if (stale) return;
@@ -62,7 +70,7 @@ export function DownloadDialog({
     return () => {
       stale = true;
     };
-  }, [localFile, tileId]);
+  }, [localFile, tileId, authorId]);
 
   const picture = file?.picture;
   const formats = picture?.animated
@@ -114,9 +122,10 @@ export function DownloadDialog({
                 <li key={format.value}>
                   <button
                     type="button"
-                    onClick={() =>
-                      downloadPicture(picture, name, format.value, scale)
-                    }
+                    onClick={() => {
+                      downloadPicture(picture, name, format.value, scale);
+                      onDownload?.();
+                    }}
                     className={OPTION}
                   >
                     <span className="font-medium">{format.label}</span>
@@ -128,23 +137,26 @@ export function DownloadDialog({
                   </button>
                 </li>
               ))}
-              <li className="mt-1 border-t pt-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    downloadBlob(
-                      new Blob([file.text], { type: PIGXEL_MIME_TYPE }),
-                      pigxelFileName(name),
-                    )
-                  }
-                  className={OPTION}
-                >
-                  <span className="font-medium">Pigxel file</span>
-                  <span className="text-xs text-muted-foreground">
-                    Layers and frames, opens in Pigxel
-                  </span>
-                </button>
-              </li>
+              {withFile && (
+                <li className="mt-1 border-t pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadBlob(
+                        new Blob([file.text], { type: PIGXEL_MIME_TYPE }),
+                        pigxelFileName(name),
+                      );
+                      onDownload?.();
+                    }}
+                    className={OPTION}
+                  >
+                    <span className="font-medium">Pigxel file</span>
+                    <span className="text-xs text-muted-foreground">
+                      Layers and frames, opens in Pigxel
+                    </span>
+                  </button>
+                </li>
+              )}
             </ul>
           </>
         )}

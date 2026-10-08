@@ -55,19 +55,26 @@ export function ProjectsView({
   initial: { tiles: CloudTileSummary[]; count: number };
   folders: Folder[];
   folder: Folder | null;
-  saved: SavedArt[];
+  saved: { arts: SavedArt[]; count: number | null };
   labels: Label[];
   view: ProjectsViewState;
   recent: CloudTileSummary[] | null;
 }) {
   useSeedProjectCache({
     list: {
-      params: listParams(view.filters, view.query, folder?.id ?? null),
+      params: listParams(
+        view.filters,
+        view.query,
+        folder?.id ?? null,
+        false,
+        false,
+        view.sort,
+      ),
       page: initial,
     },
     recent,
     labels: initialLabels,
-    saved: { query: view.query, arts: saved },
+    saved: { query: view.query, page: saved },
   });
   const labels = useLabels();
   const setLabels = useSetLabels();
@@ -78,17 +85,17 @@ export function ProjectsView({
     view.filters,
   );
   const [creating, setCreating] = useState(false);
-  const [folderSort, setFolderSort] = useState<ProjectSort>("edited");
+  const [sort, setSort] = useState<ProjectSort>(view.sort);
   const folderTiles = useCloudTileActions(userId);
   const moveProjects = useMoveProjects();
   const [reorderError, setReorderError] = useState<string | null>(null);
-  const sort = useFolderSort(folders, (ids) => {
+  const folderOrder = useFolderSort(folders, (ids) => {
     setReorderError(null);
     void reorderFolders(ids).then((result) =>
       setReorderError(result.error ?? null),
     );
   });
-  const sortedFolders = sort.folders;
+  const sortedFolders = folderOrder.folders;
   const drop = (ids: string[], folderId: string) =>
     moveProjects.mutate({ ids, folderId });
 
@@ -99,10 +106,10 @@ export function ProjectsView({
 
   useEffect(() => {
     if (folder) return;
-    const next = `${window.location.pathname}${viewSearch({ filter, query: searched, filters: projectFilters })}`;
+    const next = `${window.location.pathname}${viewSearch({ filter, query: searched, filters: projectFilters, sort })}`;
     if (next !== window.location.pathname + window.location.search)
       window.history.replaceState(window.history.state, "", next);
-  }, [folder, filter, searched, projectFilters]);
+  }, [folder, filter, searched, projectFilters, sort]);
 
   if (folder)
     return (
@@ -111,8 +118,11 @@ export function ProjectsView({
         <FolderToolbar
           query={query}
           onQueryChange={setQuery}
-          sort={folderSort}
-          onSortChange={setFolderSort}
+          sort={sort}
+          onSortChange={setSort}
+          filters={projectFilters}
+          onFiltersChange={setProjectFilters}
+          labels={labels}
         />
         <ProjectGrid
           userId={userId}
@@ -122,7 +132,8 @@ export function ProjectsView({
           query={query}
           searched={searched}
           folderId={folder.id}
-          sort={folderSort}
+          sort={sort}
+          filters={projectFilters}
         />
       </ProjectDragProvider>
     );
@@ -139,6 +150,7 @@ export function ProjectsView({
     onLabelsChange: setLabels,
     query,
     searched,
+    sort,
   };
 
   return (
@@ -151,6 +163,8 @@ export function ProjectsView({
         projectFilters={projectFilters}
         onProjectFiltersChange={setProjectFilters}
         labels={labels}
+        sort={sort}
+        onSortChange={setSort}
       />
       {filter === "All" && !query.trim() && unfiltered && (
         <RecentRow
@@ -204,7 +218,7 @@ export function ProjectsView({
                 key={f.id}
                 folder={f}
                 opening={folderTiles.busy}
-                sort={sort.itemProps(f.id)}
+                sort={folderOrder.itemProps(f.id)}
                 onOpen={(project) =>
                   void folderTiles.open({
                     id: project.id,
@@ -232,7 +246,12 @@ export function ProjectsView({
       {filter === "Archive" && <ProjectGrid {...gridProps} archived />}
       {filter === "Trash" && <ProjectGrid {...gridProps} trashed />}
       {filter === "Favourite" && (
-        <Favourites query={query} searched={searched} grid={GRID} />
+        <Favourites
+          userId={userId}
+          query={query}
+          searched={searched}
+          grid={GRID}
+        />
       )}
       {filter === "Shared" && (
         <EmptyState

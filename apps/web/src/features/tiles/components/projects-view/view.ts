@@ -4,16 +4,19 @@ import { cleanSearch } from "../../search";
 import {
   FILTERS,
   NO_PROJECT_FILTERS,
+  PROJECT_SORTS,
   PUBLISHED,
   STORAGES,
   type Filter,
   type ProjectFilters,
+  type ProjectSort,
 } from "./constants";
 
 export type ProjectsViewState = {
   filter: Filter;
   query: string;
   filters: ProjectFilters;
+  sort: ProjectSort;
 };
 
 export type ViewParams = {
@@ -24,6 +27,7 @@ export type ViewParams = {
   animated?: string;
   label?: string;
   published?: string;
+  sort?: string;
 };
 
 export function readView(
@@ -35,6 +39,7 @@ export function readView(
       FILTERS.find((f) => f.toLowerCase() === params.tab?.toLowerCase()) ??
       "All",
     query: cleanSearch(params.q ?? ""),
+    sort: PROJECT_SORTS.find((s) => s.value === params.sort)?.value ?? "edited",
     filters: {
       size:
         SIZES.find((s) => s.value === params.size)?.value ??
@@ -51,10 +56,16 @@ export function readView(
   };
 }
 
-export function viewSearch({ filter, query, filters }: ProjectsViewState) {
+export function viewSearch({
+  filter,
+  query,
+  filters,
+  sort,
+}: ProjectsViewState) {
   const params = new URLSearchParams();
   if (filter !== "All") params.set("tab", filter.toLowerCase());
   if (query) params.set("q", query);
+  if (sort !== "edited") params.set("sort", sort);
   if (filters.size !== NO_PROJECT_FILTERS.size)
     params.set("size", filters.size);
   if (filters.storage !== NO_PROJECT_FILTERS.storage)

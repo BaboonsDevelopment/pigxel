@@ -34,6 +34,7 @@ import {
   type Project,
 } from "../../helpers";
 import { DownloadDialog } from "../download-dialog";
+import { StatsHover } from "../stats-hover";
 import { LabelsDialog } from "../labels-dialog";
 import { MoveDialog } from "../move-dialog";
 import { NewProjectCard } from "../new-project-card";
@@ -415,6 +416,7 @@ function Grid({
                 });
               }}
               dragging={drag.isDragging(project.id)}
+              corner={tile.published && <StatsHover tile={tile} />}
               opening={
                 cloud.busy === project.id || actions.duplicating === project.id
               }

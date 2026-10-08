@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
 export function OptionMenu<Value extends string>({
@@ -8,8 +8,10 @@ export function OptionMenu<Value extends string>({
   options,
   value,
   onChange,
+  icon,
 }: {
   label: string;
+  icon?: ReactNode;
   options: readonly [
     { value: Value; label: string },
     ...{ value: Value; label: string }[],
@@ -49,6 +51,7 @@ export function OptionMenu<Value extends string>({
         onClick={() => setOpen(!open)}
         className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3.5 text-xs transition-colors hover:bg-muted"
       >
+        {icon}
         {current.label}
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5">
           <path

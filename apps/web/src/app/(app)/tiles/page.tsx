@@ -35,15 +35,18 @@ export default async function Tiles({ searchParams }: Props) {
   const folder = folders.find((f) => f.id === params.folder) ?? null;
   const view = readView(folder ? {} : params, labels);
   const [saved, cloudTiles, recent] = await Promise.all([
-    listSavedArts(user.id, searchMatch(view.query)).catch((error: unknown) => {
+    listSavedArts(user.id, {
+      match: searchMatch(view.query),
+      limit: PAGE_SIZE,
+    }).catch((error: unknown) => {
       console.error(error);
-      return [];
+      return { arts: [], count: 0 };
     }),
     countedCloudTilesOnServer(
       user.id,
       PAGE_SIZE,
       folder?.id ?? null,
-      cloudFilter({ ...view.filters, query: view.query }),
+      cloudFilter({ ...view.filters, query: view.query, sort: view.sort }),
     ),
     folder ? null : listRecentlyOpenedOnServer(user.id, RECENT_SHOWN),
   ]);

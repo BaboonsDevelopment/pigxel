@@ -6,10 +6,9 @@ import { useEffect, useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
-import { parsePigxel } from "@/lib/pigxel-file/format";
-import { draftFromFile, editorUrl } from "@/lib/pigxel-file/open-tile";
-import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { CloudError } from "@/lib/pigxel-file/cloud";
+import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { remixArt } from "../../../remix";
 import { setFollowing } from "@/features/profile/actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { PublicTile } from "@/features/profile/profile";
@@ -19,7 +18,6 @@ import { ProjectMenu } from "@/features/tiles/components/project-card/components
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
 import {
-  linkRemix,
   recordDownload,
   recordView,
   reportArt,
@@ -150,20 +148,7 @@ export function ArtDetails({
     setRemixing(true);
     setError(null);
     try {
-      const image = parsePigxel(file);
-      const name = `${tile.name.slice(0, 91)} (remix)`;
-      const copy = await saveCloudTile(
-        { name },
-        file,
-        image,
-        thumbnailDataUrl(image),
-      );
-      await linkRemix(copy.id, tile.id);
-      const id = await draftFromFile(viewerId, file, name, {
-        kind: "cloud",
-        tile: copy,
-      });
-      router.push(editorUrl(id));
+      router.push(editorUrl(await remixArt(viewerId, tile, file)));
     } catch (e) {
       setError(
         e instanceof CloudError

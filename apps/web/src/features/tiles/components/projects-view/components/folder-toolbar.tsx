@@ -6,18 +6,31 @@ import {
   InputGroupText,
 } from "@pigxel/ui/components/input";
 import { OptionMenu } from "@/features/explore/components/explore-header/components/option-menu";
-import { PROJECT_SORTS, type ProjectSort } from "../constants";
+import type { Label } from "../../../labels";
+import {
+  PROJECT_SORTS,
+  type ProjectFilters,
+  type ProjectSort,
+} from "../constants";
+import { ProjectFiltersMenu } from "./project-filters-menu";
+import { SortIcon } from "./toolbar-icons";
 
 export function FolderToolbar({
   query,
   onQueryChange,
   sort,
   onSortChange,
+  filters,
+  onFiltersChange,
+  labels,
 }: {
   query: string;
   onQueryChange: (query: string) => void;
   sort: ProjectSort;
   onSortChange: (sort: ProjectSort) => void;
+  filters: ProjectFilters;
+  onFiltersChange: (filters: ProjectFilters) => void;
+  labels: Label[];
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -46,9 +59,16 @@ export function FolderToolbar({
       </InputGroup>
       <OptionMenu
         label="Sort"
+        icon={<SortIcon />}
         options={PROJECT_SORTS}
         value={sort}
         onChange={onSortChange}
+      />
+      <ProjectFiltersMenu
+        filters={filters}
+        onChange={onFiltersChange}
+        labels={labels}
+        storage={false}
       />
     </div>
   );

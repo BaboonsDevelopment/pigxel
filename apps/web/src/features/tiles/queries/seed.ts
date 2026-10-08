@@ -19,7 +19,7 @@ export function useSeedProjectCache({
   };
   recent: CloudTileSummary[] | null;
   labels: Label[];
-  saved: { query: string; arts: SavedArt[] };
+  saved: { query: string; page: { arts: SavedArt[]; count: number | null } };
 }) {
   const client = useQueryClient();
   useState(() => {
@@ -33,6 +33,9 @@ export function useSeedProjectCache({
     });
     if (recent) client.setQueryData(projectKeys.recent(), recent);
     client.setQueryData(projectKeys.labels(), labels);
-    client.setQueryData(projectKeys.saved(saved.query), saved.arts);
+    client.setQueryData(projectKeys.saved(saved.query), {
+      pages: [saved.page],
+      pageParams: [0],
+    });
   });
 }

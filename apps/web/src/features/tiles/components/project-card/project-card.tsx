@@ -19,6 +19,7 @@ export function ProjectCard({
   selected,
   onPointerDown,
   dragging = false,
+  corner,
 }: {
   name: string;
   thumbnail: ReactNode;
@@ -33,6 +34,7 @@ export function ProjectCard({
   selected?: boolean;
   onPointerDown?: (event: PointerEvent) => void;
   dragging?: boolean;
+  corner?: ReactNode;
 }) {
   const face = (
     <span
@@ -103,6 +105,9 @@ export function ProjectCard({
         >
           {face}
         </button>
+      )}
+      {corner && selected === undefined && (
+        <div className="absolute top-2 right-2 z-10">{corner}</div>
       )}
       <div
         className={

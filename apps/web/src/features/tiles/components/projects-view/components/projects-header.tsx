@@ -6,8 +6,17 @@ import {
 } from "@pigxel/ui/components/input";
 import { Heading } from "@pigxel/ui/components/typography";
 import mascot from "../../../../../../public/art/pigxel-mascot-studying.png";
-import { FILTERS, type Filter, type ProjectFilters } from "../constants";
+import {
+  FILTERS,
+  PROJECT_SORTS,
+  type Filter,
+  type ProjectFilters,
+  type ProjectSort,
+} from "../constants";
 import { ProjectFiltersMenu } from "./project-filters-menu";
+import { SortIcon } from "./toolbar-icons";
+import { StatsHover } from "./stats-hover";
+import { OptionMenu } from "@/features/explore/components/explore-header/components/option-menu";
 import type { Label } from "../../../labels";
 
 const SIDE_VIEWS: ReadonlySet<Filter> = new Set(["Archive", "Trash"]);
@@ -63,6 +72,8 @@ export function ProjectsHeader({
   projectFilters,
   onProjectFiltersChange,
   labels,
+  sort,
+  onSortChange,
 }: {
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
@@ -71,6 +82,8 @@ export function ProjectsHeader({
   projectFilters: ProjectFilters;
   onProjectFiltersChange: (filters: ProjectFilters) => void;
   labels: Label[];
+  sort: ProjectSort;
+  onSortChange: (sort: ProjectSort) => void;
 }) {
   return (
     <header className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -98,11 +111,20 @@ export function ProjectsHeader({
             </button>
           ))}
           {(filter === "All" || filter === "Projects") && (
-            <ProjectFiltersMenu
-              filters={projectFilters}
-              onChange={onProjectFiltersChange}
-              labels={labels}
-            />
+            <>
+              <OptionMenu
+                label="Sort"
+                icon={<SortIcon />}
+                options={PROJECT_SORTS}
+                value={sort}
+                onChange={onSortChange}
+              />
+              <ProjectFiltersMenu
+                filters={projectFilters}
+                onChange={onProjectFiltersChange}
+                labels={labels}
+              />
+            </>
           )}
         </div>
       </div>
@@ -116,6 +138,7 @@ export function ProjectsHeader({
           className="-mt-[30px] -mb-[16px] hidden h-auto w-[237px] md:block"
         />
         <div className="flex w-full items-center gap-2">
+          <StatsHover tile={null} />
           <ViewButton
             label="Archive"
             active={filter === "Archive"}

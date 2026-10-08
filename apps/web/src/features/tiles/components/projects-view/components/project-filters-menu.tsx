@@ -10,6 +10,7 @@ import {
   type ProjectFilters,
 } from "../constants";
 import type { Label } from "../../../labels";
+import { FilterIcon } from "./toolbar-icons";
 
 const ITEM =
   "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 text-left whitespace-nowrap text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground";
@@ -39,10 +40,12 @@ export function ProjectFiltersMenu({
   filters,
   onChange,
   labels,
+  storage = true,
 }: {
   filters: ProjectFilters;
   onChange: (filters: ProjectFilters) => void;
   labels: Label[];
+  storage?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [submenu, setSubmenu] = useState<Submenu | null>(null);
@@ -90,6 +93,7 @@ export function ProjectFiltersMenu({
         }}
         className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3.5 text-xs transition-colors hover:bg-muted"
       >
+        <FilterIcon />
         Filters
         {active > 0 && (
           <span
@@ -130,20 +134,22 @@ export function ProjectFiltersMenu({
             onOpenChange={(next) => setSubmenu(next ? "size" : null)}
             onChange={(size) => choose({ size })}
           />
-          <SubmenuItem
-            label="Storage"
-            icon={
-              <>
-                <ellipse cx="8" cy="4" rx="5" ry="1.8" />
-                <path d="M3 4v8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V4M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8" />
-              </>
-            }
-            options={STORAGES}
-            value={filters.storage}
-            open={submenu === "storage"}
-            onOpenChange={(next) => setSubmenu(next ? "storage" : null)}
-            onChange={(storage) => choose({ storage })}
-          />
+          {storage && (
+            <SubmenuItem
+              label="Storage"
+              icon={
+                <>
+                  <ellipse cx="8" cy="4" rx="5" ry="1.8" />
+                  <path d="M3 4v8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V4M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8" />
+                </>
+              }
+              options={STORAGES}
+              value={filters.storage}
+              open={submenu === "storage"}
+              onOpenChange={(next) => setSubmenu(next ? "storage" : null)}
+              onChange={(storage) => choose({ storage })}
+            />
+          )}
           <SubmenuItem
             label="Explore"
             icon={

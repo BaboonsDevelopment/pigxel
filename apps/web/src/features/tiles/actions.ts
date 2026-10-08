@@ -16,6 +16,7 @@ import { PAGE_SIZE, PROJECT_NAME_MAX, RECENT_SHOWN } from "./constants";
 import { FOLDER_NAME_MAX } from "./folders";
 import { LABEL_COLORS, LABEL_NAME_MAX, type Label } from "./labels";
 import { listLabels } from "./server";
+import type { ArtStats } from "./stats";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,12 +53,20 @@ export async function loadCloudTilesCounted(
   );
 }
 
-export async function searchSavedArts(query: string): Promise<SavedArt[]> {
+export async function searchSavedArts(
+  query: string,
+  from = 0,
+): Promise<{ arts: SavedArt[]; count: number | null }> {
   const user = await requireUser();
+  if (!Number.isInteger(from) || from < 0) return { arts: [], count: 0 };
   try {
-    return await listSavedArts(user.id, searchMatch(query));
+    return await listSavedArts(user.id, {
+      match: searchMatch(query),
+      from,
+      limit: PAGE_SIZE,
+    });
   } catch {
-    return [];
+    return { arts: [], count: from === 0 ? 0 : null };
   }
 }
 
@@ -428,4 +437,40 @@ export async function deleteProjectsForever(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
+}
+
+type StatsRow = {
+  id: string;
+  name: string;
+  thumbnail: string | null;
+  likes: { count: number }[];
+  comments: { count: number }[];
+  views: { total: number } | null;
+  downloads: { total: number } | null;
+};
+
+export async function loadArtStats(tileId?: string): Promise<ArtStats[]> {
+  const user = await requireUser();
+  if (tileId !== undefined && !UUID.test(tileId)) return [];
+  const supabase = await createClient();
+  const base = supabase
+    .from("tiles")
+    .select(
+      "id, name, thumbnail, likes:tile_likes(count), comments:tile_comments(count), views:tile_views(total), downloads:tile_downloads(total)",
+    )
+    .eq("user_id", user.id)
+    .or("visibility.eq.public,review.eq.pending")
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false });
+  const { data, error } = await (tileId ? base.eq("id", tileId) : base);
+  if (error) throw new Error("Couldn’t load statistics. Try again.");
+  return (data as unknown as StatsRow[]).map((row) => ({
+    id: row.id,
+    name: row.name,
+    thumbnail: row.thumbnail,
+    views: Number(row.views?.total ?? 0),
+    likes: row.likes[0]?.count ?? 0,
+    downloads: Number(row.downloads?.total ?? 0),
+    comments: row.comments[0]?.count ?? 0,
+  }));
 }

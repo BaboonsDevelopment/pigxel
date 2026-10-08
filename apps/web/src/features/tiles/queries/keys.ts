@@ -15,6 +15,8 @@ export const projectKeys = {
   saved: (query: string) => [...projectKeys.all, "saved", query] as const,
   savedAll: () => [...projectKeys.all, "saved"] as const,
   labels: () => [...projectKeys.all, "labels"] as const,
+  stats: (tileId: string | null) =>
+    [...projectKeys.all, "stats", tileId ?? "all"] as const,
 };
 
 export function listParams(
