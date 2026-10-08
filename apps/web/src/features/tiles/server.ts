@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { Folder } from "./folders";
+import type { Label } from "./labels";
 
 type FolderRow = {
   id: string;
@@ -43,4 +44,16 @@ export async function listFolders(userId: string): Promise<Folder[]> {
       at: Date.parse(tile.updated_at),
     })),
   }));
+}
+
+export async function listLabels(userId: string): Promise<Label[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("labels")
+    .select("id, name, color")
+    .eq("user_id", userId)
+    .order("name");
+  if (error) throw new Error(`Couldn’t load labels: ${error.message}`);
+  return data;
 }

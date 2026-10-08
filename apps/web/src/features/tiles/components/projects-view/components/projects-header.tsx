@@ -6,18 +6,26 @@ import {
 } from "@pigxel/ui/components/input";
 import { Heading } from "@pigxel/ui/components/typography";
 import mascot from "../../../../../../public/art/pigxel-mascot-studying.png";
-import { FILTERS, type Filter } from "../constants";
+import { FILTERS, type Filter, type ProjectFilters } from "../constants";
+import { ProjectFiltersMenu } from "./project-filters-menu";
+import type { Label } from "../../../labels";
 
 export function ProjectsHeader({
   filter,
   onFilterChange,
   query,
   onQueryChange,
+  projectFilters,
+  onProjectFiltersChange,
+  labels,
 }: {
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
   query: string;
   onQueryChange: (query: string) => void;
+  projectFilters: ProjectFilters;
+  onProjectFiltersChange: (filters: ProjectFilters) => void;
+  labels: Label[];
 }) {
   return (
     <header className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
@@ -44,6 +52,13 @@ export function ProjectsHeader({
               {name}
             </button>
           ))}
+          {(filter === "All" || filter === "Projects") && (
+            <ProjectFiltersMenu
+              filters={projectFilters}
+              onChange={onProjectFiltersChange}
+              labels={labels}
+            />
+          )}
         </div>
       </div>
       <div className="flex w-full max-w-[364px] flex-col items-end">

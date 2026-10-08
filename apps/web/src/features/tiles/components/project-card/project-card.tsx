@@ -14,6 +14,7 @@ export function ProjectCard({
   disabled = false,
   menu,
   meta,
+  badges,
 }: {
   name: string;
   thumbnail: ReactNode;
@@ -23,6 +24,7 @@ export function ProjectCard({
   disabled?: boolean;
   menu: Parameters<typeof ProjectMenu>[0]["items"];
   meta?: ReactNode;
+  badges?: ReactNode;
 }) {
   const face = (
     <span
@@ -32,6 +34,11 @@ export function ProjectCard({
         {thumbnail}
       </span>
       <HoverOverlay label={opening ? busyLabel : "Open"} force={opening} />
+      {badges && (
+        <span className="pointer-events-none absolute top-2 left-2 flex max-w-[calc(100%-1rem)] flex-wrap gap-1">
+          {badges}
+        </span>
+      )}
     </span>
   );
   const openLabel = `Open ${name}`;

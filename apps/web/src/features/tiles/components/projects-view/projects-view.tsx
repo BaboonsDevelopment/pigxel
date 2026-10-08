@@ -20,6 +20,7 @@ import { pixelifySans } from "@/lib/fonts/pixelify";
 import { loadCloudTiles, moveTileToFolder } from "../../actions";
 import { PAGE_SIZE } from "../../constants";
 import type { Folder } from "../../folders";
+import type { Label } from "../../labels";
 import {
   confirmRemoveLocalTile,
   useCloudTileActions,
@@ -32,12 +33,22 @@ import { Favourites } from "./components/favourites";
 import { FolderCard } from "./components/folder-card";
 import { FolderHeader } from "./components/folder-header";
 import { FolderNameDialog } from "./components/folder-name-dialog";
+import { LabelsDialog } from "./components/labels-dialog";
 import { MoveDialog } from "./components/move-dialog";
 import { NewProjectCard } from "./components/new-project-card";
 import { ProjectsHeader } from "./components/projects-header";
 import { SectionHeader } from "./components/section-header";
-import type { Filter } from "./constants";
-import { editedAgo, readLocalProjects, toCloudProject } from "./helpers";
+import {
+  NO_PROJECT_FILTERS,
+  type Filter,
+  type ProjectFilters,
+} from "./constants";
+import {
+  editedAgo,
+  matchesLocal,
+  readLocalProjects,
+  toCloudProject,
+} from "./helpers";
 
 const PRELOAD = "1500px";
 const GRID =
@@ -49,15 +60,20 @@ export function ProjectsView({
   folders,
   folder,
   saved,
+  labels: initialLabels,
 }: {
   userId: string;
   initial: CloudTileSummary[];
   folders: Folder[];
   folder: Folder | null;
   saved: SavedArt[];
+  labels: Label[];
 }) {
+  const [labels, setLabels] = useState(initialLabels);
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
+  const [projectFilters, setProjectFilters] =
+    useState<ProjectFilters>(NO_PROJECT_FILTERS);
   const [creating, setCreating] = useState(false);
   const folderTiles = useCloudTileActions(userId);
 
@@ -71,6 +87,8 @@ export function ProjectsView({
           query=""
           folders={folders}
           folderId={folder.id}
+          labels={labels}
+          onLabelsChange={setLabels}
         />
       </>
     );
@@ -82,6 +100,9 @@ export function ProjectsView({
         onFilterChange={setFilter}
         query={query}
         onQueryChange={setQuery}
+        projectFilters={projectFilters}
+        onProjectFiltersChange={setProjectFilters}
+        labels={labels}
       />
       {(filter === "All" || filter === "Folders") && (
         <section aria-labelledby="folders-heading" className="mb-[35px]">
@@ -142,10 +163,14 @@ export function ProjectsView({
       )}
       {(filter === "All" || filter === "Projects") && (
         <Projects
+          key={JSON.stringify(projectFilters)}
+          filters={projectFilters}
           userId={userId}
           initial={initial}
           query={query}
           folders={folders}
+          labels={labels}
+          onLabelsChange={setLabels}
           onViewAll={
             filter === "Projects" ? undefined : () => setFilter("Projects")
           }
@@ -172,6 +197,9 @@ type GridProps = {
   folders: Folder[];
   folderId?: string;
   onViewAll?: () => void;
+  filters?: ProjectFilters;
+  labels: Label[];
+  onLabelsChange: (labels: Label[]) => void;
 };
 
 function Projects(props: GridProps) {
@@ -186,18 +214,29 @@ function ProjectGrid({
   folders,
   folderId,
   onViewAll,
+  filters = NO_PROJECT_FILTERS,
+  labels,
+  onLabelsChange,
 }: GridProps) {
+  const showCloud = filters.storage === "any" || filters.storage === "cloud";
+  const filtered =
+    filters.size !== "any" || filters.animated || filters.label !== null;
+  const narrowed = filtered || filters.storage !== "any";
+  const first = !showCloud ? [] : filtered ? null : initial;
   const cloud = useCloudTileActions(userId);
   const [local, refreshLocal] = useReducer(
     () => readLocalProjects(userId),
     userId,
     readLocalProjects,
   );
-  const [tiles, setTiles] = useState(initial);
-  const [offset, setOffset] = useState(initial.length);
-  const [done, setDone] = useState(initial.length < PAGE_SIZE);
+  const [tiles, setTiles] = useState(first ?? []);
+  const [offset, setOffset] = useState(first?.length ?? 0);
+  const [done, setDone] = useState(
+    first !== null && (!showCloud || first.length < PAGE_SIZE),
+  );
   const [moving, setMoving] = useState<CloudTileSummary | null>(null);
   const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
+  const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
   const [movedOut, setMovedOut] = useState<ReadonlySet<string>>(new Set());
   const [moveError, setMoveError] = useState<string | null>(null);
   const [published, setPublished] = useState<ReadonlyMap<string, boolean>>(
@@ -255,7 +294,13 @@ function ProjectGrid({
       if (loading.current) return;
       loading.current = true;
       try {
-        const more = await loadCloudTiles(offset, folderId ?? null);
+        const more = await loadCloudTiles(
+          offset,
+          folderId ?? null,
+          filters.size,
+          filters.animated,
+          filters.label,
+        );
         if (more.length < PAGE_SIZE) setDone(true);
         setOffset(offset + more.length);
         setTiles((all) => {
@@ -274,7 +319,7 @@ function ProjectGrid({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [offset, done, folderId]);
+  }, [offset, done, folderId, filters.size, filters.animated, filters.label]);
 
   const markMoved = (tileId: string, to: string | null) => {
     if (folderId && to !== folderId)
@@ -289,7 +334,9 @@ function ProjectGrid({
   };
 
   const projects = [
-    ...(folderId ? [] : local),
+    ...(folderId || filters.storage === "cloud"
+      ? []
+      : local.filter((project) => matchesLocal(project, filters))),
     ...tiles
       .filter((t) => !cloud.removed.has(t.id) && !movedOut.has(t.id))
       .map(toCloudProject),
@@ -315,7 +362,7 @@ function ProjectGrid({
         </FormMessage>
       )}
       <ul className={GRID}>
-        {!search && !folderId && <NewProjectCard />}
+        {!search && !folderId && !narrowed && <NewProjectCard />}
         {shown.map((project) => {
           const meta = `${project.width} × ${project.height} px · Edited ${editedAgo(project.at)}`;
           return project.kind === "local" ? (
@@ -360,6 +407,17 @@ function ProjectGrid({
                   <PixelImage src={project.tile.thumbnail} alt="" />
                 )
               }
+              badges={labels
+                .filter((label) => project.tile.labels?.includes(label.id))
+                .map((label) => (
+                  <span
+                    key={label.id}
+                    className="max-w-24 truncate rounded-full px-2 py-0.5 text-[10px] leading-tight font-medium text-[#3b2a33] shadow-sm"
+                    style={{ background: label.color }}
+                  >
+                    {label.name}
+                  </span>
+                ))}
               open={{ onClick: () => void cloud.open(project.tile) }}
               opening={cloud.busy === project.id}
               disabled={cloud.busy !== null}
@@ -381,6 +439,10 @@ function ProjectGrid({
                   label: "Move to folder…",
                   onSelect: () => setMoving(project.tile),
                 },
+                {
+                  label: "Labels…",
+                  onSelect: () => setLabelling(project.tile),
+                },
                 ...(folderId
                   ? [
                       {
@@ -400,10 +462,17 @@ function ProjectGrid({
         })}
       </ul>
       {!shown.length &&
-        (search ? (
+        done &&
+        (search || narrowed ? (
           <EmptyState
-            title="Nothing matches your search"
-            description="Try a different name."
+            title={
+              search
+                ? "Nothing matches your search"
+                : "No projects match these filters"
+            }
+            description={
+              search ? "Try a different name." : "Try other filters."
+            }
           />
         ) : (
           folderId && (
@@ -420,6 +489,21 @@ function ProjectGrid({
           onPublished={() => markPublished(publishing.id, true)}
           onUnpublished={() => markPublished(publishing.id, false)}
           onClose={() => setPublishing(null)}
+        />
+      )}
+      {labelling && (
+        <LabelsDialog
+          tile={labelling}
+          labels={labels}
+          onLabelsChange={onLabelsChange}
+          onSaved={(ids) =>
+            setTiles((all) =>
+              all.map((t) =>
+                t.id === labelling.id ? { ...t, labels: ids } : t,
+              ),
+            )
+          }
+          onClose={() => setLabelling(null)}
         />
       )}
       {moving && (

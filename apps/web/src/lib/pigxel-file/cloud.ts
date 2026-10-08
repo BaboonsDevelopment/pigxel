@@ -14,6 +14,7 @@ export type CloudTileSummary = CloudTile & {
   thumbnail: string | null;
   updatedAt: string;
   published?: boolean;
+  labels?: string[];
 };
 
 export class CloudError extends Error {}
@@ -28,6 +29,7 @@ type TileRow = {
   updated_at: string;
   visibility?: string;
   review?: string | null;
+  labels?: { label_id: string }[];
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -60,6 +62,7 @@ export function toSummary(row: TileRow): CloudTileSummary {
     ...(row.visibility && {
       published: row.visibility === "public" || row.review === "pending",
     }),
+    ...(row.labels && { labels: row.labels.map((l) => l.label_id) }),
   };
 }
 
