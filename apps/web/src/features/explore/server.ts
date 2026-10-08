@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { avatarUrlOf, type ProfileRow } from "@/features/profile/profile";
-import { COMMENT_COLUMNS, type ArtComment } from "./comments";
+import { COMMENT_COLUMNS, COMMENT_PAGE, type ArtComment } from "./comments";
 
 export type SavedArt = {
   id: string;
@@ -68,6 +68,8 @@ type CommentRow = {
   id: string;
   body: string;
   created_at: string;
+  edited_at: string | null;
+  parent_id: string | null;
   user_id: string;
   author: Pick<
     ProfileRow,
@@ -84,6 +86,9 @@ export function toComment(row: CommentRow): ArtComment {
     id: row.id,
     body: row.body,
     createdAt: row.created_at,
+    edited: row.edited_at !== null,
+    parentId: row.parent_id,
+    replies: [],
     author: {
       id: row.user_id,
       username: row.author?.username ?? null,
@@ -95,15 +100,39 @@ export function toComment(row: CommentRow): ArtComment {
 
 export async function listComments(
   tileId: string,
+  before?: string,
 ): Promise<{ comments: ArtComment[]; count: number }> {
   const supabase = await createClient();
-  const { data, count, error } = await supabase
+  const query = supabase
     .from("tile_comments")
     .select(COMMENT_COLUMNS, { count: "exact" })
     .eq("tile_id", tileId)
+    .is("parent_id", null);
+  const { data, count, error } = await (
+    before ? query.lt("created_at", before) : query
+  )
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(COMMENT_PAGE);
   if (error) throw new Error(`Couldn’t load comments: ${error.message}`);
   const rows = data as unknown as CommentRow[];
-  return { comments: rows.map(toComment), count: count ?? rows.length };
+  const comments = rows.map(toComment);
+  if (comments.length) {
+    const replies = await supabase
+      .from("tile_comments")
+      .select(COMMENT_COLUMNS)
+      .in(
+        "parent_id",
+        comments.map((c) => c.id),
+      )
+      .order("created_at", { ascending: true });
+    if (replies.error)
+      throw new Error(`Couldn’t load replies: ${replies.error.message}`);
+    const byId = new Map(comments.map((c) => [c.id, c]));
+    for (const row of replies.data as unknown as CommentRow[]) {
+      const reply = toComment(row);
+      byId.set(reply.id, reply);
+      byId.get(row.parent_id!)?.replies.push(reply);
+    }
+  }
+  return { comments, count: count ?? rows.length };
 }

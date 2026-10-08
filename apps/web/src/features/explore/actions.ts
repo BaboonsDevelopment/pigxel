@@ -21,7 +21,7 @@ import {
 } from "./constants";
 import { findArtists, type ArtistResult } from "@/features/search/server";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
-import { toComment } from "./server";
+import { listComments, toComment } from "./server";
 import { requestReview } from "@/features/moderation/request";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -167,20 +167,49 @@ export async function setTileSaved(
 export async function postComment(
   tileId: string,
   body: string,
+  parentId: string | null = null,
 ): Promise<{ comment?: ArtComment; error?: string }> {
   await requireUser();
   const text = body.trim();
-  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  if (!UUID.test(tileId) || (parentId !== null && !UUID.test(parentId)))
+    return { error: "Invalid request." };
   if (!text || text.length > COMMENT_MAX)
     return { error: `Keep it between 1 and ${COMMENT_MAX} characters.` };
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("tile_comments")
-      .insert({ tile_id: tileId, body: text })
+      .insert({ tile_id: tileId, body: text, parent_id: parentId })
       .select(COMMENT_COLUMNS)
       .single();
     if (error) return { error: "Couldn’t post that. Try again." };
+    return {
+      comment: toComment(data as unknown as Parameters<typeof toComment>[0]),
+    };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+}
+
+export async function editComment(
+  commentId: string,
+  body: string,
+): Promise<{ comment?: ArtComment; error?: string }> {
+  const user = await requireUser();
+  const text = body.trim();
+  if (!UUID.test(commentId)) return { error: "Invalid request." };
+  if (!text || text.length > COMMENT_MAX)
+    return { error: `Keep it between 1 and ${COMMENT_MAX} characters.` };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("tile_comments")
+      .update({ body: text })
+      .eq("id", commentId)
+      .eq("user_id", user.id)
+      .select(COMMENT_COLUMNS)
+      .maybeSingle();
+    if (error || !data) return { error: "Couldn’t save that. Try again." };
     return {
       comment: toComment(data as unknown as Parameters<typeof toComment>[0]),
     };
@@ -336,4 +365,31 @@ export async function linkRemix(
     .eq("id", copyId)
     .eq("user_id", user.id);
   if (error) console.error(`Couldn’t link remix ${copyId}:`, error.message);
+}
+
+export async function loadMoreComments(
+  tileId: string,
+  before: string,
+): Promise<ArtComment[]> {
+  if (!UUID.test(tileId) || Number.isNaN(Date.parse(before))) return [];
+  const { comments } = await listComments(tileId, before);
+  return comments;
+}
+
+export async function reportComment(
+  commentId: string,
+): Promise<{ error?: string }> {
+  await requireUser();
+  if (!UUID.test(commentId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("comment_reports")
+      .insert({ comment_id: commentId });
+    if (error && error.code !== "23505")
+      return { error: "Couldn’t report that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
 }
