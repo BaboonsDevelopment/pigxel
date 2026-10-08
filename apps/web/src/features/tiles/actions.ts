@@ -3,7 +3,10 @@
 import { refresh } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
-import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
+import {
+  countedCloudTilesOnServer,
+  listCloudTilesOnServer,
+} from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
@@ -27,6 +30,20 @@ export async function loadCloudTiles(
     user.id,
     PAGE_SIZE,
     from,
+    folderId,
+    cloudFilter(options),
+  );
+}
+
+export async function loadCloudTilesCounted(
+  folderId: string | null,
+  options: ProjectQuery,
+): Promise<{ tiles: CloudTileSummary[]; count: number }> {
+  const user = await requireUser();
+  if (folderId !== null && !UUID.test(folderId)) return { tiles: [], count: 0 };
+  return countedCloudTilesOnServer(
+    user.id,
+    PAGE_SIZE,
     folderId,
     cloudFilter(options),
   );
@@ -202,6 +219,59 @@ export async function setTileLabels(
       );
       if (added) return { error: "Couldn’t change labels. Try again." };
     }
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function setProjectPinned(
+  tileId: string,
+  pinned: boolean,
+): Promise<Result> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({ pinned_at: pinned ? new Date().toISOString() : null })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t change that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function markTileOpened(tileId: string): Promise<void> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return;
+  try {
+    const supabase = await createClient();
+    await supabase
+      .from("tiles")
+      .update({ opened_at: new Date().toISOString() })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+  } catch {}
+}
+
+export async function setProjectArchived(
+  tileId: string,
+  archived: boolean,
+): Promise<Result> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t change that. Try again." };
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }

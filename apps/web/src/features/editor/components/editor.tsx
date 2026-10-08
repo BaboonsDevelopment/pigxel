@@ -79,6 +79,8 @@ import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
 import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { markTileOpened } from "@/features/tiles/actions";
+import { writeMark } from "@/features/tiles/local-marks";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -221,6 +223,12 @@ export function Editor({
   kept: KeptTile | null;
 }) {
   const router = useRouter();
+  const openedTile =
+    draft.location?.kind === "cloud" ? draft.location.tile.id : null;
+  useEffect(() => {
+    if (openedTile) void markTileOpened(openedTile);
+    else writeMark(userId, "opened", draft.id, true);
+  }, [userId, draft.id, openedTile]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [exporting, setExporting] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);

@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { toSummary, type CloudTileSummary } from "./cloud";
 
 const COLUMNS =
-  "id, user_id, name, width, height, thumbnail, updated_at, visibility, review, labels:tile_labels(label_id)";
+  "id, user_id, name, width, height, thumbnail, updated_at, visibility, review, pinned_at, opened_at, labels:tile_labels(label_id)";
 
 type CloudTileFilter = {
   min?: number;
@@ -13,6 +13,8 @@ type CloudTileFilter = {
   label?: string | null;
   match?: string | null;
   published?: boolean;
+  pinnedFirst?: boolean;
+  archived?: boolean;
 };
 
 export async function listCloudTilesOnServer(
@@ -22,7 +24,28 @@ export async function listCloudTilesOnServer(
   folderId: string | null = null,
   filter: CloudTileFilter = {},
 ): Promise<CloudTileSummary[]> {
-  if (!isSupabaseConfigured()) return [];
+  const { tiles } = await cloudTilesPage(userId, limit, from, folderId, filter);
+  return tiles;
+}
+
+export function countedCloudTilesOnServer(
+  userId: string,
+  limit: number,
+  folderId: string | null,
+  filter: CloudTileFilter,
+) {
+  return cloudTilesPage(userId, limit, 0, folderId, filter, true);
+}
+
+async function cloudTilesPage(
+  userId: string,
+  limit: number,
+  from: number,
+  folderId: string | null,
+  filter: CloudTileFilter,
+  counted = false,
+): Promise<{ tiles: CloudTileSummary[]; count: number }> {
+  if (!isSupabaseConfigured()) return { tiles: [], count: 0 };
   const supabase = await createClient();
   let query = supabase
     .from("tiles")
@@ -30,6 +53,7 @@ export async function listCloudTilesOnServer(
       filter.label
         ? `${COLUMNS}, labelled:tile_labels!inner(label_id)`
         : COLUMNS,
+      counted ? { count: "exact" } : undefined,
     )
     .eq("user_id", userId);
   if (folderId) query = query.eq("folder_id", folderId);
@@ -46,10 +70,36 @@ export async function listCloudTilesOnServer(
     query = query
       .neq("visibility", "public")
       .or("review.is.null,review.neq.pending");
-  const { data, error } = await query
+  query = filter.archived
+    ? query.not("archived_at", "is", null)
+    : query.is("archived_at", null);
+  if (filter.pinnedFirst)
+    query = query.order("pinned_at", { ascending: false, nullsFirst: false });
+  const { data, error, count } = await query
     .order("updated_at", { ascending: false })
     .order("id")
     .range(from, from + limit - 1);
+  if (error || !data) return { tiles: [], count: 0 };
+  const tiles = (data as unknown as Parameters<typeof toSummary>[0][]).map(
+    toSummary,
+  );
+  return { tiles, count: count ?? tiles.length };
+}
+
+export async function listRecentlyOpenedOnServer(
+  userId: string,
+  limit: number,
+): Promise<CloudTileSummary[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select(COLUMNS)
+    .eq("user_id", userId)
+    .not("opened_at", "is", null)
+    .is("archived_at", null)
+    .order("opened_at", { ascending: false })
+    .limit(limit);
   if (error || !data) return [];
   return (data as unknown as Parameters<typeof toSummary>[0][]).map(toSummary);
 }

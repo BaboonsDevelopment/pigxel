@@ -3,7 +3,10 @@ import { Page } from "@pigxel/ui/components/page";
 import { ProjectsView } from "@/features/tiles/components/projects-view/projects-view";
 import { listFolders, listLabels } from "@/features/tiles/server";
 import { listSavedArts } from "@/features/explore/server";
-import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
+import {
+  countedCloudTilesOnServer,
+  listRecentlyOpenedOnServer,
+} from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
 import { PAGE_SIZE } from "@/features/tiles/constants";
 import { cloudFilter, searchMatch } from "@/features/tiles/search";
@@ -31,18 +34,18 @@ export default async function Tiles({ searchParams }: Props) {
   ]);
   const folder = folders.find((f) => f.id === params.folder) ?? null;
   const view = readView(folder ? {} : params, labels);
-  const [saved, cloudTiles] = await Promise.all([
+  const [saved, cloudTiles, recent] = await Promise.all([
     listSavedArts(user.id, searchMatch(view.query)).catch((error: unknown) => {
       console.error(error);
       return [];
     }),
-    listCloudTilesOnServer(
+    countedCloudTilesOnServer(
       user.id,
       PAGE_SIZE,
-      0,
       folder?.id ?? null,
       cloudFilter({ ...view.filters, query: view.query }),
     ),
+    folder ? [] : listRecentlyOpenedOnServer(user.id, 6),
   ]);
   return (
     <div className="min-h-full bg-[url(/art/background-effect.png)] bg-top bg-repeat">
@@ -50,12 +53,14 @@ export default async function Tiles({ searchParams }: Props) {
         <ProjectsView
           key={folder?.id ?? "all"}
           userId={user.id}
-          initial={cloudTiles}
+          initial={cloudTiles.tiles}
+          initialCount={cloudTiles.count}
           folders={folders}
           folder={folder}
           saved={saved}
           labels={labels}
           view={view}
+          recent={recent}
         />
       </Page>
     </div>

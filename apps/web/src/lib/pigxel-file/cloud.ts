@@ -15,6 +15,8 @@ export type CloudTileSummary = CloudTile & {
   updatedAt: string;
   published?: boolean;
   labels?: string[];
+  pinnedAt?: string | null;
+  openedAt?: string | null;
 };
 
 export class CloudError extends Error {}
@@ -30,6 +32,8 @@ type TileRow = {
   visibility?: string;
   review?: string | null;
   labels?: { label_id: string }[];
+  pinned_at?: string | null;
+  opened_at?: string | null;
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -63,6 +67,8 @@ export function toSummary(row: TileRow): CloudTileSummary {
       published: row.visibility === "public" || row.review === "pending",
     }),
     ...(row.labels && { labels: row.labels.map((l) => l.label_id) }),
+    ...(row.pinned_at !== undefined && { pinnedAt: row.pinned_at }),
+    ...(row.opened_at !== undefined && { openedAt: row.opened_at }),
   };
 }
 

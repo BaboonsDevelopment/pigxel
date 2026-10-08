@@ -21,15 +21,24 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: mocks.auth,
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          order: () => ({
-            order: () => ({ range: async () => ({ data: [], error: null }) }),
-          }),
-        }),
-      }),
-    }),
+    from: () => {
+      const query: Record<string, unknown> = {
+        then: (resolve: (value: unknown) => void) =>
+          resolve({ data: [], error: null }),
+      };
+      for (const method of [
+        "select",
+        "is",
+        "eq",
+        "not",
+        "or",
+        "order",
+        "range",
+        "limit",
+      ])
+        query[method] = () => query;
+      return query;
+    },
   }),
 }));
 vi.mock("@/lib/supabase/config", () => ({

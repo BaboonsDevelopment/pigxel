@@ -17,7 +17,14 @@ import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { scrollParent } from "@/lib/utils/scroll-parent";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { pixelifySans } from "@/lib/fonts/pixelify";
-import { loadCloudTiles, moveTileToFolder } from "../../actions";
+import {
+  loadCloudTiles,
+  loadCloudTilesCounted,
+  moveTileToFolder,
+  setProjectArchived,
+  setProjectPinned,
+} from "../../actions";
+import { readMarks, writeMark } from "../../local-marks";
 import { PAGE_SIZE } from "../../constants";
 import type { Folder } from "../../folders";
 import type { Label } from "../../labels";
@@ -36,10 +43,13 @@ import { FolderNameDialog } from "./components/folder-name-dialog";
 import { LabelsDialog } from "./components/labels-dialog";
 import { MoveDialog } from "./components/move-dialog";
 import { NewProjectCard } from "./components/new-project-card";
+import { RecentRow } from "./components/recent-row";
 import { ProjectsHeader } from "./components/projects-header";
 import { SectionHeader } from "./components/section-header";
 import {
   NO_PROJECT_FILTERS,
+  filtersKey,
+  queryOfKey,
   type Filter,
   type ProjectFilters,
 } from "./constants";
@@ -48,6 +58,7 @@ import {
   matchesLocal,
   readLocalProjects,
   toCloudProject,
+  type Project,
 } from "./helpers";
 import { viewSearch, type ProjectsViewState } from "./view";
 
@@ -56,25 +67,70 @@ const SEARCH_DELAY = 300;
 
 const hasName = (name: string, query: string) =>
   !query || name.toLowerCase().includes(query.toLowerCase());
+
+const PIN_BADGE = (
+  <span
+    key="pinned"
+    aria-label="Pinned"
+    className="flex size-6 items-center justify-center rounded-md border border-black/5 bg-white/95 text-primary shadow-sm"
+  >
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 9 9"
+      shapeRendering="crispEdges"
+      className="size-4"
+    >
+      <path d="M2 0h5v2H6v2h2v1H5v4H4V5H1V4h2V2H2Z" fill="currentColor" />
+      <path d="M3 0h1v2H3Z" fill="#fff" fillOpacity=".55" />
+    </svg>
+  </span>
+);
+const PUBLISHED_BADGE = (
+  <span
+    key="published"
+    className={cn(
+      pixelifySans.className,
+      "flex h-6 items-center gap-1 rounded-md border border-primary/20 bg-primary px-2 text-xs text-primary-foreground shadow-sm",
+    )}
+  >
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 7 7"
+      shapeRendering="crispEdges"
+      className="size-2.5"
+    >
+      <path
+        d="M2 0h3v1h1v1h1v3H6v1H5v1H2V6H1V5H0V2h1V1h1Z"
+        fill="currentColor"
+      />
+    </svg>
+    Published
+  </span>
+);
+
 const GRID =
   "grid grid-cols-2 gap-x-[33px] gap-y-[28px] sm:grid-cols-3 lg:grid-cols-5";
 
 export function ProjectsView({
   userId,
   initial,
+  initialCount,
   folders,
   folder,
   saved,
   labels: initialLabels,
   view,
+  recent,
 }: {
   userId: string;
   initial: CloudTileSummary[];
+  initialCount: number;
   folders: Folder[];
   folder: Folder | null;
   saved: SavedArt[];
   labels: Label[];
   view: ProjectsViewState;
+  recent: CloudTileSummary[];
 }) {
   const [labels, setLabels] = useState(initialLabels);
   const [filter, setFilter] = useState<Filter>(view.filter);
@@ -83,9 +139,7 @@ export function ProjectsView({
   const [projectFilters, setProjectFilters] = useState<ProjectFilters>(
     view.filters,
   );
-  const [initialKey] = useState(() =>
-    JSON.stringify({ ...view.filters, query: view.query }),
-  );
+  const [initialKey] = useState(() => filtersKey(view.filters, view.query));
 
   useEffect(() => {
     const timer = setTimeout(() => setSearched(query.trim()), SEARCH_DELAY);
@@ -110,8 +164,9 @@ export function ProjectsView({
         <ProjectGrid
           userId={userId}
           initial={initial}
+          initialCount={initialCount}
           query=""
-          initialKey={JSON.stringify({ ...NO_PROJECT_FILTERS, query: "" })}
+          initialKey={filtersKey(NO_PROJECT_FILTERS)}
           searched=""
           folders={folders}
           folderId={folder.id}
@@ -132,6 +187,16 @@ export function ProjectsView({
         onProjectFiltersChange={setProjectFilters}
         labels={labels}
       />
+      {filter === "All" &&
+        !query.trim() &&
+        filtersKey(projectFilters) === filtersKey(NO_PROJECT_FILTERS) && (
+          <RecentRow
+            userId={userId}
+            cloud={recent}
+            busy={folderTiles.busy}
+            onOpen={(tile) => void folderTiles.open(tile)}
+          />
+        )}
       {(filter === "All" || filter === "Folders") && (
         <section aria-labelledby="folders-heading" className="mb-[35px]">
           <SectionHeader
@@ -194,10 +259,11 @@ export function ProjectsView({
       )}
       {(filter === "All" || filter === "Projects") && (
         <Projects
-          key={JSON.stringify(projectFilters)}
+          key={filtersKey(projectFilters)}
           filters={projectFilters}
           userId={userId}
           initial={initial}
+          initialCount={initialCount}
           initialKey={initialKey}
           query={query}
           searched={searched}
@@ -207,6 +273,21 @@ export function ProjectsView({
           onViewAll={
             filter === "Projects" ? undefined : () => setFilter("Projects")
           }
+        />
+      )}
+      {filter === "Archive" && (
+        <Projects
+          key="archive"
+          archived
+          userId={userId}
+          initial={[]}
+          initialCount={0}
+          initialKey=""
+          query={query}
+          searched={searched}
+          folders={folders}
+          labels={labels}
+          onLabelsChange={setLabels}
         />
       )}
       {filter === "Favourite" && (
@@ -232,12 +313,14 @@ export function ProjectsView({
 type GridProps = {
   userId: string;
   initial: CloudTileSummary[];
+  initialCount: number;
   initialKey: string;
   query: string;
   searched: string;
   folders: Folder[];
   folderId?: string;
   onViewAll?: () => void;
+  archived?: boolean;
   filters?: ProjectFilters;
   labels: Label[];
   onLabelsChange: (labels: Label[]) => void;
@@ -251,12 +334,14 @@ function Projects(props: GridProps) {
 function ProjectGrid({
   userId,
   initial,
+  initialCount,
   initialKey,
   query,
   searched,
   folders,
   folderId,
   onViewAll,
+  archived = false,
   filters = NO_PROJECT_FILTERS,
   labels,
   onLabelsChange,
@@ -268,7 +353,7 @@ function ProjectGrid({
     filters.label !== null ||
     filters.published !== "any" ||
     filters.storage !== "any";
-  const key = JSON.stringify({ ...filters, query: searched });
+  const key = filtersKey(filters, searched);
   const first = !showCloud ? [] : key === initialKey ? initial : null;
   const [loadedKey, setLoadedKey] = useState(first ? key : null);
   const cloud = useCloudTileActions(userId);
@@ -285,7 +370,68 @@ function ProjectGrid({
   const [moving, setMoving] = useState<CloudTileSummary | null>(null);
   const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
   const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
+  const [localArchived, setLocalArchived] = useState(() =>
+    readMarks(userId, "archived"),
+  );
+  const [localPins, setLocalPins] = useState(() => readMarks(userId, "pinned"));
+  const [cloudPins, setCloudPins] = useState<
+    ReadonlyMap<string, number | null>
+  >(new Map());
+  const pinOf = (project: Project): number | null => {
+    if (project.kind === "local") return localPins[project.id] ?? null;
+    if (cloudPins.has(project.id)) return cloudPins.get(project.id) ?? null;
+    return project.tile.pinnedAt ? Date.parse(project.tile.pinnedAt) : null;
+  };
+  const togglePin = async (project: Project) => {
+    const pin = pinOf(project) === null;
+    if (project.kind === "local") {
+      writeMark(userId, "pinned", project.id, pin);
+      setLocalPins(readMarks(userId, "pinned"));
+      return;
+    }
+    setMoveError(null);
+    setCloudPins((pins) =>
+      new Map(pins).set(project.id, pin ? Number.MAX_SAFE_INTEGER : null),
+    );
+    const result = await setProjectPinned(project.id, pin);
+    if (!result.error) return;
+    setMoveError(result.error);
+    setCloudPins((pins) => {
+      const next = new Map(pins);
+      next.delete(project.id);
+      return next;
+    });
+  };
+  const toggleArchive = async (project: Project) => {
+    if (project.kind === "local") {
+      writeMark(userId, "archived", project.id, !archived);
+      setLocalArchived(readMarks(userId, "archived"));
+      return;
+    }
+    setMoveError(null);
+    setMovedOut((ids) => new Set(ids).add(project.id));
+    const result = await setProjectArchived(project.id, !archived);
+    if (!result.error) return;
+    setMoveError(result.error);
+    setMovedOut((ids) => {
+      const next = new Set(ids);
+      next.delete(project.id);
+      return next;
+    });
+  };
+  const archiveItem = (project: Project) => ({
+    label: archived ? "Restore" : "Archive",
+    onSelect: () => void toggleArchive(project),
+  });
+  const pinItem = (project: Project) => ({
+    label: pinOf(project) === null ? "Pin to top" : "Unpin",
+    onSelect: () => void togglePin(project),
+  });
   const [movedOut, setMovedOut] = useState<ReadonlySet<string>>(new Set());
+  const [cloudCount, setCloudCount] = useState(
+    showCloud && first ? initialCount : 0,
+  );
+  const [countedAt, setCountedAt] = useState({ removed: 0, moved: 0 });
   const [moveError, setMoveError] = useState<string | null>(null);
   const [published, setPublished] = useState<ReadonlyMap<string, boolean>>(
     new Map(),
@@ -320,6 +466,7 @@ function ProjectGrid({
         published: false,
       };
       setTiles((all) => [summary, ...all]);
+      setCloudCount((count) => count + 1);
       refreshLocal();
       setPublishing(summary);
     } catch (e) {
@@ -340,19 +487,32 @@ function ProjectGrid({
     let stale = false;
     void (
       showCloud
-        ? loadCloudTiles(0, folderId ?? null, JSON.parse(key))
-        : Promise.resolve([])
-    ).then((page) => {
+        ? loadCloudTilesCounted(folderId ?? null, {
+            ...queryOfKey(key),
+            archived,
+          })
+        : Promise.resolve({ tiles: [], count: 0 })
+    ).then(({ tiles: page, count }) => {
       if (stale) return;
       setTiles(page);
       setOffset(page.length);
       setDone(page.length < PAGE_SIZE);
+      setCloudCount(count);
+      setCountedAt({ removed: cloud.removed.size, moved: movedOut.size });
       setLoadedKey(key);
     });
     return () => {
       stale = true;
     };
-  }, [key, loadedKey, showCloud, folderId]);
+  }, [
+    key,
+    loadedKey,
+    showCloud,
+    folderId,
+    archived,
+    cloud.removed.size,
+    movedOut.size,
+  ]);
 
   useEffect(() => {
     const target = sentinel.current;
@@ -361,11 +521,10 @@ function ProjectGrid({
       if (loading.current) return;
       loading.current = true;
       try {
-        const more = await loadCloudTiles(
-          offset,
-          folderId ?? null,
-          JSON.parse(key),
-        );
+        const more = await loadCloudTiles(offset, folderId ?? null, {
+          ...queryOfKey(key),
+          archived,
+        });
         if (more.length < PAGE_SIZE) setDone(true);
         setOffset(offset + more.length);
         setTiles((all) => {
@@ -384,7 +543,7 @@ function ProjectGrid({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [offset, done, folderId, key, loadedKey]);
+  }, [offset, done, folderId, archived, key, loadedKey]);
 
   const markMoved = (tileId: string, to: string | null) => {
     if (folderId && to !== folderId)
@@ -400,13 +559,25 @@ function ProjectGrid({
 
   const search = query.trim();
   const settled = key === loadedKey && search === searched;
-  const projects = [
-    ...(folderId || filters.storage === "cloud"
+  const localShown =
+    folderId || filters.storage === "cloud"
       ? []
       : local.filter(
           (project) =>
-            matchesLocal(project, filters) && hasName(project.name, search),
-        )),
+            Boolean(localArchived[project.id]) === archived &&
+            matchesLocal(project, filters) &&
+            hasName(project.name, search),
+        );
+  const total =
+    localShown.length +
+    Math.max(
+      0,
+      cloudCount -
+        (cloud.removed.size - countedAt.removed) -
+        (movedOut.size - countedAt.moved),
+    );
+  const projects = [
+    ...localShown,
     ...tiles
       .filter(
         (t) =>
@@ -415,7 +586,7 @@ function ProjectGrid({
           (settled || hasName(t.name, search)),
       )
       .map(toCloudProject),
-  ].sort((a, b) => b.at - a.at);
+  ].sort((a, b) => (pinOf(b) ?? -1) - (pinOf(a) ?? -1) || b.at - a.at);
   const shown = projects;
   const error = cloud.error ?? moveError;
 
@@ -423,8 +594,8 @@ function ProjectGrid({
     <section aria-labelledby="projects-heading">
       <SectionHeader
         id="projects-heading"
-        title="Projects"
-        count={`${projects.length}${done ? "" : "+"}`}
+        title={archived ? "Archive" : "Projects"}
+        count={String(total)}
         className="mb-3"
         onViewAll={onViewAll}
       />
@@ -434,7 +605,7 @@ function ProjectGrid({
         </FormMessage>
       )}
       <ul className={GRID}>
-        {!search && !folderId && !narrowed && <NewProjectCard />}
+        {!search && !folderId && !narrowed && !archived && <NewProjectCard />}
         {shown.map((project) => {
           const meta = `${project.width} × ${project.height} px · Edited ${editedAgo(project.at)}`;
           return project.kind === "local" ? (
@@ -443,10 +614,12 @@ function ProjectGrid({
               name={project.name}
               meta={meta}
               thumbnail={<TileThumbnail image={project.image} />}
+              badges={pinOf(project) !== null && PIN_BADGE}
               open={{ href: editorUrl(project.id) }}
               opening={uploading === project.id}
               busyLabel="Saving to cloud…"
               menu={[
+                pinItem(project),
                 ...(project.draft.location
                   ? []
                   : [
@@ -456,6 +629,7 @@ function ProjectGrid({
                           void publishLocal(project.draft, project.image),
                       },
                     ]),
+                archiveItem(project),
                 {
                   label:
                     project.draft.location?.kind === "drive"
@@ -479,21 +653,31 @@ function ProjectGrid({
                   <PixelImage src={project.tile.thumbnail} alt="" />
                 )
               }
-              badges={labels
-                .filter((label) => project.tile.labels?.includes(label.id))
-                .map((label) => (
-                  <span
-                    key={label.id}
-                    className="max-w-24 truncate rounded-full px-2 py-0.5 text-[10px] leading-tight font-medium text-[#3b2a33] shadow-sm"
-                    style={{ background: label.color }}
-                  >
-                    {label.name}
-                  </span>
-                ))}
+              badges={[
+                ...(pinOf(project) !== null ? [PIN_BADGE] : []),
+                ...((published.get(project.id) ?? project.tile.published)
+                  ? [PUBLISHED_BADGE]
+                  : []),
+                ...labels
+                  .filter((label) => project.tile.labels?.includes(label.id))
+                  .map((label) => (
+                    <span
+                      key={label.id}
+                      className={cn(
+                        pixelifySans.className,
+                        "flex h-6 max-w-28 items-center truncate rounded-md border border-black/5 px-2 text-xs text-[#3b2a33] shadow-sm",
+                      )}
+                      style={{ background: label.color }}
+                    >
+                      {label.name}
+                    </span>
+                  )),
+              ]}
               open={{ onClick: () => void cloud.open(project.tile) }}
               opening={cloud.busy === project.id}
               disabled={cloud.busy !== null}
               menu={[
+                pinItem(project),
                 ...((published.get(project.id) ?? project.tile.published)
                   ? [
                       {
@@ -523,6 +707,7 @@ function ProjectGrid({
                       },
                     ]
                   : []),
+                archiveItem(project),
                 {
                   label: "Delete",
                   destructive: true,
@@ -548,6 +733,11 @@ function ProjectGrid({
                 ? "Try a different name, description or tag."
                 : "Try other filters."
             }
+          />
+        ) : archived ? (
+          <EmptyState
+            title="Nothing archived"
+            description="Archive a project from its ⋯ menu to tuck it away here. You can restore it any time."
           />
         ) : (
           folderId && (

@@ -28,6 +28,7 @@ export type ProjectQuery = {
   label?: string | null;
   query?: string;
   published?: string;
+  archived?: boolean;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +39,7 @@ export function cloudFilter({
   label,
   query,
   published,
+  archived,
 }: ProjectQuery) {
   const range = SIZES.find((s) => s.value === size) ?? SIZES[0];
   return {
@@ -48,5 +50,7 @@ export function cloudFilter({
     match: searchMatch(query ?? ""),
     published:
       published === "yes" ? true : published === "no" ? false : undefined,
+    pinnedFirst: true,
+    archived: archived === true,
   };
 }
