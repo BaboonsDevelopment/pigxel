@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_EXPORT,
   TIMELAPSE_FPS,
+  TIMELAPSE_LENGTHS,
 } from "@/features/editor/export/constants";
 import {
   exportFiles,
@@ -86,6 +87,15 @@ describe("paintOrder", () => {
       paint(canvas, strokes, 0, strokes.at.length);
       expect([...canvas]).toEqual([...art]);
     }
+  });
+});
+
+describe("long timelapses", () => {
+  it("offers 30 and 60 seconds and finishes drawing on time", () => {
+    expect(TIMELAPSE_LENGTHS).toEqual([5, 10, 15, 30, 60]);
+    const timing = timelapseTiming(60);
+    expect(timing.draw).toBe(60 * TIMELAPSE_FPS);
+    expect(strokesBy(timing.leadIn + timing.draw - 1, timing, 4096)).toBe(4096);
   });
 });
 
