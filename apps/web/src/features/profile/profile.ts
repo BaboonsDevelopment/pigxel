@@ -53,6 +53,7 @@ export type TileAuthor = {
   username: string;
   name: string;
   avatarUrl: string | null;
+  bio?: string;
 };
 
 export type PublicTile = ProfileTile & {

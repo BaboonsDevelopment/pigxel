@@ -126,7 +126,8 @@ type PublicTileRow = TileRow & {
     | "avatar_kind"
     | "avatar_path"
     | "provider_avatar_url"
-  >;
+  > &
+    Partial<Pick<ProfileRow, "bio">>;
   likes: { count: number }[];
   mine?: { user_id: string }[];
 };
@@ -167,6 +168,11 @@ const publicTiles = (
 
 const PUBLIC_TILE_COLUMNS =
   "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+
+const ART_PAGE_COLUMNS = PUBLIC_TILE_COLUMNS.replace(
+  "provider_avatar_url)",
+  "provider_avatar_url, bio)",
+);
 
 async function followeesOf(supabase: Supabase, userId: string) {
   const { data, error } = await supabase
@@ -273,6 +279,7 @@ const toPublicTile = (row: PublicTileRow): PublicTile => ({
     username: row.author.username,
     name: row.author.display_name,
     avatarUrl: avatarUrlOf(row.author),
+    ...(row.author.bio !== undefined && { bio: row.author.bio }),
   },
   likes: row.likes[0]?.count ?? 0,
   liked: Boolean(row.mine?.length),
@@ -290,8 +297,8 @@ export async function getPublicTile(
     .from("tiles")
     .select(
       viewerId
-        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
-        : PUBLIC_TILE_COLUMNS,
+        ? `${ART_PAGE_COLUMNS}, mine:tile_likes(user_id)`
+        : ART_PAGE_COLUMNS,
     )
     .eq("id", id)
     .or(

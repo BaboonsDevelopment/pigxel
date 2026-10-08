@@ -57,17 +57,25 @@ type FormProps = {
   driveError?: boolean;
   asset?: Asset | null;
   paletteId?: string;
+  customPalette?: PalettePreset | null;
   from?: string;
 };
 
-export function NewTileForm({ asset, paletteId, ...props }: FormProps) {
+export function NewTileForm({
+  asset,
+  paletteId,
+  customPalette,
+  ...props
+}: FormProps) {
   if (!useIsClient()) return <div className="min-h-96" />;
   return (
     <Form
-      key={`${asset?.id}:${paletteId}`}
+      key={`${asset?.id}:${paletteId}:${customPalette?.colors.join()}`}
       {...props}
       asset={asset ?? null}
-      palette={PALETTE_PRESETS.find((p) => p.id === paletteId) ?? null}
+      palette={
+        PALETTE_PRESETS.find((p) => p.id === paletteId) ?? customPalette ?? null
+      }
     />
   );
 }
@@ -79,7 +87,7 @@ function Form({
   from,
   asset,
   palette,
-}: Omit<FormProps, "asset" | "paletteId"> & {
+}: Omit<FormProps, "asset" | "paletteId" | "customPalette"> & {
   asset: Asset | null;
   palette: PalettePreset | null;
 }) {

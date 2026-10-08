@@ -208,6 +208,14 @@ export function ArtDetails({
             <span className="block truncate text-[10px] text-muted-foreground">
               @{author.username}
             </span>
+            {author.bio?.trim() && (
+              <span
+                title={author.bio}
+                className="mt-0.5 block truncate text-[11px] text-muted-foreground"
+              >
+                {author.bio.trim()}
+              </span>
+            )}
           </span>
         </Link>
         {!own && (
@@ -383,20 +391,31 @@ export function ArtDetails({
           <Heading as="h2" className="text-base font-bold text-[#4a1f35]">
             Little colors, big mood
           </Heading>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinejoin="round"
-            className="size-5 text-primary"
-          >
-            <path d="M8 1.5a6.5 6.5 0 1 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2s.6-1.2 1.4-1.2h1.6a2.8 2.8 0 0 0 2.8-2.8C14.5 4 11.6 1.5 8 1.5Z" />
-            <circle cx="4.8" cy="7" r=".8" />
-            <circle cx="7" cy="4.5" r=".8" />
-            <circle cx="10.2" cy="5" r=".8" />
-          </svg>
+          {palette.length > 0 ? (
+            <Link
+              href={`/tiles/new?${new URLSearchParams({
+                colors: palette.map((color) => color.slice(1)).join(","),
+                paletteName: `From “${tile.name}”`,
+              })}`}
+              className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-primary-soft bg-pastel-pink-soft px-2.5 text-[11px] text-primary transition-colors hover:bg-pastel-pink"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+                className="size-3.5"
+              >
+                <path d="M8 1.5a6.5 6.5 0 1 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2s.6-1.2 1.4-1.2h1.6a2.8 2.8 0 0 0 2.8-2.8C14.5 4 11.6 1.5 8 1.5Z" />
+                <circle cx="4.8" cy="7" r=".8" />
+                <circle cx="7" cy="4.5" r=".8" />
+                <circle cx="10.2" cy="5" r=".8" />
+              </svg>
+              Use this palette
+            </Link>
+          ) : null}
         </div>
         <ul className="mt-2.5 grid grid-cols-7 gap-2">
           {palette.map((color) => (
