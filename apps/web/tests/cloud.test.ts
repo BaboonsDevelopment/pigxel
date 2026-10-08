@@ -77,7 +77,6 @@ const fake = vi.hoisted(() => {
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => fake.client }));
 
 import {
-  deleteCloudTile,
   readCloudTile,
   saveCloudTile,
 } from "@/lib/pigxel-file/cloud";
@@ -141,13 +140,10 @@ describe("Pigxel cloud tiles", () => {
     await saveCloudTile({ name: "Big" }, "v1", image, "x".repeat(60000));
     expect(fake.state.rows.get("tile-1")?.thumbnail).toBeNull();
   });
-  it("reads and deletes a tile with its file", async () => {
+  it("reads a saved tile back with its file", async () => {
     await saveCloudTile({ name: "Grass" }, "{pixels}", image, "");
     expect(await readCloudTile("tile-1")).toBe("{pixels}");
-    await deleteCloudTile("tile-1");
-    expect(fake.state.rows.size).toBe(0);
-    expect(fake.state.files.size).toBe(0);
-    await expect(readCloudTile("tile-1")).rejects.toThrow(
+    await expect(readCloudTile("tile-2")).rejects.toThrow(
       "no longer in Pigxel cloud",
     );
   });

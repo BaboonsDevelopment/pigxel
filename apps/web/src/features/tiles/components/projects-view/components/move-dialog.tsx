@@ -15,13 +15,13 @@ import { createFolder, moveTileToFolder } from "../../../actions";
 import { FOLDER_NAME_MAX, type Folder } from "../../../folders";
 
 export function MoveDialog({
-  tile,
+  tiles,
   folders,
   currentFolderId,
   onMoved,
   onClose,
 }: {
-  tile: { id: string; name: string };
+  tiles: { id: string; name: string }[];
   folders: Folder[];
   currentFolderId?: string | null;
   onMoved: (folderId: string | null) => void;
@@ -46,9 +46,12 @@ export function MoveDialog({
       }
       folderId = created.id;
     }
-    const result = await moveTileToFolder(tile.id, folderId);
+    const results = await Promise.all(
+      tiles.map((tile) => moveTileToFolder(tile.id, folderId)),
+    );
     setSaving(false);
-    if (result.error) return setError(result.error);
+    const failed = results.find((result) => result.error);
+    if (failed) return setError(failed.error ?? "Couldn’t move that.");
     onMoved(folderId);
     onClose();
   };
@@ -60,7 +63,12 @@ export function MoveDialog({
 
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader title="Move to folder" description={tile.name} />
+      <DialogHeader
+        title="Move to folder"
+        description={
+          tiles.length === 1 ? tiles[0]?.name : `${tiles.length} projects`
+        }
+      />
       <DialogBody>
         <ul role="radiogroup" aria-label="Folder" className="grid gap-1">
           {options.map((option) => {

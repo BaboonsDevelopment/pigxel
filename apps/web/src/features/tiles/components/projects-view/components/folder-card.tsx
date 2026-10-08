@@ -1,29 +1,52 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { pixelifySans } from "@/lib/fonts/pixelify";
 import type { Folder, FolderProject } from "../../../folders";
+import { useFolderDropTarget } from "../drag/project-drag";
+import type { useFolderSort } from "../drag/use-folder-sort";
+
+type FolderSortProps = ReturnType<
+  ReturnType<typeof useFolderSort>["itemProps"]
+>;
 import { editedAgo } from "../helpers";
 
 const DECK = [
-  "z-10 -rotate-6 group-hover:-translate-x-4 group-hover:-translate-y-1 group-hover:-rotate-12",
-  "z-20 -ml-5 -rotate-1 group-hover:-translate-y-3 group-hover:rotate-0",
-  "z-10 -ml-5 rotate-6 group-hover:translate-x-4 group-hover:-translate-y-1 group-hover:rotate-12",
+  "z-10 -rotate-6 group-hover:-translate-x-4 group-hover:-translate-y-1 group-hover:-rotate-12 group-data-over:-translate-x-6 group-data-over:-translate-y-3 group-data-over:-rotate-[16deg]",
+  "z-20 -ml-5 -rotate-1 group-hover:-translate-y-3 group-hover:rotate-0 group-data-over:-translate-y-6 group-data-over:rotate-0",
+  "z-10 -ml-5 rotate-6 group-hover:translate-x-4 group-hover:-translate-y-1 group-hover:rotate-12 group-data-over:translate-x-6 group-data-over:-translate-y-3 group-data-over:rotate-[16deg]",
 ];
 
 export function FolderCard({
   folder,
   opening,
   onOpen,
+  sort,
 }: {
   folder: Folder;
   opening: string | null;
   onOpen: (project: FolderProject) => void;
+  sort: FolderSortProps;
 }) {
+  const { lifted, ...sortProps } = sort;
+  const { dragging, over, targetProps } = useFolderDropTarget(folder.id);
   const href = `/tiles?folder=${folder.id}`;
   const shown = folder.projects.slice(0, 3);
   return (
-    <li className="group relative">
+    <li
+      {...targetProps}
+      {...sortProps}
+      onDragStart={(event) => event.preventDefault()}
+      data-over={over || undefined}
+      className={cn(
+        "group relative transition-transform duration-200 ease-out",
+        over && "scale-[1.04]",
+        dragging && !over && "opacity-90",
+        lifted && "drop-shadow-[0_18px_24px_rgb(74_31_53/0.25)]",
+      )}
+    >
       <Link
         href={href}
         className="relative block rounded-2xl pt-12 outline-none focus-visible:ring-3 focus-visible:ring-ring/30"
@@ -49,16 +72,23 @@ export function FolderCard({
             </span>
           ))}
         </span>
-        <span className="relative z-30 flex h-[68px] items-center justify-between gap-2 rounded-2xl border border-[#efc0d0] bg-[#fadbe5] px-4 transition-colors group-hover:bg-[#f8d2df]">
+        <span
+          className={cn(
+            "relative z-30 flex h-[68px] items-center justify-between gap-2 rounded-2xl border border-[#efc0d0] bg-[#fadbe5] px-4 transition-colors group-hover:bg-[#f8d2df]",
+            over && "border-primary bg-[#f8d2df] ring-2 ring-primary",
+          )}
+        >
           <span className="truncate text-base font-semibold">
             {folder.name}
           </span>
           <span className="shrink-0 text-[11px] text-muted-foreground">
-            {folder.count} {folder.count === 1 ? "project" : "projects"}
+            {over
+              ? "Drop to move here"
+              : `${folder.count} ${folder.count === 1 ? "project" : "projects"}`}
           </span>
         </span>
       </Link>
-      {shown.length > 0 && (
+      {shown.length > 0 && !dragging && !lifted && (
         <div className="invisible absolute inset-x-0 top-full z-40 pt-1 opacity-0 transition-opacity duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
           <div className="overflow-hidden rounded-2xl border border-[#efc0d0] bg-background shadow-lg">
             <ul className="px-2 pt-1.5">

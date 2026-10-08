@@ -2,11 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import {
-  CloudError,
-  deleteCloudTile,
-  type CloudTileSummary,
-} from "@/lib/pigxel-file/cloud";
+import { CloudError, type CloudTileSummary } from "@/lib/pigxel-file/cloud";
+import { trashProjects } from "./actions";
+import { TRASH_DAYS } from "./constants";
 import {
   findDraftFor,
   loadDrafts,
@@ -45,28 +43,15 @@ export function useCloudTileActions(userId: string) {
 
   const remove = async (tile: CloudTileSummary) => {
     const confirmed = await confirmDialog({
-      title: "Delete tile?",
-      message: `“${tile.name}” will be deleted from Pigxel cloud.`,
-      confirmLabel: "Delete",
+      title: "Move to Trash?",
+      message: `You can restore “${tile.name}” from Trash for ${TRASH_DAYS} days. After that it’s deleted for good.`,
+      confirmLabel: "Move to Trash",
     });
     if (!confirmed) return;
     setError(null);
     setRemoved((ids) => new Set(ids).add(tile.id));
     try {
-      await deleteCloudTile(tile.id);
-      await loadDrafts(userId);
-      const open = findDraftFor(userId, {
-        kind: "cloud",
-        tile: { id: tile.id, name: tile.name },
-      });
-      if (open)
-        writeDraft(userId, {
-          id: open.id,
-          name: open.name,
-          file: open.file,
-          location: null,
-          dirty: true,
-        });
+      await deleteCloudProject(userId, tile);
       router.refresh();
     } catch (e) {
       setRemoved((ids) => {
@@ -81,6 +66,27 @@ export function useCloudTileActions(userId: string) {
   };
 
   return { busy, error, removed, open, remove };
+}
+
+export async function deleteCloudProject(
+  userId: string,
+  tile: { id: string; name: string },
+) {
+  const { error } = await trashProjects([tile.id]);
+  if (error) throw new CloudError(error);
+  await loadDrafts(userId);
+  const open = findDraftFor(userId, {
+    kind: "cloud",
+    tile: { id: tile.id, name: tile.name },
+  });
+  if (open)
+    writeDraft(userId, {
+      id: open.id,
+      name: open.name,
+      file: open.file,
+      location: null,
+      dirty: true,
+    });
 }
 
 export async function confirmRemoveLocalTile(

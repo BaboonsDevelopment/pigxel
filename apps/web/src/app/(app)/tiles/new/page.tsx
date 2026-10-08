@@ -4,6 +4,7 @@ import { PageTitle } from "@pigxel/ui/components/typography";
 import { NewTileForm } from "@/features/tiles/components/new-tile-form";
 import { findAsset } from "@/features/assets/server";
 import { requireUser } from "@/lib/auth/session";
+import { listFolders } from "@/features/tiles/server";
 import { getDriveStatus } from "@/lib/google-drive/server";
 import { readPalette } from "@/lib/palette/presets";
 
@@ -20,6 +21,7 @@ export default async function NewTile({
     colors?: string;
     paletteName?: string;
     from?: string;
+    folder?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -27,10 +29,12 @@ export default async function NewTile({
   const colors = readPalette(
     params.colors?.split(",").map((color) => `#${color}`) ?? [],
   );
-  const [drive, asset] = await Promise.all([
+  const [drive, asset, folders] = await Promise.all([
     getDriveStatus(user.id),
     findAsset(params.asset),
+    params.folder ? listFolders(user.id).catch(() => []) : [],
   ]);
+  const folder = folders.find((f) => f.id === params.folder);
   return (
     <Page>
       <PageTitle className="mb-8">New tile</PageTitle>
@@ -50,6 +54,7 @@ export default async function NewTile({
             : null
         }
         from={params.from}
+        folder={folder && { id: folder.id, name: folder.name }}
       />
     </Page>
   );

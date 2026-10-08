@@ -29,6 +29,7 @@ import {
 } from "@/lib/pigxel-file/format";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
 import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
+import { moveTileToFolder } from "@/features/tiles/actions";
 import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
 import type { TileLocation } from "@/lib/pigxel-file/location";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
@@ -59,6 +60,7 @@ type FormProps = {
   paletteId?: string;
   customPalette?: PalettePreset | null;
   from?: string;
+  folder?: { id: string; name: string };
 };
 
 export function NewTileForm({
@@ -85,6 +87,7 @@ function Form({
   drive,
   driveError,
   from,
+  folder,
   asset,
   palette,
 }: Omit<FormProps, "asset" | "paletteId" | "customPalette"> & {
@@ -126,16 +129,19 @@ function Form({
     const file = serializePigxel(image);
     let location: TileLocation | null = null;
     try {
-      if (storage === "cloud")
-        location = {
-          kind: "cloud",
-          tile: await saveCloudTile(
-            { name },
-            file,
-            image,
-            thumbnailDataUrl(image),
-          ),
-        };
+      if (storage === "cloud" || folder) {
+        const tile = await saveCloudTile(
+          { name },
+          file,
+          image,
+          thumbnailDataUrl(image),
+        );
+        if (folder) {
+          const moved = await moveTileToFolder(tile.id, folder.id);
+          if (moved.error) throw new CloudError(moved.error);
+        }
+        location = { kind: "cloud", tile };
+      }
       if (storage === "drive")
         location = {
           kind: "drive",
@@ -294,71 +300,82 @@ function Form({
         </Field>
       )}
 
-      <fieldset>
-        <legend className="mb-3 text-sm font-medium">Where to keep it</legend>
-        <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
-          <ChoiceCard>
-            <Radio
-              name="storage"
-              value="cloud"
-              checked={storage === "cloud"}
-              onChange={() => setStorage("cloud")}
-            />
-            <ChoiceText title="Pigxel cloud">
-              Saved to your Pigxel account and autosaved as you draw. Open it
-              from any device.
-            </ChoiceText>
-          </ChoiceCard>
-          <ChoiceCard>
-            <Radio
-              name="storage"
-              value="drive"
-              checked={storage === "drive"}
-              disabled={!drive.connected}
-              onChange={() => setStorage("drive")}
-            />
-            <ChoiceText title="Google Drive">
-              {!drive.available ? (
-                "Google Drive isn’t set up for Pigxel yet."
-              ) : drive.connected ? (
-                <>
-                  Created in the Drive of {drive.email ?? "your Google account"}{" "}
-                  and saved automatically as you draw.
-                </>
-              ) : (
-                <>
-                  Link your Google account to keep tiles in your Drive.{" "}
-                  <a
-                    href={connectDriveUrl("/tiles/new")}
-                    className={textLinkClassName}
-                  >
-                    Connect Google Drive
-                  </a>
-                </>
-              )}
-            </ChoiceText>
-          </ChoiceCard>
-          <ChoiceCard>
-            <Radio
-              name="storage"
-              value="none"
-              checked={storage === "none"}
-              onChange={() => setStorage("none")}
-            />
-            <ChoiceText title="Don’t store it">
-              Kept in this browser while you work. Download it or save it to
-              Pigxel cloud{drive.available ? " or Google Drive" : ""} any time.
-            </ChoiceText>
-          </ChoiceCard>
-        </div>
-      </fieldset>
+      {folder ? (
+        <Field label="Where to keep it">
+          <p className="text-sm">
+            In the <span className="font-semibold">{folder.name}</span> folder,
+            saved to Pigxel cloud and autosaved as you draw.
+          </p>
+        </Field>
+      ) : (
+        <fieldset>
+          <legend className="mb-3 text-sm font-medium">Where to keep it</legend>
+          <div className="grid max-w-3xl gap-3 sm:grid-cols-3">
+            <ChoiceCard>
+              <Radio
+                name="storage"
+                value="cloud"
+                checked={storage === "cloud"}
+                onChange={() => setStorage("cloud")}
+              />
+              <ChoiceText title="Pigxel cloud">
+                Saved to your Pigxel account and autosaved as you draw. Open it
+                from any device.
+              </ChoiceText>
+            </ChoiceCard>
+            <ChoiceCard>
+              <Radio
+                name="storage"
+                value="drive"
+                checked={storage === "drive"}
+                disabled={!drive.connected}
+                onChange={() => setStorage("drive")}
+              />
+              <ChoiceText title="Google Drive">
+                {!drive.available ? (
+                  "Google Drive isn’t set up for Pigxel yet."
+                ) : drive.connected ? (
+                  <>
+                    Created in the Drive of{" "}
+                    {drive.email ?? "your Google account"} and saved
+                    automatically as you draw.
+                  </>
+                ) : (
+                  <>
+                    Link your Google account to keep tiles in your Drive.{" "}
+                    <a
+                      href={connectDriveUrl("/tiles/new")}
+                      className={textLinkClassName}
+                    >
+                      Connect Google Drive
+                    </a>
+                  </>
+                )}
+              </ChoiceText>
+            </ChoiceCard>
+            <ChoiceCard>
+              <Radio
+                name="storage"
+                value="none"
+                checked={storage === "none"}
+                onChange={() => setStorage("none")}
+              />
+              <ChoiceText title="Don’t store it">
+                Kept in this browser while you work. Download it or save it to
+                Pigxel cloud{drive.available ? " or Google Drive" : ""} any
+                time.
+              </ChoiceText>
+            </ChoiceCard>
+          </div>
+        </fieldset>
+      )}
 
       {error && <FormMessage tone="error">{error}</FormMessage>}
 
       <div className="flex items-center gap-3">
         <Button size="lg" disabled={busy}>
           {busy
-            ? storage === "cloud"
+            ? storage === "cloud" || folder
               ? "Creating in Pigxel cloud…"
               : storage === "drive"
                 ? "Creating in Google Drive…"
@@ -366,7 +383,13 @@ function Form({
             : "Create tile"}
         </Button>
         <Link
-          href={from ? editorUrl(from) : "/tiles"}
+          href={
+            from
+              ? editorUrl(from)
+              : folder
+                ? `/tiles?folder=${folder.id}`
+                : "/tiles"
+          }
           className={buttonVariants({ variant: "ghost", size: "lg" })}
         >
           Cancel

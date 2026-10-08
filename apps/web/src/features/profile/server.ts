@@ -93,6 +93,7 @@ export async function listProfileTiles(
       { count: "exact" },
     )
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .order("pin_order", { ascending: true, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(120);

@@ -1,0 +1,41 @@
+import type { ProjectQuery } from "../search";
+
+export type ProjectListParams = ProjectQuery & {
+  folderId: string | null;
+  archived: boolean;
+  trashed: boolean;
+};
+
+export const projectKeys = {
+  all: ["projects"] as const,
+  lists: () => [...projectKeys.all, "list"] as const,
+  list: (params: ProjectListParams) =>
+    [...projectKeys.lists(), params] as const,
+  recent: () => [...projectKeys.all, "recent"] as const,
+  saved: (query: string) => [...projectKeys.all, "saved", query] as const,
+  savedAll: () => [...projectKeys.all, "saved"] as const,
+  labels: () => [...projectKeys.all, "labels"] as const,
+  stats: (tileId: string | null) =>
+    [...projectKeys.all, "stats", tileId ?? "all"] as const,
+};
+
+export function listParams(
+  filters: Omit<ProjectQuery, "query" | "archived">,
+  query: string,
+  folderId: string | null,
+  archived = false,
+  trashed = false,
+  sort = "edited",
+): ProjectListParams {
+  return {
+    folderId,
+    archived,
+    trashed,
+    sort,
+    size: filters.size,
+    animated: filters.animated,
+    label: filters.label,
+    published: filters.published,
+    query,
+  };
+}
