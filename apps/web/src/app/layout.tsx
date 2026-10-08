@@ -4,6 +4,7 @@ import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
   title: "Pigxel",
   description: "Pixel art with an AI helper.",
 };

@@ -64,6 +64,11 @@ export type PublicTile = ProfileTile & {
   tags: string[];
   description: string | null;
   allowRemix?: boolean;
+  remixes?: number;
+  remixOf?: {
+    username: string;
+    tile: { id: string; name: string } | null;
+  } | null;
 };
 
 export const AVATAR_BUCKET = "avatars";

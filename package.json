@@ -23,5 +23,11 @@
     "prettier": "^3.6.2",
     "supabase": "^2.50.0",
     "turbo": "^2.5.8"
+  },
+  "knip": {
+    "ignoreDependencies": [
+      "nsfwjs",
+      "@tensorflow/tfjs"
+    ]
   }
 }

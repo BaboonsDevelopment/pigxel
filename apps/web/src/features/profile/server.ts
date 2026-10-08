@@ -312,24 +312,37 @@ export async function getPublicTile(
   if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
   if (!data) return null;
   const tile = toPublicTile(data as unknown as PublicTileRow);
-  const [downloads, details] = await Promise.all([
+  const [downloads, details, remixes] = await Promise.all([
     downloadCounts([tile.id]),
     supabase
       .from("tiles")
-      .select("tags, description, allow_remix")
+      .select(
+        "tags, description, allow_remix, remix_of_user, original:remix_of_tile(id, name), original_author:remix_of_user(username)",
+      )
       .eq("id", tile.id)
       .maybeSingle<{
         tags: string[];
         description: string | null;
         allow_remix: boolean;
+        remix_of_user: string | null;
+        original: { id: string; name: string } | null;
+        original_author: { username: string } | null;
       }>(),
+    supabase.rpc("remix_count", { tile: tile.id }),
   ]);
   return {
     ...tile,
     downloads: downloads.get(tile.id) ?? 0,
+    remixes: remixes.error ? 0 : Number(remixes.data),
     tags: details.data?.tags ?? [],
     description: details.data?.description ?? null,
     allowRemix: details.data?.allow_remix ?? true,
+    remixOf: details.data?.original_author
+      ? {
+          username: details.data.original_author.username,
+          tile: details.data.original,
+        }
+      : null,
   };
 }
 

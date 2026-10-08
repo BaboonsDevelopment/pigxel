@@ -6,14 +6,22 @@ import { useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
+import { parsePigxel } from "@/lib/pigxel-file/format";
 import { draftFromFile, editorUrl } from "@/lib/pigxel-file/open-tile";
+import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { setFollowing } from "@/features/profile/actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { PublicTile } from "@/features/profile/profile";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
-import { recordDownload, setTileLiked, setTileSaved } from "../../../actions";
+import {
+  linkRemix,
+  recordDownload,
+  setTileLiked,
+  setTileSaved,
+} from "../../../actions";
 import { downloadPicture, type DownloadFormat } from "../download";
 import { DownloadMenu } from "./download-menu";
 import type { Picture } from "../helpers";
@@ -97,10 +105,26 @@ export function ArtDetails({
     setRemixing(true);
     setError(null);
     try {
-      const id = await draftFromFile(viewerId, file, tile.name, null);
+      const image = parsePigxel(file);
+      const name = `${tile.name.slice(0, 91)} (remix)`;
+      const copy = await saveCloudTile(
+        { name },
+        file,
+        image,
+        thumbnailDataUrl(image),
+      );
+      await linkRemix(copy.id, tile.id);
+      const id = await draftFromFile(viewerId, file, name, {
+        kind: "cloud",
+        tile: copy,
+      });
       router.push(editorUrl(id));
-    } catch {
-      setError("Couldn’t open this art in the editor. Try again.");
+    } catch (e) {
+      setError(
+        e instanceof CloudError
+          ? e.message
+          : "Couldn’t open this art in the editor. Try again.",
+      );
       setRemixing(false);
     }
   };
@@ -242,7 +266,7 @@ export function ArtDetails({
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-2 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
+      <div className="mt-4 grid grid-cols-3 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
         <button
           type="button"
           aria-pressed={like.liked}
@@ -272,6 +296,28 @@ export function ArtDetails({
             <p className="text-[10px] text-muted-foreground">likes</p>
           </div>
         </button>
+        <div className="flex items-center justify-center gap-3 border-r border-[#f6dbe4] px-4">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-5"
+          >
+            <path d="M2.5 5h8.5M9 2.5 11.5 5 9 7.5M13.5 11H5M7 8.5 4.5 11 7 13.5" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold tabular-nums">
+              {formatCount(tile.remixes ?? 0)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {tile.remixes === 1 ? "remix" : "remixes"}
+            </p>
+          </div>
+        </div>
         <div className="flex items-center justify-end gap-3 px-4">
           <svg
             aria-hidden="true"
@@ -323,7 +369,7 @@ export function ArtDetails({
         </>
       ) : (
         <p className="mt-4 rounded-xl border border-dashed px-3 py-2.5 text-center text-[11px] text-muted-foreground">
-          {author.username} turned off remixing for this art.
+          The owner turned off remixing for this art.
         </p>
       )}
       {error && (
@@ -453,7 +499,32 @@ export function ArtDetails({
             Public project · Remix {details.allowRemix ? "enabled" : "disabled"}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            Original creation by {author.username}
+            {tile.remixOf ? (
+              <>
+                {tile.remixOf.tile ? (
+                  <>
+                    Remix of{" "}
+                    <Link
+                      href={`/explore/${tile.remixOf.tile.id}`}
+                      className="text-foreground underline-offset-2 hover:underline"
+                    >
+                      {tile.remixOf.tile.name}
+                    </Link>{" "}
+                    by{" "}
+                  </>
+                ) : (
+                  "Remixed from "
+                )}
+                <Link
+                  href={`/u/${tile.remixOf.username}`}
+                  className="text-foreground underline-offset-2 hover:underline"
+                >
+                  @{tile.remixOf.username}
+                </Link>
+              </>
+            ) : (
+              <>Original creation by {author.username}</>
+            )}
           </p>
         </div>
       </div>

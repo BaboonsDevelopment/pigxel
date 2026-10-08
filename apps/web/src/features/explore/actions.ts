@@ -315,3 +315,25 @@ export async function unpublishArt(
   }
   return {};
 }
+
+export async function linkRemix(
+  copyId: string,
+  originalId: string,
+): Promise<void> {
+  const user = await requireUser();
+  if (!UUID.test(copyId) || !UUID.test(originalId)) return;
+  const supabase = await createClient();
+  const { data: original } = await supabase
+    .from("tiles")
+    .select("id, user_id")
+    .eq("id", originalId)
+    .eq("visibility", "public")
+    .maybeSingle<{ id: string; user_id: string }>();
+  if (!original) return;
+  const { error } = await supabase
+    .from("tiles")
+    .update({ remix_of_tile: original.id, remix_of_user: original.user_id })
+    .eq("id", copyId)
+    .eq("user_id", user.id);
+  if (error) console.error(`Couldn’t link remix ${copyId}:`, error.message);
+}

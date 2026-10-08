@@ -20,7 +20,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const tile = UUID.test(id)
     ? await getPublicTile(id, null).catch(() => null)
     : null;
-  return { title: `${tile?.name ?? "Art"} · Pigxel` };
+  if (!tile) return { title: "Art · Pigxel" };
+  const title = `${tile.name} by @${tile.author.username} · Pigxel`;
+  const description =
+    tile.description?.trim().slice(0, 200) ||
+    `Pixel art by ${tile.author.name} on Pigxel. Open it, remix it and make your own.`;
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "article", siteName: "Pigxel" },
+    twitter: { card: "summary_large_image", title, description },
+  };
 }
 
 export default async function ArtDetailPage({ params }: Props) {
