@@ -249,6 +249,23 @@ export function useTileFile({
       }
     });
 
+  const saveToCloudFirst = async () => {
+    let cloud = null as CloudTile | null;
+    await run(async () => {
+      const savedRevision = latestRevision.current;
+      setSync("saving");
+      try {
+        const next = await saveTo("cloud", location);
+        saved(next, savedRevision);
+        if (next.kind === "cloud") cloud = next.tile;
+      } catch (error) {
+        setSync(location ? "failed" : "idle");
+        throw error;
+      }
+    });
+    return cloud;
+  };
+
   const save = () => (location ? saveNow(location.kind) : download());
 
   const place = location ? LOCATION_LABELS[location.kind] : null;
@@ -293,6 +310,7 @@ export function useTileFile({
     openCloudTile,
     download,
     saveToCloud: () => saveNow("cloud"),
+    saveToCloudFirst,
     saveToDrive: () => saveNow("drive"),
     save,
   };

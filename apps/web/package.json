@@ -17,9 +17,11 @@
     "@pigxel/ui": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.80.0",
+    "@tensorflow/tfjs": "4.22.0",
     "fflate": "0.8.3",
     "mediabunny": "1.61.1",
     "next": "catalog:",
+    "nsfwjs": "4.4.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "server-only": "^0.0.1"

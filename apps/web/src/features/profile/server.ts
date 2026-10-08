@@ -25,6 +25,7 @@ type TileRow = {
   visibility: Visibility;
   pin_order: number | null;
   updated_at: string;
+  review?: string | null;
 };
 
 export const getOwnProfile = cache(
@@ -88,7 +89,7 @@ export async function listProfileTiles(
   const { data, count, error } = await supabase
     .from("tiles")
     .select(
-      "id, name, width, height, thumbnail, visibility, pin_order, updated_at",
+      "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at",
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -108,7 +109,8 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
   width: row.width,
   height: row.height,
   thumbnail: row.thumbnail,
-  visibility: row.visibility,
+  visibility: row.review === "pending" ? "public" : row.visibility,
+  inReview: row.review === "pending",
   pinOrder: row.pin_order,
   updatedAt: row.updated_at,
 });
@@ -129,7 +131,7 @@ type PublicTileRow = TileRow & {
   mine?: { user_id: string }[];
 };
 
-export type ArtFilter = {
+type ArtFilter = {
   min?: number;
   max?: number;
   animated?: boolean;
@@ -164,7 +166,7 @@ const publicTiles = (
 };
 
 const PUBLIC_TILE_COLUMNS =
-  "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
 
 async function followeesOf(supabase: Supabase, userId: string) {
   const { data, error } = await supabase
@@ -292,7 +294,11 @@ export async function getPublicTile(
         : PUBLIC_TILE_COLUMNS,
     )
     .eq("id", id)
-    .eq("visibility", "public");
+    .or(
+      viewerId
+        ? "visibility.eq.public,review.eq.pending"
+        : "visibility.eq.public",
+    );
   const { data, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).maybeSingle();

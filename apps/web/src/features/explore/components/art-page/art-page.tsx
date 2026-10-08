@@ -47,6 +47,14 @@ export function ArtPage({
   return (
     <div className="flex flex-col lg:-mb-8 lg:h-[calc(100dvh-5.5rem)]">
       <Breadcrumb name={tile.name} />
+      {tile.inReview && (
+        <p
+          role="status"
+          className="mb-3 rounded-lg bg-pastel-pink-soft px-3 py-2 text-xs"
+        >
+          Only you can see this until it’s checked, usually within a minute.
+        </p>
+      )}
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,708fr)_minmax(0,342fr)] lg:gap-x-[26px] lg:gap-y-[18px] lg:grid-rows-[minmax(0,1fr)_auto]">
         <ArtPreview tile={tile} picture={picture} error={error} />
         <ArtDetails

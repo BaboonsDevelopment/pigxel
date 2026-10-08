@@ -9,13 +9,17 @@ import {
 
 export type AppNotification = {
   id: string;
-  kind: "follow";
-  name: string;
-  username: string;
-  avatarUrl: string | null;
   ago: string;
   unread: boolean;
-};
+} & (
+  | {
+      kind: "follow";
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+    }
+  | { kind: "art_rejected"; tileName: string }
+);
 
 const SHOWN = 20;
 
@@ -36,19 +40,29 @@ export async function countUnreadNotifications(
   const since = await seenAt(userId);
   if (!since) return 0;
   const supabase = await createClient();
-  const { count, error } = await supabase
-    .from("follows")
-    .select("follower_id", { count: "exact", head: true })
-    .eq("followee_id", userId)
-    .gt("created_at", since);
-  return error ? 0 : (count ?? 0);
+  const [follows, own] = await Promise.all([
+    supabase
+      .from("follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("followee_id", userId)
+      .gt("created_at", since),
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gt("created_at", since),
+  ]);
+  return (
+    (follows.error ? 0 : (follows.count ?? 0)) +
+    (own.error ? 0 : (own.count ?? 0))
+  );
 }
 
 export async function listNotifications(
   userId: string,
 ): Promise<AppNotification[]> {
   const supabase = await createClient();
-  const [since, { data, error }] = await Promise.all([
+  const [since, { data, error }, own] = await Promise.all([
     seenAt(userId),
     supabase
       .from("follows")
@@ -58,26 +72,51 @@ export async function listNotifications(
       .eq("followee_id", userId)
       .order("created_at", { ascending: false })
       .limit(SHOWN),
+    supabase
+      .from("notifications")
+      .select("id, kind, tile_name, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(SHOWN),
   ]);
   if (error) throw new Error(`Couldn’t load notifications: ${error.message}`);
   const now = Date.now();
-  return (
+  const follows = (
     data as unknown as { created_at: string; follower: ProfileRow | null }[]
   ).flatMap((row) => {
     if (!row.follower) return [];
     const follower = toArtistProfile(row.follower);
     return [
       {
-        id: `follow:${follower.id}`,
-        kind: "follow" as const,
-        name: follower.name,
-        username: follower.username,
-        avatarUrl: follower.avatarUrl,
-        ago: timeAgo(Date.parse(row.created_at), now),
-        unread: since !== null && row.created_at > since,
+        at: row.created_at,
+        item: {
+          id: `follow:${follower.id}`,
+          kind: "follow" as const,
+          name: follower.name,
+          username: follower.username,
+          avatarUrl: follower.avatarUrl,
+          ago: timeAgo(Date.parse(row.created_at), now),
+          unread: since !== null && row.created_at > since,
+        },
       },
     ];
   });
+  const rejected = (
+    (own.data ?? []) as { id: string; tile_name: string; created_at: string }[]
+  ).map((row) => ({
+    at: row.created_at,
+    item: {
+      id: `notification:${row.id}`,
+      kind: "art_rejected" as const,
+      tileName: row.tile_name,
+      ago: timeAgo(Date.parse(row.created_at), now),
+      unread: since !== null && row.created_at > since,
+    },
+  }));
+  return [...follows, ...rejected]
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, SHOWN)
+    .map((entry) => entry.item);
 }
 
 export async function markNotificationsSeen(userId: string) {

@@ -4,7 +4,14 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
+import {
+  CloudError,
+  saveCloudTile,
+  type CloudTileSummary,
+} from "@/lib/pigxel-file/cloud";
+import { writeDraft, type Draft } from "@/lib/pigxel-file/draft";
+import type { PigxelDocument } from "@/lib/pigxel-file/format";
+import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { scrollParent } from "@/lib/utils/scroll-parent";
@@ -20,6 +27,7 @@ import {
 import { ProjectCard } from "../project-card/project-card";
 import { TileThumbnail } from "../tile-thumbnail";
 import type { SavedArt } from "@/features/explore/server";
+import { PublishDialog } from "@/features/explore/components/explore-header/components/publish-dialog";
 import { Favourites } from "./components/favourites";
 import { FolderCard } from "./components/folder-card";
 import { FolderHeader } from "./components/folder-header";
@@ -189,8 +197,54 @@ function ProjectGrid({
   const [offset, setOffset] = useState(initial.length);
   const [done, setDone] = useState(initial.length < PAGE_SIZE);
   const [moving, setMoving] = useState<CloudTileSummary | null>(null);
+  const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
   const [movedOut, setMovedOut] = useState<ReadonlySet<string>>(new Set());
   const [moveError, setMoveError] = useState<string | null>(null);
+  const [published, setPublished] = useState<ReadonlyMap<string, boolean>>(
+    new Map(),
+  );
+  const markPublished = (tileId: string, value: boolean) =>
+    setPublished((map) => new Map(map).set(tileId, value));
+  const [uploading, setUploading] = useState<string | null>(null);
+  const publishLocal = async (draft: Draft, image: PigxelDocument) => {
+    setMoveError(null);
+    setUploading(draft.id);
+    try {
+      const tile = await saveCloudTile(
+        { name: draft.name },
+        draft.file,
+        image,
+        thumbnailDataUrl(image),
+      );
+      writeDraft(userId, {
+        id: draft.id,
+        name: draft.name,
+        file: draft.file,
+        location: { kind: "cloud", tile },
+        dirty: false,
+      });
+      const summary: CloudTileSummary = {
+        id: tile.id,
+        name: tile.name,
+        width: image.width,
+        height: image.height,
+        thumbnail: thumbnailDataUrl(image),
+        updatedAt: new Date().toISOString(),
+        published: false,
+      };
+      setTiles((all) => [summary, ...all]);
+      refreshLocal();
+      setPublishing(summary);
+    } catch (e) {
+      setMoveError(
+        e instanceof CloudError
+          ? e.message
+          : "Couldn’t save to Pigxel cloud. Try again.",
+      );
+    } finally {
+      setUploading(null);
+    }
+  };
   const loading = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
 
@@ -271,7 +325,18 @@ function ProjectGrid({
               meta={meta}
               thumbnail={<TileThumbnail image={project.image} />}
               open={{ href: editorUrl(project.id) }}
+              opening={uploading === project.id}
+              busyLabel="Saving to cloud…"
               menu={[
+                ...(project.draft.location
+                  ? []
+                  : [
+                      {
+                        label: "Publish to Explore…",
+                        onSelect: () =>
+                          void publishLocal(project.draft, project.image),
+                      },
+                    ]),
                 {
                   label:
                     project.draft.location?.kind === "drive"
@@ -299,6 +364,19 @@ function ProjectGrid({
               opening={cloud.busy === project.id}
               disabled={cloud.busy !== null}
               menu={[
+                ...((published.get(project.id) ?? project.tile.published)
+                  ? [
+                      {
+                        label: "Edit Explore details…",
+                        onSelect: () => setPublishing(project.tile),
+                      },
+                    ]
+                  : [
+                      {
+                        label: "Publish to Explore…",
+                        onSelect: () => setPublishing(project.tile),
+                      },
+                    ]),
                 {
                   label: "Move to folder…",
                   onSelect: () => setMoving(project.tile),
@@ -336,6 +414,14 @@ function ProjectGrid({
           )
         ))}
       {!done && <div ref={sentinel} aria-hidden="true" className="h-px" />}
+      {publishing && (
+        <PublishDialog
+          tile={publishing}
+          onPublished={() => markPublished(publishing.id, true)}
+          onUnpublished={() => markPublished(publishing.id, false)}
+          onClose={() => setPublishing(null)}
+        />
+      )}
       {moving && (
         <MoveDialog
           tile={moving}

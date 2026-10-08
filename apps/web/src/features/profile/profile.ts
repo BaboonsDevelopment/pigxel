@@ -43,6 +43,7 @@ export type ProfileTile = {
   height: number;
   thumbnail: string | null;
   visibility: Visibility;
+  inReview?: boolean;
   pinOrder: number | null;
   updatedAt: string;
 };

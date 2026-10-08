@@ -80,6 +80,9 @@ import type { TileTransform } from "@/lib/sprite/transform";
 import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
+import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { loadArtDetails } from "@/features/explore/actions";
+import type { PublishTile } from "@/features/explore/components/explore-header/components/publish-dialog";
 import {
   IMAGE_FILE_TYPES,
   documentFromFrames,
@@ -192,6 +195,13 @@ const ModifySelectionDialog = dynamic(
   () => import("./modify-selection-dialog"),
   { ssr: false },
 );
+const PublishArtDialog = dynamic(
+  () =>
+    import("@/features/explore/components/explore-header/components/publish-dialog").then(
+      (m) => m.PublishDialog,
+    ),
+  { ssr: false },
+);
 const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
@@ -241,6 +251,11 @@ export function Editor({
   } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
+  const [explore, setExplore] = useState<{
+    tileId: string;
+    published: boolean;
+  } | null>(null);
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
   const [exportSettings, setExportSettings] =
@@ -309,6 +324,24 @@ export function Editor({
         }
       : undefined,
   });
+  const cloudTile = file.location?.kind === "cloud" ? file.location.tile : null;
+  const cloudTileId = cloudTile?.id;
+  useEffect(() => {
+    if (!cloudTileId) return;
+    let live = true;
+    loadArtDetails(cloudTileId).then(
+      (details) => {
+        if (live && details)
+          setExplore({ tileId: cloudTileId, published: details.published });
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [cloudTileId]);
+  const published =
+    !!cloudTileId && explore?.tileId === cloudTileId && explore.published;
 
   const sprite = useSprite(image, file.markDirty, kept?.sprite);
   const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
@@ -1305,6 +1338,23 @@ export function Editor({
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
+        explorePublished={published}
+        onPublishArt={
+          cloudTile || !file.location
+            ? async () => {
+                const target = cloudTile ?? (await file.saveToCloudFirst());
+                if (!target) return;
+                const image = sprite.document();
+                setPublishingArt({
+                  id: target.id,
+                  name: file.name,
+                  width: image.width,
+                  height: image.height,
+                  thumbnail: thumbnailDataUrl(image),
+                });
+              }
+            : undefined
+        }
         onImportSheet={() => sheetInput.current?.click()}
         onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
@@ -1415,6 +1465,18 @@ export function Editor({
           draftId={draft.id}
           file={file}
           onClose={() => setOpening(null)}
+        />
+      )}
+      {publishingArt && (
+        <PublishArtDialog
+          tile={publishingArt}
+          onPublished={() =>
+            setExplore({ tileId: publishingArt.id, published: true })
+          }
+          onUnpublished={() =>
+            setExplore({ tileId: publishingArt.id, published: false })
+          }
+          onClose={() => setPublishingArt(null)}
         />
       )}
       {publishing && (

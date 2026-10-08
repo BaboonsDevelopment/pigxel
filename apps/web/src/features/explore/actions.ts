@@ -22,6 +22,7 @@ import {
 import { findArtists, type ArtistResult } from "@/features/search/server";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
 import { toComment } from "./server";
+import { requestReview } from "@/features/moderation/request";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -228,17 +229,14 @@ async function saveArtDetails(
     const supabase = await createClient();
     const query = supabase
       .from("tiles")
-      .update({
-        ...(publish ? { visibility: "public" } : {}),
-        tags: chosen,
-        description: text || null,
-      })
+      .update({ tags: chosen, description: text || null })
       .eq("id", tileId)
       .eq("user_id", user.id);
     const { error } = await (publish
       ? query
       : query.eq("visibility", "public"));
     if (error) return { error: "Couldn’t save this art. Try again." };
+    if (publish) await requestReview(supabase, tileId, user.id);
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }
@@ -259,4 +257,50 @@ export async function updateArtDetails(
   description: string,
 ): Promise<{ error?: string }> {
   return saveArtDetails(tileId, tags, description, false);
+}
+
+export async function loadArtDetails(tileId: string): Promise<{
+  published: boolean;
+  tags: string[];
+  description: string;
+} | null> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tiles")
+    .select("visibility, review, tags, description")
+    .eq("id", tileId)
+    .eq("user_id", user.id)
+    .maybeSingle<{
+      visibility: string;
+      review: string | null;
+      tags: string[];
+      description: string | null;
+    }>();
+  if (!data) return null;
+  return {
+    published: data.visibility === "public" || data.review === "pending",
+    tags: data.tags,
+    description: data.description ?? "",
+  };
+}
+
+export async function unpublishArt(
+  tileId: string,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({ visibility: "private", review: null })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t remove this art from Explore." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
 }
