@@ -8,6 +8,7 @@ import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { scrollParent } from "@/lib/utils/scroll-parent";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { PublishDialog } from "@/features/explore/components/explore-header/components/publish-dialog";
 import type { Folder } from "../../../../folders";
 import type { Label } from "../../../../labels";
@@ -34,6 +35,8 @@ import { RenameDialog } from "../rename-dialog";
 import { SectionHeader } from "../section-header";
 import { LabelBadge, PinBadge, PublishedBadge } from "./badges";
 import { useLocalProjects } from "./use-local-projects";
+import { useProjectDrag } from "../../drag/project-drag";
+import { SelectionBar } from "./selection-bar";
 import { useProjectActions } from "./use-project-actions";
 
 const PRELOAD = "1500px";
@@ -89,6 +92,7 @@ function Grid({
   );
   const local = useLocalProjects(userId);
   const cloud = useCloudTileActions(userId);
+  const drag = useProjectDrag();
   const actions = useProjectActions({
     userId,
     folderId: folderId ?? null,
@@ -96,7 +100,9 @@ function Grid({
     local,
   });
 
-  const [moving, setMoving] = useState<CloudTileSummary | null>(null);
+  const [moving, setMoving] = useState<CloudTileSummary[] | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
   const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
   const [renaming, setRenaming] = useState<Project | null>(null);
@@ -149,6 +155,49 @@ function Grid({
   );
   const error = cloud.error ?? actions.error;
 
+  const chosen = projects.filter((project) => selected.has(project.id));
+  const chosenTiles = chosen.flatMap((project) =>
+    project.kind === "cloud" ? [project.tile] : [],
+  );
+  const unpublished = chosenTiles.filter((tile) => !tile.published);
+  const toggle = (id: string) =>
+    setSelected((ids) => {
+      const next = new Set(ids);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const stopSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+  const publishChosen = async () => {
+    const confirmed = await confirmDialog({
+      title: `Publish ${unpublished.length === 1 ? "1 project" : `${unpublished.length} projects`} to Explore?`,
+      message:
+        "Each one is checked for adult content first. You can add tags and a description later with “Edit Explore details…”.",
+      confirmLabel: "Publish",
+    });
+    if (!confirmed) return;
+    await actions.publishMany(unpublished).then(stopSelecting, () => {});
+  };
+  const deleteChosen = async () => {
+    const local = chosen.length - chosenTiles.length;
+    const confirmed = await confirmDialog({
+      title: `Delete ${chosen.length === 1 ? "1 project" : `${chosen.length} projects`}?`,
+      message: [
+        chosenTiles.length > 0 &&
+          `${chosenTiles.length} will be deleted from Pigxel cloud.`,
+        local > 0 &&
+          `${local} kept in this browser will be removed from it. Projects only in this browser are gone for good.`,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      confirmLabel: "Delete",
+    });
+    if (!confirmed) return;
+    await actions.deleteMany(chosen).then(stopSelecting, () => {});
+  };
+
   const commonItems = (project: Project) => [
     {
       label: pinOf(project) === null ? "Pin to top" : "Unpin",
@@ -171,6 +220,18 @@ function Grid({
         count={String(total)}
         className="mb-3"
         onViewAll={onViewAll}
+        action={
+          projects.length > 0 && (
+            <button
+              type="button"
+              aria-pressed={selecting}
+              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+              className="ml-auto mr-4 cursor-pointer text-xs text-link-accent transition-colors hover:text-lavender-foreground"
+            >
+              {selecting ? "Done" : "Select"}
+            </button>
+          )
+        }
       />
       {error && (
         <FormMessage tone="error" className="mb-4">
@@ -189,7 +250,12 @@ function Grid({
                 meta={meta}
                 thumbnail={<TileThumbnail image={project.image} />}
                 badges={pinOf(project) !== null && <PinBadge />}
-                open={{ href: editorUrl(project.id) }}
+                open={
+                  selecting
+                    ? { onClick: () => toggle(project.id) }
+                    : { href: editorUrl(project.id) }
+                }
+                selected={selecting ? selected.has(project.id) : undefined}
                 opening={actions.uploading === project.id}
                 busyLabel="Saving to cloud…"
                 menu={[
@@ -243,7 +309,22 @@ function Grid({
                   .filter((label) => tile.labels?.includes(label.id))
                   .map((label) => <LabelBadge key={label.id} label={label} />),
               ]}
-              open={{ onClick: () => void cloud.open(tile) }}
+              open={{
+                onClick: () =>
+                  selecting ? toggle(project.id) : void cloud.open(tile),
+              }}
+              selected={selecting ? selected.has(project.id) : undefined}
+              onPointerDown={(event) => {
+                const group =
+                  selecting && selected.has(project.id) ? chosenTiles : [tile];
+                drag.start(event, {
+                  ids: group.map((t) => t.id),
+                  name:
+                    group.length > 1 ? `${group.length} projects` : tile.name,
+                  thumbnail: tile.thumbnail,
+                });
+              }}
+              dragging={drag.isDragging(project.id)}
               opening={
                 cloud.busy === project.id || actions.duplicating === project.id
               }
@@ -259,7 +340,7 @@ function Grid({
                     : "Publish to Explore…",
                   onSelect: () => setPublishing(tile),
                 },
-                { label: "Move to folder…", onSelect: () => setMoving(tile) },
+                { label: "Move to folder…", onSelect: () => setMoving([tile]) },
                 { label: "Labels…", onSelect: () => setLabelling(tile) },
                 ...(folderId
                   ? [
@@ -348,12 +429,30 @@ function Grid({
           onClose={() => setRenaming(null)}
         />
       )}
+      {selecting && (
+        <SelectionBar
+          count={chosen.length}
+          busy={actions.batchBusy}
+          canMove={chosenTiles.length > 0}
+          canPublish={unpublished.length > 0}
+          onMove={() => setMoving(chosenTiles)}
+          onPublish={() => void publishChosen()}
+          onDelete={() => void deleteChosen()}
+          onSelectAll={() =>
+            setSelected(new Set(projects.map((project) => project.id)))
+          }
+          onCancel={stopSelecting}
+        />
+      )}
       {moving && (
         <MoveDialog
-          tile={moving}
+          tiles={moving}
           folders={folders}
           currentFolderId={folderId}
-          onMoved={(to) => actions.moved(moving, to)}
+          onMoved={(to) => {
+            actions.moved(moving, to);
+            if (selecting) stopSelecting();
+          }}
           onClose={() => setMoving(null)}
         />
       )}

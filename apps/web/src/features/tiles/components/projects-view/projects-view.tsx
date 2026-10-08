@@ -11,6 +11,8 @@ import type { Folder } from "../../folders";
 import type { Label } from "../../labels";
 import { listParams } from "../../queries/keys";
 import { useLabels, useSetLabels } from "../../queries/labels";
+import { useMoveProjects } from "../../queries/move-projects";
+import { ProjectDragProvider } from "./drag/project-drag";
 import { useSeedProjectCache } from "../../queries/seed";
 import { useCloudTileActions } from "../../tile-actions";
 import { Favourites } from "./components/favourites";
@@ -73,6 +75,9 @@ export function ProjectsView({
   );
   const [creating, setCreating] = useState(false);
   const folderTiles = useCloudTileActions(userId);
+  const moveProjects = useMoveProjects();
+  const drop = (ids: string[], folderId: string) =>
+    moveProjects.mutate({ ids, folderId });
 
   useEffect(() => {
     const timer = setTimeout(() => setSearched(query.trim()), SEARCH_DELAY);
@@ -88,7 +93,7 @@ export function ProjectsView({
 
   if (folder)
     return (
-      <>
+      <ProjectDragProvider onDrop={drop}>
         <FolderHeader folder={folder} />
         <ProjectGrid
           userId={userId}
@@ -99,7 +104,7 @@ export function ProjectsView({
           searched=""
           folderId={folder.id}
         />
-      </>
+      </ProjectDragProvider>
     );
 
   const unfiltered =
@@ -115,7 +120,7 @@ export function ProjectsView({
   };
 
   return (
-    <>
+    <ProjectDragProvider onDrop={drop}>
       <ProjectsHeader
         filter={filter}
         onFilterChange={setFilter}
@@ -143,9 +148,9 @@ export function ProjectsView({
               filter === "Folders" ? undefined : () => setFilter("Folders")
             }
           />
-          {folderTiles.error && (
+          {(folderTiles.error ?? moveProjects.error) && (
             <FormMessage tone="error" className="mb-4">
-              {folderTiles.error}
+              {folderTiles.error ?? moveProjects.error?.message}
             </FormMessage>
           )}
           <ul className={GRID}>
@@ -212,6 +217,6 @@ export function ProjectsView({
         />
       )}
       {creating && <FolderNameDialog onClose={() => setCreating(false)} />}
-    </>
+    </ProjectDragProvider>
   );
 }

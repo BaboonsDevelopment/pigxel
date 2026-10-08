@@ -12,6 +12,7 @@ import {
   createDraft,
   findDraftFor,
   loadDrafts,
+  removeDraft,
   writeDraft,
   type Draft,
 } from "@/lib/pigxel-file/draft";
@@ -23,6 +24,7 @@ import {
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import {
   moveTileToFolder,
+  publishProjects,
   renameTile,
   setProjectArchived,
   setProjectPinned,
@@ -31,6 +33,7 @@ import {
   patchProjectLists,
   useInvalidateProjects,
 } from "../../../../queries/project-list";
+import { deleteCloudProject } from "../../../../tile-actions";
 import type { Project } from "../../helpers";
 import type { useLocalProjects } from "./use-local-projects";
 
@@ -139,6 +142,39 @@ export function useProjectActions({
     onSettled: invalidate,
   });
 
+  const publishManyMutation = useMutation({
+    mutationFn: (tiles: CloudTileSummary[]) =>
+      ensure(publishProjects(tiles.map((tile) => tile.id))),
+    onMutate: (tiles) =>
+      tiles.forEach((tile) =>
+        patchProjectLists(client, tile.id, { published: true }),
+      ),
+    onError: fail,
+    onSettled: invalidate,
+  });
+
+  const deleteManyMutation = useMutation({
+    mutationFn: async (projects: Project[]) => {
+      for (const project of projects)
+        if (project.kind === "local") removeDraft(userId, project.id);
+      local.refresh();
+      await Promise.all(
+        projects.flatMap((project) =>
+          project.kind === "cloud"
+            ? [deleteCloudProject(userId, project.tile)]
+            : [],
+        ),
+      );
+    },
+    onMutate: (projects) =>
+      projects.forEach((project) => {
+        if (project.kind === "cloud")
+          patchProjectLists(client, project.id, null);
+      }),
+    onError: fail,
+    onSettled: invalidate,
+  });
+
   const uploadMutation = useMutation({
     mutationFn: async ({
       draft,
@@ -238,11 +274,25 @@ export function useProjectActions({
       return uploadMutation.mutateAsync({ draft, image });
     },
 
-    moved: (tile: CloudTileSummary, to: string | null) => {
+    moved: (tiles: CloudTileSummary[], to: string | null) => {
       if (folderId && to !== folderId)
-        patchProjectLists(client, tile.id, null, inThisFolder);
+        tiles.forEach((tile) =>
+          patchProjectLists(client, tile.id, null, inThisFolder),
+        );
       void invalidate();
     },
+
+    publishMany: (tiles: CloudTileSummary[]) => {
+      setError(null);
+      return publishManyMutation.mutateAsync(tiles);
+    },
+
+    deleteMany: (projects: Project[]) => {
+      setError(null);
+      return deleteManyMutation.mutateAsync(projects);
+    },
+
+    batchBusy: publishManyMutation.isPending || deleteManyMutation.isPending,
 
     published: (tile: CloudTileSummary, value: boolean) => {
       patchProjectLists(client, tile.id, { published: value });

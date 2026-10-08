@@ -53,20 +53,7 @@ export function useCloudTileActions(userId: string) {
     setError(null);
     setRemoved((ids) => new Set(ids).add(tile.id));
     try {
-      await deleteCloudTile(tile.id);
-      await loadDrafts(userId);
-      const open = findDraftFor(userId, {
-        kind: "cloud",
-        tile: { id: tile.id, name: tile.name },
-      });
-      if (open)
-        writeDraft(userId, {
-          id: open.id,
-          name: open.name,
-          file: open.file,
-          location: null,
-          dirty: true,
-        });
+      await deleteCloudProject(userId, tile);
       router.refresh();
     } catch (e) {
       setRemoved((ids) => {
@@ -81,6 +68,26 @@ export function useCloudTileActions(userId: string) {
   };
 
   return { busy, error, removed, open, remove };
+}
+
+export async function deleteCloudProject(
+  userId: string,
+  tile: { id: string; name: string },
+) {
+  await deleteCloudTile(tile.id);
+  await loadDrafts(userId);
+  const open = findDraftFor(userId, {
+    kind: "cloud",
+    tile: { id: tile.id, name: tile.name },
+  });
+  if (open)
+    writeDraft(userId, {
+      id: open.id,
+      name: open.name,
+      file: open.file,
+      location: null,
+      dirty: true,
+    });
 }
 
 export async function confirmRemoveLocalTile(

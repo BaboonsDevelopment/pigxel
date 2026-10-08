@@ -9,6 +9,7 @@ import {
   listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
+import { requestReview } from "@/features/moderation/request";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
 import { PAGE_SIZE, PROJECT_NAME_MAX, RECENT_SHOWN } from "./constants";
@@ -317,4 +318,19 @@ export async function loadLabels(): Promise<Label[]> {
   } catch {
     return [];
   }
+}
+
+export async function publishProjects(tileIds: string[]): Promise<Result> {
+  const user = await requireUser();
+  if (!tileIds.length || !tileIds.every((id) => UUID.test(id)))
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    await Promise.all(
+      tileIds.map((id) => requestReview(supabase, id, user.id)),
+    );
+  } catch {
+    return { error: "Couldn’t publish these projects. Try again." };
+  }
+  return {};
 }
