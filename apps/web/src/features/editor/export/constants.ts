@@ -135,7 +135,7 @@ export const TIMELAPSE_SHAPES = [
 
 export type TimelapseShape = (typeof TIMELAPSE_SHAPES)[number]["id"];
 
-export const TIMELAPSE_LENGTHS = [5, 10, 15] as const;
+export const TIMELAPSE_LENGTHS = [5, 10, 15, 30, 60] as const;
 
 export type TimelapseLength = (typeof TIMELAPSE_LENGTHS)[number];
 
