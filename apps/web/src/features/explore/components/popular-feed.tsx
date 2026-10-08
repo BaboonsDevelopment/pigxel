@@ -15,6 +15,7 @@ import {
 import type { PublicTile } from "@/features/profile/profile";
 import type { ArtistResult } from "@/features/search/server";
 import { scrollParent } from "@/lib/utils/scroll-parent";
+import { saveFeedOrder } from "../feed-order";
 import { ExploreHeader } from "./explore-header/explore-header";
 import { ArtistMatches } from "./artist-matches";
 import { PopularCard } from "./popular-card/popular-card";
@@ -184,6 +185,15 @@ export function PopularFeed({
     clearTimeout(typing.current);
     applyFilters({ ...NO_FILTERS, feed: applied.current.feed });
   };
+
+  useEffect(() => {
+    saveFeedOrder({
+      ids: tiles.map((t) => t.id),
+      filters,
+      count,
+      url: window.location.pathname + window.location.search,
+    });
+  }, [tiles, filters, count]);
 
   const { query, tags } = filters;
   const words = searchWords(query);

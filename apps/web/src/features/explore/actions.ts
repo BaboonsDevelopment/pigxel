@@ -242,9 +242,13 @@ async function saveArtDetails(
   description: string,
   allowRemix: boolean,
   publish: boolean,
+  name?: string,
 ): Promise<{ error?: string }> {
   const user = await requireUser();
   const text = description.trim();
+  const title = typeof name === "string" ? name.trim() : undefined;
+  if (title !== undefined && (!title || title.length > 100))
+    return { error: "Give it a name up to 100 characters." };
   const chosen = [...new Set(tags)];
   if (
     !UUID.test(tileId) ||
@@ -264,6 +268,7 @@ async function saveArtDetails(
         tags: chosen,
         description: text || null,
         allow_remix: allowRemix,
+        ...(title !== undefined && { name: title }),
       })
       .eq("id", tileId)
       .eq("user_id", user.id);
@@ -292,8 +297,9 @@ export async function updateArtDetails(
   tags: string[],
   description: string,
   allowRemix = true,
+  name?: string,
 ): Promise<{ error?: string }> {
-  return saveArtDetails(tileId, tags, description, allowRemix, false);
+  return saveArtDetails(tileId, tags, description, allowRemix, false, name);
 }
 
 export async function loadArtDetails(tileId: string): Promise<{
@@ -392,4 +398,17 @@ export async function reportComment(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
+}
+
+export async function recordView(tileId: string): Promise<number | null> {
+  if (!UUID.test(tileId)) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("record_tile_view", {
+      tile: tileId,
+    });
+    return error ? null : Number(data);
+  } catch {
+    return null;
+  }
 }

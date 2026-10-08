@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
@@ -13,12 +13,15 @@ import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { setFollowing } from "@/features/profile/actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { PublicTile } from "@/features/profile/profile";
+import type { AuthorArt } from "@/features/profile/server";
+import { PixelImage } from "@/components/ui/pixel-image";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { manrope } from "@/lib/fonts/manrope";
 import { formatCount } from "../../popular-card/helpers";
 import {
   linkRemix,
   recordDownload,
+  recordView,
   setTileLiked,
   setTileSaved,
 } from "../../../actions";
@@ -26,6 +29,8 @@ import { downloadPicture, type DownloadFormat } from "../download";
 import { DownloadMenu } from "./download-menu";
 import type { Picture } from "../helpers";
 import { EditDetailsDialog } from "./edit-details-dialog";
+
+const counting = new Set<string>();
 
 export function ArtDetails({
   tile,
@@ -35,6 +40,8 @@ export function ArtDetails({
   file,
   picture,
   palette,
+  moreArts,
+  className,
 }: {
   tile: PublicTile;
   viewerId: string | null;
@@ -43,6 +50,8 @@ export function ArtDetails({
   file: string | null;
   picture: Picture | null;
   palette: string[];
+  moreArts: AuthorArt[];
+  className?: string;
 }) {
   const { author } = tile;
   const router = useRouter();
@@ -52,6 +61,25 @@ export function ArtDetails({
   const [follows, setFollows] = useState(following);
   const [followPending, startFollow] = useTransition();
   const [downloads, setDownloads] = useState(tile.downloads);
+  const [views, setViews] = useState(tile.views ?? 0);
+
+  useEffect(() => {
+    const key = `pigxel:viewed:${tile.id}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+    } catch {}
+    if (counting.has(tile.id)) return;
+    counting.add(tile.id);
+    void recordView(tile.id)
+      .then((count) => {
+        if (count === null) return;
+        setViews(count);
+        try {
+          sessionStorage.setItem(key, "1");
+        } catch {}
+      })
+      .finally(() => counting.delete(tile.id));
+  }, [tile.id]);
   const [like, setLike] = useState({ liked: tile.liked, count: tile.likes });
   const [likePending, startLike] = useTransition();
   const [isSaved, setIsSaved] = useState(saved);
@@ -61,6 +89,7 @@ export function ArtDetails({
     tags: tile.tags,
     description: tile.description,
     allowRemix: tile.allowRemix ?? true,
+    name: tile.name,
   });
   const canRemix = own || details.allowRemix;
   const [editing, setEditing] = useState(false);
@@ -162,6 +191,7 @@ export function ArtDetails({
       className={cn(
         manrope.className,
         "flex flex-col rounded-2xl border bg-background px-5 py-4 text-[#4a1f35] [&>*]:shrink-0 shadow-[0_1px_2px_rgb(59_42_51/0.06)] lg:min-h-0 lg:overflow-y-auto",
+        className,
       )}
     >
       <div className="flex items-center justify-between gap-3">
@@ -203,7 +233,7 @@ export function ArtDetails({
       {editing && (
         <EditDetailsDialog
           tileId={tile.id}
-          name={tile.name}
+          name={details.name}
           tags={details.tags}
           description={details.description}
           allowRemix={details.allowRemix}
@@ -217,7 +247,7 @@ export function ArtDetails({
         id="art-title"
         className="mt-3 text-[34px] leading-[1.1] font-bold text-[#4a1f35]"
       >
-        {tile.name}
+        {details.name}
       </Heading>
 
       <div className="mt-3 flex items-center gap-3">
@@ -266,7 +296,7 @@ export function ArtDetails({
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-3 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
+      <div className="mt-4 grid grid-cols-4 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
         <button
           type="button"
           aria-pressed={like.liked}
@@ -274,7 +304,7 @@ export function ArtDetails({
           disabled={likePending}
           onClick={toggleLike}
           className={cn(
-            "flex cursor-pointer items-center gap-3 border-r border-[#f6dbe4] px-4 text-left transition-colors hover:text-primary",
+            "flex cursor-pointer items-center justify-center gap-2 border-r border-[#f6dbe4] px-2 text-left transition-colors hover:text-primary",
             like.liked && "text-primary",
           )}
         >
@@ -296,7 +326,7 @@ export function ArtDetails({
             <p className="text-[10px] text-muted-foreground">likes</p>
           </div>
         </button>
-        <div className="flex items-center justify-center gap-3 border-r border-[#f6dbe4] px-4">
+        <div className="flex items-center justify-center gap-2 border-r border-[#f6dbe4] px-2">
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"
@@ -318,7 +348,7 @@ export function ArtDetails({
             </p>
           </div>
         </div>
-        <div className="flex items-center justify-end gap-3 px-4">
+        <div className="flex items-center justify-center gap-2 border-r border-[#f6dbe4] px-2">
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"
@@ -331,11 +361,34 @@ export function ArtDetails({
           >
             <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
           </svg>
-          <div className="text-right">
+          <div>
             <p className="text-sm font-semibold tabular-nums">
               {formatCount(downloads)}
             </p>
             <p className="text-[10px] text-muted-foreground">downloads</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-2 px-2">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-5"
+          >
+            <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+            <circle cx="8" cy="8" r="2" />
+          </svg>
+          <div>
+            <p className="text-sm font-semibold tabular-nums">
+              {formatCount(views)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {views === 1 ? "view" : "views"}
+            </p>
           </div>
         </div>
       </div>
@@ -528,6 +581,47 @@ export function ArtDetails({
           </p>
         </div>
       </div>
+
+      {moreArts.length > 0 && (
+        <div className="mt-4 border-t pt-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <Heading as="h2" className="text-base font-bold text-[#4a1f35]">
+              More from @{author.username}
+            </Heading>
+            <Link
+              href={`/u/${author.username}`}
+              className="shrink-0 text-[10px] text-primary hover:underline"
+            >
+              View profile →
+            </Link>
+          </div>
+          <ul className="mt-2.5 grid grid-cols-3 gap-2">
+            {moreArts.map((art) => (
+              <li key={art.id}>
+                <Link
+                  href={`/explore/${art.id}`}
+                  title={art.name}
+                  aria-label={`Open ${art.name}`}
+                  className="group block aspect-square overflow-hidden rounded-lg border bg-checker"
+                >
+                  {art.thumbnail ? (
+                    <PixelImage
+                      src={art.thumbnail}
+                      alt=""
+                      loading="lazy"
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
+                    />
+                  ) : (
+                    <span className="flex size-full items-center justify-center text-[9px] text-muted-foreground">
+                      {art.name}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

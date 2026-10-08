@@ -47,11 +47,6 @@ export function CommunityCard({
   const sentinel = useRef<HTMLDivElement>(null);
   const hasMore = comments.length < count;
 
-  const expand = (next: boolean) => {
-    setAll(next);
-    onExpandedChange(next);
-  };
-
   useEffect(() => {
     const target = sentinel.current;
     if (!all || !hasMore || moreFailed || !target) return;
@@ -99,8 +94,36 @@ export function CommunityCard({
   const [openThreads, setOpenThreads] = useState<ReadonlySet<string>>(
     new Set(),
   );
-  const openThread = (id: string) =>
-    setOpenThreads((ids) => new Set(ids).add(id));
+  type Reply = typeof replyTo;
+  const layout = (next: {
+    all?: boolean;
+    threads?: ReadonlySet<string>;
+    replyTo?: Reply;
+  }) =>
+    onExpandedChange(
+      (next.all ?? all) ||
+        (next.threads ?? openThreads).size > 0 ||
+        !!("replyTo" in next ? next.replyTo : replyTo),
+    );
+  const expand = (next: boolean) => {
+    layout({ all: next });
+    setAll(next);
+  };
+  const openThread = (id: string) => {
+    const threads = new Set(openThreads).add(id);
+    layout({ threads });
+    setOpenThreads(threads);
+  };
+  const closeThread = (id: string) => {
+    const threads = new Set(openThreads);
+    threads.delete(id);
+    layout({ threads });
+    setOpenThreads(threads);
+  };
+  const setReply = (next: Reply) => {
+    layout({ replyTo: next });
+    setReplyTo(next);
+  };
 
   const postReply = async (parentId: string, body: string) => {
     const result = await postComment(tileId, body, parentId);
@@ -114,7 +137,7 @@ export function CommunityCard({
       })),
     );
     openThread(parentId);
-    setReplyTo(null);
+    setReply(null);
     return null;
   };
 
@@ -178,7 +201,7 @@ export function CommunityCard({
     if (!viewer) return;
     const root = comment.parentId ?? comment.id;
     openThread(root);
-    setReplyTo({
+    setReply({
       thread: root,
       text:
         comment.parentId && comment.author.username
@@ -194,7 +217,18 @@ export function CommunityCard({
     const children = (
       <>
         {open || replies.length <= 2 ? (
-          replies.map(item)
+          <>
+            {replies.map(item)}
+            {replies.length > 2 && (
+              <button
+                type="button"
+                onClick={() => closeThread(comment.id)}
+                className="w-fit cursor-pointer text-[10px] text-primary hover:underline"
+              >
+                Hide replies
+              </button>
+            )}
+          </>
         ) : (
           <button
             type="button"
@@ -210,7 +244,7 @@ export function CommunityCard({
             initial={replyTo.text}
             viewer={viewer}
             onPost={(body) => postReply(comment.id, body)}
-            onCancel={() => setReplyTo(null)}
+            onCancel={() => setReply(null)}
           />
         )}
       </>

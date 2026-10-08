@@ -5,6 +5,7 @@ import {
   getFollowStats,
   getOwnProfile,
   getPublicTile,
+  listMoreByAuthor,
 } from "@/features/profile/server";
 import { isTileSaved, listComments } from "@/features/explore/server";
 import { getUser } from "@/lib/auth/session";
@@ -39,7 +40,7 @@ export default async function ArtDetailPage({ params }: Props) {
   const user = await getUser();
   const tile = await getPublicTile(id, user?.id ?? null);
   if (!tile) notFound();
-  const [profile, follow, saved, comments] = await Promise.all([
+  const [profile, follow, saved, comments, moreArts] = await Promise.all([
     user ? getOwnProfile(user.id) : null,
     user && user.id !== tile.author.id
       ? getFollowStats(tile.author.id, user.id).catch(() => null)
@@ -49,6 +50,7 @@ export default async function ArtDetailPage({ params }: Props) {
       console.error(error);
       return { comments: [], count: 0 };
     }),
+    listMoreByAuthor(tile.author.id, tile.id).catch(() => []),
   ]);
   return (
     <ArtPage
@@ -65,6 +67,7 @@ export default async function ArtDetailPage({ params }: Props) {
       following={follow?.following ?? false}
       saved={saved}
       comments={comments}
+      moreArts={moreArts}
     />
   );
 }

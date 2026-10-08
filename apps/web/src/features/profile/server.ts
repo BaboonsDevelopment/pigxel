@@ -312,7 +312,7 @@ export async function getPublicTile(
   if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
   if (!data) return null;
   const tile = toPublicTile(data as unknown as PublicTileRow);
-  const [downloads, details, remixes] = await Promise.all([
+  const [downloads, details, remixes, views] = await Promise.all([
     downloadCounts([tile.id]),
     supabase
       .from("tiles")
@@ -329,11 +329,17 @@ export async function getPublicTile(
         original_author: { username: string } | null;
       }>(),
     supabase.rpc("remix_count", { tile: tile.id }),
+    supabase
+      .from("tile_views")
+      .select("total")
+      .eq("tile_id", tile.id)
+      .maybeSingle<{ total: number }>(),
   ]);
   return {
     ...tile,
     downloads: downloads.get(tile.id) ?? 0,
     remixes: remixes.error ? 0 : Number(remixes.data),
+    views: Number(views.data?.total ?? 0),
     tags: details.data?.tags ?? [],
     description: details.data?.description ?? null,
     allowRemix: details.data?.allow_remix ?? true,
@@ -344,6 +350,30 @@ export async function getPublicTile(
         }
       : null,
   };
+}
+
+export type AuthorArt = {
+  id: string;
+  name: string;
+  thumbnail: string | null;
+};
+
+export async function listMoreByAuthor(
+  authorId: string,
+  exceptId: string,
+  limit = 6,
+): Promise<AuthorArt[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select("id, name, thumbnail")
+    .eq("user_id", authorId)
+    .eq("visibility", "public")
+    .neq("id", exceptId)
+    .order("published_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Couldn’t load more arts: ${error.message}`);
+  return data;
 }
 
 export async function getFollowStats(

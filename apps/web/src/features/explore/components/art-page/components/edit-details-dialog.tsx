@@ -10,7 +10,7 @@ import {
   DialogHeader,
 } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Textarea } from "@pigxel/ui/components/input";
+import { Input, Textarea } from "@pigxel/ui/components/input";
 import { updateArtDetails } from "../../../actions";
 import { removeFromExplore } from "../../../remove-from-explore";
 import { DESCRIPTION_MAX } from "../../../constants";
@@ -32,12 +32,14 @@ export function EditDetailsDialog({
   description: string | null;
   allowRemix: boolean;
   onSaved: (details: {
+    name: string;
     tags: string[];
     description: string | null;
     allowRemix: boolean;
   }) => void;
   onClose: () => void;
 }) {
+  const [title, setTitle] = useState(name);
   const [tags, setTags] = useState(initialTags);
   const [description, setDescription] = useState(initialDescription ?? "");
   const [allowRemix, setAllowRemix] = useState(initialAllowRemix);
@@ -53,10 +55,17 @@ export function EditDetailsDialog({
       tags,
       description,
       allowRemix,
+      title,
     );
     setSaving(false);
     if (result.error) return setError(result.error);
-    onSaved({ tags, description: description.trim() || null, allowRemix });
+    onSaved({
+      name: title.trim(),
+      tags,
+      description: description.trim() || null,
+      allowRemix,
+    });
+    if (title.trim() !== name) router.refresh();
     onClose();
   };
 
@@ -73,9 +82,18 @@ export function EditDetailsDialog({
     <Dialog onClose={onClose} size="md" portal>
       <DialogHeader
         title="Edit details"
-        description="Tags help people find it. The description shows on this page."
+        description="The name, tags and description show on this page."
       />
       <DialogBody className="grid gap-4">
+        <label className="block">
+          <span className="mb-1.5 block text-xs font-medium">Name</span>
+          <Input
+            value={title}
+            maxLength={100}
+            required
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </label>
         <div>
           <span className="mb-1.5 block text-xs font-medium">Tags</span>
           <TagPicker value={tags} onChange={setTags} />

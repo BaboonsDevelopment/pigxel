@@ -5,7 +5,9 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { scrollParent } from "@/lib/utils/scroll-parent";
 import type { PublicTile } from "@/features/profile/profile";
+import type { AuthorArt } from "@/features/profile/server";
 import type { ArtComment } from "../../comments";
+import { ArtNav } from "./components/art-nav";
 import { Breadcrumb } from "./components/breadcrumb";
 import { ArtDetails } from "./components/art-details";
 import { ArtPreview } from "./components/art-preview";
@@ -19,12 +21,14 @@ export function ArtPage({
   following,
   saved,
   comments,
+  moreArts,
 }: {
   tile: PublicTile;
   viewer: { id: string; name: string; avatarUrl: string | null } | null;
   following: boolean;
   saved: boolean;
   comments: { comments: ArtComment[]; count: number };
+  moreArts: AuthorArt[];
 }) {
   const [file, setFile] = useState<string | null>(null);
   const [picture, setPicture] = useState<Picture | null>(null);
@@ -41,13 +45,13 @@ export function ArtPage({
     };
   }, []);
 
-  const expandComments = (open: boolean) =>
-    setTopRow(
-      open
-        ? (grid.current?.firstElementChild?.getBoundingClientRect().height ??
-            null)
-        : null,
-    );
+  const expandComments = (open: boolean) => {
+    if (!open) return setTopRow(null);
+    if (topRow !== null) return;
+    const height =
+      grid.current?.firstElementChild?.getBoundingClientRect().height;
+    if (height) setTopRow(height);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +76,9 @@ export function ArtPage({
         topRow === null && "lg:h-[calc(100dvh-5.5rem)]",
       )}
     >
-      <Breadcrumb name={tile.name} />
+      <Breadcrumb name={tile.name}>
+        <ArtNav tileId={tile.id} />
+      </Breadcrumb>
       {tile.inReview && (
         <p
           role="status"
@@ -104,6 +110,10 @@ export function ArtPage({
           file={file}
           picture={picture}
           palette={picture ? paletteOf(picture.frames[0]!.pixels) : []}
+          moreArts={moreArts}
+          className={
+            moreArts.length ? "lg:row-span-2 lg:self-start" : undefined
+          }
         />
         <CommunityCard
           tileId={tile.id}
@@ -112,11 +122,12 @@ export function ArtPage({
           total={comments.count}
           onExpandedChange={expandComments}
         />
-        {(tile.allowRemix !== false || viewer?.id === tile.author.id) && (
-          <div className="lg:self-start">
-            <InspiredCard />
-          </div>
-        )}
+        {moreArts.length === 0 &&
+          (tile.allowRemix !== false || viewer?.id === tile.author.id) && (
+            <div className="lg:self-start">
+              <InspiredCard />
+            </div>
+          )}
       </div>
     </div>
   );
