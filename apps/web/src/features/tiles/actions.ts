@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/auth/session";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
-import { SIZES } from "@/features/explore/constants";
+import { listSavedArts, type SavedArt } from "@/features/explore/server";
+import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
 import { PAGE_SIZE } from "./constants";
 import { FOLDER_NAME_MAX } from "./folders";
 import { LABEL_COLORS, LABEL_NAME_MAX, type Label } from "./labels";
@@ -17,21 +18,27 @@ type Result = { error?: string };
 export async function loadCloudTiles(
   from: number,
   folderId: string | null = null,
-  size = "any",
-  animated = false,
-  label: string | null = null,
+  options: ProjectQuery = {},
 ): Promise<CloudTileSummary[]> {
   const user = await requireUser();
   if (!Number.isInteger(from) || from < 0) return [];
   if (folderId !== null && !UUID.test(folderId)) return [];
-  if (label !== null && !UUID.test(label)) return [];
-  const range = SIZES.find((s) => s.value === size) ?? SIZES[0];
-  return listCloudTilesOnServer(user.id, PAGE_SIZE, from, folderId, {
-    min: range.min,
-    max: range.max,
-    animated: animated === true,
-    label,
-  });
+  return listCloudTilesOnServer(
+    user.id,
+    PAGE_SIZE,
+    from,
+    folderId,
+    cloudFilter(options),
+  );
+}
+
+export async function searchSavedArts(query: string): Promise<SavedArt[]> {
+  const user = await requireUser();
+  try {
+    return await listSavedArts(user.id, searchMatch(query));
+  } catch {
+    return [];
+  }
 }
 
 function folderName(name: string) {

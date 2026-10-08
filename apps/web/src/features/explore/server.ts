@@ -40,16 +40,22 @@ export async function isTileSaved(
   return !error && !!data;
 }
 
-export async function listSavedArts(userId: string): Promise<SavedArt[]> {
+export async function listSavedArts(
+  userId: string,
+  match: string | null = null,
+): Promise<SavedArt[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const base = supabase
     .from("saved_tiles")
     .select(
       "created_at, tile:tiles!inner(id, name, width, height, thumbnail, author:profiles!tiles_user_id_profiles_fkey!inner(username))",
     )
     .eq("user_id", userId)
-    .eq("tile.visibility", "public")
+    .eq("tile.visibility", "public");
+  const { data, error } = await (
+    match ? base.or(match, { referencedTable: "tile" }) : base
+  )
     .order("created_at", { ascending: false })
     .limit(120);
   if (error) throw new Error(`Couldn’t load saved arts: ${error.message}`);

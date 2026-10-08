@@ -1,23 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { setTileSaved } from "@/features/explore/actions";
+import { searchSavedArts } from "../../../actions";
 import type { SavedArt } from "@/features/explore/server";
 import { ProjectCard } from "../../project-card/project-card";
 import { SectionHeader } from "./section-header";
 
 export function Favourites({
   saved,
+  savedFor,
   query,
+  searched,
   grid,
 }: {
   saved: SavedArt[];
+  savedFor: string;
   query: string;
+  searched: string;
   grid: string;
 }) {
+  const [results, setResults] = useState({ for: savedFor, arts: saved });
+
+  useEffect(() => {
+    if (searched === results.for) return;
+    let stale = false;
+    void searchSavedArts(searched).then((arts) => {
+      if (!stale) setResults({ for: searched, arts });
+    });
+    return () => {
+      stale = true;
+    };
+  }, [searched, results.for]);
+
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
@@ -34,11 +52,14 @@ export function Favourites({
     });
   };
 
-  const arts = saved.filter((art) => !removed.has(art.id));
-  const search = query.trim().toLowerCase();
-  const shown = search
-    ? arts.filter((art) => art.name.toLowerCase().includes(search))
-    : arts;
+  const arts = results.arts.filter((art) => !removed.has(art.id));
+  const search = query.trim();
+  const settled = search === results.for;
+  const shown = settled
+    ? arts
+    : arts.filter((art) =>
+        art.name.toLowerCase().includes(search.toLowerCase()),
+      );
 
   return (
     <section aria-labelledby="favourites-heading">
@@ -75,10 +96,12 @@ export function Favourites({
           ))}
         </ul>
       ) : search ? (
-        <EmptyState
-          title="Nothing matches your search"
-          description="Try a different name."
-        />
+        settled && (
+          <EmptyState
+            title="Nothing matches your search"
+            description="Try a different name, description or tag."
+          />
+        )
       ) : (
         <EmptyState
           title="No saved arts yet"

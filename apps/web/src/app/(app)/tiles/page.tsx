@@ -6,20 +6,21 @@ import { listSavedArts } from "@/features/explore/server";
 import { listCloudTilesOnServer } from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
 import { PAGE_SIZE } from "@/features/tiles/constants";
+import { cloudFilter, searchMatch } from "@/features/tiles/search";
+import {
+  readView,
+  type ViewParams,
+} from "@/features/tiles/components/projects-view/view";
 
 export const metadata: Metadata = { title: "My projects · Pigxel" };
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ folder?: string }> };
+type Props = { searchParams: Promise<ViewParams & { folder?: string }> };
 
 export default async function Tiles({ searchParams }: Props) {
   const [user, params] = await Promise.all([requireUser(), searchParams]);
-  const [folders, saved, labels] = await Promise.all([
+  const [folders, labels] = await Promise.all([
     listFolders(user.id).catch((error: unknown) => {
-      console.error(error);
-      return [];
-    }),
-    listSavedArts(user.id).catch((error: unknown) => {
       console.error(error);
       return [];
     }),
@@ -29,12 +30,20 @@ export default async function Tiles({ searchParams }: Props) {
     }),
   ]);
   const folder = folders.find((f) => f.id === params.folder) ?? null;
-  const cloudTiles = await listCloudTilesOnServer(
-    user.id,
-    PAGE_SIZE,
-    0,
-    folder?.id ?? null,
-  );
+  const view = readView(folder ? {} : params, labels);
+  const [saved, cloudTiles] = await Promise.all([
+    listSavedArts(user.id, searchMatch(view.query)).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    }),
+    listCloudTilesOnServer(
+      user.id,
+      PAGE_SIZE,
+      0,
+      folder?.id ?? null,
+      cloudFilter({ ...view.filters, query: view.query }),
+    ),
+  ]);
   return (
     <div className="min-h-full bg-[url(/art/background-effect.png)] bg-top bg-repeat">
       <Page className="max-w-[100rem] px-5 pt-3 pb-12 md:px-8 md:pt-2 xl:px-10">
@@ -46,6 +55,7 @@ export default async function Tiles({ searchParams }: Props) {
           folder={folder}
           saved={saved}
           labels={labels}
+          view={view}
         />
       </Page>
     </div>

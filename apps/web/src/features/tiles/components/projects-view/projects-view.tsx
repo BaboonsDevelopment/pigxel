@@ -49,8 +49,13 @@ import {
   readLocalProjects,
   toCloudProject,
 } from "./helpers";
+import { viewSearch, type ProjectsViewState } from "./view";
 
 const PRELOAD = "1500px";
+const SEARCH_DELAY = 300;
+
+const hasName = (name: string, query: string) =>
+  !query || name.toLowerCase().includes(query.toLowerCase());
 const GRID =
   "grid grid-cols-2 gap-x-[33px] gap-y-[28px] sm:grid-cols-3 lg:grid-cols-5";
 
@@ -61,6 +66,7 @@ export function ProjectsView({
   folder,
   saved,
   labels: initialLabels,
+  view,
 }: {
   userId: string;
   initial: CloudTileSummary[];
@@ -68,12 +74,32 @@ export function ProjectsView({
   folder: Folder | null;
   saved: SavedArt[];
   labels: Label[];
+  view: ProjectsViewState;
 }) {
   const [labels, setLabels] = useState(initialLabels);
-  const [filter, setFilter] = useState<Filter>("All");
-  const [query, setQuery] = useState("");
-  const [projectFilters, setProjectFilters] =
-    useState<ProjectFilters>(NO_PROJECT_FILTERS);
+  const [filter, setFilter] = useState<Filter>(view.filter);
+  const [query, setQuery] = useState(view.query);
+  const [searched, setSearched] = useState(view.query);
+  const [projectFilters, setProjectFilters] = useState<ProjectFilters>(
+    view.filters,
+  );
+  const [initialKey] = useState(() =>
+    JSON.stringify({ ...view.filters, query: view.query }),
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearched(query.trim()), SEARCH_DELAY);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (folder) return;
+    const next = `${window.location.pathname}${viewSearch({ filter, query: searched, filters: projectFilters })}`;
+    if (next !== window.location.pathname + window.location.search)
+      window.history.replaceState(window.history.state, "", next);
+  }, [folder, filter, searched, projectFilters]);
+
+  const matchingFolders = folders.filter((f) => hasName(f.name, query.trim()));
   const [creating, setCreating] = useState(false);
   const folderTiles = useCloudTileActions(userId);
 
@@ -85,6 +111,8 @@ export function ProjectsView({
           userId={userId}
           initial={initial}
           query=""
+          initialKey={JSON.stringify({ ...NO_PROJECT_FILTERS, query: "" })}
+          searched=""
           folders={folders}
           folderId={folder.id}
           labels={labels}
@@ -109,7 +137,7 @@ export function ProjectsView({
           <SectionHeader
             id="folders-heading"
             title="Folders"
-            count={String(folders.length)}
+            count={String(matchingFolders.length)}
             className="mb-[27px]"
             onViewAll={
               filter === "Folders" ? undefined : () => setFilter("Folders")
@@ -141,7 +169,10 @@ export function ProjectsView({
                 New folder
               </button>
             </li>
-            {(filter === "Folders" ? folders : folders.slice(0, 4)).map((f) => (
+            {(filter === "Folders"
+              ? matchingFolders
+              : matchingFolders.slice(0, 4)
+            ).map((f) => (
               <FolderCard
                 key={f.id}
                 folder={f}
@@ -167,7 +198,9 @@ export function ProjectsView({
           filters={projectFilters}
           userId={userId}
           initial={initial}
+          initialKey={initialKey}
           query={query}
+          searched={searched}
           folders={folders}
           labels={labels}
           onLabelsChange={setLabels}
@@ -177,7 +210,13 @@ export function ProjectsView({
         />
       )}
       {filter === "Favourite" && (
-        <Favourites saved={saved} query={query} grid={GRID} />
+        <Favourites
+          saved={saved}
+          savedFor={view.query}
+          query={query}
+          searched={searched}
+          grid={GRID}
+        />
       )}
       {filter === "Shared" && (
         <EmptyState
@@ -193,7 +232,9 @@ export function ProjectsView({
 type GridProps = {
   userId: string;
   initial: CloudTileSummary[];
+  initialKey: string;
   query: string;
+  searched: string;
   folders: Folder[];
   folderId?: string;
   onViewAll?: () => void;
@@ -210,7 +251,9 @@ function Projects(props: GridProps) {
 function ProjectGrid({
   userId,
   initial,
+  initialKey,
   query,
+  searched,
   folders,
   folderId,
   onViewAll,
@@ -219,10 +262,15 @@ function ProjectGrid({
   onLabelsChange,
 }: GridProps) {
   const showCloud = filters.storage === "any" || filters.storage === "cloud";
-  const filtered =
-    filters.size !== "any" || filters.animated || filters.label !== null;
-  const narrowed = filtered || filters.storage !== "any";
-  const first = !showCloud ? [] : filtered ? null : initial;
+  const narrowed =
+    filters.size !== "any" ||
+    filters.animated ||
+    filters.label !== null ||
+    filters.published !== "any" ||
+    filters.storage !== "any";
+  const key = JSON.stringify({ ...filters, query: searched });
+  const first = !showCloud ? [] : key === initialKey ? initial : null;
+  const [loadedKey, setLoadedKey] = useState(first ? key : null);
   const cloud = useCloudTileActions(userId);
   const [local, refreshLocal] = useReducer(
     () => readLocalProjects(userId),
@@ -288,8 +336,27 @@ function ProjectGrid({
   const sentinel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (key === loadedKey) return;
+    let stale = false;
+    void (
+      showCloud
+        ? loadCloudTiles(0, folderId ?? null, JSON.parse(key))
+        : Promise.resolve([])
+    ).then((page) => {
+      if (stale) return;
+      setTiles(page);
+      setOffset(page.length);
+      setDone(page.length < PAGE_SIZE);
+      setLoadedKey(key);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [key, loadedKey, showCloud, folderId]);
+
+  useEffect(() => {
     const target = sentinel.current;
-    if (done || !target) return;
+    if (done || !target || key !== loadedKey) return;
     const loadMore = async () => {
       if (loading.current) return;
       loading.current = true;
@@ -297,9 +364,7 @@ function ProjectGrid({
         const more = await loadCloudTiles(
           offset,
           folderId ?? null,
-          filters.size,
-          filters.animated,
-          filters.label,
+          JSON.parse(key),
         );
         if (more.length < PAGE_SIZE) setDone(true);
         setOffset(offset + more.length);
@@ -319,7 +384,7 @@ function ProjectGrid({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [offset, done, folderId, filters.size, filters.animated, filters.label]);
+  }, [offset, done, folderId, key, loadedKey]);
 
   const markMoved = (tileId: string, to: string | null) => {
     if (folderId && to !== folderId)
@@ -333,18 +398,25 @@ function ProjectGrid({
     else markMoved(tile.id, null);
   };
 
+  const search = query.trim();
+  const settled = key === loadedKey && search === searched;
   const projects = [
     ...(folderId || filters.storage === "cloud"
       ? []
-      : local.filter((project) => matchesLocal(project, filters))),
+      : local.filter(
+          (project) =>
+            matchesLocal(project, filters) && hasName(project.name, search),
+        )),
     ...tiles
-      .filter((t) => !cloud.removed.has(t.id) && !movedOut.has(t.id))
+      .filter(
+        (t) =>
+          !cloud.removed.has(t.id) &&
+          !movedOut.has(t.id) &&
+          (settled || hasName(t.name, search)),
+      )
       .map(toCloudProject),
   ].sort((a, b) => b.at - a.at);
-  const search = query.trim().toLowerCase();
-  const shown = search
-    ? projects.filter((p) => p.name.toLowerCase().includes(search))
-    : projects;
+  const shown = projects;
   const error = cloud.error ?? moveError;
 
   return (
@@ -463,6 +535,7 @@ function ProjectGrid({
       </ul>
       {!shown.length &&
         done &&
+        settled &&
         (search || narrowed ? (
           <EmptyState
             title={
@@ -471,7 +544,9 @@ function ProjectGrid({
                 : "No projects match these filters"
             }
             description={
-              search ? "Try a different name." : "Try other filters."
+              search
+                ? "Try a different name, description or tag."
+                : "Try other filters."
             }
           />
         ) : (

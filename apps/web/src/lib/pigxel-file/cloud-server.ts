@@ -11,6 +11,8 @@ type CloudTileFilter = {
   max?: number;
   animated?: boolean;
   label?: string | null;
+  match?: string | null;
+  published?: boolean;
 };
 
 export async function listCloudTilesOnServer(
@@ -37,6 +39,13 @@ export async function listCloudTilesOnServer(
     query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
   if (filter.animated) query = query.gt("frame_count", 1);
   if (filter.label) query = query.eq("labelled.label_id", filter.label);
+  if (filter.match) query = query.or(filter.match);
+  if (filter.published === true)
+    query = query.or("visibility.eq.public,review.eq.pending");
+  if (filter.published === false)
+    query = query
+      .neq("visibility", "public")
+      .or("review.is.null,review.neq.pending");
   const { data, error } = await query
     .order("updated_at", { ascending: false })
     .order("id")

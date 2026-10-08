@@ -19,11 +19,20 @@ export const STORAGES = [
 
 export type Storage = (typeof STORAGES)[number]["value"];
 
+export const PUBLISHED = [
+  { value: "any", label: "Any" },
+  { value: "yes", label: "Published" },
+  { value: "no", label: "Not published" },
+] as const;
+
+export type Published = (typeof PUBLISHED)[number]["value"];
+
 export type ProjectFilters = {
   size: Size;
   animated: boolean;
   storage: Storage;
   label: string | null;
+  published: Published;
 };
 
 export const NO_PROJECT_FILTERS: ProjectFilters = {
@@ -31,4 +40,5 @@ export const NO_PROJECT_FILTERS: ProjectFilters = {
   animated: false,
   storage: "any",
   label: null,
+  published: "any",
 };

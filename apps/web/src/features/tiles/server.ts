@@ -55,5 +55,5 @@ export async function listLabels(userId: string): Promise<Label[]> {
     .eq("user_id", userId)
     .order("name");
   if (error) throw new Error(`Couldn’t load labels: ${error.message}`);
-  return data;
+  return data ?? [];
 }

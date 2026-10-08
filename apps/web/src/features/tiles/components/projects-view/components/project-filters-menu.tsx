@@ -5,6 +5,7 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { SIZES } from "@/features/explore/constants";
 import {
   NO_PROJECT_FILTERS,
+  PUBLISHED,
   STORAGES,
   type ProjectFilters,
 } from "../constants";
@@ -13,7 +14,7 @@ import type { Label } from "../../../labels";
 const ITEM =
   "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 text-left whitespace-nowrap text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground";
 
-type Submenu = "size" | "storage" | "label";
+type Submenu = "size" | "storage" | "published" | "label";
 
 const ANY_LABEL = "any";
 
@@ -51,6 +52,7 @@ export function ProjectFiltersMenu({
     Number(filters.size !== "any") +
     Number(filters.storage !== "any") +
     Number(filters.label !== null) +
+    Number(filters.published !== "any") +
     Number(filters.animated);
 
   useEffect(() => {
@@ -141,6 +143,20 @@ export function ProjectFiltersMenu({
             open={submenu === "storage"}
             onOpenChange={(next) => setSubmenu(next ? "storage" : null)}
             onChange={(storage) => choose({ storage })}
+          />
+          <SubmenuItem
+            label="Explore"
+            icon={
+              <>
+                <circle cx="8" cy="8" r="5.8" />
+                <path d="m10.4 5.6-1.5 3.3-3.3 1.5 1.5-3.3Z" />
+              </>
+            }
+            options={PUBLISHED}
+            value={filters.published}
+            open={submenu === "published"}
+            onOpenChange={(next) => setSubmenu(next ? "published" : null)}
+            onChange={(published) => choose({ published })}
           />
           {labels.length > 0 && (
             <SubmenuItem

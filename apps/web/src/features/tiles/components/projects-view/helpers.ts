@@ -50,7 +50,7 @@ export function readLocalProjects(userId: string): Project[] {
 
 export function matchesLocal(project: Project, filters: ProjectFilters) {
   if (project.kind !== "local") return true;
-  if (filters.label) return false;
+  if (filters.label || filters.published === "yes") return false;
   const range = SIZES.find((s) => s.value === filters.size) ?? SIZES[0];
   if (range.max && (project.width > range.max || project.height > range.max))
     return false;
