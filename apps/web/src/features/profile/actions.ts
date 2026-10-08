@@ -103,3 +103,31 @@ export async function setFollowing(
   }
   return done();
 }
+
+export async function setBlocked(
+  profileId: string,
+  blocked: boolean,
+): Promise<Result> {
+  const user = await requireUser();
+  if (!UUID.test(profileId) || profileId === user.id)
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = blocked
+      ? await supabase
+          .from("blocks")
+          .upsert(
+            { blocked_id: profileId },
+            { onConflict: "blocker_id,blocked_id", ignoreDuplicates: true },
+          )
+      : await supabase
+          .from("blocks")
+          .delete()
+          .eq("blocker_id", user.id)
+          .eq("blocked_id", profileId);
+    if (error) return { error: "Couldn’t change that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return done();
+}

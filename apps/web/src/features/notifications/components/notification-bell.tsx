@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { openNotifications } from "../actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
-import type { AppNotification } from "../server";
+import type { ActivityKind, AppNotification } from "../server";
 import { BellIcon } from "@/components/ui/icons";
 
 export function NotificationBell({
@@ -91,25 +91,22 @@ export function NotificationBell({
               <Message>Loading…</Message>
             ) : items.length === 0 ? (
               <Message>
-                Nothing yet. When someone follows you, you’ll see it here.
+                Nothing yet. When someone follows you or likes, comments on,
+                saves, remixes or downloads your art, you’ll see it here.
               </Message>
             ) : (
               <ul>
                 {items.map((item) => (
                   <li key={item.id}>
                     <Link
-                      href={
-                        item.kind === "follow"
-                          ? `/u/${item.username}`
-                          : "/tiles"
-                      }
+                      href={hrefOf(item)}
                       onClick={() => setOpen(false)}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary",
                         item.unread && "bg-primary-soft/35",
                       )}
                     >
-                      {item.kind === "follow" ? (
+                      {item.kind !== "art_rejected" ? (
                         <ProfileAvatar name={item.name} url={item.avatarUrl} />
                       ) : (
                         <span
@@ -135,6 +132,16 @@ export function NotificationBell({
                           <>
                             <span className="font-semibold">{item.name}</span>{" "}
                             started following you
+                          </>
+                        ) : item.kind !== "art_rejected" ? (
+                          <>
+                            <span className="font-semibold">{item.name}</span>{" "}
+                            {ACTIVITY[item.kind]} “{item.tileName}”
+                            {item.detail && (
+                              <span className="line-clamp-2 text-muted-foreground">
+                                {item.detail}
+                              </span>
+                            )}
                           </>
                         ) : (
                           <>
@@ -165,6 +172,20 @@ export function NotificationBell({
       )}
     </div>
   );
+}
+
+const ACTIVITY: Record<ActivityKind, string> = {
+  like: "liked",
+  comment: "commented on",
+  save: "saved",
+  remix: "remixed",
+  download: "downloaded",
+};
+
+function hrefOf(item: AppNotification) {
+  if (item.kind === "follow") return `/u/${item.username}`;
+  if (item.kind === "art_rejected") return "/tiles";
+  return item.tileId ? `/explore/${item.tileId}` : `/u/${item.username}`;
 }
 
 function Message({ children }: { children: React.ReactNode }) {

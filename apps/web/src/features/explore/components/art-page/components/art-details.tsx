@@ -22,6 +22,7 @@ import {
   linkRemix,
   recordDownload,
   recordView,
+  reportArt,
   setTileLiked,
   setTileSaved,
 } from "../../../actions";
@@ -29,6 +30,8 @@ import { downloadPicture, type DownloadFormat } from "../download";
 import { DownloadMenu } from "./download-menu";
 import type { Picture } from "../helpers";
 import { EditDetailsDialog } from "./edit-details-dialog";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { CollectButton } from "@/features/collections/components/collect-button";
 
 const counting = new Set<string>();
 
@@ -93,6 +96,19 @@ export function ArtDetails({
   });
   const canRemix = own || details.allowRemix;
   const [editing, setEditing] = useState(false);
+  const [reported, setReported] = useState(false);
+
+  const report = async () => {
+    const confirmed = await confirmDialog({
+      title: "Report this art?",
+      message: "We’ll take a look. The author won’t know who reported it.",
+      confirmLabel: "Report",
+    });
+    if (!confirmed) return;
+    const result = await reportArt(tile.id);
+    setError(result.error ?? null);
+    if (!result.error) setReported(true);
+  };
 
   const download = async (format: DownloadFormat, scale: number) => {
     if (!picture) return;
@@ -348,7 +364,16 @@ export function ArtDetails({
             </p>
           </div>
         </div>
-        <div className="flex items-center justify-center gap-2 border-r border-[#f6dbe4] px-2">
+        <DownloadMenu
+          width={tile.width}
+          height={tile.height}
+          animated={!!picture?.animated}
+          disabled={!picture}
+          onDownload={(format, scale) => void download(format, scale)}
+          className="flex border-r border-[#f6dbe4]"
+          align="right"
+          triggerClassName="flex flex-1 cursor-pointer items-center justify-center gap-2 px-2 text-left transition-colors hover:text-primary disabled:cursor-default"
+        >
           <svg
             aria-hidden="true"
             viewBox="0 0 16 16"
@@ -361,13 +386,15 @@ export function ArtDetails({
           >
             <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
           </svg>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">
+          <span>
+            <span className="block text-sm font-semibold tabular-nums">
               {formatCount(downloads)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">downloads</p>
-          </div>
-        </div>
+            </span>
+            <span className="block text-[10px] text-muted-foreground">
+              downloads
+            </span>
+          </span>
+        </DownloadMenu>
         <div className="flex items-center justify-center gap-2 px-2">
           <svg
             aria-hidden="true"
@@ -462,6 +489,7 @@ export function ArtDetails({
           </svg>
           {isSaved ? "Saved" : "Save project"}
         </button>
+        <CollectButton tileId={tile.id} signedIn={!!viewerId} />
         <button
           type="button"
           onClick={() => void share()}
@@ -483,6 +511,39 @@ export function ArtDetails({
           </svg>
           {copied === "link" ? "Link copied" : "Share"}
         </button>
+        {viewerId && !own && (
+          <span className="group relative flex">
+            <button
+              type="button"
+              aria-label={reported ? "Reported, thanks" : "Report art"}
+              disabled={reported}
+              onClick={() => void report()}
+              className={cn(
+                "flex size-8 cursor-pointer items-center justify-center rounded-lg border bg-background transition-colors hover:bg-muted hover:text-destructive disabled:cursor-default disabled:hover:bg-background",
+                reported && "text-destructive",
+              )}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill={reported ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-4"
+              >
+                <path d="M3.5 14V2.5M3.5 3h8l-1.8 3 1.8 3h-8" />
+              </svg>
+            </button>
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-[10px] whitespace-nowrap text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100"
+            >
+              {reported ? "Reported · thanks" : "Report this art"}
+            </span>
+          </span>
+        )}
       </div>
 
       <div className="mt-4 border-t pt-4">

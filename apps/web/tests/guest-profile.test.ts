@@ -24,6 +24,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/lib/auth/session", () => ({ getUser: mocks.user }));
+vi.mock("@/features/collections/server", () => ({
+  listProfileCollections: async () => [],
+}));
+
 vi.mock("@/features/profile/server", () => ({
   findProfile: async () => ({
     kind: "found",
@@ -42,6 +46,7 @@ vi.mock("@/features/profile/server", () => ({
   listProfileTiles: mocks.tiles,
   getFollowStats: mocks.follows,
   getProfileActivity: async () => ({ days: new Map(), today: Date.now() }),
+  hasBlocked: async () => false,
 }));
 
 import ArtistProfilePage from "@/app/(app)/u/[username]/page";

@@ -10,11 +10,14 @@ import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { ProfileGallery } from "@/features/profile/components/profile-gallery";
 import { ProfileHeader } from "@/features/profile/components/profile-header";
 import { ProfileStats } from "@/features/profile/components/profile-stats";
+import { CollectionList } from "@/features/collections/components/collection-list";
+import { listProfileCollections } from "@/features/collections/server";
 import { getUser } from "@/lib/auth/session";
 import {
   findProfile,
   getFollowStats,
   getProfileActivity,
+  hasBlocked,
   listProfileTiles,
 } from "@/features/profile/server";
 import { usernameError, usernameIn } from "@/features/profile/validation";
@@ -45,13 +48,18 @@ export default async function ArtistProfilePage({ params }: Props) {
 
   const { profile } = lookup;
   const isOwner = profile.id === user?.id;
-  const [arts, follows, activity] = await Promise.all([
+  const [arts, follows, activity, blocked, collections] = await Promise.all([
     listProfileTiles(profile.id).catch((error: unknown) => {
       console.error(error);
       return null;
     }),
     getFollowStats(profile.id, user?.id ?? null),
     getProfileActivity(profile.id),
+    hasBlocked(user?.id ?? null, profile.id),
+    listProfileCollections(profile.id).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    }),
   ]);
 
   return (
@@ -65,11 +73,19 @@ export default async function ArtistProfilePage({ params }: Props) {
         </Notice>
       )}
 
+      {blocked && (
+        <Notice className="mb-8">
+          You blocked @{profile.username}. You won’t see each other’s arts or
+          comments. Unblock them from the ⋯ menu.
+        </Notice>
+      )}
+
       <ProfileHeader
         profile={profile}
         isOwner={isOwner}
         guest={!user}
         follows={follows}
+        blocked={blocked}
       />
 
       {!arts ? (
@@ -91,6 +107,10 @@ export default async function ArtistProfilePage({ params }: Props) {
               }
             />
           </ProfileGallery>
+
+          {collections.length > 0 && (
+            <CollectionList collections={collections} />
+          )}
 
           {arts.tiles.length === 0 ? (
             <EmptyState
