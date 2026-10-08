@@ -47,7 +47,7 @@ function folderAt(x: number, y: number) {
     : null;
 }
 
-function swallowNextClick() {
+export function swallowNextClick() {
   const swallow = (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();

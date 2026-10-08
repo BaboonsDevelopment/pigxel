@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { toSummary, type CloudTileSummary } from "./cloud";
 
 const COLUMNS =
-  "id, user_id, name, width, height, thumbnail, updated_at, visibility, review, pinned_at, opened_at, labels:tile_labels(label_id)";
+  "id, user_id, name, width, height, thumbnail, updated_at, visibility, review, pinned_at, opened_at, deleted_at, labels:tile_labels(label_id)";
 
 type CloudTileFilter = {
   min?: number;
@@ -15,6 +15,7 @@ type CloudTileFilter = {
   published?: boolean;
   pinnedFirst?: boolean;
   archived?: boolean;
+  trashed?: boolean;
 };
 
 export async function listCloudTilesOnServer(
@@ -70,10 +71,17 @@ async function cloudTilesPage(
     query = query
       .neq("visibility", "public")
       .or("review.is.null,review.neq.pending");
-  query = filter.archived
-    ? query.not("archived_at", "is", null)
-    : query.is("archived_at", null);
-  if (filter.pinnedFirst)
+  if (filter.trashed)
+    query = query
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+  else
+    query = (
+      filter.archived
+        ? query.not("archived_at", "is", null)
+        : query.is("archived_at", null)
+    ).is("deleted_at", null);
+  if (filter.pinnedFirst && !filter.trashed)
     query = query.order("pinned_at", { ascending: false, nullsFirst: false });
   const { data, error, count } = await query
     .order("updated_at", { ascending: false })
@@ -98,6 +106,7 @@ export async function listRecentlyOpenedOnServer(
     .eq("user_id", userId)
     .not("opened_at", "is", null)
     .is("archived_at", null)
+    .is("deleted_at", null)
     .order("opened_at", { ascending: false })
     .limit(limit);
   if (error || !data) return [];

@@ -17,6 +17,7 @@ export type CloudTileSummary = CloudTile & {
   labels?: string[];
   pinnedAt?: string | null;
   openedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export class CloudError extends Error {}
@@ -34,6 +35,7 @@ type TileRow = {
   labels?: { label_id: string }[];
   pinned_at?: string | null;
   opened_at?: string | null;
+  deleted_at?: string | null;
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -49,6 +51,7 @@ export async function listCloudTiles(): Promise<CloudTileSummary[]> {
     .from("tiles")
     .select("id, user_id, name, width, height, thumbnail, updated_at")
     .eq("user_id", session.user.id)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .limit(200);
   if (error) throw new CloudError("Couldn’t load your Pigxel cloud tiles.");
@@ -69,6 +72,7 @@ export function toSummary(row: TileRow): CloudTileSummary {
     ...(row.labels && { labels: row.labels.map((l) => l.label_id) }),
     ...(row.pinned_at !== undefined && { pinnedAt: row.pinned_at }),
     ...(row.opened_at !== undefined && { openedAt: row.opened_at }),
+    ...(row.deleted_at !== undefined && { deletedAt: row.deleted_at }),
   };
 }
 
@@ -145,14 +149,6 @@ export async function saveCloudTile(
     );
   }
   return { id: data.id, name: data.name };
-}
-
-export async function deleteCloudTile(id: string): Promise<void> {
-  const supabase = createClient();
-  const row = await findRow(supabase, id);
-  await supabase.storage.from(BUCKET).remove([filePath(row)]);
-  const { error } = await supabase.from("tiles").delete().eq("id", id);
-  if (error) throw new CloudError("Couldn’t delete this tile. Try again.");
 }
 
 async function findRow(supabase: ReturnType<typeof createClient>, id: string) {

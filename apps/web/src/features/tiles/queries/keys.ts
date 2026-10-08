@@ -3,6 +3,7 @@ import type { ProjectQuery } from "../search";
 export type ProjectListParams = ProjectQuery & {
   folderId: string | null;
   archived: boolean;
+  trashed: boolean;
 };
 
 export const projectKeys = {
@@ -21,10 +22,12 @@ export function listParams(
   query: string,
   folderId: string | null,
   archived = false,
+  trashed = false,
 ): ProjectListParams {
   return {
     folderId,
     archived,
+    trashed,
     size: filters.size,
     animated: filters.animated,
     label: filters.label,

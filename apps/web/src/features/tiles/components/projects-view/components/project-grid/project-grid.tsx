@@ -20,9 +20,11 @@ import {
 } from "../../../../tile-actions";
 import { ProjectCard } from "../../../project-card/project-card";
 import { TileThumbnail } from "../../../tile-thumbnail";
+import { TRASH_DAYS } from "../../../../constants";
 import { NO_PROJECT_FILTERS, type ProjectFilters } from "../../constants";
 import {
   editedAgo,
+  trashDaysLeft,
   matchesLocal,
   toCloudProject,
   type Project,
@@ -56,6 +58,7 @@ type ProjectGridProps = {
   searched: string;
   folderId?: string;
   archived?: boolean;
+  trashed?: boolean;
   filters?: ProjectFilters;
   onViewAll?: () => void;
 };
@@ -75,6 +78,7 @@ function Grid({
   searched,
   folderId,
   archived = false,
+  trashed = false,
   filters = NO_PROJECT_FILTERS,
   onViewAll,
 }: ProjectGridProps) {
@@ -87,7 +91,7 @@ function Grid({
     filters.storage !== "any";
 
   const list = useProjectList(
-    listParams(filters, searched, folderId ?? null, archived),
+    listParams(filters, searched, folderId ?? null, archived, trashed),
     { enabled: showCloud },
   );
   const local = useLocalProjects(userId);
@@ -131,7 +135,7 @@ function Grid({
   };
 
   const localShown =
-    folderId || filters.storage === "cloud"
+    folderId || trashed || filters.storage === "cloud"
       ? []
       : local.projects.filter(
           (project) =>
@@ -186,7 +190,7 @@ function Grid({
       title: `Delete ${chosen.length === 1 ? "1 project" : `${chosen.length} projects`}?`,
       message: [
         chosenTiles.length > 0 &&
-          `${chosenTiles.length} will be deleted from Pigxel cloud.`,
+          `${chosenTiles.length} from Pigxel cloud will move to Trash for ${TRASH_DAYS} days.`,
         local > 0 &&
           `${local} kept in this browser will be removed from it. Projects only in this browser are gone for good.`,
       ]
@@ -196,6 +200,24 @@ function Grid({
     });
     if (!confirmed) return;
     await actions.deleteMany(chosen).then(stopSelecting, () => {});
+  };
+
+  const forget = async (tile: CloudTileSummary) => {
+    const confirmed = await confirmDialog({
+      title: "Delete forever?",
+      message: `“${tile.name}” will be gone for good. This can’t be undone.`,
+      confirmLabel: "Delete forever",
+    });
+    if (confirmed) actions.deleteForever([tile]);
+  };
+  const emptyTrash = async () => {
+    const confirmed = await confirmDialog({
+      title: "Empty Trash?",
+      message:
+        "Every project in Trash will be gone for good. This can’t be undone.",
+      confirmLabel: "Empty Trash",
+    });
+    if (confirmed) actions.deleteForever(list.tiles, true);
   };
 
   const commonItems = (project: Project) => [
@@ -216,21 +238,33 @@ function Grid({
     <section aria-labelledby="projects-heading">
       <SectionHeader
         id="projects-heading"
-        title={archived ? "Archive" : "Projects"}
+        title={trashed ? "Trash" : archived ? "Archive" : "Projects"}
         count={String(total)}
         className="mb-3"
         onViewAll={onViewAll}
         action={
-          projects.length > 0 && (
-            <button
-              type="button"
-              aria-pressed={selecting}
-              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
-              className="ml-auto mr-4 cursor-pointer text-xs text-link-accent transition-colors hover:text-lavender-foreground"
-            >
-              {selecting ? "Done" : "Select"}
-            </button>
-          )
+          trashed
+            ? projects.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => void emptyTrash()}
+                  className="mr-4 ml-auto cursor-pointer text-xs text-destructive transition-colors hover:underline"
+                >
+                  Empty Trash
+                </button>
+              )
+            : projects.length > 0 && (
+                <button
+                  type="button"
+                  aria-pressed={selecting}
+                  onClick={() =>
+                    selecting ? stopSelecting() : setSelecting(true)
+                  }
+                  className="ml-auto mr-4 cursor-pointer text-xs text-link-accent transition-colors hover:text-lavender-foreground"
+                >
+                  {selecting ? "Done" : "Select"}
+                </button>
+              )
         }
       />
       {error && (
@@ -239,7 +273,9 @@ function Grid({
         </FormMessage>
       )}
       <ul className={GRID}>
-        {!search && !folderId && !narrowed && !archived && <NewProjectCard />}
+        {!search && !folderId && !narrowed && !archived && !trashed && (
+          <NewProjectCard />
+        )}
         {projects.map((project) => {
           const meta = `${project.width} × ${project.height} px · Edited ${editedAgo(project.at)}`;
           if (project.kind === "local")
@@ -294,6 +330,27 @@ function Grid({
               />
             );
           const { tile } = project;
+          if (trashed && tile.deletedAt)
+            return (
+              <ProjectCard
+                key={project.id}
+                name={project.name}
+                meta={`${trashDaysLeft(tile.deletedAt)} days left · Deleted ${editedAgo(Date.parse(tile.deletedAt))}`}
+                thumbnail={
+                  tile.thumbnail && <PixelImage src={tile.thumbnail} alt="" />
+                }
+                openLabel="Restore"
+                open={{ onClick: () => actions.restore([tile]) }}
+                menu={[
+                  { label: "Restore", onSelect: () => actions.restore([tile]) },
+                  {
+                    label: "Delete forever",
+                    destructive: true,
+                    onSelect: () => void forget(tile),
+                  },
+                ]}
+              />
+            );
           return (
             <ProjectCard
               key={project.id}
@@ -379,6 +436,11 @@ function Grid({
                 ? "Try a different name, description or tag."
                 : "Try other filters."
             }
+          />
+        ) : trashed ? (
+          <EmptyState
+            title="Trash is empty"
+            description={`Deleted cloud projects stay here for ${TRASH_DAYS} days, so you can restore them.`}
           />
         ) : archived ? (
           <EmptyState

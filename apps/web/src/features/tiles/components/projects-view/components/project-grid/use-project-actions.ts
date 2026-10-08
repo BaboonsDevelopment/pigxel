@@ -23,9 +23,11 @@ import {
 } from "@/lib/pigxel-file/format";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import {
+  deleteProjectsForever,
   moveTileToFolder,
   publishProjects,
   renameTile,
+  restoreProjects,
   setProjectArchived,
   setProjectPinned,
 } from "../../../../actions";
@@ -175,6 +177,28 @@ export function useProjectActions({
     onSettled: invalidate,
   });
 
+  const restoreMutation = useMutation({
+    mutationFn: (tiles: CloudTileSummary[]) =>
+      ensure(restoreProjects(tiles.map((tile) => tile.id))),
+    onMutate: (tiles) =>
+      tiles.forEach((tile) =>
+        patchProjectLists(client, tile.id, null, (params) => params.trashed),
+      ),
+    onError: fail,
+    onSettled: invalidate,
+  });
+
+  const forgetMutation = useMutation({
+    mutationFn: ({ tiles, all }: { tiles: CloudTileSummary[]; all: boolean }) =>
+      ensure(deleteProjectsForever(all ? "all" : tiles.map((tile) => tile.id))),
+    onMutate: ({ tiles }) =>
+      tiles.forEach((tile) =>
+        patchProjectLists(client, tile.id, null, (params) => params.trashed),
+      ),
+    onError: fail,
+    onSettled: invalidate,
+  });
+
   const uploadMutation = useMutation({
     mutationFn: async ({
       draft,
@@ -305,5 +329,15 @@ export function useProjectActions({
     },
 
     deleted: () => void invalidate(),
+
+    restore: (tiles: CloudTileSummary[]) => {
+      setError(null);
+      restoreMutation.mutate(tiles);
+    },
+
+    deleteForever: (tiles: CloudTileSummary[], all = false) => {
+      setError(null);
+      forgetMutation.mutate({ tiles, all });
+    },
   };
 }

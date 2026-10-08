@@ -2,6 +2,7 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 import { SIZES } from "@/features/explore/constants";
+import { TRASH_DAYS } from "../../constants";
 import type { ProjectFilters } from "./constants";
 
 export type Project =
@@ -90,4 +91,11 @@ export function editedAgo(then: number, now = Date.now()) {
     if (elapsed >= size)
       return format.format(-Math.floor(elapsed / size), unit);
   return "just now";
+}
+
+export function trashDaysLeft(deletedAt: string, now = Date.now()) {
+  return Math.max(
+    0,
+    TRASH_DAYS - Math.floor((now - Date.parse(deletedAt)) / 86_400_000),
+  );
 }

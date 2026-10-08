@@ -11,6 +11,7 @@ export function ProjectCard({
   open,
   opening = false,
   busyLabel = "Opening…",
+  openLabel: hoverLabel = "Open",
   disabled = false,
   menu,
   meta,
@@ -24,6 +25,7 @@ export function ProjectCard({
   open: { href: string } | { onClick: () => void };
   opening?: boolean;
   busyLabel?: string;
+  openLabel?: string;
   disabled?: boolean;
   menu: Parameters<typeof ProjectMenu>[0]["items"];
   meta?: ReactNode;
@@ -40,7 +42,10 @@ export function ProjectCard({
         {thumbnail}
       </span>
       {selected === undefined ? (
-        <HoverOverlay label={opening ? busyLabel : "Open"} force={opening} />
+        <HoverOverlay
+          label={opening ? busyLabel : hoverLabel}
+          force={opening}
+        />
       ) : (
         <span
           aria-hidden="true"
@@ -69,7 +74,7 @@ export function ProjectCard({
   );
   const openLabel =
     selected === undefined
-      ? `Open ${name}`
+      ? `${hoverLabel} ${name}`
       : `${selected ? "Deselect" : "Select"} ${name}`;
   return (
     <li

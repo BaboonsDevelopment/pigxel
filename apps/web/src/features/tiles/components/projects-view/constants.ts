@@ -7,6 +7,7 @@ export const FILTERS = [
   "Shared",
   "Favourite",
   "Archive",
+  "Trash",
 ] as const;
 
 export type Filter = (typeof FILTERS)[number];

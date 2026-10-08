@@ -12,6 +12,8 @@ import type { Label } from "../../labels";
 import { listParams } from "../../queries/keys";
 import { useLabels, useSetLabels } from "../../queries/labels";
 import { useMoveProjects } from "../../queries/move-projects";
+import { reorderFolders } from "../../actions";
+import { useFolderSort } from "./drag/use-folder-sort";
 import { ProjectDragProvider } from "./drag/project-drag";
 import { useSeedProjectCache } from "../../queries/seed";
 import { useCloudTileActions } from "../../tile-actions";
@@ -76,6 +78,14 @@ export function ProjectsView({
   const [creating, setCreating] = useState(false);
   const folderTiles = useCloudTileActions(userId);
   const moveProjects = useMoveProjects();
+  const [reorderError, setReorderError] = useState<string | null>(null);
+  const sort = useFolderSort(folders, (ids) => {
+    setReorderError(null);
+    void reorderFolders(ids).then((result) =>
+      setReorderError(result.error ?? null),
+    );
+  });
+  const sortedFolders = sort.folders;
   const drop = (ids: string[], folderId: string) =>
     moveProjects.mutate({ ids, folderId });
 
@@ -109,7 +119,9 @@ export function ProjectsView({
 
   const unfiltered =
     filtersKey(projectFilters) === filtersKey(NO_PROJECT_FILTERS);
-  const matchingFolders = folders.filter((f) => hasName(f.name, query.trim()));
+  const matchingFolders = sortedFolders.filter((f) =>
+    hasName(f.name, query.trim()),
+  );
   const gridProps = {
     userId,
     folders,
@@ -148,9 +160,9 @@ export function ProjectsView({
               filter === "Folders" ? undefined : () => setFilter("Folders")
             }
           />
-          {(folderTiles.error ?? moveProjects.error) && (
+          {(folderTiles.error ?? moveProjects.error ?? reorderError) && (
             <FormMessage tone="error" className="mb-4">
-              {folderTiles.error ?? moveProjects.error?.message}
+              {folderTiles.error ?? moveProjects.error?.message ?? reorderError}
             </FormMessage>
           )}
           <ul className={GRID}>
@@ -182,6 +194,7 @@ export function ProjectsView({
                 key={f.id}
                 folder={f}
                 opening={folderTiles.busy}
+                sort={sort.itemProps(f.id)}
                 onOpen={(project) =>
                   void folderTiles.open({
                     id: project.id,
@@ -207,6 +220,7 @@ export function ProjectsView({
         />
       )}
       {filter === "Archive" && <ProjectGrid {...gridProps} archived />}
+      {filter === "Trash" && <ProjectGrid {...gridProps} trashed />}
       {filter === "Favourite" && (
         <Favourites query={query} searched={searched} grid={GRID} />
       )}

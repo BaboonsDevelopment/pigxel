@@ -6,6 +6,11 @@ import { PixelImage } from "@/components/ui/pixel-image";
 import { pixelifySans } from "@/lib/fonts/pixelify";
 import type { Folder, FolderProject } from "../../../folders";
 import { useFolderDropTarget } from "../drag/project-drag";
+import type { useFolderSort } from "../drag/use-folder-sort";
+
+type FolderSortProps = ReturnType<
+  ReturnType<typeof useFolderSort>["itemProps"]
+>;
 import { editedAgo } from "../helpers";
 
 const DECK = [
@@ -18,22 +23,28 @@ export function FolderCard({
   folder,
   opening,
   onOpen,
+  sort,
 }: {
   folder: Folder;
   opening: string | null;
   onOpen: (project: FolderProject) => void;
+  sort: FolderSortProps;
 }) {
+  const { lifted, ...sortProps } = sort;
   const { dragging, over, targetProps } = useFolderDropTarget(folder.id);
   const href = `/tiles?folder=${folder.id}`;
   const shown = folder.projects.slice(0, 3);
   return (
     <li
       {...targetProps}
+      {...sortProps}
+      onDragStart={(event) => event.preventDefault()}
       data-over={over || undefined}
       className={cn(
         "group relative transition-transform duration-200 ease-out",
         over && "scale-[1.04]",
         dragging && !over && "opacity-90",
+        lifted && "drop-shadow-[0_18px_24px_rgb(74_31_53/0.25)]",
       )}
     >
       <Link
@@ -77,7 +88,7 @@ export function FolderCard({
           </span>
         </span>
       </Link>
-      {shown.length > 0 && !dragging && (
+      {shown.length > 0 && !dragging && !lifted && (
         <div className="invisible absolute inset-x-0 top-full z-40 pt-1 opacity-0 transition-opacity duration-200 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
           <div className="overflow-hidden rounded-2xl border border-[#efc0d0] bg-background shadow-lg">
             <ul className="px-2 pt-1.5">

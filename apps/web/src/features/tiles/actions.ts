@@ -116,6 +116,30 @@ export async function renameFolder(
   return {};
 }
 
+export async function reorderFolders(folderIds: string[]): Promise<Result> {
+  const user = await requireUser();
+  if (!folderIds.length || !folderIds.every((id) => UUID.test(id)))
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const results = await Promise.all(
+      folderIds.map((id, position) =>
+        supabase
+          .from("folders")
+          .update({ position })
+          .eq("id", id)
+          .eq("user_id", user.id),
+      ),
+    );
+    if (results.some((result) => result.error))
+      return { error: "Couldn’t reorder folders. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  refresh();
+  return {};
+}
+
 export async function deleteFolder(folderId: string): Promise<Result> {
   const user = await requireUser();
   if (!UUID.test(folderId)) return { error: "Invalid request." };
@@ -331,6 +355,77 @@ export async function publishProjects(tileIds: string[]): Promise<Result> {
     );
   } catch {
     return { error: "Couldn’t publish these projects. Try again." };
+  }
+  return {};
+}
+
+const validIds = (ids: string[]) =>
+  ids.length > 0 && ids.length <= 200 && ids.every((id) => UUID.test(id));
+
+export async function trashProjects(tileIds: string[]): Promise<Result> {
+  const user = await requireUser();
+  if (!validIds(tileIds)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({
+        deleted_at: new Date().toISOString(),
+        visibility: "private",
+        review: null,
+      })
+      .in("id", tileIds)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t move that to Trash. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function restoreProjects(tileIds: string[]): Promise<Result> {
+  const user = await requireUser();
+  if (!validIds(tileIds)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({ deleted_at: null })
+      .in("id", tileIds)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t restore that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function deleteProjectsForever(
+  tileIds: string[] | "all",
+): Promise<Result> {
+  const user = await requireUser();
+  if (tileIds !== "all" && !validIds(tileIds))
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const query = supabase
+      .from("tiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .not("deleted_at", "is", null);
+    const { data, error } = await (tileIds === "all"
+      ? query
+      : query.in("id", tileIds));
+    if (error) return { error: "Couldn’t empty Trash. Try again." };
+    if (!data.length) return {};
+    const ids = data.map((row) => row.id as string);
+    await supabase.storage
+      .from("tiles")
+      .remove(ids.map((id) => `${user.id}/${id}.pigxel`));
+    const removed = await supabase.from("tiles").delete().in("id", ids);
+    if (removed.error) return { error: "Couldn’t empty Trash. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
   }
   return {};
 }

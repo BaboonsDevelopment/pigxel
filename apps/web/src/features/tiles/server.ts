@@ -27,6 +27,9 @@ export async function listFolders(userId: string): Promise<Folder[]> {
       "id, name, count:tiles(count), recent:tiles(id, name, width, height, thumbnail, updated_at)",
     )
     .eq("user_id", userId)
+    .is("count.deleted_at", null)
+    .is("recent.deleted_at", null)
+    .order("position", { nullsFirst: false })
     .order("created_at")
     .order("updated_at", { referencedTable: "recent", ascending: false })
     .limit(3, { referencedTable: "recent" });
