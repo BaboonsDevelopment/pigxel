@@ -129,10 +129,51 @@ type PublicTileRow = TileRow & {
   mine?: { user_id: string }[];
 };
 
-export type ArtFilter = { min?: number; max?: number; animated?: boolean };
+export type ArtFilter = {
+  min?: number;
+  max?: number;
+  animated?: boolean;
+  query?: string;
+  order?: "relevance" | "recent" | "az";
+  likedBy?: string;
+  followedBy?: string;
+};
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+const publicTiles = (
+  supabase: Supabase,
+  days: number,
+  filter: ArtFilter,
+  head = false,
+) => {
+  const since = new Date(days ? Date.now() - days * DAY : 0).toISOString();
+  return filter.query
+    ? supabase.rpc(
+        "search_public_tiles",
+        {
+          query: filter.query,
+          liked_since:
+            filter.order === "recent" || filter.order === "az" || filter.likedBy
+              ? null
+              : since,
+        },
+        { count: "exact", head },
+      )
+    : supabase.rpc("popular_tiles", { since }, { count: "exact", head });
+};
 
 const PUBLIC_TILE_COLUMNS =
   "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+
+async function followeesOf(supabase: Supabase, userId: string) {
+  const { data, error } = await supabase
+    .from("follows")
+    .select("followee_id")
+    .eq("follower_id", userId);
+  if (error) throw new Error(`Couldn’t load follows: ${error.message}`);
+  return data.map((row) => row.followee_id as string);
+}
 
 export async function listPublicTiles(
   from: number,
@@ -143,26 +184,30 @@ export async function listPublicTiles(
   filter: ArtFilter = {},
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
-  const base = supabase
-    .rpc(
-      "popular_tiles",
-      { since: new Date(Date.now() - days * DAY).toISOString() },
-      { count: "exact" },
-    )
-    .select(
-      viewerId
+  const followees = filter.followedBy
+    ? await followeesOf(supabase, filter.followedBy)
+    : null;
+  if (followees && !followees.length) return { tiles: [], count: 0 };
+  const base = publicTiles(supabase, days, filter).select(
+    filter.likedBy
+      ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes!inner(user_id)`
+      : viewerId
         ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
         : PUBLIC_TILE_COLUMNS,
-    );
+  );
   let query = tags.length ? base.overlaps("tags", tags) : base;
   if (filter.max)
     query = query.lte("width", filter.max).lte("height", filter.max);
   if (filter.min)
     query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
   if (filter.animated) query = query.gt("frame_count", 1);
-  const { data, count, error } = await (
-    viewerId ? query.eq("mine.user_id", viewerId) : query
-  ).range(from, from + limit - 1);
+  const mine = filter.likedBy ?? viewerId;
+  if (mine) query = query.eq("mine.user_id", mine);
+  if (followees) query = query.in("user_id", followees);
+  if (filter.order === "recent")
+    query = query.order("published_at", { ascending: false }).order("id");
+  if (filter.order === "az") query = query.order("name").order("id");
+  const { data, count, error } = await query.range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
   const downloads = await downloadCounts(rows.map((row) => row.id));
@@ -181,12 +226,18 @@ export async function countPublicTilesByTag(
   filter: ArtFilter = {},
 ): Promise<Record<string, number>> {
   const supabase = await createClient();
-  const since = new Date(Date.now() - days * DAY).toISOString();
+  const followees = filter.followedBy
+    ? await followeesOf(supabase, filter.followedBy)
+    : null;
+  if (followees && !followees.length)
+    return Object.fromEntries(["All", ...tags].map((tag) => [tag, 0]));
   const counts = await Promise.all(
     [null, ...tags].map(async (tag) => {
-      let query = supabase
-        .rpc("popular_tiles", { since }, { count: "exact", head: true })
-        .select("id, author:profiles!tiles_user_id_profiles_fkey!inner(id)");
+      let query = publicTiles(supabase, days, filter, true).select(
+        `id, author:profiles!tiles_user_id_profiles_fkey!inner(id)${filter.likedBy ? ", mine:tile_likes!inner(user_id)" : ""}`,
+      );
+      if (followees) query = query.in("user_id", followees);
+      if (filter.likedBy) query = query.eq("mine.user_id", filter.likedBy);
       if (tag) query = query.contains("tags", [tag]);
       if (filter.max)
         query = query.lte("width", filter.max).lte("height", filter.max);

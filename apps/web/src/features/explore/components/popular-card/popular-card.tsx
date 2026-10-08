@@ -7,6 +7,7 @@ import type { PublicTile } from "@/features/profile/profile";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
+import { Highlighted } from "./components/highlighted";
 import { LikeButton } from "./components/like-button";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { formatCount } from "./helpers";
@@ -15,9 +16,11 @@ import { manrope } from "@/lib/fonts/manrope";
 
 export function PopularCard({
   tile,
+  words = [],
   delay = 0,
 }: {
   tile: PublicTile;
+  words?: string[];
   delay?: number;
 }) {
   const { author } = tile;
@@ -40,7 +43,7 @@ export function PopularCard({
                 src={tile.thumbnail}
                 alt=""
                 loading="lazy"
-                className="size-full object-contain"
+                className="size-full object-cover"
               />
             ) : (
               <span className="flex size-full items-center justify-center font-mono text-xs text-muted-foreground">
@@ -54,7 +57,7 @@ export function PopularCard({
       <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="truncate text-xl leading-tight" title={tile.name}>
-            {tile.name}
+            <Highlighted text={tile.name} words={words} />
           </h3>
           <ProjectMenu
             label={`More for ${tile.name}`}
@@ -88,7 +91,9 @@ export function PopularCard({
               url={author.avatarUrl}
               className="size-3.5 shrink-0 text-[7px]"
             />
-            <span className="truncate">{author.username}</span>
+            <span className="truncate">
+              <Highlighted text={author.username} words={words} />
+            </span>
           </Link>
           <div
             className={cn(

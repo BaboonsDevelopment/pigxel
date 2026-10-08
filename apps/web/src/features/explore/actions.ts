@@ -10,51 +10,84 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   DESCRIPTION_MAX,
+  FEEDS,
   PAGE_SIZE,
   PERIODS,
+  QUERY_MAX,
   SIZES,
+  SORTS,
   TAGS,
-  type Period,
-  type Size,
+  type ExploreFilters,
 } from "./constants";
+import { findArtists, type ArtistResult } from "@/features/search/server";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
 import { toComment } from "./server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function loadPopularTiles(
-  period: Period,
-  from: number,
-  tags: string[] = [],
-  size: Size = "any",
-  animated = false,
-): Promise<{ tiles: PublicTile[]; count: number }> {
-  const none = { tiles: [], count: 0 };
-  const range = SIZES.find((s) => s.value === size);
-  if (!range || typeof animated !== "boolean") return none;
-  const days = PERIODS.find((p) => p.value === period)?.days;
-  if (!days || !Number.isInteger(from) || from < 0) return none;
+async function artFilter(filters: ExploreFilters) {
+  const days = PERIODS.find((p) => p.value === filters?.period)?.days;
+  const range = SIZES.find((s) => s.value === filters?.size);
   if (
-    !Array.isArray(tags) ||
-    tags.some((tag) => !(TAGS as readonly string[]).includes(tag))
+    days === undefined ||
+    !range ||
+    typeof filters.animated !== "boolean" ||
+    typeof filters.query !== "string" ||
+    !SORTS.some((s) => s.value === filters.sort) ||
+    !FEEDS.some((s) => s.value === filters.feed) ||
+    !Array.isArray(filters.tags) ||
+    filters.tags.some((tag) => !(TAGS as readonly string[]).includes(tag))
   )
-    return none;
+    return null;
   const user = await getUser();
-  return listPublicTiles(from, PAGE_SIZE, days, user?.id ?? null, tags, {
-    ...range,
-    animated,
-  });
+  if ((filters.sort === "liked" || filters.feed === "following") && !user)
+    return null;
+  return {
+    days,
+    user,
+    filter: {
+      order:
+        filters.sort === "recent" || filters.sort === "az"
+          ? filters.sort
+          : ("relevance" as const),
+      likedBy: filters.sort === "liked" ? user?.id : undefined,
+      followedBy: filters.feed === "following" ? user?.id : undefined,
+      min: range.min,
+      max: range.max,
+      animated: filters.animated,
+      query: filters.query.trim().slice(0, QUERY_MAX),
+    },
+  };
+}
+
+export async function loadPopularTiles(
+  from: number,
+  filters: ExploreFilters,
+): Promise<{ tiles: PublicTile[]; count: number }> {
+  if (!Number.isInteger(from) || from < 0) return { tiles: [], count: 0 };
+  const valid = await artFilter(filters);
+  if (!valid) return { tiles: [], count: 0 };
+  return listPublicTiles(
+    from,
+    PAGE_SIZE,
+    valid.days,
+    valid.user?.id ?? null,
+    filters.tags,
+    valid.filter,
+  );
 }
 
 export async function loadTagCounts(
-  period: Period,
-  size: Size,
-  animated: boolean,
+  filters: ExploreFilters,
 ): Promise<Record<string, number> | null> {
-  const days = PERIODS.find((p) => p.value === period)?.days;
-  const range = SIZES.find((s) => s.value === size);
-  if (!days || !range || typeof animated !== "boolean") return null;
-  return countPublicTilesByTag(days, TAGS, { ...range, animated });
+  const valid = await artFilter(filters);
+  if (!valid) return null;
+  return countPublicTilesByTag(valid.days, TAGS, valid.filter);
+}
+
+export async function loadArtists(query: string): Promise<ArtistResult[]> {
+  if (typeof query !== "string") return [];
+  return findArtists(query);
 }
 
 export async function setTileLiked(

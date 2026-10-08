@@ -2,19 +2,25 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { SIZES, type Size } from "../../../constants";
 
-export function SizeMenu({
-  size,
+export function OptionMenu<Value extends string>({
+  label,
+  options,
+  value,
   onChange,
 }: {
-  size: Size;
-  onChange: (size: Size) => void;
+  label: string;
+  options: readonly [
+    { value: Value; label: string },
+    ...{ value: Value; label: string }[],
+  ];
+  value: Value;
+  onChange: (value: Value) => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const current = SIZES.find((s) => s.value === size) ?? SIZES[0];
+  const current = options.find((o) => o.value === value) ?? options[0];
 
   useEffect(() => {
     if (!open) return;
@@ -36,12 +42,12 @@ export function SizeMenu({
     <div ref={root} className="relative">
       <button
         type="button"
-        aria-label={`Canvas size: ${current.label}`}
+        aria-label={`${label}: ${current.label}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen(!open)}
-        className="flex h-9 items-center gap-2 rounded-lg border bg-background px-3.5 text-xs transition-colors hover:bg-muted"
+        className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3.5 text-xs transition-colors hover:bg-muted"
       >
         {current.label}
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3.5">
@@ -61,19 +67,19 @@ export function SizeMenu({
           role="menu"
           className="absolute top-full left-0 z-20 mt-1 min-w-full rounded-lg border bg-popover p-1 text-xs shadow-lg"
         >
-          {SIZES.map((s) => (
+          {options.map((s) => (
             <li key={s.value} role="none">
               <button
                 type="button"
                 role="menuitemradio"
-                aria-checked={s.value === size}
+                aria-checked={s.value === value}
                 onClick={() => {
                   setOpen(false);
                   onChange(s.value);
                 }}
                 className={cn(
-                  "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left whitespace-nowrap text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                  s.value === size && "bg-pastel-pink-soft text-foreground",
+                  "flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 text-left whitespace-nowrap text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                  s.value === value && "bg-pastel-pink-soft text-foreground",
                 )}
               >
                 {s.label}

@@ -68,7 +68,7 @@ export function PublishDialog({ onClose }: { onClose: () => void }) {
                   <PixelImage
                     src={selected.thumbnail}
                     alt=""
-                    className="size-full object-contain"
+                    className="size-full object-cover"
                   />
                 )}
               </span>
@@ -139,7 +139,7 @@ export function PublishDialog({ onClose }: { onClose: () => void }) {
                           src={tile.thumbnail}
                           alt=""
                           loading="lazy"
-                          className="size-full object-contain"
+                          className="size-full object-cover"
                         />
                       )}
                     </span>
