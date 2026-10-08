@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Mono, Fredoka, Poppins } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
+import { QueryProvider } from "@/components/providers/query-provider";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
@@ -34,7 +35,7 @@ export default function RootLayout({
       className={`${poppins.variable} ${fredoka.variable} ${dmMono.variable}`}
     >
       <body className="min-h-screen" suppressHydrationWarning>
-        {children}
+        <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
   );

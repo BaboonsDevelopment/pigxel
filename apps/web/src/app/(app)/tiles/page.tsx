@@ -8,7 +8,7 @@ import {
   listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { requireUser } from "@/lib/auth/session";
-import { PAGE_SIZE } from "@/features/tiles/constants";
+import { PAGE_SIZE, RECENT_SHOWN } from "@/features/tiles/constants";
 import { cloudFilter, searchMatch } from "@/features/tiles/search";
 import {
   readView,
@@ -45,7 +45,7 @@ export default async function Tiles({ searchParams }: Props) {
       folder?.id ?? null,
       cloudFilter({ ...view.filters, query: view.query }),
     ),
-    folder ? [] : listRecentlyOpenedOnServer(user.id, 6),
+    folder ? null : listRecentlyOpenedOnServer(user.id, RECENT_SHOWN),
   ]);
   return (
     <div className="min-h-full bg-[url(/art/background-effect.png)] bg-top bg-repeat">
@@ -53,8 +53,7 @@ export default async function Tiles({ searchParams }: Props) {
         <ProjectsView
           key={folder?.id ?? "all"}
           userId={user.id}
-          initial={cloudTiles.tiles}
-          initialCount={cloudTiles.count}
+          initial={cloudTiles}
           folders={folders}
           folder={folder}
           saved={saved}

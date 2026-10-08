@@ -48,15 +48,3 @@ export function filtersKey(filters: ProjectFilters, query = "") {
   const { size, animated, storage, label, published } = filters;
   return JSON.stringify([size, animated, storage, label, published, query]);
 }
-
-export function queryOfKey(key: string) {
-  const [size, animated, , label, published, query] = JSON.parse(key) as [
-    Size,
-    boolean,
-    Storage,
-    string | null,
-    Published,
-    string,
-  ];
-  return { size, animated, label, published, query };
-}

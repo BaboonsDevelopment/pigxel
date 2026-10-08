@@ -6,13 +6,15 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import {
   countedCloudTilesOnServer,
   listCloudTilesOnServer,
+  listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
-import { PAGE_SIZE } from "./constants";
+import { PAGE_SIZE, PROJECT_NAME_MAX, RECENT_SHOWN } from "./constants";
 import { FOLDER_NAME_MAX } from "./folders";
 import { LABEL_COLORS, LABEL_NAME_MAX, type Label } from "./labels";
+import { listLabels } from "./server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -276,4 +278,43 @@ export async function setProjectArchived(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
+}
+
+export async function renameTile(
+  tileId: string,
+  name: string,
+): Promise<Result> {
+  const user = await requireUser();
+  const clean = name.trim();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  if (!clean || clean.length > PROJECT_NAME_MAX)
+    return {
+      error: `Give the project a name up to ${PROJECT_NAME_MAX} characters.`,
+    };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("tiles")
+      .update({ name: clean })
+      .eq("id", tileId)
+      .eq("user_id", user.id);
+    if (error) return { error: "Couldn’t rename the project. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
+export async function loadRecentlyOpened(): Promise<CloudTileSummary[]> {
+  const user = await requireUser();
+  return listRecentlyOpenedOnServer(user.id, RECENT_SHOWN);
+}
+
+export async function loadLabels(): Promise<Label[]> {
+  const user = await requireUser();
+  try {
+    return await listLabels(user.id);
+  } catch {
+    return [];
+  }
 }

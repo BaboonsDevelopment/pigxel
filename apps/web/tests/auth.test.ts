@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({
@@ -70,6 +71,7 @@ import AccountSettings from "@/app/(app)/settings/account/page";
 import Login from "@/app/login/page";
 import UpdatePassword from "@/app/auth/update-password/page";
 import Home from "@/app/page";
+import { QueryProvider } from "@/components/providers/query-provider";
 import Tiles from "@/app/(app)/tiles/page";
 import NewTile from "@/app/(app)/tiles/new/page";
 import { proxy } from "@/proxy";
@@ -487,7 +489,11 @@ describe("proxy", () => {
 describe("tiles", () => {
   it("shows My projects to signed-in users", async () => {
     const html = renderToStaticMarkup(
-      await Tiles({ searchParams: Promise.resolve({}) }),
+      createElement(
+        QueryProvider,
+        null,
+        await Tiles({ searchParams: Promise.resolve({}) }),
+      ),
     );
     expect(html).toMatch(/<h1[^>]*>My projects<\/h1>/);
   });

@@ -6,12 +6,12 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { RECENT_SHOWN } from "../../../constants";
 import { readMarks } from "../../../local-marks";
+import { useRecentProjects } from "../../../queries/recent-projects";
 import { TileThumbnail } from "../../tile-thumbnail";
 import { editedAgo, readLocalProjects } from "../helpers";
 import { SectionHeader } from "./section-header";
-
-const SHOWN = 6;
 
 type Recent = {
   id: string;
@@ -23,33 +23,28 @@ type Recent = {
 
 export function RecentRow({
   userId,
-  cloud,
   busy,
   onOpen,
 }: {
   userId: string;
-  cloud: CloudTileSummary[];
   busy: string | null;
   onOpen: (tile: CloudTileSummary) => void;
 }) {
   const loaded = useDraftsLoaded(userId);
   if (!loaded) return null;
-  return (
-    <RecentList userId={userId} cloud={cloud} busy={busy} onOpen={onOpen} />
-  );
+  return <RecentList userId={userId} busy={busy} onOpen={onOpen} />;
 }
 
 function RecentList({
   userId,
-  cloud,
   busy,
   onOpen,
 }: {
   userId: string;
-  cloud: CloudTileSummary[];
   busy: string | null;
   onOpen: (tile: CloudTileSummary) => void;
 }) {
+  const recent = useRecentProjects();
   const [local] = useState(() => {
     const opened = readMarks(userId, "opened");
     const archived = readMarks(userId, "archived");
@@ -61,7 +56,7 @@ function RecentList({
   });
 
   const items: Recent[] = [
-    ...cloud.flatMap((tile): Recent[] =>
+    ...recent.flatMap((tile): Recent[] =>
       tile.openedAt
         ? [
             {
@@ -91,7 +86,7 @@ function RecentList({
     ),
   ]
     .sort((a, b) => b.at - a.at)
-    .slice(0, SHOWN);
+    .slice(0, RECENT_SHOWN);
 
   if (!items.length) return null;
 

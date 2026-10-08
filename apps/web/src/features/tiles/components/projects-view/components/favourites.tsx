@@ -1,60 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { PixelImage } from "@/components/ui/pixel-image";
-import { setTileSaved } from "@/features/explore/actions";
-import { searchSavedArts } from "../../../actions";
-import type { SavedArt } from "@/features/explore/server";
+import { useSavedArts, useUnsaveArt } from "../../../queries/saved-arts";
 import { ProjectCard } from "../../project-card/project-card";
 import { SectionHeader } from "./section-header";
 
 export function Favourites({
-  saved,
-  savedFor,
   query,
   searched,
   grid,
 }: {
-  saved: SavedArt[];
-  savedFor: string;
   query: string;
   searched: string;
   grid: string;
 }) {
-  const [results, setResults] = useState({ for: savedFor, arts: saved });
-
-  useEffect(() => {
-    if (searched === results.for) return;
-    let stale = false;
-    void searchSavedArts(searched).then((arts) => {
-      if (!stale) setResults({ for: searched, arts });
-    });
-    return () => {
-      stale = true;
-    };
-  }, [searched, results.for]);
-
-  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-
-  const unsave = async (art: SavedArt) => {
-    setError(null);
-    setRemoved((ids) => new Set(ids).add(art.id));
-    const result = await setTileSaved(art.id, false);
-    if (!result.error) return;
-    setError(result.error);
-    setRemoved((ids) => {
-      const next = new Set(ids);
-      next.delete(art.id);
-      return next;
-    });
-  };
-
-  const arts = results.arts.filter((art) => !removed.has(art.id));
+  const { arts, loaded } = useSavedArts(searched);
+  const unsave = useUnsaveArt();
   const search = query.trim();
-  const settled = search === results.for;
+  const settled = loaded && search === searched;
   const shown = settled
     ? arts
     : arts.filter((art) =>
@@ -69,9 +34,9 @@ export function Favourites({
         count={String(arts.length)}
         className="mb-3"
       />
-      {error && (
+      {unsave.error && (
         <FormMessage tone="error" className="mb-4">
-          {error}
+          {unsave.error.message}
         </FormMessage>
       )}
       {shown.length ? (
@@ -89,7 +54,7 @@ export function Favourites({
                 {
                   label: "Remove from saved",
                   destructive: true,
-                  onSelect: () => void unsave(art),
+                  onSelect: () => unsave.mutate(art),
                 },
               ]}
             />

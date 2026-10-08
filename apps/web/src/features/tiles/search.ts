@@ -1,6 +1,6 @@
 import { SIZES, TAGS } from "@/features/explore/constants";
 
-export const SEARCH_MAX = 100;
+const SEARCH_MAX = 100;
 
 export function cleanSearch(query: string) {
   return query
