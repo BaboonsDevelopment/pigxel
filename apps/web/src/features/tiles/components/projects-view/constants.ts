@@ -49,3 +49,12 @@ export function filtersKey(filters: ProjectFilters, query = "") {
   const { size, animated, storage, label, published } = filters;
   return JSON.stringify([size, animated, storage, label, published, query]);
 }
+
+export const PROJECT_SORTS = [
+  { value: "edited", label: "Last edited" },
+  { value: "oldest", label: "Oldest edited" },
+  { value: "az", label: "Name A–Z" },
+  { value: "za", label: "Name Z–A" },
+] as const;
+
+export type ProjectSort = (typeof PROJECT_SORTS)[number]["value"];

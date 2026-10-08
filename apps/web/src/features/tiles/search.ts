@@ -30,7 +30,10 @@ export type ProjectQuery = {
   published?: string;
   archived?: boolean;
   trashed?: boolean;
+  sort?: string;
 };
+
+const SORTS = ["edited", "oldest", "az", "za"] as const;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,6 +45,7 @@ export function cloudFilter({
   published,
   archived,
   trashed,
+  sort,
 }: ProjectQuery) {
   const range = SIZES.find((s) => s.value === size) ?? SIZES[0];
   return {
@@ -55,5 +59,6 @@ export function cloudFilter({
     pinnedFirst: true,
     archived: archived === true,
     trashed: trashed === true,
+    order: SORTS.find((order) => order === sort) ?? "edited",
   };
 }

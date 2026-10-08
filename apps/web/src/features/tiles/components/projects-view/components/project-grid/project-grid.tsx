@@ -21,7 +21,11 @@ import {
 import { ProjectCard } from "../../../project-card/project-card";
 import { TileThumbnail } from "../../../tile-thumbnail";
 import { TRASH_DAYS } from "../../../../constants";
-import { NO_PROJECT_FILTERS, type ProjectFilters } from "../../constants";
+import {
+  NO_PROJECT_FILTERS,
+  type ProjectFilters,
+  type ProjectSort,
+} from "../../constants";
 import {
   editedAgo,
   trashDaysLeft,
@@ -46,6 +50,15 @@ const PRELOAD = "1500px";
 export const GRID =
   "grid grid-cols-2 gap-x-[33px] gap-y-[28px] sm:grid-cols-3 lg:grid-cols-5";
 
+const compareProjects = (a: Project, b: Project, sort: ProjectSort) =>
+  sort === "az"
+    ? a.name.localeCompare(b.name)
+    : sort === "za"
+      ? b.name.localeCompare(a.name)
+      : sort === "oldest"
+        ? a.at - b.at
+        : b.at - a.at;
+
 export const hasName = (name: string, query: string) =>
   !query || name.toLowerCase().includes(query.toLowerCase());
 
@@ -59,6 +72,7 @@ type ProjectGridProps = {
   folderId?: string;
   archived?: boolean;
   trashed?: boolean;
+  sort?: ProjectSort;
   filters?: ProjectFilters;
   onViewAll?: () => void;
 };
@@ -79,6 +93,7 @@ function Grid({
   folderId,
   archived = false,
   trashed = false,
+  sort = "edited",
   filters = NO_PROJECT_FILTERS,
   onViewAll,
 }: ProjectGridProps) {
@@ -91,7 +106,7 @@ function Grid({
     filters.storage !== "any";
 
   const list = useProjectList(
-    listParams(filters, searched, folderId ?? null, archived, trashed),
+    listParams(filters, searched, folderId ?? null, archived, trashed, sort),
     { enabled: showCloud },
   );
   const local = useLocalProjects(userId);
@@ -155,7 +170,8 @@ function Grid({
         list.tiles.filter((tile) => cloud.removed.has(tile.id)).length,
     );
   const projects = [...localShown, ...cloudShown.map(toCloudProject)].sort(
-    (a, b) => (pinOf(b) ?? -1) - (pinOf(a) ?? -1) || b.at - a.at,
+    (a, b) =>
+      (pinOf(b) ?? -1) - (pinOf(a) ?? -1) || compareProjects(a, b, sort),
   );
   const error = cloud.error ?? actions.error;
 
@@ -220,6 +236,19 @@ function Grid({
     if (confirmed) actions.deleteForever(list.tiles, true);
   };
 
+  const moveLocal = async (project: Extract<Project, { kind: "local" }>) => {
+    const confirmed = await confirmDialog({
+      title: "Save to Pigxel cloud first?",
+      message: `Folders hold cloud projects, so “${project.name}” will be saved to Pigxel cloud and then moved.`,
+      confirmLabel: "Save and move",
+    });
+    if (!confirmed) return;
+    const tile = await actions
+      .upload(project.draft, project.image)
+      .catch(() => null);
+    if (tile) setMoving([tile]);
+  };
+
   const commonItems = (project: Project) => [
     {
       label: pinOf(project) === null ? "Pin to top" : "Unpin",
@@ -273,8 +302,8 @@ function Grid({
         </FormMessage>
       )}
       <ul className={GRID}>
-        {!search && !folderId && !narrowed && !archived && !trashed && (
-          <NewProjectCard />
+        {!search && !narrowed && !archived && !trashed && (
+          <NewProjectCard folderId={folderId} />
         )}
         {projects.map((project) => {
           const meta = `${project.width} × ${project.height} px · Edited ${editedAgo(project.at)}`;
@@ -312,6 +341,10 @@ function Grid({
                             void actions
                               .upload(project.draft, project.image)
                               .then(setPublishing, () => {}),
+                        },
+                        {
+                          label: "Move to folder…",
+                          onSelect: () => void moveLocal(project),
                         },
                       ]),
                   archiveItem(project),

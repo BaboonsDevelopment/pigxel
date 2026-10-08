@@ -20,6 +20,7 @@ import { useCloudTileActions } from "../../tile-actions";
 import { Favourites } from "./components/favourites";
 import { FolderCard } from "./components/folder-card";
 import { FolderHeader } from "./components/folder-header";
+import { FolderToolbar } from "./components/folder-toolbar";
 import { FolderNameDialog } from "./components/folder-name-dialog";
 import {
   GRID,
@@ -34,6 +35,7 @@ import {
   filtersKey,
   type Filter,
   type ProjectFilters,
+  type ProjectSort,
 } from "./constants";
 import { viewSearch, type ProjectsViewState } from "./view";
 
@@ -76,6 +78,7 @@ export function ProjectsView({
     view.filters,
   );
   const [creating, setCreating] = useState(false);
+  const [folderSort, setFolderSort] = useState<ProjectSort>("edited");
   const folderTiles = useCloudTileActions(userId);
   const moveProjects = useMoveProjects();
   const [reorderError, setReorderError] = useState<string | null>(null);
@@ -105,14 +108,21 @@ export function ProjectsView({
     return (
       <ProjectDragProvider onDrop={drop}>
         <FolderHeader folder={folder} />
+        <FolderToolbar
+          query={query}
+          onQueryChange={setQuery}
+          sort={folderSort}
+          onSortChange={setFolderSort}
+        />
         <ProjectGrid
           userId={userId}
           folders={folders}
           labels={labels}
           onLabelsChange={setLabels}
-          query=""
-          searched=""
+          query={query}
+          searched={searched}
           folderId={folder.id}
+          sort={folderSort}
         />
       </ProjectDragProvider>
     );

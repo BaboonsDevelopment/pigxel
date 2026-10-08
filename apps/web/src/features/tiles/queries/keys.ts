@@ -23,11 +23,13 @@ export function listParams(
   folderId: string | null,
   archived = false,
   trashed = false,
+  sort = "edited",
 ): ProjectListParams {
   return {
     folderId,
     archived,
     trashed,
+    sort,
     size: filters.size,
     animated: filters.animated,
     label: filters.label,

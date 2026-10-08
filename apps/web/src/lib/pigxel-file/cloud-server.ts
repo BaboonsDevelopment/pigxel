@@ -14,6 +14,7 @@ type CloudTileFilter = {
   match?: string | null;
   published?: boolean;
   pinnedFirst?: boolean;
+  order?: "edited" | "oldest" | "az" | "za";
   archived?: boolean;
   trashed?: boolean;
 };
@@ -83,8 +84,11 @@ async function cloudTilesPage(
     ).is("deleted_at", null);
   if (filter.pinnedFirst && !filter.trashed)
     query = query.order("pinned_at", { ascending: false, nullsFirst: false });
+  const order = filter.order ?? "edited";
+  if (order === "az" || order === "za")
+    query = query.order("name", { ascending: order === "az" });
   const { data, error, count } = await query
-    .order("updated_at", { ascending: false })
+    .order("updated_at", { ascending: order === "oldest" })
     .order("id")
     .range(from, from + limit - 1);
   if (error || !data) return { tiles: [], count: 0 };
