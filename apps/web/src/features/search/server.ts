@@ -56,30 +56,12 @@ async function byHandle(
     .slice(0, LIMIT);
 }
 
-export async function search(
-  userId: string,
-  query: string,
-): Promise<SearchResults> {
-  const supabase = await createClient();
-  if (isHandleQuery(query)) {
-    const handle = normalizeUsername(query).slice(0, MAX_QUERY);
-    return {
-      tiles: [],
-      artists: handle ? await byHandle(supabase, handle) : [],
-    };
-  }
-
-  const text = query.trim().slice(0, MAX_QUERY);
-  if (!text) return { tiles: [], artists: [] };
+async function byText(
+  supabase: Supabase,
+  text: string,
+): Promise<ArtistResult[]> {
   const pattern = `%${literal(text)}%`;
-  const [tiles, byUsername, byName] = await Promise.all([
-    supabase
-      .from("tiles")
-      .select("id, user_id, name, width, height, thumbnail, updated_at")
-      .eq("user_id", userId)
-      .ilike("name", pattern)
-      .order("updated_at", { ascending: false })
-      .limit(LIMIT),
+  const [byUsername, byName] = await Promise.all([
     supabase
       .from("profiles")
       .select(PROFILE_COLUMNS)
@@ -99,12 +81,38 @@ export async function search(
   ])
     artists.set(row.id, toResult(row));
   const exact = text.toLowerCase();
-  return {
-    tiles: (tiles.data ?? []).map(toSummary),
-    artists: [...artists.values()]
-      .sort(
-        (a, b) => Number(b.username === exact) - Number(a.username === exact),
-      )
-      .slice(0, LIMIT),
-  };
+  return [...artists.values()]
+    .sort((a, b) => Number(b.username === exact) - Number(a.username === exact))
+    .slice(0, LIMIT);
+}
+
+export async function findArtists(query: string): Promise<ArtistResult[]> {
+  const supabase = await createClient();
+  if (isHandleQuery(query)) {
+    const handle = normalizeUsername(query).slice(0, MAX_QUERY);
+    return handle ? byHandle(supabase, handle) : [];
+  }
+  const text = query.trim().slice(0, MAX_QUERY);
+  return text ? byText(supabase, text) : [];
+}
+
+export async function search(
+  userId: string,
+  query: string,
+): Promise<SearchResults> {
+  const text = query.trim().slice(0, MAX_QUERY);
+  if (!text || isHandleQuery(query))
+    return { tiles: [], artists: await findArtists(query) };
+  const supabase = await createClient();
+  const [tiles, artists] = await Promise.all([
+    supabase
+      .from("tiles")
+      .select("id, user_id, name, width, height, thumbnail, updated_at")
+      .eq("user_id", userId)
+      .ilike("name", `%${literal(text)}%`)
+      .order("updated_at", { ascending: false })
+      .limit(LIMIT),
+    byText(supabase, text),
+  ]);
+  return { tiles: (tiles.data ?? []).map(toSummary), artists };
 }

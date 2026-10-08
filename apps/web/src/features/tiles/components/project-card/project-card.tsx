@@ -10,6 +10,7 @@ export function ProjectCard({
   thumbnail,
   open,
   opening = false,
+  busyLabel = "Opening…",
   disabled = false,
   menu,
   meta,
@@ -18,6 +19,7 @@ export function ProjectCard({
   thumbnail: ReactNode;
   open: { href: string } | { onClick: () => void };
   opening?: boolean;
+  busyLabel?: string;
   disabled?: boolean;
   menu: Parameters<typeof ProjectMenu>[0]["items"];
   meta?: ReactNode;
@@ -29,7 +31,7 @@ export function ProjectCard({
       <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-has-[:focus-visible]:scale-105 group-has-[:focus-visible]:blur-[2px] motion-reduce:transition-none [&>*]:size-full [&>*]:object-cover [&>*]:[image-rendering:pixelated]">
         {thumbnail}
       </span>
-      <HoverOverlay label={opening ? "Opening…" : "Open"} force={opening} />
+      <HoverOverlay label={opening ? busyLabel : "Open"} force={opening} />
     </span>
   );
   const openLabel = `Open ${name}`;

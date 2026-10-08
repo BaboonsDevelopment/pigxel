@@ -1,4 +1,5 @@
 import { GRID, OPS } from "@/lib/edit/constants";
+import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import {
   ANIMATION_RULES,
   ASPECT_RATIOS,
@@ -192,6 +193,37 @@ export function sheetLayout(
   }
   const { cols, rows, aspectRatio } = best;
   return { cols, rows, aspectRatio };
+}
+
+export function buildSheetAnimatePrompt(args: {
+  subject: string;
+  poses: string[];
+  cellW: number;
+  cellH: number;
+  layout: SheetLayout;
+}): string {
+  const { cols, rows } = args.layout;
+  const frames = args.poses
+    .map(
+      (pose, i) =>
+        `Cell ${i + 1} (row ${Math.floor(i / cols) + 1}, column ${(i % cols) + 1}): ${pose}.`,
+    )
+    .join(" ");
+  return [
+    `This picture is a pixel art sprite sheet: ${args.poses.length} identical copies of one ${args.cellW}x${args.cellH} pixel picture on a grid of exactly ${cols} columns and ${rows} rows of equal cells, in reading order. It shows: ${args.subject}.`,
+    args.poses.length < cols * rows
+      ? "The remaining cells at the end of the last row are empty and stay empty."
+      : "",
+    "Redraw the whole sheet as frames of one animation, one frame per cell:",
+    frames,
+    "The copy in each cell is the strict reference for that frame: follow it as closely as possible — the very same character and everything around it, with the same design, proportions, size, place, framing, colours, palette, outline, shading and pixel size. Change only the pose the frame describes; it must look like the same drawing animated, not a new drawing.",
+    "Keep the grid exactly: every frame fills its own cell as the copy does and never crosses into another cell.",
+    "No grid lines, no numbers, no labels.",
+    IMAGE_STYLE_RULES[0],
+    `Where the picture is ${CHROMA_KEY_HEX} magenta it stays the same flat magenta. No text, no watermark, no border.`,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function buildSheetRedrawPrompt(args: {

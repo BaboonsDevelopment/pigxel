@@ -27,7 +27,7 @@ export function ArtCard({
             src={tile.thumbnail}
             alt={tile.name}
             loading="lazy"
-            className="size-full object-contain"
+            className="size-full object-cover"
           />
         ) : (
           <Text

@@ -36,6 +36,8 @@ export function EditorHeader({
   onConnectDrive,
   onExport,
   onPublish,
+  onPublishArt,
+  explorePublished = false,
   onImportSheet,
   onTilemap,
   keyOf,
@@ -53,6 +55,8 @@ export function EditorHeader({
   onConnectDrive: () => void;
   onExport: () => void;
   onPublish?: () => void;
+  onPublishArt?: () => void;
+  explorePublished?: boolean;
   onImportSheet: () => void;
   onTilemap: (convert: boolean) => void;
   keyOf: (id: ActionId) => string | undefined;
@@ -152,6 +156,13 @@ export function EditorHeader({
               label: "Export…",
               shortcut: keyOf("command:export"),
               onSelect: onExport,
+            },
+            {
+              label: explorePublished
+                ? "Edit Explore details…"
+                : "Publish to Explore…",
+              onSelect: () => onPublishArt?.(),
+              disabled: !onPublishArt,
             },
             {
               label: "Publish to Assets…",

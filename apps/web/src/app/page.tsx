@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import { Landing } from "@/features/landing/components/landing";
 
 export const metadata: Metadata = {
-  title: "Pigxel — Small pixels. Wild imagination.",
+  title: "Pigxel Studio",
   description:
-    "A happy little home for pixel art. Draw, animate, and bring your tiny worlds to life in your browser. Try the playful pixel canvas and make a little something.",
+    "Pigxel Studio is a pixel art editor that runs in your browser. Draw and animate pixel art, then sign in with Google to save your projects to Pigxel cloud or your own Google Drive.",
+  alternates: { canonical: "https://www.pigxel.studio/" },
 };
 
 export default async function Home({

@@ -13,7 +13,9 @@ export async function listCloudTilesOnServer(
   const supabase = await createClient();
   const query = supabase
     .from("tiles")
-    .select("id, user_id, name, width, height, thumbnail, updated_at")
+    .select(
+      "id, user_id, name, width, height, thumbnail, updated_at, visibility, review",
+    )
     .eq("user_id", userId);
   const { data, error } = await (
     folderId ? query.eq("folder_id", folderId) : query
