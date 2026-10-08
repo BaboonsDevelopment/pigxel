@@ -218,14 +218,56 @@ export async function listPublicTiles(
   const { data, count, error } = await query.range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
-  const downloads = await downloadCounts(rows.map((row) => row.id));
+  const ids = rows.map((row) => row.id);
+  const [downloads, views] = await Promise.all([
+    downloadCounts(ids),
+    totals("tile_views", ids),
+  ]);
   return {
     count: count ?? rows.length,
     tiles: rows.map((row) => ({
       ...toPublicTile(row),
       downloads: downloads.get(row.id) ?? 0,
+      views: views.get(row.id) ?? 0,
     })),
   };
+}
+
+export async function listPublicTilesByIds(
+  ids: string[],
+  viewerId: string | null,
+): Promise<PublicTile[]> {
+  if (!ids.length) return [];
+  const supabase = await createClient();
+  const base = supabase
+    .from("tiles")
+    .select(
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    )
+    .in("id", ids)
+    .eq("visibility", "public");
+  const { data, error } = await (viewerId
+    ? base.eq("mine.user_id", viewerId)
+    : base);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  const rows = data as unknown as PublicTileRow[];
+  const [downloads, views] = await Promise.all([
+    downloadCounts(ids),
+    totals("tile_views", ids),
+  ]);
+  const byId = new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        ...toPublicTile(row),
+        downloads: downloads.get(row.id) ?? 0,
+        views: views.get(row.id) ?? 0,
+      },
+    ]),
+  );
+  return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
 export async function countPublicTilesByTag(
@@ -261,11 +303,16 @@ export async function countPublicTilesByTag(
   return Object.fromEntries(counts);
 }
 
-async function downloadCounts(ids: string[]): Promise<Map<string, number>> {
+const downloadCounts = (ids: string[]) => totals("tile_downloads", ids);
+
+async function totals(
+  table: "tile_downloads" | "tile_views",
+  ids: string[],
+): Promise<Map<string, number>> {
   if (!ids.length) return new Map();
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("tile_downloads")
+    .from(table)
     .select("tile_id, total")
     .in("tile_id", ids);
   if (error) return new Map();
@@ -397,6 +444,21 @@ export async function getFollowStats(
       : { data: null },
   ]);
   return { followers: all.count ?? 0, following: Boolean(mine.data) };
+}
+
+export async function hasBlocked(
+  viewerId: string | null,
+  profileId: string,
+): Promise<boolean> {
+  if (!viewerId || viewerId === profileId) return false;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("blocks")
+    .select("blocked_id")
+    .eq("blocker_id", viewerId)
+    .eq("blocked_id", profileId)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 export type ProfileActivity = {

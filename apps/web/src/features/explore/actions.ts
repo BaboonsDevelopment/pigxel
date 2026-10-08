@@ -400,6 +400,22 @@ export async function reportComment(
   return {};
 }
 
+export async function reportArt(tileId: string): Promise<{ error?: string }> {
+  await requireUser();
+  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("art_reports")
+      .insert({ tile_id: tileId });
+    if (error && error.code !== "23505")
+      return { error: "Couldn’t report that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
+}
+
 export async function recordView(tileId: string): Promise<number | null> {
   if (!UUID.test(tileId)) return null;
   try {

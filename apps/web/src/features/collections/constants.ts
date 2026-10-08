@@ -1,0 +1,7 @@
+export const COLLECTION_NAME_MAX = 60;
+
+export const COLLECTION_DESCRIPTION_MAX = 300;
+
+export const COLLECTION_COVERS = 4;
+
+export const COLLECTION_ARTS_MAX = 200;

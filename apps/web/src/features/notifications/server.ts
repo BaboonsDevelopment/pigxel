@@ -19,7 +19,28 @@ export type AppNotification = {
       avatarUrl: string | null;
     }
   | { kind: "art_rejected"; tileName: string }
+  | {
+      kind: ActivityKind;
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      tileId: string | null;
+      tileName: string;
+      detail: string | null;
+    }
 );
+
+export type ActivityKind = "like" | "comment" | "save" | "remix" | "download";
+
+type NotificationRow = {
+  id: string;
+  kind: "art_rejected" | ActivityKind;
+  tile_id: string | null;
+  tile_name: string;
+  detail: string | null;
+  created_at: string;
+  actor: ProfileRow | null;
+};
 
 const SHOWN = 20;
 
@@ -74,7 +95,9 @@ export async function listNotifications(
       .limit(SHOWN),
     supabase
       .from("notifications")
-      .select("id, kind, tile_name, created_at")
+      .select(
+        `id, kind, tile_id, tile_name, detail, created_at, actor:actor_id(${PROFILE_COLUMNS})`,
+      )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(SHOWN),
@@ -101,19 +124,40 @@ export async function listNotifications(
       },
     ];
   });
-  const rejected = (
-    (own.data ?? []) as { id: string; tile_name: string; created_at: string }[]
-  ).map((row) => ({
-    at: row.created_at,
-    item: {
+  const notifications = (
+    (own.data ?? []) as unknown as NotificationRow[]
+  ).flatMap((row): { at: string; item: AppNotification }[] => {
+    const base = {
       id: `notification:${row.id}`,
-      kind: "art_rejected" as const,
-      tileName: row.tile_name,
       ago: timeAgo(Date.parse(row.created_at), now),
       unread: since !== null && row.created_at > since,
-    },
-  }));
-  return [...follows, ...rejected]
+    };
+    if (row.kind === "art_rejected")
+      return [
+        {
+          at: row.created_at,
+          item: { ...base, kind: row.kind, tileName: row.tile_name },
+        },
+      ];
+    if (!row.actor) return [];
+    const actor = toArtistProfile(row.actor);
+    return [
+      {
+        at: row.created_at,
+        item: {
+          ...base,
+          kind: row.kind,
+          name: actor.name,
+          username: actor.username,
+          avatarUrl: actor.avatarUrl,
+          tileId: row.tile_id,
+          tileName: row.tile_name,
+          detail: row.detail,
+        },
+      },
+    ];
+  });
+  return [...follows, ...notifications]
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .slice(0, SHOWN)
     .map((entry) => entry.item);

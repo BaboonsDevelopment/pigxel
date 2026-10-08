@@ -18,10 +18,12 @@ export function PopularCard({
   tile,
   words = [],
   delay = 0,
+  menu = [],
 }: {
   tile: PublicTile;
   words?: string[];
   delay?: number;
+  menu?: { label: string; onSelect: () => void; destructive?: boolean }[];
 }) {
   const { author } = tile;
   const router = useRouter();
@@ -78,6 +80,7 @@ export function PopularCard({
                 label: "View profile",
                 onSelect: () => router.push(`/u/${author.username}`),
               },
+              ...menu,
             ]}
           />
         </div>
@@ -121,6 +124,23 @@ export function PopularCard({
                 <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
               </svg>
               {formatCount(tile.downloads)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span aria-label="Views" className="flex items-center gap-1">
+              <svg
+                aria-hidden="true"
+                viewBox="1 3 14 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-2 w-2.5"
+              >
+                <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+                <circle cx="8" cy="8" r="2" />
+              </svg>
+              {formatCount(tile.views ?? 0)}
             </span>
           </div>
         </div>

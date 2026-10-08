@@ -4,6 +4,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { pixelifySans } from "@/lib/fonts/pixelify";
 import type { PublicTile } from "@/features/profile/profile";
+import {
+  DEFAULT_EXPORT,
+  TIMELAPSE_FPS,
+} from "@/features/editor/export/constants";
+import {
+  paint,
+  paintOrder,
+  strokesBy,
+  timelapseTiming,
+} from "@/features/editor/export/timelapse";
 import { MAX_ZOOM, MIN_ZOOM, nextZoom, type Picture } from "../helpers";
 
 type Anchor = { x: number; y: number; atX: number; atY: number };
@@ -26,6 +36,8 @@ export function ArtPreview({
   const [zoom, setZoom] = useState<number | null>(null);
   const [playing, setPlaying] = useState(true);
   const [dragging, setDragging] = useState(false);
+  const [replay, setReplay] = useState<number | null>(null);
+  const [replayed, setReplayed] = useState(0);
   const anchor = useRef<Anchor | null>(null);
   const drag = useRef<{
     x: number;
@@ -92,18 +104,56 @@ export function ArtPreview({
 
   useEffect(() => {
     const shown = picture?.frames[frame];
-    if (shown)
+    if (shown && replay === null)
       canvas.current?.getContext("2d")?.putImageData(shown.pixels, 0, 0);
-  }, [picture, frame]);
+  }, [picture, frame, replay]);
 
   useEffect(() => {
-    if (!picture?.animated || !playing) return;
+    const ctx = canvas.current?.getContext("2d");
+    const source = picture?.frames[replay ?? -1];
+    if (!picture || !source || !ctx) return;
+    const size = { w: picture.width, h: picture.height };
+    const strokes = paintOrder(
+      [source.pixels.data],
+      size,
+      DEFAULT_EXPORT.timelapseStyle,
+    );
+    const timing = timelapseTiming(DEFAULT_EXPORT.timelapseLength);
+    const end = timing.leadIn + timing.draw + timing.hold;
+    const pixels = new Uint8ClampedArray(size.w * size.h * 4);
+    const start = performance.now();
+    let painted = 0;
+    let request = 0;
+    ctx.clearRect(0, 0, size.w, size.h);
+    const tick = (now: number) => {
+      const at = Math.floor(((now - start) / 1000) * TIMELAPSE_FPS);
+      const next = strokesBy(at, timing, strokes.at.length);
+      if (next > painted) {
+        paint(pixels, strokes, painted, next);
+        ctx.putImageData(new ImageData(pixels, size.w, size.h), 0, 0);
+        painted = next;
+        setReplayed(next / strokes.at.length);
+      }
+      if (at >= end) setReplay(null);
+      else request = requestAnimationFrame(tick);
+    };
+    request = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(request);
+  }, [picture, replay]);
+
+  const toggleReplay = () => {
+    setReplayed(0);
+    setReplay(replay === null ? frame : null);
+  };
+
+  useEffect(() => {
+    if (!picture?.animated || !playing || replay !== null) return;
     const timer = setTimeout(
       () => setFrame((i) => (i + 1) % picture.frames.length),
       picture.frames[frame]!.duration,
     );
     return () => clearTimeout(timer);
-  }, [picture, frame, playing]);
+  }, [picture, frame, playing, replay]);
 
   const showFrame = (index: number) => {
     if (!picture) return;
@@ -133,6 +183,34 @@ export function ArtPreview({
           Project preview
         </span>
         <span className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          {picture && (
+            <button
+              type="button"
+              aria-label={replay === null ? "Play timelapse" : "Stop timelapse"}
+              title={replay === null ? "Watch it being drawn" : undefined}
+              aria-pressed={replay !== null}
+              onClick={toggleReplay}
+              className={cn(ICON_BUTTON, "aria-pressed:text-primary")}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="size-3.5"
+              >
+                <path d="M2.8 8a5.2 5.2 0 1 0 1.5-3.7M2.6 2.4v2.4H5" />
+                {replay === null ? (
+                  <path d="M7 5.9v4.2L10.2 8Z" fill="currentColor" />
+                ) : (
+                  <path d="M6.4 6.4h3.2v3.2H6.4Z" fill="currentColor" />
+                )}
+              </svg>
+            </button>
+          )}
           {picture?.animated && (
             <button
               type="button"
@@ -353,8 +431,9 @@ export function ArtPreview({
       )}
       <div className="flex h-8 items-center justify-between gap-3 px-3 text-[10px] text-muted-foreground">
         <span className="tabular-nums">
-          {tile.width} × {tile.height} px
-          {picture?.animated && ` · ${picture.frames.length} frames`}
+          {replay === null
+            ? `${tile.width} × ${tile.height} px${picture?.animated ? ` · ${picture.frames.length} frames` : ""}`
+            : `Timelapse · ${Math.round(replayed * 100)}%`}
         </span>
         <span className={cn(pixelifySans.className, "text-foreground")}>
           Made by {tile.author.username}

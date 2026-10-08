@@ -5,6 +5,7 @@ import { linkTitle } from "../validation";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
 import { FollowButton, FollowerCount } from "./follow-button";
 import { ProfileAvatar } from "./profile-avatar";
+import { BlockMenu } from "./block-menu";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 import { loginUrl } from "@/lib/auth/routes";
@@ -14,11 +15,13 @@ export function ProfileHeader({
   isOwner,
   guest = false,
   follows,
+  blocked = false,
 }: {
   profile: ArtistProfile;
   isOwner: boolean;
   guest?: boolean;
   follows: { followers: number; following: boolean };
+  blocked?: boolean;
 }) {
   const joined = joinedLabel(profile.joinedAt);
   const premium = profile.premiumSince && monthLabel(profile.premiumSince);
@@ -89,11 +92,27 @@ export function ProfileHeader({
                 <FollowerCount count={follows.followers} />
               </div>
             ) : (
-              <FollowButton
-                profileId={profile.id}
-                name={profile.name}
-                {...follows}
-              />
+              <div className="flex items-start gap-2">
+                {blocked ? (
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+                    <span className="flex h-10 items-center rounded-full border bg-white/80 px-6 text-sm font-medium">
+                      Blocked
+                    </span>
+                    <FollowerCount count={follows.followers} />
+                  </div>
+                ) : (
+                  <FollowButton
+                    profileId={profile.id}
+                    name={profile.name}
+                    {...follows}
+                  />
+                )}
+                <BlockMenu
+                  profileId={profile.id}
+                  username={profile.username}
+                  blocked={blocked}
+                />
+              </div>
             )}
           </div>
 
