@@ -7,8 +7,20 @@ export type EditorProps = {
   drive: DriveStatus;
   driveError?: boolean;
   guide?: string;
+  start?: string;
   canPublish?: boolean;
 };
+
+export const START_PANELS = {
+  ai: "assistant",
+  animation: "timeline",
+  tileset: "tileset",
+} as const;
+
+export type StartKind = keyof typeof START_PANELS;
+
+export const isStartKind = (value: unknown): value is StartKind =>
+  typeof value === "string" && value in START_PANELS;
 
 export type { ToolId };
 

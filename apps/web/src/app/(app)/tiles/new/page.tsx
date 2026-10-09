@@ -7,6 +7,13 @@ import { requireUser } from "@/lib/auth/session";
 import { listFolders } from "@/features/tiles/server";
 import { getDriveStatus } from "@/lib/google-drive/server";
 import { readPalette } from "@/lib/palette/presets";
+import { isStartKind, type StartKind } from "@/features/editor/constants";
+
+const START_TITLES: Record<StartKind, string> = {
+  ai: "New tile with AI",
+  animation: "New animation",
+  tileset: "New tileset",
+};
 
 export const metadata: Metadata = { title: "New tile · Pigxel" };
 export const dynamic = "force-dynamic";
@@ -22,6 +29,7 @@ export default async function NewTile({
     paletteName?: string;
     from?: string;
     folder?: string;
+    start?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -35,9 +43,12 @@ export default async function NewTile({
     params.folder ? listFolders(user.id).catch(() => []) : [],
   ]);
   const folder = folders.find((f) => f.id === params.folder);
+  const start = isStartKind(params.start) ? params.start : undefined;
   return (
     <Page>
-      <PageTitle className="mb-8">New tile</PageTitle>
+      <PageTitle className="mb-8">
+        {start ? START_TITLES[start] : "New tile"}
+      </PageTitle>
       <NewTileForm
         userId={user.id}
         drive={drive}
@@ -55,6 +66,7 @@ export default async function NewTile({
         }
         from={params.from}
         folder={folder && { id: folder.id, name: folder.name }}
+        start={start}
       />
     </Page>
   );

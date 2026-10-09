@@ -111,7 +111,14 @@ import {
   setToolShown,
   type PanelId,
 } from "../layout";
-import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
+import {
+  isStartKind,
+  START_PANELS,
+  type Command,
+  type EditorProps,
+  type OpenSource,
+  type ToolId,
+} from "../constants";
 import { isTyping, sizeKey } from "../helpers";
 import {
   actionFor,
@@ -223,6 +230,7 @@ export function Editor({
   drive,
   driveError,
   guide,
+  start,
   canPublish,
   draft,
   image,
@@ -282,7 +290,10 @@ export function Editor({
   const [exportSettings, setExportSettings] =
     useState<ExportSettings>(DEFAULT_EXPORT);
   const [tool, setTool] = useState<ToolId>("pen");
-  const [layout, setLayout] = useEditorLayout(userId);
+  const [layout, setLayout] = useEditorLayout(
+    userId,
+    isStartKind(start) ? START_PANELS[start] : undefined,
+  );
   const panelDrag = usePanelDrag(
     (id, target) => setLayout((l) => movePanel(l, id, target)),
     (id, target) => movesPanel(layout, id, target),
@@ -309,7 +320,13 @@ export function Editor({
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
-  const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
+  const [tiling, setTiling] = useState<{ convert: boolean } | null>(() =>
+    start === "tileset" ? { convert: false } : null,
+  );
+  const [startedWith] = useState(start);
+  useEffect(() => {
+    if (isStartKind(start)) router.replace(editorUrl(draft.id));
+  }, [start, router, draft.id]);
   const [stamp, setStamp] = useState<Stamp | null>(null);
   const [brushes, setBrushes] = useState(() => readBrushes(userId));
   const changeBrushes = (next: SavedBrush[]) => {
@@ -1311,6 +1328,7 @@ export function Editor({
       fill: true,
       body: (
         <EditorChat
+          autoFocus={startedWith === "ai"}
           canvas={canvas}
           sprite={sprite}
           playback={playback}

@@ -26,6 +26,7 @@ import {
   blankDocument,
   serializePigxel,
   type Background,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
 import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
@@ -34,6 +35,8 @@ import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
 import type { TileLocation } from "@/lib/pigxel-file/location";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { useIsClient } from "@/lib/utils/use-is-client";
+import { createFrame } from "@/lib/sprite/frames";
+import type { StartKind } from "@/features/editor/constants";
 
 type Storage = "cloud" | "drive" | "none";
 
@@ -61,6 +64,7 @@ type FormProps = {
   customPalette?: PalettePreset | null;
   from?: string;
   folder?: { id: string; name: string };
+  start?: StartKind;
 };
 
 export function NewTileForm({
@@ -88,6 +92,7 @@ function Form({
   driveError,
   from,
   folder,
+  start,
   asset,
   palette,
 }: Omit<FormProps, "asset" | "paletteId" | "customPalette"> & {
@@ -126,6 +131,7 @@ function Form({
       return;
     }
     if (palette && !asset) image.palette = [...palette.colors];
+    if (start === "animation" && !asset) image = withFrames(image, 4);
     const file = serializePigxel(image);
     let location: TileLocation | null = null;
     try {
@@ -173,7 +179,9 @@ function Form({
       return;
     }
     if (from) openTabAfter(userId, draft.id, from);
-    router.push(editorUrl(draft.id));
+    router.push(
+      start ? `${editorUrl(draft.id)}&start=${start}` : editorUrl(draft.id),
+    );
   };
 
   return (
@@ -422,4 +430,25 @@ function StartingAsset({ asset }: { asset: Asset }) {
       </div>
     </Field>
   );
+}
+
+function withFrames(doc: PigxelDocument, count: number): PigxelDocument {
+  const first = doc.frames[0]!;
+  const base = doc.cels.get(first.id) ?? new Map();
+  const frames = [
+    first,
+    ...Array.from({ length: count - 1 }, () => createFrame(first.duration)),
+  ];
+  const cels = new Map(doc.cels);
+  for (const frame of frames.slice(1))
+    cels.set(
+      frame.id,
+      new Map(
+        [...base].map(([layer, pixels]) => [
+          layer,
+          new Uint8ClampedArray(pixels),
+        ]),
+      ),
+    );
+  return { ...doc, frames, cels };
 }
