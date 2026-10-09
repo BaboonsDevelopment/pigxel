@@ -83,6 +83,9 @@ import { markTileOpened } from "@/features/tiles/actions";
 import { writeMark } from "@/features/tiles/local-marks";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { useProjectAccess } from "@/features/sharing/queries";
+import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
 import type { PublishTile } from "@/features/explore/components/explore-header/components/publish-dialog";
 import {
@@ -204,6 +207,13 @@ const PublishArtDialog = dynamic(
     ),
   { ssr: false },
 );
+const ShareDialog = dynamic(
+  () =>
+    import("@/features/sharing/components/share-dialog/share-dialog").then(
+      (m) => m.ShareDialog,
+    ),
+  { ssr: false },
+);
 const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
@@ -260,6 +270,9 @@ export function Editor({
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
+  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [explore, setExplore] = useState<{
     tileId: string;
     published: boolean;
@@ -350,8 +363,28 @@ export function Editor({
   }, [cloudTileId]);
   const published =
     !!cloudTileId && explore?.tileId === cloudTileId && explore.published;
+  const access = useProjectAccess(cloudTileId ?? null);
+  const owner = !cloudTileId || access === undefined || access === "owner";
+  const heldBy = useEditLock(
+    cloudTileId && (access === "owner" || access === "editor")
+      ? cloudTileId
+      : null,
+  );
+  const removed = !!cloudTileId && access === null;
+  const { setPause } = file;
+  useEffect(
+    () =>
+      setPause(
+        removed
+          ? "You no longer have access to this project, so it’s view-only now."
+          : heldBy
+            ? `${heldBy} is editing now. Your changes here won’t be saved.`
+            : null,
+      ),
+    [setPause, removed, heldBy],
+  );
 
-  const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
   const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
   const [seenLayers, setSeenLayers] = useState(layerIds);
   if (seenLayers.join() !== layerIds.join()) {
@@ -1347,8 +1380,9 @@ export function Editor({
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         explorePublished={published}
+        renameLocked={!owner}
         onPublishArt={
-          cloudTile || !file.location
+          owner && (cloudTile || !file.location)
             ? async () => {
                 const target = cloudTile ?? (await file.saveToCloudFirst());
                 if (!target) return;
@@ -1360,6 +1394,22 @@ export function Editor({
                   height: image.height,
                   thumbnail: thumbnailDataUrl(image),
                 });
+              }
+            : undefined
+        }
+        onShare={
+          owner && (cloudTile || !file.location)
+            ? async () => {
+                if (cloudTile)
+                  return setSharing({ id: cloudTile.id, name: file.name });
+                const confirmed = await confirmDialog({
+                  title: "Save to Pigxel cloud first?",
+                  message: `Only cloud projects can be shared, so “${file.name}” will be saved to Pigxel cloud first.`,
+                  confirmLabel: "Save and share",
+                });
+                if (!confirmed) return;
+                const target = await file.saveToCloudFirst();
+                if (target) setSharing({ id: target.id, name: file.name });
               }
             : undefined
         }
@@ -1486,6 +1536,9 @@ export function Editor({
           }
           onClose={() => setPublishingArt(null)}
         />
+      )}
+      {sharing && (
+        <ShareDialog tile={sharing} onClose={() => setSharing(null)} />
       )}
       {publishing && (
         <PublishAssetDialog

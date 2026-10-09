@@ -58,3 +58,16 @@ export function LabelBadge({ label }: { label: Label }) {
     </span>
   );
 }
+
+export function RoleBadge({ label }: { label: string }) {
+  return (
+    <span
+      className={cn(
+        pixelifySans.className,
+        "flex h-6 items-center rounded-md border border-black/5 bg-white/95 px-2 text-xs text-foreground shadow-sm",
+      )}
+    >
+      {label}
+    </span>
+  );
+}

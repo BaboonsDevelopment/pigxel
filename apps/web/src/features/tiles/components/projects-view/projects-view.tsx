@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
@@ -30,6 +29,7 @@ import {
 import { ProjectsHeader } from "./components/projects-header";
 import { RecentRow } from "./components/recent-row";
 import { SectionHeader } from "./components/section-header";
+import { SharedProjects } from "./components/shared-projects";
 import {
   NO_PROJECT_FILTERS,
   filtersKey,
@@ -254,10 +254,7 @@ export function ProjectsView({
         />
       )}
       {filter === "Shared" && (
-        <EmptyState
-          title="Nothing here yet"
-          description="This section is coming soon."
-        />
+        <SharedProjects userId={userId} query={query} grid={GRID} />
       )}
       {creating && <FolderNameDialog onClose={() => setCreating(false)} />}
     </ProjectDragProvider>

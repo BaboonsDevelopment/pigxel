@@ -37,6 +37,8 @@ export function EditorHeader({
   onExport,
   onPublish,
   onPublishArt,
+  onShare,
+  renameLocked = false,
   explorePublished = false,
   onImportSheet,
   onTilemap,
@@ -56,6 +58,8 @@ export function EditorHeader({
   onExport: () => void;
   onPublish?: () => void;
   onPublishArt?: () => void;
+  onShare?: () => void;
+  renameLocked?: boolean;
   explorePublished?: boolean;
   onImportSheet: () => void;
   onTilemap: (convert: boolean) => void;
@@ -187,6 +191,10 @@ export function EditorHeader({
         <InputGroupInput
           aria-label="File name"
           value={file.name}
+          readOnly={renameLocked}
+          title={
+            renameLocked ? "Only the owner can rename this project" : undefined
+          }
           onChange={(e) => file.rename(e.target.value)}
           maxLength={100}
           className="w-40 px-2"
@@ -250,7 +258,20 @@ export function EditorHeader({
           Google Drive · {drive.email ?? "connected"}
         </p>
       )}
-      <TokensButton className={drive.connected ? undefined : "ml-auto"} />
+      {onShare && (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onShare}
+          className={drive.connected ? undefined : "ml-auto"}
+        >
+          Share…
+        </Button>
+      )}
+      <TokensButton
+        className={drive.connected || onShare ? undefined : "ml-auto"}
+      />
     </header>
   );
 }
