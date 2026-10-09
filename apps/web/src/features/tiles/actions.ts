@@ -449,28 +449,44 @@ type StatsRow = {
   downloads: { total: number } | null;
 };
 
+const STATS_COLUMNS =
+  "id, name, thumbnail, likes:tile_likes(count), comments:tile_comments(count), views:tile_views(total), downloads:tile_downloads(total)";
+
+const toArtStats = (row: StatsRow): ArtStats => ({
+  id: row.id,
+  name: row.name,
+  thumbnail: row.thumbnail,
+  views: Number(row.views?.total ?? 0),
+  likes: row.likes[0]?.count ?? 0,
+  downloads: Number(row.downloads?.total ?? 0),
+  comments: row.comments[0]?.count ?? 0,
+});
+
+export async function loadProfileStats(profileId: string): Promise<ArtStats[]> {
+  if (!UUID.test(profileId)) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select(STATS_COLUMNS)
+    .eq("user_id", profileId)
+    .eq("visibility", "public")
+    .is("deleted_at", null);
+  if (error) throw new Error("Couldn’t load statistics. Try again.");
+  return (data as unknown as StatsRow[]).map(toArtStats);
+}
+
 export async function loadArtStats(tileId?: string): Promise<ArtStats[]> {
   const user = await requireUser();
   if (tileId !== undefined && !UUID.test(tileId)) return [];
   const supabase = await createClient();
   const base = supabase
     .from("tiles")
-    .select(
-      "id, name, thumbnail, likes:tile_likes(count), comments:tile_comments(count), views:tile_views(total), downloads:tile_downloads(total)",
-    )
+    .select(STATS_COLUMNS)
     .eq("user_id", user.id)
     .or("visibility.eq.public,review.eq.pending")
     .is("deleted_at", null)
     .order("updated_at", { ascending: false });
   const { data, error } = await (tileId ? base.eq("id", tileId) : base);
   if (error) throw new Error("Couldn’t load statistics. Try again.");
-  return (data as unknown as StatsRow[]).map((row) => ({
-    id: row.id,
-    name: row.name,
-    thumbnail: row.thumbnail,
-    views: Number(row.views?.total ?? 0),
-    likes: row.likes[0]?.count ?? 0,
-    downloads: Number(row.downloads?.total ?? 0),
-    comments: row.comments[0]?.count ?? 0,
-  }));
+  return (data as unknown as StatsRow[]).map(toArtStats);
 }

@@ -11,7 +11,7 @@ import { EditorSelect } from "@/features/editor/components/editor-select";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { searchPeople } from "../../../actions";
 import type { PersonMatch, SharePerson, ShareRole } from "../../../sharing";
-import { PILL, ROLE_OPTIONS } from "../constants";
+import { ACTION_WIDTH, PILL, PILL_WIDTH, ROLE_OPTIONS } from "../constants";
 
 const ROW_HEIGHT = 44;
 const VISIBLE_ROWS = 4.5;
@@ -174,9 +174,13 @@ export function InviteForm({
           value={role}
           options={ROLE_OPTIONS}
           onChange={(value) => setRole(value as ShareRole)}
-          className={cn(PILL, "w-24")}
+          className={cn(PILL, PILL_WIDTH)}
         />
-        <Button type="submit" disabled={inviting || !username.trim()}>
+        <Button
+          type="submit"
+          disabled={inviting || !username.trim()}
+          className={ACTION_WIDTH}
+        >
           {inviting ? "Inviting…" : "Invite"}
         </Button>
       </form>

@@ -6,11 +6,7 @@ import { PixelImage } from "@/components/ui/pixel-image";
 import { pixelifySans } from "@/lib/fonts/pixelify";
 import type { Folder, FolderProject } from "../../../folders";
 import { useFolderDropTarget } from "../drag/project-drag";
-import type { useFolderSort } from "../drag/use-folder-sort";
-
-type FolderSortProps = ReturnType<
-  ReturnType<typeof useFolderSort>["itemProps"]
->;
+import type { SortProps } from "../drag/use-sortable";
 import { editedAgo } from "../helpers";
 
 const DECK = [
@@ -28,7 +24,7 @@ export function FolderCard({
   folder: Folder;
   opening: string | null;
   onOpen: (project: FolderProject) => void;
-  sort: FolderSortProps;
+  sort: SortProps;
 }) {
   const { lifted, ...sortProps } = sort;
   const { dragging, over, targetProps } = useFolderDropTarget(folder.id);

@@ -7,6 +7,7 @@ import {
   DialogFooter,
   DialogHeader,
 } from "@pigxel/ui/components/dialog";
+import { cn } from "@pigxel/ui/lib/utils";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
@@ -15,7 +16,7 @@ import { InviteForm } from "./components/invite-form";
 import { LinkAccessSection } from "./components/link-access-section";
 import { PersonRow } from "./components/person-row";
 import { ShareBadge } from "./components/share-badge";
-import { ROW, SECTION_TITLE } from "./constants";
+import { ACTION_WIDTH, PILL_WIDTH, ROW, SECTION_TITLE } from "./constants";
 
 export function ShareDialog({
   tile,
@@ -57,14 +58,19 @@ export function ShareDialog({
           <ul className="-mx-2 grid gap-0.5">
             <li className={ROW}>
               <ProfileAvatar name="You" url={null} className="size-8 text-xs" />
-              <span className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="ml-1 flex min-w-0 flex-1 items-center gap-2">
                 <span className="text-sm font-medium">You</span>
                 <ShareBadge tone="owner">Owner</ShareBadge>
               </span>
-              <span className="w-24 shrink-0 px-3 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  PILL_WIDTH,
+                  "shrink-0 px-3 text-xs text-muted-foreground",
+                )}
+              >
                 Full access
               </span>
-              <span aria-hidden="true" className="-mr-1 size-8 shrink-0" />
+              <span aria-hidden="true" className={ACTION_WIDTH} />
             </li>
             {share.loading && (
               <li className="mx-2 h-12 animate-pulse rounded-lg bg-muted" />

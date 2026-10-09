@@ -25,52 +25,7 @@ const shortDate = (time: number) =>
     timeZone: "UTC",
   });
 
-export function ProfileStats({
-  activity,
-  artCount,
-  publishedCount,
-}: {
-  activity: ProfileActivity;
-  artCount: number;
-  publishedCount?: number;
-}) {
-  return (
-    <section
-      aria-label="Activity"
-      className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_15rem]"
-    >
-      <ActivityCard activity={activity} />
-      <div className="flex flex-col justify-between gap-6 rounded-2xl border bg-linear-160 from-[#fff4f7] to-[#fbe4ec] p-5 lg:aspect-square">
-        <span
-          aria-hidden="true"
-          className="flex size-11 items-center justify-center rounded-xl bg-primary text-white shadow-[0_6px_16px_-8px_var(--color-primary)]"
-        >
-          <FrameIcon />
-        </span>
-        <div>
-          <Text tone="muted">Total arts</Text>
-          <Heading
-            as="p"
-            size="display"
-            className="mt-1 text-5xl tabular-nums sm:text-5xl"
-          >
-            {artCount}
-          </Heading>
-          {publishedCount !== undefined && (
-            <Text size="xs" tone="muted" className="mt-1">
-              <span className="font-semibold text-success tabular-nums">
-                {publishedCount}
-              </span>{" "}
-              published
-            </Text>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ActivityCard({
+export function ActivityHeatmap({
   activity: { days: activity, today },
 }: {
   activity: ProfileActivity;
@@ -106,7 +61,10 @@ function ActivityCard({
   });
 
   return (
-    <div className={cardVariants({ className: "min-w-0" })}>
+    <section
+      aria-label="Activity"
+      className={cardVariants({ className: "mt-8 w-fit max-w-full min-w-0" })}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <Heading>Daily activity</Heading>
         <Text size="xs" tone="muted">
@@ -174,7 +132,7 @@ function ActivityCard({
         ))}
         More
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -195,20 +153,5 @@ function Stat({ value, label }: { value: number; label: string }) {
       </span>{" "}
       {label}
     </>
-  );
-}
-
-function FrameIcon() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="size-5"
-      fill="currentColor"
-      shapeRendering="crispEdges"
-    >
-      <path d="M2 2h12v12H2zm2 2v8h8V4z" />
-      <path d="M5 10h2V8h1v1h1V7h1v1h1v2H5z" />
-      <path d="M5 5h2v2H5z" />
-    </svg>
   );
 }

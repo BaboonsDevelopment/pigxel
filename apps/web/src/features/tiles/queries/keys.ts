@@ -16,6 +16,8 @@ export const projectKeys = {
   savedAll: () => [...projectKeys.all, "saved"] as const,
   labels: () => [...projectKeys.all, "labels"] as const,
   shared: () => [...projectKeys.all, "shared"] as const,
+  profileStats: (profileId: string) =>
+    [...projectKeys.all, "profile-stats", profileId] as const,
   stats: (tileId: string | null) =>
     [...projectKeys.all, "stats", tileId ?? "all"] as const,
 };

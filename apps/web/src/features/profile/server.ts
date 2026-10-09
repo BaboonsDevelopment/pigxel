@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   PROFILE_COLUMNS,
+  PROFILE_PAGE_COLUMNS,
+  ARTS_PAGE,
+  NO_ARTS_QUERY,
+  type ArtsKind,
+  type ArtsQuery,
   avatarUrlOf,
   toArtistProfile,
   type ArtistProfile,
@@ -26,6 +31,8 @@ type TileRow = {
   pin_order: number | null;
   updated_at: string;
   review?: string | null;
+  likes?: { count: number }[];
+  views?: { total: number } | null;
 };
 
 export const getOwnProfile = cache(
@@ -34,7 +41,7 @@ export const getOwnProfile = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select(PROFILE_COLUMNS)
+      .select(PROFILE_PAGE_COLUMNS)
       .eq("id", userId)
       .maybeSingle<ProfileRow>();
     if (error) console.error("Couldn’t load your profile:", error.message);
@@ -63,12 +70,14 @@ type ProfileLookup =
   | { kind: "private" }
   | { kind: "missing" };
 
-export async function findProfile(username: string): Promise<ProfileLookup> {
+export const findProfile = cache(async function findProfile(
+  username: string,
+): Promise<ProfileLookup> {
   if (!isSupabaseConfigured()) return { kind: "missing" };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select(PROFILE_COLUMNS)
+    .select(PROFILE_PAGE_COLUMNS)
     .eq("username", username)
     .maybeSingle<ProfileRow>();
   if (error) throw new Error(`Couldn’t load @${username}: ${error.message}`);
@@ -80,7 +89,7 @@ export async function findProfile(username: string): Promise<ProfileLookup> {
   if (rpcError)
     throw new Error(`Couldn’t load @${username}: ${rpcError.message}`);
   return isPrivate === true ? { kind: "private" } : { kind: "missing" };
-}
+});
 
 export async function listProfileTiles(
   userId: string,
@@ -89,7 +98,7 @@ export async function listProfileTiles(
   const { data, count, error } = await supabase
     .from("tiles")
     .select(
-      "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at",
+      "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, likes:tile_likes(count), views:tile_views(total)",
       { count: "exact" },
     )
     .eq("user_id", userId)
@@ -100,7 +109,7 @@ export async function listProfileTiles(
   if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map(toProfileTile),
+    tiles: (data as unknown as TileRow[]).map(toProfileTile),
   };
 }
 
@@ -114,6 +123,8 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
   inReview: row.review === "pending",
   pinOrder: row.pin_order,
   updatedAt: row.updated_at,
+  ...(row.likes && { likes: row.likes[0]?.count ?? 0 }),
+  ...(row.views !== undefined && { views: Number(row.views?.total ?? 0) }),
 });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -427,14 +438,18 @@ export async function listMoreByAuthor(
 export async function getFollowStats(
   profileId: string,
   viewerId: string | null,
-): Promise<{ followers: number; following: boolean }> {
+): Promise<{ followers: number; followed: number; following: boolean }> {
   const supabase = await createClient();
-  const [all, mine] = await Promise.all([
+  const [all, followed, mine] = await Promise.all([
     // Guests may only read followee_id, which is enough to count.
     supabase
       .from("follows")
       .select("followee_id", { count: "exact", head: true })
       .eq("followee_id", profileId),
+    supabase
+      .from("follows")
+      .select("followee_id", { count: "exact", head: true })
+      .eq("follower_id", profileId),
     viewerId
       ? supabase
           .from("follows")
@@ -444,7 +459,11 @@ export async function getFollowStats(
           .maybeSingle()
       : { data: null },
   ]);
-  return { followers: all.count ?? 0, following: Boolean(mine.data) };
+  return {
+    followers: all.count ?? 0,
+    followed: followed.count ?? 0,
+    following: Boolean(mine.data),
+  };
 }
 
 export async function hasBlocked(
@@ -460,6 +479,155 @@ export async function hasBlocked(
     .eq("blocked_id", profileId)
     .maybeSingle();
   return Boolean(data);
+}
+
+const ART_COLUMNS =
+  "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, likes:tile_likes(count), views:tile_views(total)";
+
+async function rankedPublished(
+  profileId: string,
+  query: ArtsQuery,
+  from: number,
+): Promise<{ tiles: ProfileTile[]; count: number }> {
+  const supabase = await createClient();
+  const counting = supabase
+    .from("tiles")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", profileId)
+    .eq("visibility", "public")
+    .is("deleted_at", null);
+  const [ranked, total] = await Promise.all([
+    supabase.rpc("profile_arts_ranked", {
+      profile: profileId,
+      sort: query.sort,
+      tag: query.tag,
+      skip: from,
+      take: ARTS_PAGE,
+    }),
+    query.tag ? counting.contains("tags", [query.tag]) : counting,
+  ]);
+  if (ranked.error || total.error)
+    throw new Error("Couldn’t load arts. Try again.");
+  const ids = (ranked.data as { id: string }[]).map((row) => row.id);
+  if (ids.length === 0) return { tiles: [], count: total.count ?? 0 };
+  const { data, error } = await supabase
+    .from("tiles")
+    .select(ART_COLUMNS)
+    .in("id", ids);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  const byId = new Map(
+    (data as unknown as TileRow[]).map((row) => [row.id, toProfileTile(row)]),
+  );
+  return {
+    count: total.count ?? ids.length,
+    tiles: ids.flatMap((id) => {
+      const tile = byId.get(id);
+      return tile ? [{ ...tile, pinOrder: null }] : [];
+    }),
+  };
+}
+
+export async function listProfileTags(profileId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select("tags")
+    .eq("user_id", profileId)
+    .eq("visibility", "public")
+    .is("deleted_at", null)
+    .limit(500);
+  if (error) return [];
+  const counts = new Map<string, number>();
+  for (const row of data as { tags: string[] | null }[])
+    for (const tag of row.tags ?? [])
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 30)
+    .map(([tag]) => tag);
+}
+
+export async function listProfileArts(
+  profileId: string,
+  kind: ArtsKind,
+  from = 0,
+  query: ArtsQuery = NO_ARTS_QUERY,
+): Promise<{ tiles: ProfileTile[]; count: number }> {
+  if (kind === "published" && query.sort !== "newest")
+    return rankedPublished(profileId, query, from);
+  const supabase = await createClient();
+  const to = from + ARTS_PAGE - 1;
+  if (kind === "published" || kind === "drafts") {
+    const all = supabase
+      .from("tiles")
+      .select(ART_COLUMNS, { count: "exact" })
+      .eq("user_id", profileId)
+      .is("deleted_at", null);
+    const base =
+      kind === "published" && query.tag
+        ? all.contains("tags", [query.tag])
+        : all;
+    const { data, count, error } = await (
+      kind === "published"
+        ? base.or("visibility.eq.public,review.eq.pending")
+        : base
+            .eq("visibility", "private")
+            .or("review.is.null,review.neq.pending")
+    )
+      .order("pin_order", { ascending: true, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .order("id")
+      .range(from, to);
+    if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+    return {
+      count: count ?? data.length,
+      tiles: (data as unknown as TileRow[]).map(toProfileTile),
+    };
+  }
+  const { data, count, error } = await supabase
+    .from(kind === "liked" ? "tile_likes" : "saved_tiles")
+    .select(`created_at, tile:tiles!inner(${ART_COLUMNS})`, {
+      count: "exact",
+    })
+    .eq("user_id", profileId)
+    .eq("tile.visibility", "public")
+    .order("created_at", { ascending: false })
+    .order("tile_id")
+    .range(from, to);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  return {
+    count: count ?? data.length,
+    tiles: (data as unknown as { tile: TileRow }[]).map((row) => ({
+      ...toProfileTile(row.tile),
+      pinOrder: null,
+    })),
+  };
+}
+
+const SHOWN = 120;
+
+export async function listFollows(
+  profileId: string,
+  side: "followers" | "followed",
+): Promise<{ people: ArtistProfile[]; count: number }> {
+  const supabase = await createClient();
+  const embed =
+    side === "followed"
+      ? "person:profiles!follows_followee_id_fkey"
+      : "person:profiles!follows_follower_id_fkey";
+  const { data, count, error } = await supabase
+    .from("follows")
+    .select(`created_at, ${embed}(${PROFILE_COLUMNS})`, { count: "exact" })
+    .eq(side === "followed" ? "follower_id" : "followee_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(SHOWN);
+  if (error) throw new Error(`Couldn’t load artists: ${error.message}`);
+  return {
+    count: count ?? data.length,
+    people: (data as unknown as { person: ProfileRow | null }[]).flatMap(
+      (row) => (row.person ? [toArtistProfile(row.person)] : []),
+    ),
+  };
 }
 
 export type ProfileActivity = {

@@ -12,7 +12,7 @@ import { listParams } from "../../queries/keys";
 import { useLabels, useSetLabels } from "../../queries/labels";
 import { useMoveProjects } from "../../queries/move-projects";
 import { reorderFolders } from "../../actions";
-import { useFolderSort } from "./drag/use-folder-sort";
+import { useSortable } from "./drag/use-sortable";
 import { ProjectDragProvider } from "./drag/project-drag";
 import { useSeedProjectCache } from "../../queries/seed";
 import { useCloudTileActions } from "../../tile-actions";
@@ -89,13 +89,13 @@ export function ProjectsView({
   const folderTiles = useCloudTileActions(userId);
   const moveProjects = useMoveProjects();
   const [reorderError, setReorderError] = useState<string | null>(null);
-  const folderOrder = useFolderSort(folders, (ids) => {
+  const folderOrder = useSortable(folders, (ids) => {
     setReorderError(null);
     void reorderFolders(ids).then((result) =>
       setReorderError(result.error ?? null),
     );
   });
-  const sortedFolders = folderOrder.folders;
+  const sortedFolders = folderOrder.items;
   const drop = (ids: string[], folderId: string) =>
     moveProjects.mutate({ ids, folderId });
 

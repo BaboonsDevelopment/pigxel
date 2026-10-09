@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
-import { setBlocked } from "../actions";
+import { reportProfile, setBlocked } from "../actions";
 
 export function BlockMenu({
   profileId,
@@ -17,6 +17,24 @@ export function BlockMenu({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [reported, setReported] = useState(false);
+
+  const report = async () => {
+    const confirmed = await confirmDialog({
+      title: `Report @${username}?`,
+      message:
+        "We’ll take a look at this profile. They won’t know who reported them.",
+      confirmLabel: "Report",
+    });
+    if (!confirmed) return;
+    setError(null);
+    setReported(true);
+    const result = await reportProfile(profileId);
+    if (result.error) {
+      setReported(false);
+      setError(result.error);
+    }
+  };
 
   const change = async (next: boolean) => {
     if (
@@ -43,6 +61,12 @@ export function BlockMenu({
         placement="down"
         disabled={pending}
         items={[
+          {
+            label: reported ? "Reported · thanks" : `Report @${username}…`,
+            onSelect: () => {
+              if (!reported) void report();
+            },
+          },
           blocked
             ? {
                 label: `Unblock @${username}`,

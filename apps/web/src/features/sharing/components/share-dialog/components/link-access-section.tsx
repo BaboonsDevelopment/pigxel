@@ -11,7 +11,7 @@ import {
   type LinkAccess,
 } from "../../../sharing";
 import { EditorSelect } from "@/features/editor/components/editor-select";
-import { PILL, SECTION_TITLE } from "../constants";
+import { ACTION_WIDTH, PILL, PILL_WIDTH, SECTION_TITLE } from "../constants";
 
 const LINK_OPTIONS = LINK_ACCESS.map((access) => ({
   value: access,
@@ -56,20 +56,10 @@ export function LinkAccessSection({
 
   return (
     <section aria-labelledby="share-link" className="border-t pt-5">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <h3 id="share-link" className={cn(SECTION_TITLE, "mb-0 mr-auto")}>
           Link access
         </h3>
-        {link.access !== "off" && (
-          <button
-            type="button"
-            disabled={resetting}
-            onClick={() => void reset()}
-            className="cursor-pointer text-xs text-link-accent transition-colors hover:text-lavender-foreground disabled:opacity-50"
-          >
-            Reset link
-          </button>
-        )}
         <EditorSelect
           ariaLabel="Link access"
           value={link.access}
@@ -77,11 +67,23 @@ export function LinkAccessSection({
           onChange={(value) => onAccessChange(value as LinkAccess)}
           className={cn(
             PILL,
-            "w-auto",
+            PILL_WIDTH,
             link.access === "off" &&
               "bg-secondary text-muted-foreground hover:bg-muted",
           )}
         />
+        <span className={cn(ACTION_WIDTH, "flex justify-end")}>
+          {link.access !== "off" && (
+            <button
+              type="button"
+              disabled={resetting}
+              onClick={() => void reset()}
+              className="cursor-pointer text-xs text-link-accent transition-colors hover:text-lavender-foreground disabled:opacity-50"
+            >
+              Reset link
+            </button>
+          )}
+        </span>
       </div>
       {link.access !== "off" && (
         <div className="mt-2 flex gap-2 animate-in fade-in duration-150">
@@ -93,7 +95,7 @@ export function LinkAccessSection({
             variant="secondary"
             disabled={!url}
             onClick={() => void copy()}
-            className="w-28"
+            className={ACTION_WIDTH}
           >
             {copied ? "Copied" : "Copy link"}
           </Button>

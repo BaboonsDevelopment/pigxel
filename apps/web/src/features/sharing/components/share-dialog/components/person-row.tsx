@@ -4,7 +4,13 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { EditorSelect } from "@/features/editor/components/editor-select";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { SharePerson, ShareRole } from "../../../sharing";
-import { PILL, ROLE_OPTIONS, ROW } from "../constants";
+import {
+  ACTION_WIDTH,
+  PILL,
+  PILL_WIDTH,
+  ROLE_OPTIONS,
+  ROW,
+} from "../constants";
 import { ShareBadge } from "./share-badge";
 
 const REMOVE = "remove";
@@ -31,7 +37,7 @@ export function PersonRow({
         url={person.avatarUrl}
         className="size-8 text-xs"
       />
-      <span className="flex min-w-0 flex-1 items-center gap-2">
+      <span className="ml-1 flex min-w-0 flex-1 items-center gap-2">
         <span className="truncate text-sm font-medium">{person.name}</span>
         <span className="truncate text-xs text-muted-foreground">
           @{person.username}
@@ -49,28 +55,30 @@ export function PersonRow({
         onChange={(value) =>
           value === REMOVE ? onRemove() : onRoleChange(value as ShareRole)
         }
-        className={cn(PILL, "w-24")}
+        className={cn(PILL, PILL_WIDTH)}
       />
-      <button
-        type="button"
-        aria-label={`${removeLabel}: ${person.name}`}
-        title={removeLabel}
-        onClick={onRemove}
-        className="-mr-1 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-background hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-3.5"
+      <span className={cn(ACTION_WIDTH, "flex justify-end")}>
+        <button
+          type="button"
+          aria-label={`${removeLabel}: ${person.name}`}
+          title={removeLabel}
+          onClick={onRemove}
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-background hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
         >
-          <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
-        </svg>
-      </button>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-3.5"
+          >
+            <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
+          </svg>
+        </button>
+      </span>
     </li>
   );
 }

@@ -15,16 +15,24 @@ export type ProfileRow = {
   visibility: Visibility;
   created_at: string;
   premium_since: string | null;
+  location?: string;
+  cover_path?: string | null;
+  show_activity?: boolean;
 };
 
 export const PROFILE_COLUMNS =
   "id, username, display_name, bio, links, avatar_kind, provider_avatar_url, avatar_path, visibility, created_at, premium_since";
+
+export const PROFILE_PAGE_COLUMNS = `${PROFILE_COLUMNS}, location, cover_path, show_activity`;
 
 export type ArtistProfile = {
   id: string;
   username: string;
   name: string;
   bio: string;
+  location: string;
+  coverUrl: string | null;
+  showActivity: boolean;
   links: ProfileLink[];
   avatarKind: AvatarKind;
   avatarUrl: string | null;
@@ -36,6 +44,31 @@ export type ArtistProfile = {
 
 export const MAX_PINS = 4;
 
+export const ARTS_PAGE = 40;
+
+export type ArtsKind = "published" | "drafts" | "liked" | "saved";
+
+export const ART_SORTS = [
+  { value: "newest", label: "Newest" },
+  { value: "likes", label: "Most liked" },
+  { value: "downloads", label: "Most downloaded" },
+] as const;
+
+export type ArtSort = (typeof ART_SORTS)[number]["value"];
+
+export type ArtsQuery = { sort: ArtSort; tag: string | null };
+
+export const NO_ARTS_QUERY: ArtsQuery = { sort: "newest", tag: null };
+
+const TAG = /^[\p{L}\p{N} _-]{1,40}$/u;
+
+export function readArtsQuery(sort?: string, tag?: string): ArtsQuery {
+  return {
+    sort: ART_SORTS.find((s) => s.value === sort)?.value ?? "newest",
+    tag: tag && TAG.test(tag) ? tag : null,
+  };
+}
+
 export type ProfileTile = {
   id: string;
   name: string;
@@ -46,6 +79,8 @@ export type ProfileTile = {
   inReview?: boolean;
   pinOrder: number | null;
   updatedAt: string;
+  likes?: number;
+  views?: number;
 };
 
 export type TileAuthor = {
@@ -96,6 +131,9 @@ export function toArtistProfile(row: ProfileRow): ArtistProfile {
     username: row.username,
     name: row.display_name,
     bio: row.bio,
+    location: row.location ?? "",
+    coverUrl: row.cover_path ? uploadedAvatarUrl(row.cover_path) : null,
+    showActivity: row.show_activity ?? true,
     links: readLinks(row.links),
     avatarKind: row.avatar_kind,
     avatarUrl,

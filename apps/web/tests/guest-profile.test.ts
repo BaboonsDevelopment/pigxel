@@ -14,6 +14,7 @@ vi.mock("next/font/google", () => ({
   Silkscreen: () => ({ style: {} }),
   Press_Start_2P: () => ({ style: {} }),
   Pixelify_Sans: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
 }));
@@ -36,6 +37,7 @@ vi.mock("@/features/profile/server", () => ({
       username: "pixel_pig",
       name: "Pixel Pig",
       bio: "I draw pigs.",
+      location: "",
       links: [],
       avatarUrl: null,
       visibility: "public",
@@ -43,9 +45,11 @@ vi.mock("@/features/profile/server", () => ({
       premiumSince: null,
     },
   }),
-  listProfileTiles: mocks.tiles,
-  getFollowStats: mocks.follows,
+  listProfileArts: mocks.tiles,
+  listProfileTags: async () => [],
   getProfileActivity: async () => ({ days: new Map(), today: Date.now() }),
+  listFollows: async () => ({ people: [], count: 0 }),
+  getFollowStats: mocks.follows,
   hasBlocked: async () => false,
 }));
 
@@ -60,7 +64,11 @@ const render = async () =>
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.follows.mockResolvedValue({ followers: 3, following: false });
+  mocks.follows.mockResolvedValue({
+    followers: 3,
+    followed: 2,
+    following: false,
+  });
   mocks.tiles.mockResolvedValue({ tiles: [], count: 0 });
 });
 
