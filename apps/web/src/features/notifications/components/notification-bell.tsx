@@ -7,6 +7,7 @@ import { openNotifications } from "../actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { ActivityKind, AppNotification } from "../server";
 import { BellIcon } from "@/components/ui/icons";
+import { InviteNotification } from "./invite-notification";
 
 export function NotificationBell({
   unread: initialUnread,
@@ -91,80 +92,106 @@ export function NotificationBell({
               <Message>Loading…</Message>
             ) : items.length === 0 ? (
               <Message>
-                Nothing yet. When someone follows you or likes, comments on,
-                saves, remixes or downloads your art, you’ll see it here.
+                Nothing yet. When someone follows you, shares a project with
+                you, or likes, comments on, saves, remixes or downloads your
+                art, you’ll see it here.
               </Message>
             ) : (
               <ul>
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={hrefOf(item)}
-                      onClick={() => setOpen(false)}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary",
-                        item.unread && "bg-primary-soft/35",
-                      )}
-                    >
-                      {item.kind !== "art_rejected" ? (
-                        <ProfileAvatar name={item.name} url={item.avatarUrl} />
-                      ) : (
-                        <span
-                          aria-hidden="true"
-                          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
-                        >
-                          <svg
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="size-4"
-                          >
-                            <path d="M8 2.5 14 13H2Z" />
-                            <path d="M8 6.5v3M8 11.3v.2" />
-                          </svg>
-                        </span>
-                      )}
-                      <span className="min-w-0 flex-1 text-sm">
-                        {item.kind === "follow" ? (
-                          <>
-                            <span className="font-semibold">{item.name}</span>{" "}
-                            started following you
-                          </>
-                        ) : item.kind !== "art_rejected" ? (
-                          <>
-                            <span className="font-semibold">{item.name}</span>{" "}
-                            {ACTIVITY[item.kind]} “{item.tileName}”
-                            {item.detail && (
-                              <span className="line-clamp-2 text-muted-foreground">
-                                {item.detail}
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <span className="block font-semibold">
-                              “{item.tileName}” wasn’t published
-                            </span>
-                            It didn’t pass our content check, so only you can
-                            see it. Explore doesn’t allow adult content.
-                          </>
+                {items.map((item) =>
+                  item.kind === "share_invite" ? (
+                    <li key={item.id}>
+                      <InviteNotification
+                        item={item}
+                        onOpen={() => setOpen(false)}
+                      />
+                    </li>
+                  ) : (
+                    <li key={item.id}>
+                      <Link
+                        href={hrefOf(item)}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary",
+                          item.unread && "bg-primary-soft/35",
                         )}
-                        <span className="block text-xs text-muted-foreground">
-                          {item.ago}
+                      >
+                        {item.kind !== "art_rejected" ? (
+                          <ProfileAvatar
+                            name={item.name}
+                            url={item.avatarUrl}
+                          />
+                        ) : (
+                          <span
+                            aria-hidden="true"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+                          >
+                            <svg
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="size-4"
+                            >
+                              <path d="M8 2.5 14 13H2Z" />
+                              <path d="M8 6.5v3M8 11.3v.2" />
+                            </svg>
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1 text-sm">
+                          {item.kind === "follow" ? (
+                            <>
+                              <span className="font-semibold">{item.name}</span>{" "}
+                              started following you
+                            </>
+                          ) : item.kind === "share_role" ? (
+                            <>
+                              <span className="font-semibold">{item.name}</span>{" "}
+                              changed your access to “{item.tileName}”. You can
+                              now{" "}
+                              {item.role === "editor" ? "edit" : "only view"}{" "}
+                              it.
+                            </>
+                          ) : item.kind === "share_removed" ? (
+                            <>
+                              <span className="font-semibold">{item.name}</span>{" "}
+                              removed your access to “{item.tileName}”
+                            </>
+                          ) : item.kind !== "art_rejected" ? (
+                            <>
+                              <span className="font-semibold">{item.name}</span>{" "}
+                              {ACTIVITY[item.kind]} “{item.tileName}”
+                              {item.detail && (
+                                <span className="line-clamp-2 text-muted-foreground">
+                                  {item.detail}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <span className="block font-semibold">
+                                “{item.tileName}” wasn’t published
+                              </span>
+                              It didn’t pass our content check, so only you can
+                              see it. Explore doesn’t allow adult content.
+                            </>
+                          )}
+                          <span className="block text-xs text-muted-foreground">
+                            {item.ago}
+                          </span>
                         </span>
-                      </span>
-                      {item.unread && (
-                        <span
-                          aria-label="New"
-                          className="size-2 shrink-0 rounded-full bg-primary"
-                        />
-                      )}
-                    </Link>
-                  </li>
-                ))}
+                        {item.unread && (
+                          <span
+                            aria-label="New"
+                            className="size-2 shrink-0 rounded-full bg-primary"
+                          />
+                        )}
+                      </Link>
+                    </li>
+                  ),
+                )}
               </ul>
             )}
           </div>
@@ -182,7 +209,9 @@ const ACTIVITY: Record<ActivityKind, string> = {
   download: "downloaded",
 };
 
-function hrefOf(item: AppNotification) {
+function hrefOf(item: Exclude<AppNotification, { kind: "share_invite" }>) {
+  if (item.kind === "share_role") return "/tiles?tab=shared";
+  if (item.kind === "share_removed") return "/tiles";
   if (item.kind === "follow") return `/u/${item.username}`;
   if (item.kind === "art_rejected") return "/tiles";
   return item.tileId ? `/explore/${item.tileId}` : `/u/${item.username}`;

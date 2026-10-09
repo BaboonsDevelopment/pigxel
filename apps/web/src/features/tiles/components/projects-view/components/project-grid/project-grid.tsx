@@ -10,6 +10,7 @@ import { scrollParent } from "@/lib/utils/scroll-parent";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { PublishDialog } from "@/features/explore/components/explore-header/components/publish-dialog";
+import { ShareDialog } from "@/features/sharing/components/share-dialog/share-dialog";
 import type { Folder } from "../../../../folders";
 import type { Label } from "../../../../labels";
 import { listParams } from "../../../../queries/keys";
@@ -127,6 +128,7 @@ function Grid({
   const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
   const [renaming, setRenaming] = useState<Project | null>(null);
   const [downloading, setDownloading] = useState<Project | null>(null);
+  const [sharing, setSharing] = useState<CloudTileSummary | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
   const { hasMore, loadMore } = list;
 
@@ -250,6 +252,19 @@ function Grid({
     if (tile) setMoving([tile]);
   };
 
+  const shareLocal = async (project: Extract<Project, { kind: "local" }>) => {
+    const confirmed = await confirmDialog({
+      title: "Save to Pigxel cloud first?",
+      message: `Only cloud projects can be shared, so “${project.name}” will be saved to Pigxel cloud first.`,
+      confirmLabel: "Save and share",
+    });
+    if (!confirmed) return;
+    const tile = await actions
+      .upload(project.draft, project.image)
+      .catch(() => null);
+    if (tile) setSharing(tile);
+  };
+
   const commonItems = (project: Project) => [
     {
       label: pinOf(project) === null ? "Pin to top" : "Unpin",
@@ -347,6 +362,10 @@ function Grid({
                           label: "Move to folder…",
                           onSelect: () => void moveLocal(project),
                         },
+                        {
+                          label: "Share…",
+                          onSelect: () => void shareLocal(project),
+                        },
                       ]),
                   archiveItem(project),
                   {
@@ -433,6 +452,7 @@ function Grid({
                   onSelect: () => setPublishing(tile),
                 },
                 { label: "Move to folder…", onSelect: () => setMoving([tile]) },
+                { label: "Share…", onSelect: () => setSharing(tile) },
                 { label: "Labels…", onSelect: () => setLabelling(tile) },
                 ...(folderId
                   ? [
@@ -518,6 +538,9 @@ function Grid({
             : { tileId: downloading.id })}
           onClose={() => setDownloading(null)}
         />
+      )}
+      {sharing && (
+        <ShareDialog tile={sharing} onClose={() => setSharing(null)} />
       )}
       {renaming && (
         <RenameDialog

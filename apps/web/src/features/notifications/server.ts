@@ -6,6 +6,7 @@ import {
   toArtistProfile,
   type ProfileRow,
 } from "@/features/profile/profile";
+import type { ShareRole } from "@/features/sharing/sharing";
 
 export type AppNotification = {
   id: string;
@@ -19,6 +20,22 @@ export type AppNotification = {
       avatarUrl: string | null;
     }
   | { kind: "art_rejected"; tileName: string }
+  | {
+      kind: "share_invite";
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      tileId: string;
+      tileName: string;
+      role: ShareRole;
+    }
+  | ({
+      name: string;
+      username: string;
+      avatarUrl: string | null;
+      tileName: string;
+      role: ShareRole;
+    } & ({ kind: "share_role" } | { kind: "share_removed" }))
   | {
       kind: ActivityKind;
       name: string;
@@ -34,7 +51,12 @@ export type ActivityKind = "like" | "comment" | "save" | "remix" | "download";
 
 type NotificationRow = {
   id: string;
-  kind: "art_rejected" | ActivityKind;
+  kind:
+    | "art_rejected"
+    | "share_invite"
+    | "share_role"
+    | "share_removed"
+    | ActivityKind;
   tile_id: string | null;
   tile_name: string;
   detail: string | null;
@@ -141,6 +163,39 @@ export async function listNotifications(
       ];
     if (!row.actor) return [];
     const actor = toArtistProfile(row.actor);
+    if (row.kind === "share_role" || row.kind === "share_removed")
+      return [
+        {
+          at: row.created_at,
+          item: {
+            ...base,
+            kind: row.kind,
+            name: actor.name,
+            username: actor.username,
+            avatarUrl: actor.avatarUrl,
+            tileName: row.tile_name,
+            role: row.detail === "editor" ? "editor" : "viewer",
+          },
+        },
+      ];
+    if (row.kind === "share_invite")
+      return row.tile_id
+        ? [
+            {
+              at: row.created_at,
+              item: {
+                ...base,
+                kind: row.kind,
+                name: actor.name,
+                username: actor.username,
+                avatarUrl: actor.avatarUrl,
+                tileId: row.tile_id,
+                tileName: row.tile_name,
+                role: row.detail === "editor" ? "editor" : "viewer",
+              },
+            },
+          ]
+        : [];
     return [
       {
         at: row.created_at,

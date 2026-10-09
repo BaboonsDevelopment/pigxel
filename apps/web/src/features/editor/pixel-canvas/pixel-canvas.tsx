@@ -408,7 +408,9 @@ export function PixelCanvas({
         aria-label="Tile canvas"
         title={
           blocked && !selecting
-            ? "This layer can’t be drawn on: pick a visible, unlocked layer"
+            ? sprite.viewOnly
+              ? "This project is view-only"
+              : "This layer can’t be drawn on: pick a visible, unlocked layer"
             : undefined
         }
         className={`block size-full touch-none [image-rendering:pixelated] ${cursor}`}

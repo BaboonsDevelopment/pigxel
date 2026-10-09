@@ -351,7 +351,7 @@ export async function getPublicTile(
     .eq("id", id)
     .or(
       viewerId
-        ? "visibility.eq.public,review.eq.pending"
+        ? `visibility.eq.public,and(review.eq.pending,user_id.eq.${viewerId})`
         : "visibility.eq.public",
     );
   const { data, error } = await (

@@ -1,5 +1,5 @@
 import { readCloudTile } from "./cloud";
-import { createDraft, findDraftFor, loadDrafts } from "./draft";
+import { createDraft, findDraftFor, loadDrafts, writeDraft } from "./draft";
 import {
   PigxelFileError,
   parsePigxel,
@@ -68,13 +68,14 @@ export async function draftForCloudTile(
   const location: TileLocation = { kind: "cloud", tile };
   await loadDrafts(userId);
   const open = findDraftFor(userId, location);
-  if (open) return open.id;
-  return draftFromFile(
-    userId,
-    await readCloudTile(tile.id),
-    tile.name,
-    location,
-  );
+  if (open?.dirty) return open.id;
+  const contents = await readCloudTile(tile.id);
+  if (!open) return draftFromFile(userId, contents, tile.name, location);
+  if (contents !== open.file) {
+    parsePigxel(contents);
+    writeDraft(userId, { ...open, file: contents });
+  }
+  return open.id;
 }
 
 export async function draftForDriveFile(

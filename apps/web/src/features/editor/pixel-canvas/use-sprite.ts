@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { compositeOver, flatten, orderedLayers } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
@@ -100,7 +100,12 @@ export function useSprite(
   initial: PigxelDocument,
   onChange: () => void,
   kept?: KeptSprite,
+  viewOnly = false,
 ) {
+  const viewing = useRef(viewOnly);
+  useEffect(() => {
+    viewing.current = viewOnly;
+  }, [viewOnly]);
   const [background, setBackground] = useState(initial.background);
   const [size, setSize] = useState<Size>({
     w: initial.width,
@@ -353,6 +358,10 @@ export function useSprite(
       recolor?: ReadonlyMap<string, string>;
     } = {},
   ) => {
+    if (viewing.current) {
+      restore(past.current.present, false);
+      return;
+    }
     const mode = next.colorMode ?? colorMode;
     if (mode !== "rgb")
       for (const canvas of changed.current) {
@@ -562,7 +571,7 @@ export function useSprite(
     finish({ tags: next });
   };
 
-  const restore = (snapshot: Snapshot) => {
+  const restore = (snapshot: Snapshot, notify = true) => {
     const { present } = past.current;
     const sameSize =
       snapshot.size.w === present.size.w && snapshot.size.h === present.size.h;
@@ -598,7 +607,7 @@ export function useSprite(
       );
     }
     repaint();
-    onChange();
+    if (notify) onChange();
   };
 
   const undo = () => {
@@ -1334,7 +1343,8 @@ export function useSprite(
     activeLayer,
     eraseFill: fillOf(layerId),
     frameId,
-    canPaint: layerTree.canPaint(tree, layerId),
+    canPaint: !viewOnly && layerTree.canPaint(tree, layerId),
+    viewOnly,
     version,
     context,
     composite,

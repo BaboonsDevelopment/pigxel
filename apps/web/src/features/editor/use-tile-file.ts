@@ -87,6 +87,7 @@ export function useTileFile({
   );
   const [syncError, setSyncError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pause, setPause] = useState<string | null>(null);
   const [status, setStatus] = useState<FileStatus | null>(() =>
     canStoreDrafts(userId)
       ? (notice ?? null)
@@ -148,6 +149,7 @@ export function useTileFile({
 
   useEffect(() => {
     if (!location || !dirty || sync === "saving" || sync === "failed") return;
+    if (pause) return;
     if (location.kind === "drive" && !drive.available) return;
     const timer = setTimeout(async () => {
       const savedRevision = latestRevision.current;
@@ -165,7 +167,7 @@ export function useTileFile({
     }, AUTOSAVE_DELAY);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, dirty, name, revision, sync, drive.available]);
+  }, [location, dirty, name, revision, sync, drive.available, pause]);
 
   const changed = () => {
     setDirty(true);
@@ -271,21 +273,23 @@ export function useTileFile({
   const place = location ? LOCATION_LABELS[location.kind] : null;
   const locationStatus: FileStatus | null = !place
     ? null
-    : sync === "failed"
-      ? {
-          tone: "error",
-          text: syncError?.message ?? `Couldn’t save to ${place}.`,
-          retry:
-            syncError instanceof DriveError && syncError.needsConnect
-              ? "Connect Google Drive"
-              : "Try again",
-          connect: syncError instanceof DriveError && syncError.needsConnect,
-        }
-      : sync === "saving"
-        ? { tone: "info", text: `Saving to ${place}…` }
-        : dirty
-          ? { tone: "info", text: `Changes not yet saved to ${place}` }
-          : { tone: "info", text: `All changes saved to ${place}` };
+    : pause
+      ? { tone: "error", text: pause }
+      : sync === "failed"
+        ? {
+            tone: "error",
+            text: syncError?.message ?? `Couldn’t save to ${place}.`,
+            retry:
+              syncError instanceof DriveError && syncError.needsConnect
+                ? "Connect Google Drive"
+                : "Try again",
+            connect: syncError instanceof DriveError && syncError.needsConnect,
+          }
+        : sync === "saving"
+          ? { tone: "info", text: `Saving to ${place}…` }
+          : dirty
+            ? { tone: "info", text: `Changes not yet saved to ${place}` }
+            : { tone: "info", text: `All changes saved to ${place}` };
 
   return {
     name,
@@ -297,6 +301,7 @@ export function useTileFile({
     location,
     dirty,
     markDirty: changed,
+    setPause,
     busy,
     status:
       sync === "failed" || status?.tone !== "error"
