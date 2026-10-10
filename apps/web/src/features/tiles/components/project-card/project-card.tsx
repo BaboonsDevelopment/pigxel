@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { PointerEvent, ReactNode } from "react";
 import { HoverOverlay } from "../hover-overlay";
+import type { SortProps } from "../projects-view/drag/use-sortable";
 import { ProjectMenu } from "./components/project-menu";
 
 export function ProjectCard({
@@ -20,6 +21,7 @@ export function ProjectCard({
   onPointerDown,
   dragging = false,
   corner,
+  sort,
 }: {
   name: string;
   thumbnail: ReactNode;
@@ -35,7 +37,9 @@ export function ProjectCard({
   onPointerDown?: (event: PointerEvent) => void;
   dragging?: boolean;
   corner?: ReactNode;
+  sort?: SortProps;
 }) {
+  const { lifted, ...sortProps } = sort ?? { lifted: false };
   const face = (
     <span
       className={`relative block ${meta ? "aspect-[204/165]" : "aspect-[16/10]"} overflow-hidden bg-checker`}
@@ -82,10 +86,11 @@ export function ProjectCard({
     <li
       onPointerDown={onPointerDown}
       onDragStart={(event) => {
-        if (onPointerDown) event.preventDefault();
+        if (onPointerDown || sort) event.preventDefault();
       }}
       style={dragging ? { opacity: 0.35, scale: "0.96" } : undefined}
-      className={`group relative overflow-hidden rounded-xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md ${selected ? "ring-2 ring-primary" : ""}`}
+      {...sortProps}
+      className={`group relative overflow-hidden rounded-xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md ${selected ? "ring-2 ring-primary" : ""} ${lifted ? "shadow-xl" : ""}`}
     >
       {"href" in open ? (
         <Link

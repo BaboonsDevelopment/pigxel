@@ -29,18 +29,21 @@ const STARTS: Start[] = [
     description: "Turn ideas into pixel art",
     image: generateAi,
     tint: "bg-pastel-lavender",
+    href: "/tiles/new?start=ai",
   },
   {
     title: "Sprite animation",
     description: "Create and edit animations",
     image: spriteAnimation,
     tint: "bg-pastel-peach",
+    href: "/tiles/new?start=animation",
   },
   {
     title: "Tileset",
     description: "Build custom tilesets",
     image: tileset,
     tint: "bg-pastel-mint",
+    href: "/tiles/new?start=tileset",
   },
 ];
 
@@ -104,7 +107,7 @@ function StartCard({ start }: { start: Start }) {
       </Link>
     );
   return (
-    <div aria-disabled="true" className={cn(className, "cursor-pointer")}>
+    <div aria-disabled="true" className={cn(className, "cursor-default")}>
       <Badge tone="overlay" className="absolute top-3 right-3">
         Soon
       </Badge>

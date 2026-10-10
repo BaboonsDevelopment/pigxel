@@ -19,8 +19,10 @@ const TOOLBAR =
 
 export function StatsHover({
   tile,
+  profileId,
 }: {
   tile: { id: string; name: string } | null;
+  profileId?: string;
 }) {
   const button = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,7 +85,7 @@ export function StatsHover({
             onPointerLeave={hide}
             className="fixed z-50 rounded-lg border bg-popover p-1.5 text-xs text-popover-foreground shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
           >
-            <StatsList tileId={tile?.id ?? null} />
+            <StatsList tileId={tile?.id ?? null} profileId={profileId} />
           </div>,
           document.body,
         )}
@@ -91,8 +93,14 @@ export function StatsHover({
   );
 }
 
-function StatsList({ tileId }: { tileId: string | null }) {
-  const stats = useArtStats(tileId);
+function StatsList({
+  tileId,
+  profileId,
+}: {
+  tileId: string | null;
+  profileId?: string;
+}) {
+  const stats = useArtStats(tileId, profileId);
   if (stats.isPending)
     return <p className="px-2 py-1.5 text-muted-foreground">Loading…</p>;
   if (stats.isError)

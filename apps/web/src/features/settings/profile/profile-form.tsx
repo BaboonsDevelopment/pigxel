@@ -14,6 +14,7 @@ import type { ArtistProfile } from "@/features/profile/profile";
 import {
   BIO_MAX,
   LINK_LABEL_MAX,
+  LOCATION_MAX,
   MAX_LINKS,
   NAME_MAX,
   USERNAME_MAX,
@@ -111,6 +112,16 @@ export function ProfileForm({ profile }: { profile: ArtistProfile }) {
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           placeholder="What do you like to draw?"
+        />
+      </Field>
+
+      <Field label="Location" htmlFor="location" error={errorFor("location")}>
+        <Input
+          id="location"
+          name="location"
+          maxLength={LOCATION_MAX}
+          defaultValue={profile.location}
+          placeholder="Lviv, Ukraine"
         />
       </Field>
 

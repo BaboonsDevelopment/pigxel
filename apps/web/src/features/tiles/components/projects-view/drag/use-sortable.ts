@@ -6,11 +6,10 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import type { Folder } from "../../../folders";
 import { swallowNextClick } from "./project-drag";
 
 const THRESHOLD = 6;
-const SORT_ATTRIBUTE = "data-folder-sort";
+const SORT_ATTRIBUTE = "data-sort-id";
 
 function moveBefore(ids: string[], id: string, target: string) {
   const from = ids.indexOf(id);
@@ -20,7 +19,7 @@ function moveBefore(ids: string[], id: string, target: string) {
   return from === -1 || to === -1 ? ids : next;
 }
 
-function folderAt(x: number, y: number) {
+function itemAt(x: number, y: number) {
   return (
     document
       .elementFromPoint(x, y)
@@ -29,8 +28,10 @@ function folderAt(x: number, y: number) {
   );
 }
 
-export function useFolderSort(
-  folders: Folder[],
+export type SortProps = ReturnType<ReturnType<typeof useSortable>["itemProps"]>;
+
+export function useSortable<T extends { id: string }>(
+  list: T[],
   onReorder: (ids: string[]) => void,
 ) {
   const [order, setOrder] = useState<string[] | null>(null);
@@ -41,11 +42,11 @@ export function useFolderSort(
   } | null>(null);
   const items = useRef(new Map<string, HTMLElement>());
 
-  const ids = order ?? folders.map((folder) => folder.id);
-  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  const ids = order ?? list.map((item) => item.id);
+  const byId = new Map(list.map((item) => [item.id, item]));
   const sorted = [
     ...ids.flatMap((id) => byId.get(id) ?? []),
-    ...folders.filter((folder) => !ids.includes(folder.id)),
+    ...list.filter((item) => !ids.includes(item.id)),
   ];
 
   const start = (event: ReactPointerEvent, id: string) => {
@@ -53,7 +54,7 @@ export function useFolderSort(
     if (event.button !== 0 || event.pointerType === "touch" || !element) return;
     const origin = { x: event.clientX, y: event.clientY };
     const slot = { x: element.offsetLeft, y: element.offsetTop };
-    const initial = sorted.map((folder) => folder.id);
+    const initial = sorted.map((item) => item.id);
     let current = initial;
     let active = false;
 
@@ -73,7 +74,7 @@ export function useFolderSort(
         document.body.style.cursor = "grabbing";
         document.body.style.userSelect = "none";
       }
-      const target = folderAt(e.clientX, e.clientY);
+      const target = itemAt(e.clientX, e.clientY);
       if (target && target !== id) {
         current = moveBefore(current, id, target);
         setOrder(current);
@@ -119,5 +120,5 @@ export function useFolderSort(
     };
   };
 
-  return { folders: sorted, itemProps };
+  return { items: sorted, itemProps };
 }

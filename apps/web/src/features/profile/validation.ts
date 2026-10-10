@@ -1,5 +1,6 @@
 export const NAME_MAX = 50;
 export const BIO_MAX = 200;
+export const LOCATION_MAX = 60;
 export const MAX_LINKS = 3;
 export const LINK_LABEL_MAX = 40;
 const LINK_URL_MAX = 200;

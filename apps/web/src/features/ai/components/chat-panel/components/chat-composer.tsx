@@ -10,6 +10,7 @@ import { toReference } from "../flows/pictures";
 import { ICONS } from "../icons";
 
 type Props = {
+  autoFocus?: boolean;
   draft: string;
   onDraft: (text: string) => void;
   references: string[];
@@ -21,6 +22,7 @@ type Props = {
 };
 
 export function ChatComposer({
+  autoFocus,
   draft,
   onDraft,
   references,
@@ -133,6 +135,7 @@ export function ChatComposer({
         <Textarea
           rows={1}
           aria-label="Message"
+          autoFocus={autoFocus}
           placeholder="Ask for a change…"
           value={draft}
           onChange={(e) => onDraft(e.target.value)}

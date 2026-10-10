@@ -26,9 +26,11 @@ const SAVE_DELAY = 800;
 export function ChatPanel({
   canvas,
   tileId,
+  autoFocus,
 }: {
   canvas: CanvasBridge;
   tileId: string;
+  autoFocus?: boolean;
 }) {
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -190,6 +192,7 @@ export function ChatPanel({
         )}
       </div>
       <ChatComposer
+        autoFocus={autoFocus}
         draft={draft}
         onDraft={setDraft}
         references={references}
