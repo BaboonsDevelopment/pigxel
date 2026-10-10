@@ -9,7 +9,14 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --project unit --project dom",
+    "test:watch": "vitest --project unit --project dom",
+    "test:coverage": "vitest run --project unit --project dom --coverage",
+    "test:db": "vitest run --project db",
+    "test:e2e": "playwright test",
+    "test:e2e:dev": "E2E_SERVER=dev playwright test",
+    "test:e2e:serve": "node e2e/support/serve.ts",
+    "assets:generate": "node scripts/assets/generate.ts --preview scripts/assets/out/preview.png"
   },
   "dependencies": {
     "@paddle/paddle-js": "1.6.5",
@@ -30,13 +37,22 @@
   "devDependencies": {
     "@pigxel/eslint-config": "workspace:*",
     "@pigxel/typescript-config": "workspace:*",
+    "@pigxel/vitest-config": "workspace:*",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "^4.1.17",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
+    "jsdom": "catalog:",
+    "msw": "2.15.0",
     "postcss": "8.5.28",
     "typescript": "catalog:",
-    "vitest": "4.1.11"
+    "vitest": "catalog:"
   }
 }

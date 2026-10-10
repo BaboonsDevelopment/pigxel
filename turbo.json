@@ -33,6 +33,25 @@
     "test": {
       "dependsOn": ["^test"],
       "outputs": []
+    },
+    "test:coverage": {
+      "dependsOn": ["^test:coverage"],
+      "outputs": ["coverage/**"]
+    },
+    "test:db": {
+      "cache": false,
+      "passThroughEnv": ["HOME", "DOCKER_HOST", "PIGXEL_TEST_*"]
+    },
+    "test:e2e": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "HOME",
+        "DOCKER_HOST",
+        "E2E_SERVER",
+        "PLAYWRIGHT_*",
+        "PIGXEL_TEST_*"
+      ]
     }
   },
   "agentGuidance": false

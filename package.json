@@ -16,7 +16,10 @@
     "knip": "knip",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "test:db": "turbo run test:db",
+    "test:e2e": "turbo run test:e2e"
   },
   "devDependencies": {
     "knip": "^5.88.1",
