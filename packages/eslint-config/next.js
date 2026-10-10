@@ -3,5 +3,19 @@ import nextTypescript from "eslint-config-next/typescript";
 export default [
   ...nextVitals,
   ...nextTypescript,
-  { ignores: [".next/**", "next-env.d.ts"] },
+  {
+    // Playwright fixtures hand values over with use(), which isn't React's hook.
+    files: ["e2e/**"],
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
+  {
+    ignores: [
+      ".next/**",
+      ".next-e2e/**",
+      "next-env.d.ts",
+      "coverage/**",
+      "playwright-report/**",
+      "test-results/**",
+    ],
+  },
 ];
