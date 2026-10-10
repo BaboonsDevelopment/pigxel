@@ -76,10 +76,7 @@ const fake = vi.hoisted(() => {
 
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => fake.client }));
 
-import {
-  readCloudTile,
-  saveCloudTile,
-} from "@/lib/pigxel-file/cloud";
+import { readCloudTile, saveCloudTile } from "@/lib/pigxel-file/cloud";
 
 const image = blankDocument(16, 8, "white");
 
@@ -98,7 +95,11 @@ describe("Pigxel cloud tiles", () => {
       image,
       "data:image/png;base64,x",
     );
-    expect(tile).toEqual({ id: "tile-1", name: "Grass" });
+    expect(tile).toEqual({
+      id: "tile-1",
+      name: "Grass",
+      version: expect.any(String),
+    });
     expect(fake.state.rows.get("tile-1")).toMatchObject({
       name: "Grass",
       width: 16,

@@ -1,4 +1,4 @@
-import { readCloudTile } from "./cloud";
+import { readCloudTileVersion, sameVersion } from "./cloud";
 import { createDraft, findDraftFor, loadDrafts, writeDraft } from "./draft";
 import {
   PigxelFileError,
@@ -68,13 +68,32 @@ export async function draftForCloudTile(
   const location: TileLocation = { kind: "cloud", tile };
   await loadDrafts(userId);
   const open = findDraftFor(userId, location);
-  if (open?.dirty) return open.id;
-  const contents = await readCloudTile(tile.id);
-  if (!open) return draftFromFile(userId, contents, tile.name, location);
-  if (contents !== open.file) {
-    parsePigxel(contents);
-    writeDraft(userId, { ...open, file: contents });
-  }
+  const known =
+    open?.location?.kind === "cloud" ? open.location.tile.version : undefined;
+  if (open?.dirty && !known) return open.id;
+  const cloud = await readCloudTileVersion(tile.id);
+  const latest: TileLocation = {
+    kind: "cloud",
+    tile: { ...tile, version: cloud.version },
+  };
+  if (!open) return draftFromFile(userId, cloud.file, tile.name, latest);
+  if (open.dirty && sameVersion(known, cloud.version)) return open.id;
+  if (cloud.file === open.file && sameVersion(known, cloud.version))
+    return open.id;
+  parsePigxel(cloud.file);
+  if (open.dirty)
+    createDraft(userId, {
+      name: `${open.name.slice(0, 80)} (unsaved changes)`,
+      file: open.file,
+      location: null,
+      dirty: true,
+    });
+  writeDraft(userId, {
+    ...open,
+    file: cloud.file,
+    location: latest,
+    dirty: false,
+  });
   return open.id;
 }
 

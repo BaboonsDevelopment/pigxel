@@ -37,7 +37,7 @@ export function MenuList({
         role="group"
         className="border-t py-1 first:border-t-0 first:pt-0 last:pb-0"
       >
-        {items.map((item) =>
+        {items.map((item, position) =>
           item.submenu ? (
             <Submenu
               key={item.label}
@@ -49,7 +49,7 @@ export function MenuList({
             />
           ) : (
             <button
-              key={item.label}
+              key={`${position}:${item.label}`}
               type="button"
               role="menuitem"
               disabled={item.disabled}
@@ -60,7 +60,10 @@ export function MenuList({
                 item.onSelect?.();
               }}
             >
-              {item.label}
+              <span className="flex min-w-0 items-center gap-2.5">
+                {item.icon}
+                <span className="truncate">{item.label}</span>
+              </span>
               {item.shortcut && (
                 <kbd className="font-sans text-xs text-muted-foreground">
                   {item.shortcut}

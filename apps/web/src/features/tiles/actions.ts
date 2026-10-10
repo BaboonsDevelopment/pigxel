@@ -9,6 +9,11 @@ import {
   listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
+import {
+  createAdminClient,
+  isSupabaseAdminConfigured,
+} from "@/lib/supabase/admin";
+import { removeAllVersions } from "@/features/versions/server";
 import { requestReview } from "@/features/moderation/request";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
@@ -428,6 +433,8 @@ export async function deleteProjectsForever(
     if (error) return { error: "Couldn’t empty Trash. Try again." };
     if (!data.length) return {};
     const ids = data.map((row) => row.id as string);
+    if (isSupabaseAdminConfigured())
+      await removeAllVersions(createAdminClient(), ids).catch(() => {});
     await supabase.storage
       .from("tiles")
       .remove(ids.map((id) => `${user.id}/${id}.pigxel`));

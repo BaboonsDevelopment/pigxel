@@ -64,7 +64,74 @@ export function unscaled(anim: DecodedAnimation, k: number): DecodedAnimation {
   };
 }
 
-function fitted(
+const PIXEL_ART_COLORS = 256;
+
+export function looksLikePixelArt(rgba: Uint8ClampedArray) {
+  const colors = new Set<number>();
+  const view = new Uint32Array(rgba.buffer, rgba.byteOffset, rgba.length / 4);
+  for (const color of view) {
+    colors.add(color);
+    if (colors.size > PIXEL_ART_COLORS) return false;
+  }
+  return true;
+}
+
+function sharpDownscale(
+  rgba: Uint8ClampedArray,
+  from: { w: number; h: number },
+  w: number,
+  h: number,
+): Uint8ClampedArray {
+  const source = new Uint32Array(rgba.buffer, rgba.byteOffset, rgba.length / 4);
+  const out = new Uint32Array(w * h);
+  const counts = new Map<number, number>();
+  for (let y = 0; y < h; y++) {
+    const top = Math.floor((y * from.h) / h);
+    const bottom = Math.max(top + 1, Math.floor(((y + 1) * from.h) / h));
+    for (let x = 0; x < w; x++) {
+      const left = Math.floor((x * from.w) / w);
+      const right = Math.max(left + 1, Math.floor(((x + 1) * from.w) / w));
+      counts.clear();
+      let best = source[top * from.w + left]!;
+      let most = 0;
+      for (let sy = top; sy < bottom; sy++)
+        for (let sx = left; sx < right; sx++) {
+          const color = source[sy * from.w + sx]!;
+          const count = (counts.get(color) ?? 0) + 1;
+          counts.set(color, count);
+          if (count > most) {
+            most = count;
+            best = color;
+          }
+        }
+      out[y * w + x] = best;
+    }
+  }
+  return new Uint8ClampedArray(out.buffer);
+}
+
+export const tooLarge = (anim: { w: number; h: number }) =>
+  anim.w > MAX_PIGXEL_SIZE || anim.h > MAX_PIGXEL_SIZE;
+
+export function croppedAnimation(
+  anim: DecodedAnimation,
+  area: { x: number; y: number; w: number; h: number },
+): DecodedAnimation {
+  return {
+    w: area.w,
+    h: area.h,
+    frames: anim.frames.map(({ rgba, duration }) => {
+      const out = new Uint8ClampedArray(area.w * area.h * 4);
+      for (let y = 0; y < area.h; y++) {
+        const start = ((area.y + y) * anim.w + area.x) * 4;
+        out.set(rgba.subarray(start, start + area.w * 4), y * area.w * 4);
+      }
+      return { rgba: out, duration };
+    }),
+  };
+}
+
+export function fitted(
   anim: DecodedAnimation,
   box = { w: MAX_PIGXEL_SIZE, h: MAX_PIGXEL_SIZE },
 ): DecodedAnimation {
@@ -72,6 +139,15 @@ function fitted(
   if (scale >= 1) return anim;
   const w = Math.max(1, Math.round(anim.w * scale));
   const h = Math.max(1, Math.round(anim.h * scale));
+  if (looksLikePixelArt(anim.frames[0]!.rgba))
+    return {
+      w,
+      h,
+      frames: anim.frames.map(({ rgba, duration }) => ({
+        rgba: sharpDownscale(rgba, anim, w, h),
+        duration,
+      })),
+    };
   const source = document.createElement("canvas");
   source.width = anim.w;
   source.height = anim.h;
@@ -155,9 +231,9 @@ export async function documentFromSequence(
   return documentFromFrames(fitted(unscaled(anim, pixelScale(anim))));
 }
 
-export async function documentFromImage(file: File): Promise<PigxelDocument> {
+export async function pictureFromFile(file: File): Promise<DecodedAnimation> {
   const anim = await readImage(file);
-  return documentFromFrames(fitted(unscaled(anim, pixelScale(anim))));
+  return unscaled(anim, pixelScale(anim));
 }
 
 export async function pictureForTile(
