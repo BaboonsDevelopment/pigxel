@@ -68,12 +68,14 @@ import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import {
+  listDrafts,
   readDraft,
   readPen,
   writePen,
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import { LOCATION_LABELS } from "@/lib/pigxel-file/location";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
@@ -82,8 +84,9 @@ import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { markTileOpened } from "@/features/tiles/actions";
 import { writeMark } from "@/features/tiles/local-marks";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
-import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { draftThumbnail, thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { PixelImage } from "@/components/ui/pixel-image";
 import { useProjectAccess } from "@/features/sharing/queries";
 import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -132,6 +135,8 @@ import { keepTile, type KeptTile } from "../kept-tiles";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
+import { useLayoutPresets } from "../use-layout-presets";
+import { LAYOUT_PRESETS, presetLayout } from "../layout-presets";
 import {
   readBrushes,
   withBrush,
@@ -147,6 +152,7 @@ import { PaletteActions } from "./colors/palette-actions";
 import { PalettePanel } from "./colors/palette-panel";
 import { Dock, type PanelContent } from "./dock/dock";
 import { DragOverlay } from "./dock/drag-overlay";
+import { FloatingPanels } from "./dock/floating-panels";
 import { usePanelDrag } from "./dock/use-panel-drag";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
@@ -154,6 +160,8 @@ import { TileTabs } from "./tile-tabs";
 import type { ModifyKind } from "./modify-selection-dialog";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
+
+const RECENT_FILES = 10;
 
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
@@ -221,6 +229,21 @@ const ShareDialog = dynamic(
     ),
   { ssr: false },
 );
+const VersionHistoryDialog = dynamic(
+  () =>
+    import("@/features/versions/components/version-history-dialog").then(
+      (m) => m.VersionHistoryDialog,
+    ),
+  { ssr: false },
+);
+const ConflictDialog = dynamic(
+  () => import("./conflict-dialog").then((m) => m.ConflictDialog),
+  { ssr: false },
+);
+const LargePictureDialog = dynamic(
+  () => import("./large-picture-dialog").then((m) => m.LargePictureDialog),
+  { ssr: false },
+);
 const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
@@ -278,6 +301,7 @@ export function Editor({
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [sharing, setSharing] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -297,7 +321,9 @@ export function Editor({
   const panelDrag = usePanelDrag(
     (id, target) => setLayout((l) => movePanel(l, id, target)),
     (id, target) => movesPanel(layout, id, target),
+    (id) => layout.floating[id],
   );
+  const layoutPresets = useLayoutPresets(userId);
   const [customizing, setCustomizing] = useState(false);
   const toolGroup = groupOf(tool)?.id;
   if (toolGroup && layout.groupTools[toolGroup] !== tool)
@@ -1091,6 +1117,46 @@ export function Editor({
     ],
   ];
   const windowMenu: MenuSections = [
+    [
+      {
+        label: "Layout presets",
+        submenu: [
+          LAYOUT_PRESETS.map((name) => ({
+            label: name,
+            onSelect: () =>
+              setLayout(
+                structuredClone(
+                  layoutPresets.presets[name]?.layout ?? presetLayout(name),
+                ),
+              ),
+          })),
+          [
+            {
+              label: "Save current layout as",
+              submenu: [
+                LAYOUT_PRESETS.map((name) => ({
+                  label: name,
+                  onSelect: () => {
+                    void layoutPresets.save(name, layout);
+                  },
+                })),
+              ],
+            },
+          ],
+          ...(layoutPresets.status
+            ? [
+                [
+                  {
+                    label: layoutPresets.status,
+                    disabled: true,
+                    onSelect: () => {},
+                  },
+                ],
+              ]
+            : []),
+        ],
+      },
+    ],
     PANELS.map((id) => ({
       label: check(!layout.hidden.includes(id), PANEL_LABELS[id]),
       onSelect: () =>
@@ -1394,11 +1460,46 @@ export function Editor({
         sprite={sprite}
         playback={playback}
         onOpenFrom={setOpening}
+        recent={listDrafts(userId)
+          .filter((other) => other.id !== draft.id)
+          .sort((a, b) => b.savedAt - a.savedAt)
+          .slice(0, RECENT_FILES)
+          .map((other) => ({
+            label: other.name,
+            icon: (
+              <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded border bg-checker">
+                {draftThumbnail(other) && (
+                  <PixelImage
+                    src={draftThumbnail(other)}
+                    alt=""
+                    className="size-full object-contain"
+                  />
+                )}
+              </span>
+            ),
+            shortcut: other.location
+              ? LOCATION_LABELS[other.location.kind]
+              : "This browser",
+            onSelect: () => {
+              const at = other.location;
+              if (at?.kind === "cloud") file.openCloudTile(at.tile);
+              else if (at?.kind === "drive") file.openDriveFile(at.file);
+              else {
+                openTabAfter(userId, other.id, draft.id);
+                router.push(editorUrl(other.id));
+              }
+            },
+          }))}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         explorePublished={published}
         renameLocked={!owner}
+        onVersionHistory={
+          cloudTile && (owner || access === "editor")
+            ? () => setHistoryOpen(true)
+            : undefined
+        }
         onPublishArt={
           owner && (cloudTile || !file.location)
             ? async () => {
@@ -1525,6 +1626,9 @@ export function Editor({
           <Dock side="right" {...dockProps} />
         </div>
       </div>
+      <div hidden={canvasOnly} className="contents">
+        <FloatingPanels {...dockProps} />
+      </div>
       <DragOverlay drag={panelDrag} />
       {customizing && (
         <CustomizeToolsDialog
@@ -1645,6 +1749,29 @@ export function Editor({
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {historyOpen && cloudTile && (
+        <VersionHistoryDialog
+          tileId={cloudTile.id}
+          name={file.name}
+          onRestored={file.reloadFromCloud}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {file.conflict && (
+        <ConflictDialog
+          name={file.name}
+          busy={file.busy}
+          onKeepMine={file.keepMine}
+          onTakeTheirs={file.reloadFromCloud}
+        />
+      )}
+      {file.largePicture && (
+        <LargePictureDialog
+          picture={file.largePicture}
+          onOpen={file.openLargePicture}
+          onClose={file.cancelLargePicture}
         />
       )}
       {tiling && (

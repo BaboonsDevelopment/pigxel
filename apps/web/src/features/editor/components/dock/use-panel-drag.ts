@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, type PointerEvent } from "react";
-import type { DockSide, PanelId, PanelTarget } from "../../layout";
+import {
+  FLOAT_DEFAULT,
+  type DockSide,
+  type FloatRect,
+  type PanelId,
+  type PanelTarget,
+} from "../../layout";
 
 export type PanelDrag = ReturnType<typeof usePanelDrag>;
 
@@ -16,23 +22,34 @@ const BESIDE = 8;
 const GAP_SLOT = 160;
 const CANVAS_ZONE = 0.2;
 const CANVAS_PANEL = 240;
+const HEADER = 32;
+const EDGE_ZONE = 40;
 
 function previewAt(x: number, y: number, dragged: PanelId): DropPreview | null {
   const under = document.elementFromPoint(x, y);
-  const panel = under?.closest<HTMLElement>("[data-panel]");
+  const found = under?.closest<HTMLElement>("[data-panel]");
+  const panel = found?.closest("[data-floating]") ? null : found;
   if (panel) {
     const anchor = panel.dataset.panel as PanelId;
     if (anchor === dragged) return null;
     const r = panel.getBoundingClientRect();
     const fx = (x - r.left) / r.width;
+    const edge = Math.min(r.height * SIDE_ZONE, EDGE_ZONE);
     const where =
       fx < SIDE_ZONE
         ? "left"
         : fx > 1 - SIDE_ZONE
           ? "right"
-          : y < r.top + r.height / 2
+          : y < r.top + edge
             ? "above"
-            : "below";
+            : y > r.bottom - edge
+              ? "below"
+              : "tab";
+    if (where === "tab")
+      return {
+        target: { kind: "panel", anchor, where },
+        area: { left: r.left, top: r.top, width: r.width, height: r.height },
+      };
     const stack = panel.closest<HTMLElement>("[data-stack]");
     const column = (stack ?? panel).getBoundingClientRect();
     const area =
@@ -129,9 +146,27 @@ function below(
   };
 }
 
+function floatAt(
+  x: number,
+  y: number,
+  grab: { x: number; y: number; w: number; h: number },
+): DropPreview {
+  const rect: FloatRect = {
+    x: Math.round(x - grab.x),
+    y: Math.round(y - grab.y),
+    w: grab.w,
+    h: grab.h,
+  };
+  return {
+    target: { kind: "float", rect },
+    area: { left: rect.x, top: rect.y, width: rect.w, height: rect.h },
+  };
+}
+
 export function usePanelDrag(
   onDrop: (id: PanelId, target: PanelTarget) => void,
   changes: (id: PanelId, target: PanelTarget) => boolean,
+  floatOf: (id: PanelId) => FloatRect | undefined,
 ) {
   const [dragging, setDragging] = useState<PanelId | null>(null);
   const [preview, setPreview] = useState<DropPreview | null>(null);
@@ -141,6 +176,15 @@ export function usePanelDrag(
     if (e.button !== 0) return;
     const handle = e.currentTarget;
     const from = { x: e.clientX, y: e.clientY };
+    const floating = floatOf(id);
+    const grab = floating
+      ? {
+          x: e.clientX - floating.x,
+          y: e.clientY - floating.y,
+          w: floating.w,
+          h: floating.h,
+        }
+      : { x: 48, y: HEADER / 2, ...FLOAT_DEFAULT };
     let started = false;
     let last: DropPreview | null = null;
     handle.setPointerCapture(e.pointerId);
@@ -154,7 +198,13 @@ export function usePanelDrag(
       }
       setPointer(at);
       const found = previewAt(at.x, at.y, id);
-      last = found && changes(id, found.target) ? found : null;
+      const overCanvas = document
+        .elementFromPoint(at.x, at.y)
+        ?.closest("[data-canvas-drop]");
+      const loose =
+        !found && (floating || overCanvas) ? floatAt(at.x, at.y, grab) : null;
+      const chosen = found ?? loose;
+      last = chosen && changes(id, chosen.target) ? chosen : null;
       setPreview(last);
     };
     const end = () => {

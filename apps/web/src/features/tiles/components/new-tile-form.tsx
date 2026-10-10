@@ -36,9 +36,12 @@ import type { TileLocation } from "@/lib/pigxel-file/location";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { useIsClient } from "@/lib/utils/use-is-client";
 import { createFrame } from "@/lib/sprite/frames";
+import {
+  readNewTileDefaults,
+  writeNewTileDefaults,
+  type NewTileStorage,
+} from "../new-tile-defaults";
 import type { StartKind } from "@/features/editor/constants";
-
-type Storage = "cloud" | "drive" | "none";
 
 const PRESETS = [16, 32, 64, 128];
 const BACKGROUND_OPTIONS: {
@@ -101,10 +104,15 @@ function Form({
 }) {
   const router = useRouter();
   const [name, setName] = useState(asset?.name ?? "Untitled");
-  const [width, setWidth] = useState("32");
-  const [height, setHeight] = useState("32");
-  const [background, setBackground] = useState<Background>("transparent");
-  const [storage, setStorage] = useState<Storage>("cloud");
+  const [defaults] = useState(() => readNewTileDefaults(userId));
+  const [width, setWidth] = useState(String(defaults.width));
+  const [height, setHeight] = useState(String(defaults.height));
+  const [background, setBackground] = useState<Background>(defaults.background);
+  const [storage, setStorage] = useState<NewTileStorage>(
+    defaults.storage === "drive" && !drive.connected
+      ? "cloud"
+      : defaults.storage,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
     driveError
@@ -178,6 +186,14 @@ function Form({
       setBusy(false);
       return;
     }
+    if (!asset)
+      writeNewTileDefaults(userId, {
+        width: w,
+        height: h,
+        background,
+        storage,
+      });
+    else writeNewTileDefaults(userId, { ...defaults, storage });
     if (from) openTabAfter(userId, draft.id, from);
     router.push(
       start ? `${editorUrl(draft.id)}&start=${start}` : editorUrl(draft.id),

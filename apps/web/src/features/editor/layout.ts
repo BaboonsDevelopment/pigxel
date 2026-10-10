@@ -39,6 +39,11 @@ export type Dock = {
   size: number;
 };
 
+export type FloatRect = { x: number; y: number; w: number; h: number };
+
+export const FLOAT_MIN = { w: 180, h: 120 };
+export const FLOAT_DEFAULT = { w: 280, h: 360 };
+
 export type Layout = {
   docks: Record<DockSide, Dock>;
   collapsed: PanelId[];
@@ -46,6 +51,9 @@ export type Layout = {
   hiddenTools: string[];
   groupTools: Record<string, string>;
   heights: Partial<Record<PanelId, number>>;
+  tabs: Partial<Record<PanelId, PanelId[]>>;
+  active: Partial<Record<PanelId, PanelId>>;
+  floating: Partial<Record<PanelId, FloatRect>>;
 };
 
 const stack = (panels: PanelId[], weights: number[], size: number): Stack => ({
@@ -73,9 +81,12 @@ export const DEFAULT_LAYOUT: Layout = {
   hiddenTools: [],
   groupTools: {},
   heights: {},
+  tabs: {},
+  active: {},
+  floating: {},
 };
 
-const HOME: Record<PanelId, DockSide> = {
+export const HOME: Record<PanelId, DockSide> = {
   tools: "left",
   colors: "left",
   palette: "right",
@@ -142,7 +153,42 @@ export function readLayout(raw: unknown): Layout {
           : 0,
     };
   }
+  const tabs: Layout["tabs"] = {};
+  const tabsRaw = (v.tabs ?? {}) as Record<string, unknown>;
+  for (const host of PANELS) {
+    if (!seen.has(host)) continue;
+    const guests = panelList(tabsRaw[host]).filter((p) => !seen.has(p));
+    if (!guests.length) continue;
+    guests.forEach((p) => seen.add(p));
+    tabs[host] = guests;
+  }
+  const activeRaw = (v.active ?? {}) as Record<string, unknown>;
+  const active: Layout["active"] = {};
+  for (const [host, guests] of Object.entries(tabs) as [PanelId, PanelId[]][]) {
+    const shown = activeRaw[host];
+    if (isPanel(shown) && (shown === host || guests.includes(shown)))
+      active[host] = shown;
+  }
+  const floatingRaw = (v.floating ?? {}) as Record<string, unknown>;
+  const floating: Layout["floating"] = {};
+  for (const id of PANELS) {
+    const r = floatingRaw[id] as Record<string, unknown> | undefined;
+    if (seen.has(id) || !r || typeof r !== "object") continue;
+    const x = Number(r.x);
+    const y = Number(r.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    seen.add(id);
+    floating[id] = {
+      x,
+      y,
+      w: Math.max(FLOAT_MIN.w, num(r.w, FLOAT_DEFAULT.w)),
+      h: Math.max(FLOAT_MIN.h, num(r.h, FLOAT_DEFAULT.h)),
+    };
+  }
   let layout: Layout = {
+    tabs,
+    active,
+    floating,
     docks,
     collapsed: panelList(v.collapsed),
     hidden: panelList(v.hidden),
@@ -182,9 +228,27 @@ export type PanelTarget =
   | {
       kind: "panel";
       anchor: PanelId;
-      where: "above" | "below" | "left" | "right";
+      where: "above" | "below" | "left" | "right" | "tab";
     }
-  | { kind: "dock"; dock: DockSide; where: "start" | "end" };
+  | { kind: "dock"; dock: DockSide; where: "start" | "end" }
+  | { kind: "float"; rect: FloatRect };
+
+export function hostOf(layout: Layout, id: PanelId): PanelId | null {
+  if (dockOf(layout, id)) return id;
+  const found = (Object.entries(layout.tabs) as [PanelId, PanelId[]][]).find(
+    ([, guests]) => guests.includes(id),
+  );
+  return found ? found[0] : null;
+}
+
+function omit<V>(
+  record: Partial<Record<PanelId, V>>,
+  key: PanelId,
+): Partial<Record<PanelId, V>> {
+  const next = { ...record };
+  delete next[key];
+  return next;
+}
 
 const dockOf = (layout: Layout, id: PanelId): DockSide | null =>
   DOCKS.find((d) =>
@@ -197,6 +261,42 @@ const withDock = (layout: Layout, side: DockSide, dock: Dock): Layout => ({
 });
 
 function withoutPanel(layout: Layout, id: PanelId): Layout {
+  if (layout.floating[id])
+    return { ...layout, floating: omit(layout.floating, id) };
+  const host = hostOf(layout, id);
+  if (host && host !== id) {
+    const guests = (layout.tabs[host] ?? []).filter((p) => p !== id);
+    return {
+      ...layout,
+      tabs: guests.length
+        ? { ...layout.tabs, [host]: guests }
+        : omit(layout.tabs, host),
+      active:
+        layout.active[host] === id ? omit(layout.active, host) : layout.active,
+    };
+  }
+  const guests = layout.tabs[id];
+  if (guests?.length) {
+    const [next, ...rest] = guests as [PanelId, ...PanelId[]];
+    const shown = layout.active[id];
+    let tabs = omit(layout.tabs, id);
+    if (rest.length) tabs = { ...tabs, [next]: rest };
+    let active = omit(layout.active, id);
+    if (shown && shown !== id) active = { ...active, [next]: shown };
+    let moved: Layout = { ...layout, tabs, active };
+    for (const side of DOCKS) {
+      const dock = moved.docks[side];
+      if (!dock.stacks.some((s) => s.panels.includes(id))) continue;
+      moved = withDock(moved, side, {
+        ...dock,
+        stacks: dock.stacks.map((s) => ({
+          ...s,
+          panels: s.panels.map((p) => (p === id ? next : p)),
+        })),
+      });
+    }
+    return moved;
+  }
   let out = layout;
   for (const side of DOCKS) {
     const dock = out.docks[side];
@@ -233,19 +333,33 @@ export function movePanel(
   target: PanelTarget,
 ): Layout {
   if (target.kind === "panel" && target.anchor === id) return layout;
+  if (
+    target.kind === "panel" &&
+    target.where === "tab" &&
+    hostOf(layout, target.anchor) === hostOf(layout, id)
+  )
+    return layout;
   let out = withoutPanel(layout, id);
   out = { ...out, hidden: out.hidden.filter((p) => p !== id) };
+  if (target.kind === "float")
+    return { ...out, floating: { ...out.floating, [id]: target.rect } };
   if (target.kind === "dock")
     return placeAtEdge(out, id, target.dock, target.where);
-  const side = dockOf(out, target.anchor);
-  if (!side) return placeAtEdge(out, id, HOME[id], "end");
+  const anchor = hostOf(out, target.anchor);
+  if (!anchor) return placeAtEdge(out, id, HOME[id], "end");
+  if (target.where === "tab")
+    return {
+      ...out,
+      tabs: { ...out.tabs, [anchor]: [...(out.tabs[anchor] ?? []), id] },
+      active: { ...out.active, [anchor]: id },
+    };
+  const side = dockOf(out, anchor)!;
   const dock = out.docks[side];
-  const index = dock.stacks.findIndex((s) => s.panels.includes(target.anchor));
+  const index = dock.stacks.findIndex((s) => s.panels.includes(anchor));
   const host = dock.stacks[index]!;
   const stacks = [...dock.stacks];
   if (target.where === "above" || target.where === "below") {
-    const at =
-      host.panels.indexOf(target.anchor) + (target.where === "below" ? 1 : 0);
+    const at = host.panels.indexOf(anchor) + (target.where === "below" ? 1 : 0);
     const share = host.weights.reduce((a, b) => a + b, 0) / host.panels.length;
     const panels = [...host.panels];
     const weights = [...host.weights];
@@ -269,7 +383,27 @@ const toggled = <T>(list: T[], item: T, on: boolean) =>
   on ? (list.includes(item) ? list : [...list, item]) : without(list, item);
 
 export function setPanelShown(layout: Layout, id: PanelId, shown: boolean) {
-  return { ...layout, hidden: toggled(layout.hidden, id, !shown) };
+  const out = { ...layout, hidden: toggled(layout.hidden, id, !shown) };
+  const host = hostOf(layout, id);
+  return shown && host && host !== id
+    ? { ...out, active: { ...out.active, [host]: id } }
+    : out;
+}
+
+export function setActiveTab(layout: Layout, host: PanelId, id: PanelId) {
+  return { ...layout, active: { ...layout.active, [host]: id } };
+}
+
+export function setFloatRect(layout: Layout, id: PanelId, rect: FloatRect) {
+  return layout.floating[id]
+    ? { ...layout, floating: { ...layout.floating, [id]: rect } }
+    : layout;
+}
+
+export function floatingPanels(layout: Layout) {
+  return (Object.entries(layout.floating) as [PanelId, FloatRect][]).filter(
+    ([id]) => !layout.hidden.includes(id),
+  );
 }
 
 export function setPanelCollapsed(
@@ -285,8 +419,13 @@ export function movesPanel(
   id: PanelId,
   target: PanelTarget,
 ): boolean {
+  if (target.kind === "float") return true;
   const order = (l: Layout) =>
-    JSON.stringify(DOCKS.map((d) => l.docks[d].stacks.map((s) => s.panels)));
+    JSON.stringify([
+      DOCKS.map((d) => l.docks[d].stacks.map((s) => s.panels)),
+      l.tabs,
+      Object.keys(l.floating),
+    ]);
   return order(movePanel(layout, id, target)) !== order(layout);
 }
 
@@ -339,9 +478,15 @@ export function setBottomHeight(layout: Layout, height: number): Layout {
 
 export function shownStacks(layout: Layout, side: DockSide) {
   return layout.docks[side].stacks.flatMap((s, index) => {
-    const items = s.panels.flatMap((id, at) =>
-      layout.hidden.includes(id) ? [] : [{ id, weight: s.weights[at]!, at }],
-    );
+    const items = s.panels.flatMap((id, at) => {
+      const group = [id, ...(layout.tabs[id] ?? [])].filter(
+        (p) => !layout.hidden.includes(p),
+      );
+      if (!group.length) return [];
+      const chosen = layout.active[id];
+      const active = chosen && group.includes(chosen) ? chosen : group[0]!;
+      return [{ id, weight: s.weights[at]!, at, group, active }];
+    });
     return items.length ? [{ index, size: s.size, items }] : [];
   });
 }
