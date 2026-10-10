@@ -19,7 +19,7 @@ import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "./menu/menu";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
-import type { MenuSections } from "./menu/constants";
+import type { MenuItem, MenuSections } from "./menu/constants";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { frameActions, layerActions } from "../timeline/actions";
 import type { Playback } from "../timeline/use-playback";
@@ -33,11 +33,13 @@ export function EditorHeader({
   sprite,
   playback,
   onOpenFrom,
+  recent,
   onConnectDrive,
   onExport,
   onPublish,
   onPublishArt,
   onShare,
+  onVersionHistory,
   renameLocked = false,
   explorePublished = false,
   onImportSheet,
@@ -54,11 +56,13 @@ export function EditorHeader({
   sprite: SpriteApi;
   playback: Playback;
   onOpenFrom: (source: OpenSource) => void;
+  recent: MenuItem[];
   onConnectDrive: () => void;
   onExport: () => void;
   onPublish?: () => void;
   onPublishArt?: () => void;
   onShare?: () => void;
+  onVersionHistory?: () => void;
   renameLocked?: boolean;
   explorePublished?: boolean;
   onImportSheet: () => void;
@@ -102,6 +106,20 @@ export function EditorHeader({
             {
               label: "Open from Pigxel cloud…",
               onSelect: () => onOpenFrom("cloud"),
+            },
+            {
+              label: "Open recent",
+              submenu: [
+                recent.length
+                  ? recent
+                  : [
+                      {
+                        label: "No recent files",
+                        disabled: true,
+                        onSelect: () => {},
+                      },
+                    ],
+              ],
             },
             {
               label: drive.connected
@@ -148,6 +166,19 @@ export function EditorHeader({
                   : undefined,
               onSelect: drive.connected ? file.saveToDrive : onConnectDrive,
               hidden: !drive.available,
+            },
+            {
+              label: "Save as copy",
+              onSelect: () =>
+                file.openDocument(
+                  sprite.document(),
+                  `${file.name.slice(0, 93)} (copy)`,
+                ),
+            },
+            {
+              label: "Version history…",
+              onSelect: () => onVersionHistory?.(),
+              hidden: !onVersionHistory,
             },
             {
               label: "Download .pigxel",

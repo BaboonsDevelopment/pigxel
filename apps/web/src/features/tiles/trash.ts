@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TRASH_DAYS } from "./constants";
+import { removeAllVersions } from "@/features/versions/server";
 
 const BATCH = 200;
 
@@ -33,6 +34,10 @@ async function purgeBatch(): Promise<{ purged: number; failed: boolean }> {
     return { purged: 0, failed: true };
   }
   if (!data.length) return { purged: 0, failed: false };
+  await removeAllVersions(
+    supabase,
+    data.map((tile) => tile.id),
+  ).catch(() => {});
   const files = await supabase.storage
     .from("tiles")
     .remove(data.map((tile) => `${tile.user_id}/${tile.id}.pigxel`));

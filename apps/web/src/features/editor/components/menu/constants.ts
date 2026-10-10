@@ -1,5 +1,8 @@
+import type { ReactNode } from "react";
+
 export type MenuItem = {
   label: string;
+  icon?: ReactNode;
   shortcut?: string;
   hidden?: boolean;
   disabled?: boolean;

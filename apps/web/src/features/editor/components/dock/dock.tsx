@@ -3,8 +3,11 @@
 import { Fragment, type ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import {
+  FLOAT_DEFAULT,
   MIN_PANEL,
   PANEL_LABELS,
+  movePanel,
+  setActiveTab,
   setBottomHeight,
   setPanelCollapsed,
   setPanelHeight,
@@ -26,7 +29,13 @@ export type PanelContent = {
   actions?: ReactNode;
 };
 
-type SetLayout = (change: (layout: Layout) => Layout) => void;
+export type SetLayout = (change: (layout: Layout) => Layout) => void;
+
+export const centeredFloat = () => ({
+  x: Math.max(8, Math.round((window.innerWidth - FLOAT_DEFAULT.w) / 2)),
+  y: 120,
+  ...FLOAT_DEFAULT,
+});
 
 export function Dock({
   side,
@@ -125,22 +134,34 @@ export function Dock({
           return (
             <Fragment key={item.id}>
               <Panel
-                id={item.id}
-                title={PANEL_LABELS[item.id]}
+                id={item.active}
+                title={PANEL_LABELS[item.active]}
                 collapsed={collapsed}
-                fill={panels[item.id].fill}
-                actions={panels[item.id].actions}
+                fill={panels[item.active].fill}
+                actions={panels[item.active].actions}
                 height={layout.heights[item.id]}
-                dragging={drag.dragging === item.id}
+                dragging={drag.dragging === item.active}
+                tabs={item.group}
                 onDragStart={drag.start}
+                onSelectTab={(tab) =>
+                  setLayout((l) => setActiveTab(l, item.id, tab))
+                }
                 onCollapse={(on) =>
                   setLayout((l) => setPanelCollapsed(l, item.id, on))
                 }
+                onFloat={() =>
+                  setLayout((l) =>
+                    movePanel(l, item.active, {
+                      kind: "float",
+                      rect: centeredFloat(),
+                    }),
+                  )
+                }
                 onClose={() =>
-                  setLayout((l) => setPanelShown(l, item.id, false))
+                  setLayout((l) => setPanelShown(l, item.active, false))
                 }
               >
-                {panels[item.id].body}
+                {panels[item.active].body}
               </Panel>
               {bar}
             </Fragment>
