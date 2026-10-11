@@ -45,6 +45,11 @@ export function Timeline({
     x: number;
     y: number;
   } | null>(null);
+  const [copiedCel, setCopiedCel] = useState<Uint8ClampedArray | null>(null);
+  const [draggedCel, setDraggedCel] = useState<{
+    layerId: string;
+    frameId: string;
+  } | null>(null);
   const [celMenu, setCelMenu] = useState<{
     layerId: string;
     frameId: string;
@@ -272,6 +277,25 @@ export function Timeline({
                   activeLayer={row.layer.id === layerId}
                   hasCel={(frame) => sprite.hasCel(frame, row.layer.id)}
                   isLinked={(frame) => sprite.isCelLinked(row.layer.id, frame)}
+                  canDrag={
+                    row.layer.kind !== "background" &&
+                    sprite.canEditCels(row.layer.id)
+                  }
+                  dragged={
+                    draggedCel?.layerId === row.layer.id
+                      ? draggedCel.frameId
+                      : null
+                  }
+                  onDragCel={(frame) =>
+                    setDraggedCel(
+                      frame ? { layerId: row.layer.id, frameId: frame } : null,
+                    )
+                  }
+                  onDropCel={(frame) => {
+                    if (draggedCel?.layerId === row.layer.id)
+                      sprite.moveCel(row.layer.id, draggedCel.frameId, frame);
+                    setDraggedCel(null);
+                  }}
                   onSelect={(frame) => {
                     sprite.selectLayer(row.layer.id);
                     sprite.selectFrame(frame);
@@ -341,6 +365,28 @@ export function Timeline({
           x={celMenu.x}
           y={celMenu.y}
           sections={[
+            [
+              {
+                label: "Copy cel",
+                onSelect: () =>
+                  setCopiedCel(
+                    new Uint8ClampedArray(
+                      sprite.readCel(celMenu.layerId, celMenu.frameId),
+                    ),
+                  ),
+                disabled: !sprite.hasCel(celMenu.frameId, celMenu.layerId),
+              },
+              {
+                label: "Paste cel",
+                onSelect: () =>
+                  copiedCel &&
+                  sprite.pasteCel(celMenu.layerId, celMenu.frameId, copiedCel),
+                disabled:
+                  !copiedCel ||
+                  copiedCel.length !== sprite.size.w * sprite.size.h * 4 ||
+                  !sprite.canEditCels(celMenu.layerId),
+              },
+            ],
             [
               {
                 label: "Cel properties…",

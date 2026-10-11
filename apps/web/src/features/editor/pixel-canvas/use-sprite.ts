@@ -13,7 +13,13 @@ import {
   type InlineText,
   type LayerText,
 } from "@/lib/layers/text";
-import type { Floating } from "./selection";
+import {
+  liftPixels,
+  stampFloating,
+  type Floating,
+  type Mask,
+} from "./selection";
+import { rgbaOf } from "./paint";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { lockedAlpha } from "@/lib/layers/alpha-lock";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
@@ -728,6 +734,27 @@ export function useSprite(
     }
   };
 
+  const canEditCels = (id: string) =>
+    !viewing.current && layerTree.canPaint(tree, id);
+
+  const pasteCel = (id: string, frame: string, pixels: Uint8ClampedArray) => {
+    if (!canEditCels(id) || pixels.length !== size.w * size.h * 4) return;
+    writeCels(id, new Map([[frame, new Uint8ClampedArray(pixels)]]));
+  };
+
+  const moveCel = (id: string, from: string, to: string) => {
+    const pixels = cels.pixels(from, id);
+    if (from === to || !pixels || !canEditCels(id) || isBackground(id)) return;
+    writeCels(
+      id,
+      new Map([
+        [to, new Uint8ClampedArray(pixels)],
+        [from, null],
+      ]),
+    );
+    setFrameId(to);
+  };
+
   const linkCelRange = (
     layer: string,
     sourceFrame: string,
@@ -1383,6 +1410,48 @@ export function useSprite(
     );
   };
 
+  const tweenFrames = (mask: Mask, offsets: { x: number; y: number }[]) => {
+    if (!offsets.length || !layerTree.canPaint(tree, layerId)) return;
+    const fill = fillOf(layerId);
+    const lifted = liftPixels(
+      cels.pixels(frameId, layerId) ??
+        new Uint8ClampedArray(size.w * size.h * 4),
+      size,
+      mask,
+      fill ? rgbaOf(fill) : null,
+    );
+    if (!lifted) return;
+    const current = frames.find((f) => f.id === frameId)!;
+    const at = frameList.frameIndex(frames, frameId) + 1;
+    let nextFrames = frames;
+    let nextTags = tags;
+    const nextSettings = [...celSettings];
+    offsets.forEach((offset, i) => {
+      const frame = frameList.createFrame(current.duration);
+      for (const layer of layerTree.allLayers(tree)) {
+        if (layer.kind === "group") continue;
+        const pixels =
+          layer.id === layerId
+            ? stampFloating(lifted.under, size, {
+                ...lifted.floating,
+                x: lifted.floating.x + offset.x,
+                y: lifted.floating.y + offset.y,
+              })
+            : cels.pixels(frameId, layer.id);
+        if (pixels) changed.current.add(addCel(frame.id, layer.id, pixels));
+      }
+      nextFrames = frameList.insertFrame(nextFrames, frame, at + i);
+      nextTags = insertAt(nextTags, at + i);
+      nextSettings.push(
+        ...celSettings
+          .filter((setting) => setting.frameId === frameId)
+          .map((setting) => ({ ...setting, frameId: frame.id })),
+      );
+    });
+    setFrameId(nextFrames[at]!.id);
+    changeFrames(nextFrames, nextTags, nextSettings);
+  };
+
   const removeFrame = (id: string) => {
     if (frames.length < 2) return;
     const next = frameList.removeFrame(frames, id);
@@ -1596,6 +1665,9 @@ export function useSprite(
     isCelLinked: (layer: string, frame: string) =>
       !!celLinks.linkOf(links, layer, frame),
     linkCelRange,
+    canEditCels,
+    pasteCel,
+    moveCel,
     unlinkCel,
     editLayerCels,
     readCel: (layer: string, frame: string) =>
@@ -1666,6 +1738,7 @@ export function useSprite(
     stepFrame: (step: number) =>
       setFrameId(frameList.stepFrame(frames, frameId, step).id),
     addFrame,
+    tweenFrames,
     removeFrame,
     moveFrame: (id: string, index: number) =>
       changeFrames(frameList.moveFrame(frames, id, index)),

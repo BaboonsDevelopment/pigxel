@@ -113,7 +113,34 @@ export async function readPublishedTile(tile: {
   return data.text();
 }
 
-export async function saveCloudTile(
+const ownVersions = new Map<string, Set<number>>();
+const saving = new Map<string, Promise<unknown>>();
+
+const remember = (id: string, version: string) => {
+  const known = ownVersions.get(id) ?? new Set<number>();
+  known.add(Date.parse(version));
+  ownVersions.set(id, known);
+};
+
+export function saveCloudTile(
+  tile: { id?: string; name: string; version?: string },
+  contents: string,
+  image: PigxelDocument,
+  thumbnail: string,
+): Promise<CloudTile> {
+  if (!tile.id) return writeCloudTile(tile, contents, image, thumbnail);
+  const id = tile.id;
+  const next = (saving.get(id) ?? Promise.resolve())
+    .catch(() => {})
+    .then(() => writeCloudTile(tile, contents, image, thumbnail));
+  saving.set(id, next);
+  void next.finally(() => {
+    if (saving.get(id) === next) saving.delete(id);
+  });
+  return next;
+}
+
+async function writeCloudTile(
   tile: { id?: string; name: string; version?: string },
   contents: string,
   image: PigxelDocument,
@@ -129,13 +156,15 @@ export async function saveCloudTile(
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };
-  const updating = tile.id
-    ? supabase.from("tiles").update(details).eq("id", tile.id)
-    : null;
-  const { data, error } = updating
-    ? await (tile.version ? updating.eq("updated_at", tile.version) : updating)
-        .select("id, user_id, name")
-        .maybeSingle()
+  if (tile.id) remember(tile.id, details.updated_at);
+  const update = (version?: string) => {
+    const query = supabase.from("tiles").update(details).eq("id", tile.id!);
+    return (version ? query.eq("updated_at", version) : query)
+      .select("id, user_id, name")
+      .maybeSingle();
+  };
+  let { data, error } = tile.id
+    ? await update(tile.version)
     : await supabase
         .from("tiles")
         .insert(details)
@@ -145,12 +174,18 @@ export async function saveCloudTile(
   if (!data && tile.id && tile.version) {
     const { data: still } = await supabase
       .from("tiles")
-      .select("id")
+      .select("updated_at")
       .eq("id", tile.id)
       .is("deleted_at", null)
-      .maybeSingle();
-    if (still) throw new CloudConflictError();
+      .maybeSingle<{ updated_at: string }>();
+    if (still && ownVersions.get(tile.id)?.has(Date.parse(still.updated_at))) {
+      ({ data, error } = await update(still.updated_at));
+      if (error)
+        throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
+    }
+    if (!data && still) throw new CloudConflictError();
   }
+  if (data && !tile.id) remember(data.id, details.updated_at);
   if (!data)
     throw new CloudError(
       "This tile is no longer in Pigxel cloud. Save it again to keep it.",

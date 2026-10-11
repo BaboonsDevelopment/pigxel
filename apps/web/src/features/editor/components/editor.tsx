@@ -176,6 +176,7 @@ const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
 });
+const TweenDialog = dynamic(() => import("./tween-dialog"), { ssr: false });
 const SaveSelectionDialog = dynamic(() => import("./save-selection-dialog"), {
   ssr: false,
 });
@@ -316,6 +317,7 @@ export function Editor({
   } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
   const [savingSelection, setSavingSelection] = useState(false);
+  const [tweening, setTweening] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -506,7 +508,10 @@ export function Editor({
     },
     [userId, draft.id, image],
   );
-  const playback = usePlayback(sprite);
+  const playback = usePlayback(
+    sprite,
+    `pigxel:playback:v1:${userId}:${sprite.id}`,
+  );
   const selection = useSelection(sprite);
 
   const [sliceId, setSliceId] = useState<string | null>(null);
@@ -938,6 +943,11 @@ export function Editor({
             { label: "Border…", onSelect: () => setModifying("border") },
           ],
         ],
+      },
+      {
+        label: "Tween into new frames…",
+        onSelect: () => setTweening(true),
+        disabled: !selection.mask || !sprite.canPaint,
       },
     ],
     [
@@ -1796,6 +1806,17 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {tweening && (
+        <TweenDialog
+          onApply={(offsets) => {
+            const mask = selection.mask;
+            if (!mask) return;
+            selection.drop();
+            sprite.tweenFrames(mask, offsets);
+          }}
+          onClose={() => setTweening(false)}
         />
       )}
       {savingSelection && (

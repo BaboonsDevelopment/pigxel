@@ -2,15 +2,42 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
-import { playSequence, tagSequence, type PlayMode } from "@/lib/sprite/tags";
+import {
+  PLAY_MODES,
+  PLAY_SPEEDS,
+  playSequence,
+  tagSequence,
+  type PlayMode,
+} from "@/lib/sprite/tags";
+
+type Saved = { mode: PlayMode; speed: number };
+
+function readSaved(key: string): Saved {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
+    const v = (raw ?? {}) as Record<string, unknown>;
+    return {
+      mode: PLAY_MODES.find((m) => m.value === v.mode)?.value ?? "loop",
+      speed: PLAY_SPEEDS.includes(v.speed as number) ? (v.speed as number) : 1,
+    };
+  } catch {
+    return { mode: "loop", speed: 1 };
+  }
+}
 
 export type Playback = ReturnType<typeof usePlayback>;
 
-export function usePlayback(sprite: SpriteApi) {
+export function usePlayback(sprite: SpriteApi, storageKey: string) {
   const [playing, setPlaying] = useState(false);
   const [tagId, setTagId] = useState<string | null>(null);
-  const [mode, setMode] = useState<PlayMode>("loop");
-  const [speed, setSpeed] = useState(1);
+  const [mode, setMode] = useState<PlayMode>(() => readSaved(storageKey).mode);
+  const [speed, setSpeed] = useState(() => readSaved(storageKey).speed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ mode, speed }));
+    } catch {}
+  }, [storageKey, mode, speed]);
   const tag = sprite.tags.find((item) => item.id === tagId);
   const sequence = tag
     ? tagSequence(tag)
