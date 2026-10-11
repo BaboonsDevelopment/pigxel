@@ -4,6 +4,11 @@ import { readColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { readSlices, type Slice } from "@/lib/slices/slices";
 import {
+  readSavedSelections,
+  writeSavedSelections,
+  type SavedSelection,
+} from "@/lib/selections/saved";
+import {
   isSquare,
   readPixelRatio,
   type PixelRatio,
@@ -58,6 +63,7 @@ export type PigxelDocument = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  selections?: SavedSelection[];
   colorMode?: ColorMode;
   pixelRatio?: PixelRatio;
 };
@@ -192,6 +198,9 @@ export function serializePigxel(doc: PigxelDocument): string {
     cels,
     palette: doc.palette,
     slices: doc.slices,
+    ...(doc.selections?.length && {
+      selections: writeSavedSelections(doc.selections, doc.width * doc.height),
+    }),
     ...(doc.colorMode &&
       doc.colorMode !== "rgb" && { colorMode: doc.colorMode }),
     ...(!isSquare(doc.pixelRatio) && { pixelRatio: doc.pixelRatio }),
@@ -283,6 +292,7 @@ export function parsePigxel(text: string): PigxelDocument {
     cels,
     palette,
     slices,
+    selections: readSavedSelections(file.selections, width, height),
     colorMode: readColorMode(file.colorMode),
     pixelRatio: readPixelRatio(file.pixelRatio),
   };

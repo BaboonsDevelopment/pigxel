@@ -1,6 +1,7 @@
 "use client";
 
 import { useImperativeHandle, useState } from "react";
+import { areaAround } from "../../pixel-canvas/helpers";
 import { extendStroke, type Point } from "../../pixel-canvas/pen";
 import {
   isSelected,
@@ -8,12 +9,12 @@ import {
   selectModeOf,
   type SelectMode,
 } from "../../pixel-canvas/selection";
-import { PathGuide, ToolSvg } from "../shared/overlays";
+import { PathGuide, SizeLabel, ToolSvg } from "../shared/overlays";
 import { useSelectionMove } from "../shared/use-selection-move";
 import type { ToolCanvasProps } from "../types";
 
 export function LassoCanvas({ ref, ...props }: ToolCanvasProps) {
-  const { selection, sprite } = props;
+  const { selection, sprite, scale } = props;
   const { size } = sprite;
   const moving = useSelectionMove(props);
   const [drag, setDrag] = useState<{
@@ -48,9 +49,12 @@ export function LassoCanvas({ ref, ...props }: ToolCanvasProps) {
 
   return (
     drag && (
-      <ToolSvg size={size}>
-        <PathGuide points={drag.points} />
-      </ToolSvg>
+      <>
+        <ToolSvg size={size}>
+          <PathGuide points={drag.points} />
+        </ToolSvg>
+        <SizeLabel box={areaAround(drag.points, size)} scale={scale} />
+      </>
     )
   );
 }

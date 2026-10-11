@@ -33,9 +33,12 @@ import {
 } from "../pixel-canvas/pixel-canvas";
 import {
   borderMask,
+  colorMask,
+  contentMask,
   contractMask,
   expandMask,
   maskBounds,
+  type SelectMode,
 } from "../pixel-canvas/selection";
 import {
   copiedPiece,
@@ -66,7 +69,14 @@ import { loadAssetFrame, type Asset } from "@/features/assets/assets";
 import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { allLayers, isShown, panelRows } from "@/lib/layers/tree";
+import {
+  allLayers,
+  findLayer,
+  isShown,
+  panelRows,
+  pixelLayerIds,
+} from "@/lib/layers/tree";
+import { nextSelectionName } from "@/lib/selections/saved";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
@@ -165,6 +175,9 @@ const RECENT_FILES = 10;
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
+});
+const SaveSelectionDialog = dynamic(() => import("./save-selection-dialog"), {
+  ssr: false,
 });
 const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
@@ -302,6 +315,7 @@ export function Editor({
     picture: Uint8ClampedArray;
   } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
+  const [savingSelection, setSavingSelection] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -482,6 +496,7 @@ export function Editor({
           cels: now.cels,
           palette: now.palette,
           slices: now.slices,
+          selections: now.selections,
           colorMode: now.colorMode,
           pixelRatio: now.pixelRatio,
         },
@@ -568,6 +583,10 @@ export function Editor({
     nudgeDown: () => void selection.nudge(0, 1),
     nudgeLeft: () => void selection.nudge(-1, 0),
     nudgeRight: () => void selection.nudge(1, 0),
+    nudgeUpFar: () => void selection.nudge(0, -10),
+    nudgeDownFar: () => void selection.nudge(0, 10),
+    nudgeLeftFar: () => void selection.nudge(-10, 0),
+    nudgeRightFar: () => void selection.nudge(10, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
     togglePreview: () => setPreviewing((on) => !on),
     toggleCanvasOnly: () => setCanvasOnly((on) => !on),
@@ -894,6 +913,16 @@ export function Editor({
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
       },
+      {
+        label: "Select by colour",
+        onSelect: () =>
+          selection.select(
+            colorMask(
+              sprite.readCel(sprite.layerId, sprite.frameId),
+              rgbaOf(pen.color),
+            ),
+          ),
+      },
     ],
     [
       {
@@ -910,17 +939,46 @@ export function Editor({
     ],
     [
       {
-        label: "Save selection",
-        onSelect: selection.saveSelection,
+        label: "Save selection…",
+        onSelect: () => setSavingSelection(true),
         disabled: !selection.mask,
       },
       {
-        label: "Load saved selection",
-        onSelect: selection.loadSelection,
-        disabled: !selection.hasSaved,
+        label: "Load selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.loadSelection(saved.id),
+          })),
+        ],
+      },
+      {
+        label: "Delete saved selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.deleteSelection(saved.id),
+          })),
+        ],
       },
     ],
   ];
+  const selectLayerContent = (id: string, mode: SelectMode) => {
+    const layer = findLayer(sprite.tree, id)?.layer;
+    if (!layer) return;
+    const mask = new Uint8Array(sprite.size.w * sprite.size.h);
+    for (const pixelLayer of layer.kind === "group"
+      ? pixelLayerIds(layer.children)
+      : [id])
+      contentMask(sprite.readCel(pixelLayer, sprite.frameId)).forEach(
+        (on, i) => {
+          if (on) mask[i] = 1;
+        },
+      );
+    selection.select(mask, mode);
+  };
   const transformTile = (t: TileTransform) => {
     selection.deselect();
     sprite.transformAll(t);
@@ -1393,6 +1451,7 @@ export function Editor({
           sprite={sprite}
           playback={playback}
           onTilemap={(convert) => setTiling({ convert })}
+          onSelectContent={selectLayerContent}
         />
       ),
     },
@@ -1731,6 +1790,13 @@ export function Editor({
             file.openDocument(documentFromFrames(frames), sheet.name)
           }
           onClose={() => setSheet(null)}
+        />
+      )}
+      {savingSelection && (
+        <SaveSelectionDialog
+          defaultName={nextSelectionName(sprite.selections)}
+          onSave={selection.saveSelection}
+          onClose={() => setSavingSelection(false)}
         />
       )}
       {modifying && (

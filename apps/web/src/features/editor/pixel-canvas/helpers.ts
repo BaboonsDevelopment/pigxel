@@ -78,6 +78,16 @@ export function areaBetween(a: Point, b: Point, size: Size): Area {
   return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+export function areaAround(points: Point[], size: Size): Area {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  return areaBetween(
+    { x: Math.min(...xs), y: Math.min(...ys) },
+    { x: Math.max(...xs), y: Math.max(...ys) },
+    size,
+  );
+}
+
 export function boxBetween(a: Point, b: Point): Area {
   return {
     x: Math.min(a.x, b.x),

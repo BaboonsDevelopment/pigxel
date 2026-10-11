@@ -27,6 +27,7 @@ import {
 } from "@/lib/tilemap/tilemap";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
+import type { SavedSelection } from "@/lib/selections/saved";
 import { movedSlices } from "@/lib/sprite/canvas-size";
 import {
   scalePicture,
@@ -92,6 +93,7 @@ type Snapshot = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  selections: SavedSelection[];
   colorMode: ColorMode;
   pixelRatio: PixelRatio;
 };
@@ -131,6 +133,7 @@ export function useSprite(
   const [celSettings, setCelSettings] = useState(initial.celSettings ?? []);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
+  const [selections, setSelectionsState] = useState(initial.selections ?? []);
   const [colorMode, setColorModeState] = useState<ColorMode>(
     initial.colorMode ?? "rgb",
   );
@@ -174,6 +177,7 @@ export function useSprite(
         cels: initial.cels,
         palette: initial.palette,
         slices: initial.slices,
+        selections: initial.selections ?? [],
         colorMode: initial.colorMode ?? "rgb",
         pixelRatio: initial.pixelRatio ?? SQUARE,
       }),
@@ -359,6 +363,7 @@ export function useSprite(
       size?: Size;
       palette?: string[];
       slices?: Slice[];
+      selections?: SavedSelection[];
       colorMode?: ColorMode;
       pixelRatio?: PixelRatio;
       recolor?: ReadonlyMap<string, string>;
@@ -457,6 +462,7 @@ export function useSprite(
       cels: new Map(),
       palette: next.palette ?? palette,
       slices: next.slices ?? slices,
+      selections: next.selections ?? selections,
       colorMode: mode,
       pixelRatio: next.pixelRatio ?? pixelRatio,
     };
@@ -602,6 +608,7 @@ export function useSprite(
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
+    setSelectionsState(snapshot.selections ?? []);
     setColorModeState(snapshot.colorMode);
     setPixelRatioState(snapshot.pixelRatio);
     if (!layerTree.findLayer(snapshot.tree, layerId))
@@ -1295,6 +1302,11 @@ export function useSprite(
     finish({ slices: next });
   };
 
+  const setSelections = (next: SavedSelection[]) => {
+    setSelectionsState(next);
+    finish({ selections: next });
+  };
+
   const touchAll = () => {
     for (const { canvas } of cels.list()) changed.current.add(canvas);
   };
@@ -1345,6 +1357,8 @@ export function useSprite(
     setPixelRatio,
     slices,
     setSlices,
+    selections,
+    setSelections,
     layerId,
     activeLayer,
     eraseFill: fillOf(layerId),
@@ -1498,6 +1512,7 @@ export function useSprite(
       background,
       palette,
       slices,
+      selections,
       colorMode,
       pixelRatio,
       layers: tree,

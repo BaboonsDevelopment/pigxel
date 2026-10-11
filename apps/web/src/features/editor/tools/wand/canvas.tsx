@@ -9,7 +9,10 @@ export function WandCanvas({ ref, pen, sprite, selection }: ToolCanvasProps) {
   useImperativeHandle(ref, () => ({
     down(e, point) {
       if (e.button !== 0) return;
-      const cel = sprite.readCel(sprite.layerId, sprite.frameId);
+      const cel =
+        pen.wandFrom === "all"
+          ? sprite.composite(["reference"])
+          : sprite.readCel(sprite.layerId, sprite.frameId);
       selection.select(
         wandMask(
           cel,

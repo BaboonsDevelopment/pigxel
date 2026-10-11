@@ -14,7 +14,7 @@ type Props = {
   drop: DropZone | null;
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
-  onSelect: () => void;
+  onSelect: (e: React.MouseEvent) => void;
   onSolo: () => void;
   onChange: (patch: LayerPatch) => void;
   onContextMenu: (e: React.MouseEvent) => void;

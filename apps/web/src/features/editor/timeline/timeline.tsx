@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { ContextMenu } from "../components/menu/context-menu";
+import { selectModeOf, type SelectMode } from "../pixel-canvas/selection";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { panelRows } from "@/lib/layers/tree";
 import { frameActions, layerActions } from "./actions";
@@ -26,10 +27,12 @@ export function Timeline({
   sprite,
   playback,
   onTilemap,
+  onSelectContent,
 }: {
   sprite: SpriteApi;
   playback: Playback;
   onTilemap: (convert: boolean) => void;
+  onSelectContent: (layerId: string, mode: SelectMode) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
@@ -216,7 +219,11 @@ export function Timeline({
                 drop={over?.id === row.layer.id ? over.zone : null}
                 renaming={renaming === row.layer.id}
                 onRenamingChange={(on) => setRenaming(on ? row.layer.id : null)}
-                onSelect={() => sprite.selectLayer(row.layer.id)}
+                onSelect={(e) =>
+                  e.ctrlKey || e.metaKey
+                    ? onSelectContent(row.layer.id, selectModeOf(e))
+                    : sprite.selectLayer(row.layer.id)
+                }
                 onSolo={() => sprite.toggleSolo(row.layer.id)}
                 onChange={(patch) => sprite.updateLayer(row.layer.id, patch)}
                 onContextMenu={(e) => {

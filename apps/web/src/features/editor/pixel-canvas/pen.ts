@@ -25,6 +25,7 @@ export type PenSettings = {
   contiguous: boolean;
   fillFrom: "layer" | "all";
   pickFrom: "layer" | "all";
+  wandFrom: "layer" | "all";
   tolerance: number;
   gradientShape: GradientShape;
   gradientDither: GradientDither;
@@ -66,6 +67,7 @@ export const DEFAULT_PEN: PenSettings = {
   tolerance: 0,
   fillFrom: "layer",
   pickFrom: "all",
+  wandFrom: "layer",
   gradientShape: "linear",
   gradientDither: "bayer4",
   gradientColors: [],
