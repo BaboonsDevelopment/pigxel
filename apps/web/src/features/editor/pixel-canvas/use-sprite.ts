@@ -539,6 +539,19 @@ export function useSprite(
     commit();
   };
 
+  const editLayerCels = (
+    change: (pixels: Uint8ClampedArray) => Uint8ClampedArray | null,
+  ) => {
+    if (!layerTree.canPaint(tree, layerId)) return;
+    const next = new Map<string, Uint8ClampedArray | null>();
+    for (const frame of frames) {
+      const pixels = cels.pixels(frame.id, layerId);
+      const out = pixels && change(pixels);
+      if (out) next.set(frame.id, new Uint8ClampedArray(out));
+    }
+    if (next.size) writeCels(layerId, next);
+  };
+
   const clearCel = () => {
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !layerTree.canPaint(tree, layerId)) return;
@@ -1443,6 +1456,7 @@ export function useSprite(
       !!celLinks.linkOf(links, layer, frame),
     linkCelRange,
     unlinkCel,
+    editLayerCels,
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,

@@ -608,9 +608,12 @@ export function Editor({
       pixels: Uint8ClampedArray,
       mask: Uint8Array | null,
     ) => Uint8ClampedArray,
+    allFrames = false,
   ) => {
     selection.drop();
-    sprite.editCel((pixels) => change(pixels, selection.mask));
+    const mask = selection.mask;
+    if (allFrames) sprite.editLayerCels((pixels) => change(pixels, mask));
+    else sprite.editCel((pixels) => change(pixels, mask));
   };
 
   const adjust = (kind: AdjustKind) => {
@@ -1833,16 +1836,19 @@ export function Editor({
           palette={sprite.palette}
           from={pen.color}
           to={pen.secondary}
-          onApply={({ from, to, tolerance, keepShading }) =>
-            applyEffect((pixels, mask) =>
-              replacedColor(
-                pixels,
-                rgbaOf(from),
-                rgbaOf(to),
-                mask,
-                tolerance,
-                keepShading,
-              ),
+          frameCount={sprite.frames.length}
+          onApply={({ from, to, tolerance, keepShading, allFrames }) =>
+            applyEffect(
+              (pixels, mask) =>
+                replacedColor(
+                  pixels,
+                  rgbaOf(from),
+                  rgbaOf(to),
+                  mask,
+                  tolerance,
+                  keepShading,
+                ),
+              allFrames,
             )
           }
           onClose={() => setReplacing(null)}
@@ -1931,9 +1937,18 @@ export function Editor({
           mask={outlining.mask}
           palette={sprite.palette}
           color={pen.color}
-          onApply={({ color, ...settings }) =>
-            applyEffect((pixels, mask) =>
-              outlinedWith(pixels, sprite.size, rgbaOf(color), mask, settings),
+          frameCount={sprite.frames.length}
+          onApply={({ color, allFrames, ...settings }) =>
+            applyEffect(
+              (pixels, mask) =>
+                outlinedWith(
+                  pixels,
+                  sprite.size,
+                  rgbaOf(color),
+                  mask,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setOutlining(null)}
@@ -1945,15 +1960,20 @@ export function Editor({
           size={sprite.size}
           pixels={adjusting.pixels}
           mask={adjusting.mask}
-          onApply={(settings) =>
-            applyEffect((pixels, mask) =>
-              adjustedColors(
-                adjusting.kind,
-                pixels,
-                mask,
-                sprite.size,
-                settings,
-              ),
+          frameCount={sprite.frames.length}
+          colorMode={sprite.colorMode}
+          palette={sprite.palette}
+          onApply={(settings, allFrames) =>
+            applyEffect(
+              (pixels, mask) =>
+                adjustedColors(
+                  adjusting.kind,
+                  pixels,
+                  mask,
+                  sprite.size,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setAdjusting(null)}
