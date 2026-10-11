@@ -19,6 +19,7 @@ import {
   syncTilemap,
   tileCells,
   uniqueTiles,
+  usedTiles,
   withNewTiles,
   writeCell,
   type TileFlip,
@@ -1138,10 +1139,13 @@ export function useSprite(
       : null;
   };
 
-  const placeTile = (col: number, row: number, index: number | null) => {
+  const placeTiles = (
+    cells: { col: number; row: number }[],
+    index: number | null,
+  ) => {
     const layer = activeTilemap();
     const tile = index === null ? null : layer?.tiles[index];
-    if (!layer || tile === undefined) return;
+    if (!layer || tile === undefined || !cells.length) return;
     const content =
       tile && flipTile(tile, layer.tile, layer.flips ? tileFlip : NO_FLIP);
     placing.current = true;
@@ -1149,7 +1153,8 @@ export function useSprite(
     const pixels = own
       ? new Uint8ClampedArray(own)
       : new Uint8ClampedArray(size.w * size.h * 4);
-    writeCell(pixels, size, layer.tile, col, row, content);
+    for (const { col, row } of cells)
+      writeCell(pixels, size, layer.tile, col, row, content);
     const ctx = context(true);
     if (!ctx) return;
     ctx.putImageData(
@@ -1185,6 +1190,30 @@ export function useSprite(
     if (!found) return;
     setActiveTile(found.index);
     setTileFlip(found.flip);
+  };
+
+  const setTiles = (id: string, tiles: Uint8ClampedArray[]) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap" || !layerTree.canPaint(tree, id)) return;
+    changeTree(layerTree.updateLayer(tree, id, { tiles }));
+  };
+
+  const removeUnusedTiles = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap") return 0;
+    const used = usedTiles(
+      layer.tiles,
+      frames.map((frame) => cels.pixels(frame.id, id)),
+      size,
+      layer.tile,
+      layer.flips,
+    );
+    const removed = layer.tiles.length - used.length;
+    if (!removed) return 0;
+    const picked = layer.tiles[activeTile];
+    setActiveTile(Math.max(0, picked ? used.indexOf(picked) : 0));
+    setTiles(id, used);
+    return removed;
   };
 
   const setTileFlips = (id: string, flips: boolean) => {
@@ -1469,12 +1498,14 @@ export function useSprite(
     addTilemapLayer,
     convertToTilemap,
     convertToNormal,
-    placeTile,
+    placeTiles,
     finishPlacing,
     pickTile,
     tileFlip,
     setTileFlip,
     setTileFlips,
+    setTiles,
+    removeUnusedTiles,
     canMergeDown,
     mergeDown,
     canFlatten,

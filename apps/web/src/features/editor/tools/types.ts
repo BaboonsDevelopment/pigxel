@@ -51,6 +51,9 @@ export type ToolOptionProps = {
   slice: Slice | null;
   onSliceChange: (slice: Slice) => void;
   onSliceDelete: () => void;
+  slices: Slice[];
+  onSlicePick: (id: string) => void;
+  onSlicesChange: (slices: Slice[]) => void;
 };
 
 export type ToolOption = ComponentType<ToolOptionProps>;

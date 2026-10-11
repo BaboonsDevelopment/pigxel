@@ -1637,6 +1637,9 @@ export function Editor({
           slice={slice}
           onSliceChange={changeSlice}
           onSliceDelete={deleteSlice}
+          slices={sprite.slices}
+          onSlicePick={setSliceId}
+          onSlicesChange={sprite.setSlices}
         />
       </div>
       <div className="flex min-h-0 flex-1">
