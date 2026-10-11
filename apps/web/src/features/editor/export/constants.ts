@@ -15,6 +15,14 @@ export const EXPORT_FORMATS = [
       "The frame on screen on a solid background. Edges soften slightly; use PNG for game art.",
   },
   {
+    id: "svg",
+    label: "SVG",
+    extension: ".svg",
+    mime: "image/svg+xml",
+    description:
+      "The frame on screen as vector squares, sharp at any size. For web pages, print and design tools.",
+  },
+  {
     id: "gif",
     label: "GIF",
     extension: ".gif",

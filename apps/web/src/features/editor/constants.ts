@@ -65,7 +65,8 @@ export type Command =
   | "toggleOnion"
   | "togglePreview"
   | "toggleCanvasOnly"
-  | "toggleFullScreen";
+  | "toggleFullScreen"
+  | "showShortcuts";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
 

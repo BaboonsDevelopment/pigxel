@@ -55,7 +55,11 @@ import {
   type CanvasView,
 } from "../pixel-canvas/view";
 import type { MenuSections } from "./menu/constants";
-import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
+import {
+  useSprite,
+  type KeptSprite,
+  type SpriteApi,
+} from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
@@ -66,7 +70,11 @@ import { PointerPosition } from "./pointer-position";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
-import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
+import type { ExportSettings } from "../export/constants";
+import {
+  keepExportSettings,
+  loadExportSettings,
+} from "../export/saved-settings";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
 import {
@@ -136,15 +144,10 @@ import {
   type ToolId,
 } from "../constants";
 import { isTyping, sizeKey } from "../helpers";
-import {
-  actionFor,
-  keysLabel,
-  readKeymap,
-  writeKeymap,
-  type ActionId,
-  type Keymap,
-} from "../keymap";
+import { actionFor, keysLabel, type ActionId } from "../keymap";
 import { keepTile, type KeptTile } from "../kept-tiles";
+import { useKeymap } from "../use-keymap";
+import { keepHistory, loadHistory } from "@/lib/pigxel-file/history-store";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
@@ -330,8 +333,9 @@ export function Editor({
   } | null>(null);
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
-  const [exportSettings, setExportSettings] =
-    useState<ExportSettings>(DEFAULT_EXPORT);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(() =>
+    loadExportSettings(userId, image.id),
+  );
   const [tool, setTool] = useState<ToolId>("pen");
   const [layout, setLayout] = useEditorLayout(
     userId,
@@ -357,11 +361,7 @@ export function Editor({
   const [gridding, setGridding] = useState(false);
   const [showingHistory, setShowingHistory] = useState(false);
   const [editingKeys, setEditingKeys] = useState(false);
-  const [keymap, setKeymap] = useState(() => readKeymap(userId));
-  const changeKeymap = (next: Keymap) => {
-    setKeymap(next);
-    writeKeymap(userId, next);
-  };
+  const [keymap, changeKeymap] = useKeymap(userId);
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
@@ -390,8 +390,13 @@ export function Editor({
   });
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<SpriteApi>(null);
+  const historyReady = useRef(!!kept);
   const file = useTileFile({
     tile,
+    onDraft: (text) => {
+      if (historyReady.current)
+        keepHistory(userId, image.id, text, () => tile.current?.keep().history);
+    },
     fileInput,
     userId,
     initial: draft,
@@ -447,6 +452,20 @@ export function Editor({
   );
 
   const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
+  useEffect(() => {
+    if (historyReady.current) return;
+    let live = true;
+    void loadHistory<KeptSprite["history"]>(userId, image.id, draft.file).then(
+      (history) => {
+        if (!live) return;
+        if (history) tile.current?.adoptHistory(history);
+        historyReady.current = true;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [userId, image.id, draft.file]);
   const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
   const [seenLayers, setSeenLayers] = useState(layerIds);
   if (seenLayers.join() !== layerIds.join()) {
@@ -595,6 +614,7 @@ export function Editor({
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
     togglePreview: () => setPreviewing((on) => !on),
     toggleCanvasOnly: () => setCanvasOnly((on) => !on),
+    showShortcuts: () => setEditingKeys(true),
     toggleFullScreen: () => {
       if (document.fullscreenElement) {
         void document.exitFullscreen();
@@ -1346,6 +1366,10 @@ export function Editor({
   }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === "?" && !isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      return setEditingKeys(true);
+    }
     const shortcut = actionFor(e, keymap, isTyping(e.target));
     if (!shortcut) return;
     e.preventDefault();
@@ -2095,7 +2119,10 @@ export function Editor({
           }}
           pixelRatio={sprite.pixelRatio}
           settings={exportSettings}
-          onChange={setExportSettings}
+          onChange={(next) => {
+            setExportSettings(next);
+            keepExportSettings(userId, image.id, next);
+          }}
           onClose={() => setExporting(false)}
         />
       )}

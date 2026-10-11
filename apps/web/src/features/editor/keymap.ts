@@ -45,6 +45,7 @@ export const COMMAND_LABELS: Partial<Record<Command, string>> = {
   togglePreview: "Preview window",
   toggleCanvasOnly: "Canvas only",
   toggleFullScreen: "Full screen",
+  showShortcuts: "Keyboard shortcuts",
 };
 
 const COMMAND_KEYS: Partial<Record<Command, string[]>> = {
@@ -88,6 +89,7 @@ const COMMAND_KEYS: Partial<Record<Command, string[]>> = {
   togglePreview: ["F7"],
   toggleCanvasOnly: ["Tab"],
   toggleFullScreen: ["F11"],
+  showShortcuts: ["Shift+Slash"],
 };
 
 const WHILE_TYPING = new Set<string>([
@@ -236,31 +238,52 @@ export const ownerOf = (keymap: Keymap, combo: string) =>
 
 const keymapKey = (userId: string) => `pigxel:keys:v1:${userId}`;
 
+const changedKey = (userId: string) => `pigxel:keys-at:v1:${userId}`;
+
+export function parseKeymap(raw: unknown): Keymap {
+  if (!raw || typeof raw !== "object") return DEFAULT_KEYMAP;
+  const saved = raw as Record<string, unknown>;
+  return Object.fromEntries(
+    (Object.keys(DEFAULT_KEYMAP) as ActionId[]).map((id) => {
+      const keys = saved[id];
+      return [
+        id,
+        Array.isArray(keys) && keys.every((key) => typeof key === "string")
+          ? keys
+          : DEFAULT_KEYMAP[id],
+      ];
+    }),
+  ) as Keymap;
+}
+
 export function readKeymap(userId: string): Keymap {
   try {
-    const raw: unknown = JSON.parse(
-      localStorage.getItem(keymapKey(userId)) ?? "null",
+    return parseKeymap(
+      JSON.parse(localStorage.getItem(keymapKey(userId)) ?? "null"),
     );
-    if (!raw || typeof raw !== "object") return DEFAULT_KEYMAP;
-    const saved = raw as Record<string, unknown>;
-    return Object.fromEntries(
-      (Object.keys(DEFAULT_KEYMAP) as ActionId[]).map((id) => {
-        const keys = saved[id];
-        return [
-          id,
-          Array.isArray(keys) && keys.every((key) => typeof key === "string")
-            ? keys
-            : DEFAULT_KEYMAP[id],
-        ];
-      }),
-    ) as Keymap;
   } catch {
     return DEFAULT_KEYMAP;
   }
 }
 
-export function writeKeymap(userId: string, keymap: Keymap) {
+export function keymapChangedAt(userId: string) {
+  try {
+    return Number(localStorage.getItem(changedKey(userId))) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function writeKeymap(userId: string, keymap: Keymap, at: number) {
   try {
     localStorage.setItem(keymapKey(userId), JSON.stringify(keymap));
+    localStorage.setItem(changedKey(userId), String(at));
   } catch {}
+}
+
+export function resetAction(keymap: Keymap, action: ActionId): Keymap {
+  let next: Keymap = { ...keymap, [action]: [] };
+  for (const combo of DEFAULT_KEYMAP[action] ?? [])
+    next = withKey(next, action, combo);
+  return next;
 }

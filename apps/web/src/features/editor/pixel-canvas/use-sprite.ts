@@ -1749,6 +1749,13 @@ export function useSprite(
         }),
       ),
     keep: (): KeptSprite => ({ history: past.current, layerId, frameId }),
+    adoptHistory: (kept: KeptSprite["history"]) => {
+      const now = past.current;
+      if (now.past.length || now.future.length || !kept.present) return;
+      restore(kept.present, false);
+      past.current = kept;
+      repaint();
+    },
     document: (): PigxelDocument => ({
       id: initial.id,
       width: size.w,
