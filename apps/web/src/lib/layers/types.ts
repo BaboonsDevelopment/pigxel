@@ -14,6 +14,10 @@ type LayerBase = {
   opacity: number;
   blend: BlendMode;
   labelColor?: string;
+  mask?: boolean;
+  clip?: boolean;
+  alphaLock?: boolean;
+  above?: boolean;
   texts?: Record<string, LayerText>;
   textObjects?: Record<string, InlineText[]>;
 };

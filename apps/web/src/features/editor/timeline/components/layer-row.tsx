@@ -10,6 +10,7 @@ import { ICONS } from "../icons";
 type Props = {
   row: PanelRow;
   active: boolean;
+  picked: boolean;
   solo: boolean;
   drop: DropZone | null;
   renaming: boolean;
@@ -32,6 +33,7 @@ const toggle =
 export function LayerRow({
   row,
   active,
+  picked,
   solo,
   drop,
   renaming,
@@ -63,9 +65,10 @@ export function LayerRow({
       onContextMenu={onContextMenu}
       className={cn(
         "group/row relative flex h-8 cursor-default border-b text-sm select-none",
-        active
+        active || picked
           ? "bg-[color-mix(in_oklab,var(--color-primary)_10%,var(--color-background))]"
           : "bg-background hover:bg-muted",
+        picked && "shadow-[inset_2px_0_0_var(--color-primary)]",
         !layer.visible && "text-muted-foreground",
         drop === "above" && "shadow-[inset_0_2px_0_var(--color-primary)]",
         drop === "below" && "shadow-[inset_0_-2px_0_var(--color-primary)]",
@@ -149,6 +152,22 @@ export function LayerRow({
         {layer.kind === "group" && ICONS.group}
         {layer.kind === "reference" && ICONS.reference}
         {layer.kind === "tilemap" && ICONS.tilemap}
+        {layer.clip && (
+          <span
+            title="Clipped: shows only inside the layer below"
+            className="shrink-0 text-xs text-muted-foreground"
+          >
+            ↳
+          </span>
+        )}
+        {layer.mask && (
+          <span
+            title="Mask for the layer below: black hides it, white shows it"
+            className="shrink-0 rounded border px-1 text-[10px] text-muted-foreground"
+          >
+            mask
+          </span>
+        )}
 
         {renaming ? (
           <input
@@ -177,6 +196,22 @@ export function LayerRow({
           </span>
         )}
 
+        {layer.alphaLock && (
+          <span
+            title="Transparent pixels are locked: painting changes only drawn pixels"
+            className="shrink-0 text-[10px] text-muted-foreground"
+          >
+            α
+          </span>
+        )}
+        {layer.above && (
+          <span
+            title="Shown above the art"
+            className="shrink-0 text-[10px] text-muted-foreground"
+          >
+            top
+          </span>
+        )}
         {layer.opacity < 255 && (
           <span className="text-xs text-muted-foreground tabular-nums">
             {Math.round((layer.opacity / 255) * 100)}%

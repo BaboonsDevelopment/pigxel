@@ -247,7 +247,7 @@ export function TilesetPanel({
         variant="secondary"
         className="w-full"
         disabled={!layer.tiles.length}
-        title="Saves the tiles as one PNG and the layout as a Tiled map (.tmj) for Godot, Unity and other engines"
+        title="Saves the tiles as one PNG, a Godot TileSet (.tres) and the layout as a Tiled map (.tmj) for Godot, Unity and other engines. Keep the PNG next to the .tres"
         onClick={onExport}
       >
         Export tileset and map

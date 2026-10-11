@@ -24,6 +24,37 @@ export function tilesetImage(tiles: Uint8ClampedArray[], tile: TileSize) {
   return { rgba, w, h, columns };
 }
 
+export function godotTileSet({
+  tile,
+  count,
+  image,
+}: {
+  tile: TileSize;
+  count: number;
+  image: { file: string; columns: number };
+}): string {
+  const tiles = Array.from(
+    { length: count },
+    (_, i) => `${i % image.columns}:${Math.floor(i / image.columns)}/0 = 0`,
+  );
+  const size = `Vector2i(${tile.w}, ${tile.h})`;
+  return [
+    `[gd_resource type="TileSet" load_steps=3 format=3]`,
+    "",
+    `[ext_resource type="Texture2D" path=${JSON.stringify(image.file)} id="1_texture"]`,
+    "",
+    `[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_1"]`,
+    `texture = ExtResource("1_texture")`,
+    `texture_region_size = ${size}`,
+    ...tiles,
+    "",
+    "[resource]",
+    `tile_size = ${size}`,
+    `sources/0 = SubResource("TileSetAtlasSource_1")`,
+    "",
+  ].join("\n");
+}
+
 export function tiledMap({
   name,
   size,

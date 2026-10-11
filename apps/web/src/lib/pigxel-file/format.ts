@@ -129,6 +129,10 @@ type FileLayer = {
   opacity: number;
   blend: string;
   labelColor?: string;
+  mask?: boolean;
+  clip?: boolean;
+  alphaLock?: boolean;
+  above?: boolean;
   collapsed?: boolean;
   children?: FileLayer[];
   tile?: TileSize;
@@ -155,6 +159,10 @@ export function serializePigxel(doc: PigxelDocument): string {
       opacity,
       blend,
       ...(labelColor && { labelColor }),
+      ...(layer.mask && { mask: true }),
+      ...(layer.clip && { clip: true }),
+      ...(layer.alphaLock && { alphaLock: true }),
+      ...(layer.above && { above: true }),
       ...(layer.texts && { texts: layer.texts }),
       ...(layer.textObjects && { textObjects: layer.textObjects }),
     };
@@ -358,6 +366,12 @@ function readLayers(
         /^#[0-9a-fA-F]{6}$/.test(entry.labelColor)
           ? entry.labelColor
           : undefined,
+      ...(layer.kind === "normal" && entry.mask === true && { mask: true }),
+      ...(!isBackground && entry.clip === true && { clip: true }),
+      ...(layer.kind !== "group" &&
+        entry.alphaLock === true && { alphaLock: true }),
+      ...(layer.kind === "reference" &&
+        entry.above === true && { above: true }),
     };
     if (layer.kind === "group")
       return {

@@ -306,6 +306,33 @@ export function ColorPicker({
         }}
         className="h-7 w-full rounded-md border bg-background px-2 text-center font-mono text-xs tabular-nums uppercase"
       />
+
+      <div className="grid grid-cols-3 gap-1">
+        {(["R", "G", "B"] as const).map((label, i) => (
+          <label
+            key={label}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground"
+          >
+            <span className="font-medium">{label}</span>
+            <NumericInput
+              min={0}
+              max={255}
+              aria-label={`${label} from 0 to 255`}
+              value={parseInt(opaque.slice(1 + i * 2, 3 + i * 2), 16)}
+              onValueChange={(n) => {
+                const value = Math.min(255, Math.max(0, Math.round(n)));
+                const hex =
+                  opaque.slice(0, 1 + i * 2) +
+                  value.toString(16).padStart(2, "0") +
+                  opaque.slice(3 + i * 2);
+                const next = hexToHsv(hex);
+                change(next.s && next.v ? next : { ...next, h: hsv.h });
+              }}
+              className="h-6 w-full min-w-0 rounded border bg-background px-1 text-right text-foreground tabular-nums"
+            />
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

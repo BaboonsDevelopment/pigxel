@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { compositeOver, flatten, orderedLayers } from "@/lib/layers/composite";
+import {
+  compositeOver,
+  flatten,
+  masked,
+  orderedLayers,
+} from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
 import {
   replaceInlineText,
@@ -10,6 +15,7 @@ import {
 } from "@/lib/layers/text";
 import type { Floating } from "./selection";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
+import { lockedAlpha } from "@/lib/layers/alpha-lock";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import {
@@ -59,7 +65,15 @@ import { describeStep } from "./history-steps";
 export type LayerPatch = Partial<
   Pick<
     Layer,
-    "name" | "visible" | "locked" | "opacity" | "blend" | "labelColor"
+    | "name"
+    | "visible"
+    | "locked"
+    | "opacity"
+    | "blend"
+    | "labelColor"
+    | "clip"
+    | "alphaLock"
+    | "above"
   >
 > & { collapsed?: boolean };
 
@@ -123,6 +137,7 @@ export function useSprite(
   const [tree, setTree] = useState(initial.layers);
   const [soloId, setSoloId] = useState<string | null>(null);
   const [pickedFrames, setPickedFrames] = useState<string[]>([]);
+  const [pickedLayers, setPickedLayers] = useState<string[]>([]);
   const [tileMode, setTileMode] = useState<TileMode>("manual");
   const [activeTile, setActiveTile] = useState(0);
   const [tileFlip, setTileFlip] = useState<TileFlip>(NO_FLIP);
@@ -262,9 +277,23 @@ export function useSprite(
     });
   };
 
+  const alphaLocked = (id: string) =>
+    !!layerTree.findLayer(tree, id)?.layer.alphaLock;
+
+  const keepAlpha = (canvas: HTMLCanvasElement) => {
+    if (!alphaLocked(layerId)) return;
+    const ctx = contextOf(canvas);
+    if (!ctx) return;
+    const before = frameList.celOf(past.current.present.cels, frameId, layerId);
+    const image = ctx.getImageData(0, 0, size.w, size.h);
+    image.data.set(lockedAlpha(before, image.data));
+    ctx.putImageData(image, 0, 0);
+  };
+
   const touched = () => {
     const canvas = cels.get(frameId, layerId);
     if (canvas) {
+      keepAlpha(canvas);
       cels.invalidate(canvas);
       changed.current.add(canvas);
     }
@@ -545,10 +574,15 @@ export function useSprite(
   ) => {
     if (!layerTree.canPaint(tree, layerId)) return;
     const next = new Map<string, Uint8ClampedArray | null>();
+    const locked = alphaLocked(layerId);
     for (const frame of frames) {
       const pixels = cels.pixels(frame.id, layerId);
       const out = pixels && change(pixels);
-      if (out) next.set(frame.id, new Uint8ClampedArray(out));
+      if (out)
+        next.set(
+          frame.id,
+          locked ? lockedAlpha(pixels, out) : new Uint8ClampedArray(out),
+        );
     }
     if (next.size) writeCels(layerId, next);
   };
@@ -1009,33 +1043,40 @@ export function useSprite(
     const below = layerTree.layerBelow(tree, id);
     if (!layer || !below || !canMergeDown(id)) return;
     const length = size.w * size.h * 4;
-    for (const frame of frames) {
-      const top =
-        layer.kind === "group"
-          ? flatten(
-              layer.children,
-              (child) => cels.pixels(frame.id, child),
-              length,
-              ["reference"],
-              (child) => settingsForFrame(celSettings, frame.id).get(child),
-            )
-          : cels.pixels(frame.id, layer.id);
-      if (!top) continue;
-      const own = cels.pixels(frame.id, below.id);
-      const base = own
-        ? new Uint8ClampedArray(own)
-        : new Uint8ClampedArray(length);
-      compositeOver(
-        base,
-        top,
-        layer.opacity *
-          ((settingsForFrame(celSettings, frame.id).get(layer.id)?.opacity ??
-            255) /
-            255),
-        layer.blend,
-      );
-      putCels(below.id, [[frame.id, base]]);
-    }
+    if (layer.mask)
+      for (const frame of frames) {
+        const own = cels.pixels(frame.id, below.id);
+        const mask = cels.pixels(frame.id, layer.id);
+        if (own && mask) putCels(below.id, [[frame.id, masked(own, mask)]]);
+      }
+    else
+      for (const frame of frames) {
+        const top =
+          layer.kind === "group"
+            ? flatten(
+                layer.children,
+                (child) => cels.pixels(frame.id, child),
+                length,
+                ["reference"],
+                (child) => settingsForFrame(celSettings, frame.id).get(child),
+              )
+            : cels.pixels(frame.id, layer.id);
+        if (!top) continue;
+        const own = cels.pixels(frame.id, below.id);
+        const base = own
+          ? new Uint8ClampedArray(own)
+          : new Uint8ClampedArray(length);
+        compositeOver(
+          base,
+          top,
+          layer.opacity *
+            ((settingsForFrame(celSettings, frame.id).get(layer.id)?.opacity ??
+              255) /
+              255),
+          layer.blend,
+        );
+        putCels(below.id, [[frame.id, base]]);
+      }
     for (const gone of layerTree.pixelLayerIds([layer])) cels.deleteLayer(gone);
     setLayerId(below.id);
     changeTree(layerTree.removeLayer(tree, id));
@@ -1225,6 +1266,77 @@ export function useSprite(
         flips,
         ...(flips && { tiles: uniqueTiles(layer.tiles, layer.tile, true) }),
       }),
+    );
+  };
+
+  const keepsPixelLayer = (next: Layer[]) =>
+    layerTree
+      .allLayers(next)
+      .some(
+        (layer) =>
+          layer.kind === "normal" ||
+          layer.kind === "background" ||
+          layer.kind === "tilemap",
+      );
+
+  const replaceTree = (next: Layer[]) => {
+    const kept = new Set(layerTree.pixelLayerIds(next));
+    for (const gone of layerTree.pixelLayerIds(tree))
+      if (!kept.has(gone)) cels.deleteLayer(gone);
+    if (!layerTree.findLayer(next, layerId))
+      setLayerId(layerTree.pixelLayerIds(next).at(-1)!);
+    setPickedLayers([]);
+    changeTree(next);
+  };
+
+  const canRemoveLayers = (ids: string[]) =>
+    keepsPixelLayer(layerTree.withoutLayers(tree, new Set(ids)));
+
+  const removeLayers = (ids: string[]) => {
+    const next = layerTree.withoutLayers(tree, new Set(ids));
+    if (keepsPixelLayer(next)) replaceTree(next);
+  };
+
+  const mergeLayers = (ids: string[]) => {
+    const picked = layerTree.topLayers(tree, ids);
+    if (picked.length < 2) return;
+    const pixelIds = layerTree.pixelLayerIds(picked);
+    const background = picked.find((layer) => layer.kind === "background");
+    const top = picked.at(-1)!;
+    const target = background ?? layerTree.createLayer("normal", top.name);
+    for (const frame of frames)
+      putCels(target.id, [[frame.id, compositeOf(pixelIds, frame.id)]]);
+    const gone = new Set(
+      picked.filter((layer) => layer !== background).map((layer) => layer.id),
+    );
+    const next = layerTree.withoutLayers(
+      background
+        ? tree
+        : layerTree.insertLayer(
+            tree,
+            target,
+            layerTree.placeAbove(tree, top.id),
+          ),
+      gone,
+    );
+    setLayerId(target.id);
+    const kept = new Set(layerTree.pixelLayerIds(next));
+    for (const gone of layerTree.pixelLayerIds(tree))
+      if (!kept.has(gone)) cels.deleteLayer(gone);
+    setPickedLayers([]);
+    changeTree(next);
+  };
+
+  const addMask = (id: string) => {
+    const target = layerTree.findLayer(tree, id)?.layer;
+    if (!target || target.mask) return;
+    const mask: Layer = {
+      ...layerTree.createLayer("normal", `${target.name} mask`),
+      mask: true,
+    };
+    setLayerId(mask.id);
+    changeTree(
+      layerTree.insertLayer(tree, mask, layerTree.placeAbove(tree, id)),
     );
   };
 
@@ -1525,6 +1637,20 @@ export function useSprite(
       changeTree(layerTree.updateLayer(tree, id, patch)),
     moveLayer: (id: string, place: Place) =>
       changeTree(layerTree.moveLayer(tree, id, place)),
+    moveLayers: (ids: string[], place: Place) =>
+      changeTree(layerTree.moveLayers(tree, ids, place)),
+    removeLayers,
+    canRemoveLayers,
+    addMask,
+    mergeLayers,
+    selectedLayers: (() => {
+      const picked = layerTree
+        .allLayers(tree)
+        .filter((layer) => pickedLayers.includes(layer.id))
+        .map((layer) => layer.id);
+      return picked.length > 1 ? picked : [layerId];
+    })(),
+    pickLayers: setPickedLayers,
     selectFrame: setFrameId,
     selectedFrames: (() => {
       const picked = frames

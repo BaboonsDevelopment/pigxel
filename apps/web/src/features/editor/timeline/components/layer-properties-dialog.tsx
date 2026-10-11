@@ -35,6 +35,7 @@ export function LayerPropertiesDialog({
   const [opacity, setOpacity] = useState(layer.opacity);
   const [blend, setBlend] = useState(layer.blend);
   const [labelColor, setLabelColor] = useState(layer.labelColor);
+  const [above, setAbove] = useState(!!layer.above);
   return (
     <Dialog onClose={onClose} size="sm" portal>
       <DialogHeader title="Layer properties" />
@@ -46,7 +47,13 @@ export function LayerPropertiesDialog({
             e.preventDefault();
             const trimmed = name.trim();
             if (!trimmed) return;
-            onChange({ name: trimmed, opacity, blend, labelColor });
+            onChange({
+              name: trimmed,
+              opacity,
+              blend,
+              labelColor,
+              ...(layer.kind === "reference" && { above }),
+            });
             (e.currentTarget.closest("dialog") as HTMLDialogElement).close();
           }}
         >
@@ -89,6 +96,17 @@ export function LayerPropertiesDialog({
                 />
               </label>
             </>
+          )}
+          {layer.kind === "reference" && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={above}
+                onChange={(e) => setAbove(e.target.checked)}
+                className="accent-primary"
+              />
+              Show above the art
+            </label>
           )}
           <fieldset>
             <legend className="mb-2 text-sm">Timeline label</legend>

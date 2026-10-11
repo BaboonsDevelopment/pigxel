@@ -215,19 +215,35 @@ export function Timeline({
                 key={row.layer.id}
                 row={row}
                 active={row.layer.id === layerId}
+                picked={
+                  sprite.selectedLayers.length > 1 &&
+                  sprite.selectedLayers.includes(row.layer.id)
+                }
                 solo={sprite.soloId === row.layer.id}
                 drop={over?.id === row.layer.id ? over.zone : null}
                 renaming={renaming === row.layer.id}
                 onRenamingChange={(on) => setRenaming(on ? row.layer.id : null)}
-                onSelect={(e) =>
-                  e.ctrlKey || e.metaKey
-                    ? onSelectContent(row.layer.id, selectModeOf(e))
-                    : sprite.selectLayer(row.layer.id)
-                }
+                onSelect={(e) => {
+                  if (e.ctrlKey || e.metaKey)
+                    return onSelectContent(row.layer.id, selectModeOf(e));
+                  if (e.shiftKey) {
+                    const picked = sprite.selectedLayers;
+                    return sprite.pickLayers(
+                      picked.includes(row.layer.id)
+                        ? picked.filter((id) => id !== row.layer.id)
+                        : [...picked, row.layer.id],
+                    );
+                  }
+                  sprite.pickLayers([]);
+                  sprite.selectLayer(row.layer.id);
+                }}
                 onSolo={() => sprite.toggleSolo(row.layer.id)}
                 onChange={(patch) => sprite.updateLayer(row.layer.id, patch)}
                 onContextMenu={(e) => {
-                  sprite.selectLayer(row.layer.id);
+                  if (!sprite.selectedLayers.includes(row.layer.id)) {
+                    sprite.pickLayers([]);
+                    sprite.selectLayer(row.layer.id);
+                  }
                   openMenu("layer", e);
                 }}
                 onDragStart={() => setDragging(row.layer.id)}
@@ -238,8 +254,13 @@ export function Timeline({
                 }}
                 onDragLeave={() => setOver(null)}
                 onDrop={() => {
-                  if (dragging && over)
-                    sprite.moveLayer(dragging, dropPlace(row, over.zone));
+                  if (dragging && over) {
+                    const place = dropPlace(row, over.zone);
+                    const picked = sprite.selectedLayers;
+                    if (picked.length > 1 && picked.includes(dragging))
+                      sprite.moveLayers(picked, place);
+                    else sprite.moveLayer(dragging, place);
+                  }
                   endDrag();
                 }}
                 onDragEnd={endDrag}
