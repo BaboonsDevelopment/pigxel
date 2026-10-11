@@ -9,7 +9,7 @@ export const tileTool = defineTool({
   shortcut: "P",
   icon,
   group: "tiles",
-  hint: "On a tilemap layer: click places the tile picked in the Tileset panel · Right-click clears a cell · Alt+click picks a cell’s tile",
+  hint: "On a tilemap layer: click or drag places the tile picked in the Tileset panel · Shift+drag fills a rectangle of cells · Alt+Shift+click fills the area of matching cells · Right-click clears a cell · Alt+click picks a cell’s tile",
   tip: pointTip(true),
   options: [],
   canvas: TileCanvas,

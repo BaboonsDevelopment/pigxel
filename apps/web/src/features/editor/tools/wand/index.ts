@@ -6,6 +6,7 @@ import {
 import { defineTool } from "../types";
 import { WandCanvas } from "./canvas";
 import { icon } from "./icon";
+import { WandFromOption } from "./options";
 
 export const wandTool = defineTool({
   id: "wand",
@@ -16,6 +17,11 @@ export const wandTool = defineTool({
   hint: "Click selects a colour area · Shift adds · Alt takes away",
   selects: true,
   anyLayer: true,
-  options: [ContiguousOption, ToleranceOption, SelectionActions],
+  options: [
+    ContiguousOption,
+    WandFromOption,
+    ToleranceOption,
+    SelectionActions,
+  ],
   canvas: WandCanvas,
 });

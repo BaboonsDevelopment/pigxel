@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ToolId } from "../constants";
 import { toolTitle } from "../helpers";
-import { TOOL_GROUPS, toolById } from "../tools";
+import { toolById } from "../tools";
+import { orderedToolGroups } from "../tool-order";
 
 const HOLD_MS = 400;
 type Beside = { top: number; left?: number; right?: number };
@@ -23,12 +24,16 @@ export function ToolBar({
   onSelect,
   hiddenTools,
   groupTools,
+  groupOrder,
+  toolOrder,
   keyOf,
 }: {
   tool: ToolId;
   onSelect: (tool: ToolId) => void;
   hiddenTools: string[];
   groupTools: Record<string, string>;
+  groupOrder: string[];
+  toolOrder: string[];
   keyOf: (tool: ToolId) => string | undefined;
 }) {
   const [open, setOpen] = useState<{ group: string; at: Beside } | null>(null);
@@ -53,7 +58,7 @@ export function ToolBar({
     };
   }, [open]);
 
-  const groups = TOOL_GROUPS.flatMap((group) => {
+  const groups = orderedToolGroups(groupOrder, toolOrder).flatMap((group) => {
     const tools = group.tools.filter((id) => !hiddenTools.includes(id));
     if (!tools.length) return [];
     const remembered = groupTools[group.id] as ToolId | undefined;

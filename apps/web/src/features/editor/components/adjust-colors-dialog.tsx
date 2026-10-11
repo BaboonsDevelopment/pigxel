@@ -3,19 +3,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NumericInput } from "./numeric-input";
 import { Button } from "@pigxel/ui/components/button";
+import { cn } from "@pigxel/ui/lib/utils";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import {
   CONVOLUTIONS,
+  CURVE_CHANNELS,
+  STRAIGHT_CHANNELS,
   STRAIGHT_CURVE,
+  type CurveChannel,
   adjustedColors,
   type AdjustKind,
   type AdjustSettings,
 } from "../pixel-canvas/effects";
 import { CurveEditor } from "./curve-editor";
 import { MatrixEditor } from "./matrix-editor";
+import { AllFramesOption } from "./all-frames-option";
+import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 
 type Size = { w: number; h: number };
+
+const CHANNEL_LABELS = {
+  rgb: "RGB",
+  red: "Red",
+  green: "Green",
+  blue: "Blue",
+};
+
+const CHANNEL_TONES = {
+  rgb: "",
+  red: "text-red-600",
+  green: "text-green-600",
+  blue: "text-blue-600",
+};
 
 const SLIDERS = {
   hueSaturation: [
@@ -67,6 +87,9 @@ export default function AdjustColorsDialog({
   size,
   pixels,
   mask,
+  frameCount,
+  colorMode,
+  palette,
   onApply,
   onClose,
 }: {
@@ -74,20 +97,42 @@ export default function AdjustColorsDialog({
   size: Size;
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
-  onApply: (settings: AdjustSettings) => void;
+  frameCount: number;
+  colorMode: ColorMode;
+  palette: string[];
+  onApply: (settings: AdjustSettings, allFrames: boolean) => void;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const preview = useRef<HTMLCanvasElement>(null);
   const [values, setValues] = useState(() => initialValues(kind));
   const [curve, setCurve] = useState(STRAIGHT_CURVE);
+  const [channels, setChannels] = useState(STRAIGHT_CHANNELS);
+  const [channel, setChannel] = useState<CurveChannel | "rgb">("rgb");
   const [matrix, setMatrix] = useState(FIRST.matrix);
+  const [allFrames, setAllFrames] = useState(false);
   useEffect(() => dialog.current?.showModal(), []);
 
-  const result = useMemo(
-    () => adjustedColors(kind, pixels, mask, size, { values, curve, matrix }),
-    [kind, pixels, mask, size, values, curve, matrix],
-  );
+  const result = useMemo(() => {
+    const out = adjustedColors(kind, pixels, mask, size, {
+      values,
+      curve,
+      channels,
+      matrix,
+    });
+    return inColorMode(out, colorMode, palette) ?? out;
+  }, [
+    kind,
+    pixels,
+    mask,
+    size,
+    values,
+    curve,
+    channels,
+    matrix,
+    colorMode,
+    palette,
+  ]);
   const changed = useMemo(() => {
     let n = 0;
     for (let i = 0; i < result.length; i += 4)
@@ -102,8 +147,10 @@ export default function AdjustColorsDialog({
   }, [result, pixels]);
   const untouched =
     curve === STRAIGHT_CURVE &&
+    channels === STRAIGHT_CHANNELS &&
     matrix === FIRST.matrix &&
     SLIDERS[kind].every(({ key, initial }) => values[key] === initial);
+  const applicable = changed > 0 || (allFrames && !untouched);
   const fit = Math.min(PREVIEW.w / size.w, PREVIEW.h / size.h);
   const zoom = fit >= 1 ? Math.floor(fit) : fit;
 
@@ -136,7 +183,10 @@ export default function AdjustColorsDialog({
         <div>
           <SectionTitle id="adjust-colors-title">{TITLES[kind]}</SectionTitle>
           <Lead className="mt-1">
-            {mask ? "In the selection" : "On the whole layer"}, in this frame.
+            {mask ? "In the selection" : "On the whole layer"},{" "}
+            {allFrames ? "in every frame" : "in this frame"}.
+            {colorMode === "indexed" &&
+              " Colours stay in the palette: each one goes to its nearest palette colour."}
           </Lead>
         </div>
         <Button
@@ -155,8 +205,8 @@ export default function AdjustColorsDialog({
         className="space-y-5 p-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!changed) return;
-          onApply({ values, curve, matrix });
+          if (!applicable) return;
+          onApply({ values, curve, channels, matrix }, allFrames);
           dialog.current?.close();
         }}
       >
@@ -173,8 +223,35 @@ export default function AdjustColorsDialog({
         </div>
 
         {kind === "curve" && (
-          <div className="flex justify-center">
-            <CurveEditor points={curve} onChange={setCurve} />
+          <div className="grid justify-items-center gap-3">
+            <div
+              role="group"
+              aria-label="Channel"
+              className="flex gap-1 rounded-lg border p-0.5"
+            >
+              {(["rgb", ...CURVE_CHANNELS] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={channel === option}
+                  onClick={() => setChannel(option)}
+                  className="h-7 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground"
+                >
+                  {CHANNEL_LABELS[option]}
+                </button>
+              ))}
+            </div>
+            <div className={cn("w-full max-w-64", CHANNEL_TONES[channel])}>
+              <CurveEditor
+                key={channel}
+                points={channel === "rgb" ? curve : channels[channel]}
+                onChange={(points) =>
+                  channel === "rgb"
+                    ? setCurve(points)
+                    : setChannels((c) => ({ ...c, [channel]: points }))
+                }
+              />
+            </div>
           </div>
         )}
 
@@ -228,8 +305,15 @@ export default function AdjustColorsDialog({
           {HINTS[kind]}{" "}
           {changed
             ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
-            : "Nothing changes yet."}
+            : untouched
+              ? "Nothing changes yet."
+              : "Nothing changes in this frame."}
         </FormMessage>
+        <AllFramesOption
+          frameCount={frameCount}
+          checked={allFrames}
+          onChange={setAllFrames}
+        />
 
         <div className="flex justify-between gap-2 border-t pt-4">
           <Button
@@ -239,6 +323,7 @@ export default function AdjustColorsDialog({
             onClick={() => {
               setValues(initialValues(kind));
               setCurve(STRAIGHT_CURVE);
+              setChannels(STRAIGHT_CHANNELS);
               setMatrix(FIRST.matrix);
             }}
           >
@@ -252,7 +337,7 @@ export default function AdjustColorsDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!changed}>
+            <Button type="submit" disabled={!applicable}>
               Apply
             </Button>
           </span>

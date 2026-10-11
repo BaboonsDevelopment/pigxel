@@ -37,3 +37,11 @@ export async function findPicture(id: string): Promise<string | null> {
     return null;
   }
 }
+
+export async function forgetPictures(ids: string[]) {
+  if (!available() || !ids.length) return;
+  try {
+    const cache = await caches.open(CACHE);
+    await Promise.all(ids.map((id) => cache.delete(keyOf(id))));
+  } catch {}
+}

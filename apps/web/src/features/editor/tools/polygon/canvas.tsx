@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { snapLine, type Point } from "../../pixel-canvas/pen";
+import { polygonOutline } from "@/lib/edit/raster";
 import { Corners, ToolSvg } from "../shared/overlays";
 import {
   cancelStroke,
@@ -31,7 +32,12 @@ export function PolygonCanvas({ ref, ...props }: ToolCanvasProps) {
 
   const draw = (current: Stroke) =>
     drawStroke(props, current, penInk, ({ paint }) =>
-      paint(polygonPixels(sprite.size, [...current.points, current.end]), true),
+      paint(
+        pen.fillShapes
+          ? polygonPixels(sprite.size, [...current.points, current.end])
+          : polygonOutline([...current.points, current.end]),
+        true,
+      ),
     );
 
   const show = (current: Stroke) =>

@@ -82,16 +82,27 @@ export function paintGradient(
   shape: GradientShape,
   dither: GradientDither,
   options: Pick<PaintOptions, "size" | "mask">,
+  intermediate: Rgba[] = [],
+  paletteOnly = false,
 ) {
   const { size, mask } = options;
+  const colors = [start, ...intermediate, end];
   for (let y = 0; y < size.h; y++)
     for (let x = 0; x < size.w; x++) {
       const i = y * size.w + x;
       if (mask && !mask[i]) continue;
-      const t = gradientAt(x, y, from, to, shape);
+      const position = gradientAt(x, y, from, to, shape) * (colors.length - 1);
+      const segment = Math.min(colors.length - 2, Math.floor(position));
+      const t = position - segment;
+      const a = colors[segment]!;
+      const b = colors[segment + 1]!;
       if (dither === "none") {
+        if (paletteOnly) {
+          data.set(t < 0.5 ? a : b, i * 4);
+          continue;
+        }
         data.set(
-          start.map((v, c) => Math.round(v + (end[c]! - v) * t)),
+          a.map((v, c) => Math.round(v + (b[c]! - v) * t)),
           i * 4,
         );
         continue;
@@ -100,7 +111,7 @@ export function paintGradient(
         dither === "bayer8"
           ? (bayer8(x, y) + 0.5) / 64
           : (BAYER[y & 3]![x & 3]! + 0.5) / 16;
-      data.set(t > threshold ? end : start, i * 4);
+      data.set(t > threshold ? b : a, i * 4);
     }
 }
 

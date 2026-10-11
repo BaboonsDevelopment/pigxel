@@ -12,6 +12,7 @@ import {
   type Ref,
 } from "react";
 import { frameIndex } from "@/lib/sprite/frames";
+import { pixelLayerIds } from "@/lib/layers/tree";
 import { tipRects } from "../tools/shared/tips";
 import type { Tool, ToolHandlers } from "../tools";
 import { SymmetryAxes } from "./components/symmetry-axes";
@@ -53,6 +54,7 @@ import {
   pixelColor,
   type ColorSlot,
   type PenSettings,
+  type TextStyle,
   type Point,
 } from "./pen";
 import { isSelected, maskOutline } from "./selection";
@@ -89,9 +91,11 @@ export function PixelCanvas({
   onPickColor,
   onUseColor,
   onTextPlaced,
+  onTextStyle,
   sliceId = null,
   onSelectSlice,
   onAxesChange,
+  onPointerPosition,
   ref,
 }: {
   tool: Tool;
@@ -105,9 +109,11 @@ export function PixelCanvas({
   onPickColor?: (color: string, slot: ColorSlot) => void;
   onUseColor?: (color: string) => void;
   onTextPlaced?: () => void;
+  onTextStyle?: (style: TextStyle) => void;
   sliceId?: string | null;
   onSelectSlice?: (id: string | null) => void;
   onAxesChange?: (axes: Axes | null) => void;
+  onPointerPosition?: (point: Point | null) => void;
   ref?: Ref<PixelCanvasHandle>;
 }) {
   const { size } = sprite;
@@ -115,6 +121,18 @@ export function PixelCanvas({
   const axes = view.axes ?? centreAxes(sprite.size);
   const [pending, setPending] = useState<Size | null>(null);
   const [hover, setHover] = useState<Point | null>(null);
+  const reportedPointer = useRef<Point | null>(null);
+  const reportPointer = (e?: React.PointerEvent<HTMLCanvasElement>) => {
+    const raw = e ? pixelAt(e) : null;
+    const point = raw ? wrapPixel(raw.x, raw.y, size, tiled) : null;
+    if (
+      point?.x === reportedPointer.current?.x &&
+      point?.y === reportedPointer.current?.y
+    )
+      return;
+    reportedPointer.current = point;
+    onPointerPosition?.(point);
+  };
   const [selecting, setSelecting] = useState(false);
   const [aiArea, setAiArea] = useState<Area | null>(null);
   const [toolPending, setToolPending] = useState(false);
@@ -308,9 +326,20 @@ export function PixelCanvas({
 
   const pickColor = (point: Point, slot: ColorSlot) => {
     const at = wrapPixel(point.x, point.y, size, tiled);
-    const pixel =
-      at && screenRef.current?.getContext("2d")?.getImageData(at.x, at.y, 1, 1);
-    const color = pixel && pixelColor(pixel, { x: 0, y: 0 });
+    if (!at) return;
+    const pixels =
+      pen.pickFrom === "layer"
+        ? sprite.activeLayer?.kind === "group"
+          ? sprite.compositeOf(pixelLayerIds(sprite.activeLayer.children))
+          : sprite.readCel(sprite.layerId, sprite.frameId)
+        : sprite.composite();
+    const offset = (at.y * size.w + at.x) * 4;
+    const pixel = new ImageData(
+      new Uint8ClampedArray(pixels.slice(offset, offset + 4)),
+      1,
+      1,
+    );
+    const color = pixelColor(pixel, { x: 0, y: 0 });
     if (color) onPickColor?.(color, slot);
   };
 
@@ -319,7 +348,7 @@ export function PixelCanvas({
     const point = pixelAt(e);
     const active = handlers.current;
     if (active?.pending?.()) return active.down?.(e, point);
-    if (e.altKey && !tool.selects)
+    if (e.altKey && !tool.selects && !tool.altFromCenter)
       return pickColor(point, e.button === 2 ? "secondary" : "primary");
     if (blocked) return;
     active?.down?.(e, point);
@@ -373,11 +402,21 @@ export function PixelCanvas({
   };
 
   const pointerHandlers = {
-    onPointerDown: selecting ? startAiArea : startPointer,
-    onPointerMove: selecting ? moveAiArea : movePointer,
+    onPointerEnter: reportPointer,
+    onPointerDown: (e: React.PointerEvent<HTMLCanvasElement>) => {
+      reportPointer(e);
+      (selecting ? startAiArea : startPointer)(e);
+    },
+    onPointerMove: (e: React.PointerEvent<HTMLCanvasElement>) => {
+      reportPointer(e);
+      (selecting ? moveAiArea : movePointer)(e);
+    },
     onPointerUp: selecting ? endAiArea : endPointer,
     onPointerCancel: selecting ? endAiArea : endPointer,
-    onPointerLeave: () => setHover(null),
+    onPointerLeave: () => {
+      setHover(null);
+      reportPointer();
+    },
     onDoubleClick: () => handlers.current?.doubleClick?.(),
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   };
@@ -543,6 +582,7 @@ export function PixelCanvas({
         pickColor={pickColor}
         onUseColor={onUseColor}
         onTextPlaced={onTextPlaced}
+        onTextStyle={onTextStyle}
         sliceId={sliceId}
         onSelectSlice={onSelectSlice}
       />

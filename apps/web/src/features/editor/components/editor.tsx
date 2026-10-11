@@ -25,6 +25,7 @@ import {
   clampPenSize,
   type ColorSlot,
   type PenSettings,
+  type TextStyle,
 } from "../pixel-canvas/pen";
 import {
   PixelCanvas,
@@ -32,9 +33,12 @@ import {
 } from "../pixel-canvas/pixel-canvas";
 import {
   borderMask,
+  colorMask,
+  contentMask,
   contractMask,
   expandMask,
   maskBounds,
+  type SelectMode,
 } from "../pixel-canvas/selection";
 import {
   copiedPiece,
@@ -51,19 +55,36 @@ import {
   type CanvasView,
 } from "../pixel-canvas/view";
 import type { MenuSections } from "./menu/constants";
-import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
+import {
+  useSprite,
+  type KeptSprite,
+  type SpriteApi,
+} from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
 import { PreviewWindow } from "./preview/preview-window";
 import { SecondView } from "./second-view";
+import { ZoomControl } from "./zoom-control";
+import { PointerPosition } from "./pointer-position";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
-import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
+import type { ExportSettings } from "../export/constants";
+import {
+  keepExportSettings,
+  loadExportSettings,
+} from "../export/saved-settings";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { allLayers, isShown, panelRows } from "@/lib/layers/tree";
+import {
+  allLayers,
+  findLayer,
+  isShown,
+  panelRows,
+  pixelLayerIds,
+} from "@/lib/layers/tree";
+import { nextSelectionName } from "@/lib/selections/saved";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
@@ -123,26 +144,17 @@ import {
   type ToolId,
 } from "../constants";
 import { isTyping, sizeKey } from "../helpers";
-import {
-  actionFor,
-  keysLabel,
-  readKeymap,
-  writeKeymap,
-  type ActionId,
-  type Keymap,
-} from "../keymap";
+import { actionFor, keysLabel, type ActionId } from "../keymap";
 import { keepTile, type KeptTile } from "../kept-tiles";
+import { useKeymap } from "../use-keymap";
+import { keepHistory, loadHistory } from "@/lib/pigxel-file/history-store";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
 import { useLayoutPresets } from "../use-layout-presets";
 import { LAYOUT_PRESETS, presetLayout } from "../layout-presets";
-import {
-  readBrushes,
-  withBrush,
-  writeBrushes,
-  type SavedBrush,
-} from "../brush-library";
+import { withBrush } from "../brush-library";
+import { useBrushLibrary } from "../use-brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
@@ -166,6 +178,10 @@ const RECENT_FILES = 10;
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
+});
+const TweenDialog = dynamic(() => import("./tween-dialog"), { ssr: false });
+const SaveSelectionDialog = dynamic(() => import("./save-selection-dialog"), {
+  ssr: false,
 });
 const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
@@ -271,6 +287,10 @@ export function Editor({
     else writeMark(userId, "opened", draft.id, true);
   }, [userId, draft.id, openedTile]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [pointerPosition, setPointerPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [exporting, setExporting] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
@@ -299,6 +319,8 @@ export function Editor({
     picture: Uint8ClampedArray;
   } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [tweening, setTweening] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -311,8 +333,9 @@ export function Editor({
   } | null>(null);
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
-  const [exportSettings, setExportSettings] =
-    useState<ExportSettings>(DEFAULT_EXPORT);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(() =>
+    loadExportSettings(userId, image.id),
+  );
   const [tool, setTool] = useState<ToolId>("pen");
   const [layout, setLayout] = useEditorLayout(
     userId,
@@ -338,11 +361,7 @@ export function Editor({
   const [gridding, setGridding] = useState(false);
   const [showingHistory, setShowingHistory] = useState(false);
   const [editingKeys, setEditingKeys] = useState(false);
-  const [keymap, setKeymap] = useState(() => readKeymap(userId));
-  const changeKeymap = (next: Keymap) => {
-    setKeymap(next);
-    writeKeymap(userId, next);
-  };
+  const [keymap, changeKeymap] = useKeymap(userId);
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
@@ -354,25 +373,30 @@ export function Editor({
     if (isStartKind(start)) router.replace(editorUrl(draft.id));
   }, [start, router, draft.id]);
   const [stamp, setStamp] = useState<Stamp | null>(null);
-  const [brushes, setBrushes] = useState(() => readBrushes(userId));
-  const changeBrushes = (next: SavedBrush[]) => {
-    setBrushes(next);
-    writeBrushes(userId, next);
-  };
+  const {
+    brushes,
+    changeBrushes,
+    status: brushStatus,
+  } = useBrushLibrary(userId);
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
-  const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
+  const { scale, zoomIn, zoomOut, zoomReset, zoomSet, zoomFit } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
     initial: kept?.scale,
   });
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<SpriteApi>(null);
+  const historyReady = useRef(!!kept);
   const file = useTileFile({
     tile,
+    onDraft: (text) => {
+      if (historyReady.current)
+        keepHistory(userId, image.id, text, () => tile.current?.keep().history);
+    },
     fileInput,
     userId,
     initial: draft,
@@ -428,6 +452,20 @@ export function Editor({
   );
 
   const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
+  useEffect(() => {
+    if (historyReady.current) return;
+    let live = true;
+    void loadHistory<KeptSprite["history"]>(userId, image.id, draft.file).then(
+      (history) => {
+        if (!live) return;
+        if (history) tile.current?.adoptHistory(history);
+        historyReady.current = true;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [userId, image.id, draft.file]);
   const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
   const [seenLayers, setSeenLayers] = useState(layerIds);
   if (seenLayers.join() !== layerIds.join()) {
@@ -479,6 +517,7 @@ export function Editor({
           cels: now.cels,
           palette: now.palette,
           slices: now.slices,
+          selections: now.selections,
           colorMode: now.colorMode,
           pixelRatio: now.pixelRatio,
         },
@@ -488,7 +527,10 @@ export function Editor({
     },
     [userId, draft.id, image],
   );
-  const playback = usePlayback(sprite);
+  const playback = usePlayback(
+    sprite,
+    `pigxel:playback:v1:${userId}:${sprite.id}`,
+  );
   const selection = useSelection(sprite);
 
   const [sliceId, setSliceId] = useState<string | null>(null);
@@ -565,9 +607,14 @@ export function Editor({
     nudgeDown: () => void selection.nudge(0, 1),
     nudgeLeft: () => void selection.nudge(-1, 0),
     nudgeRight: () => void selection.nudge(1, 0),
+    nudgeUpFar: () => void selection.nudge(0, -10),
+    nudgeDownFar: () => void selection.nudge(0, 10),
+    nudgeLeftFar: () => void selection.nudge(-10, 0),
+    nudgeRightFar: () => void selection.nudge(10, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
     togglePreview: () => setPreviewing((on) => !on),
     toggleCanvasOnly: () => setCanvasOnly((on) => !on),
+    showShortcuts: () => setEditingKeys(true),
     toggleFullScreen: () => {
       if (document.fullscreenElement) {
         void document.exitFullscreen();
@@ -586,9 +633,12 @@ export function Editor({
       pixels: Uint8ClampedArray,
       mask: Uint8Array | null,
     ) => Uint8ClampedArray,
+    allFrames = false,
   ) => {
     selection.drop();
-    sprite.editCel((pixels) => change(pixels, selection.mask));
+    const mask = selection.mask;
+    if (allFrames) sprite.editLayerCels((pixels) => change(pixels, mask));
+    else sprite.editCel((pixels) => change(pixels, mask));
   };
 
   const adjust = (kind: AdjustKind) => {
@@ -891,6 +941,16 @@ export function Editor({
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
       },
+      {
+        label: "Select by colour",
+        onSelect: () =>
+          selection.select(
+            colorMask(
+              sprite.readCel(sprite.layerId, sprite.frameId),
+              rgbaOf(pen.color),
+            ),
+          ),
+      },
     ],
     [
       {
@@ -904,20 +964,54 @@ export function Editor({
           ],
         ],
       },
+      {
+        label: "Tween into new frames…",
+        onSelect: () => setTweening(true),
+        disabled: !selection.mask || !sprite.canPaint,
+      },
     ],
     [
       {
-        label: "Save selection",
-        onSelect: selection.saveSelection,
+        label: "Save selection…",
+        onSelect: () => setSavingSelection(true),
         disabled: !selection.mask,
       },
       {
-        label: "Load saved selection",
-        onSelect: selection.loadSelection,
-        disabled: !selection.hasSaved,
+        label: "Load selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.loadSelection(saved.id),
+          })),
+        ],
+      },
+      {
+        label: "Delete saved selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.deleteSelection(saved.id),
+          })),
+        ],
       },
     ],
   ];
+  const selectLayerContent = (id: string, mode: SelectMode) => {
+    const layer = findLayer(sprite.tree, id)?.layer;
+    if (!layer) return;
+    const mask = new Uint8Array(sprite.size.w * sprite.size.h);
+    for (const pixelLayer of layer.kind === "group"
+      ? pixelLayerIds(layer.children)
+      : [id])
+      contentMask(sprite.readCel(pixelLayer, sprite.frameId)).forEach(
+        (on, i) => {
+          if (on) mask[i] = 1;
+        },
+      );
+    selection.select(mask, mode);
+  };
   const transformTile = (t: TileTransform) => {
     selection.deselect();
     sprite.transformAll(t);
@@ -1000,6 +1094,7 @@ export function Editor({
     ],
   ];
   const viewMenu: MenuSections = [
+    [{ label: "Fit to window", onSelect: zoomFit }],
     [
       {
         label: check(canvasOnly, "Canvas only"),
@@ -1271,6 +1366,10 @@ export function Editor({
   }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === "?" && !isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      return setEditingKeys(true);
+    }
     const shortcut = actionFor(e, keymap, isTyping(e.target));
     if (!shortcut) return;
     e.preventDefault();
@@ -1321,7 +1420,7 @@ export function Editor({
     view,
     stamp,
     highlight,
-    onTextPlaced: () => setTool("move"),
+    onTextStyle: (style: TextStyle) => setPen((p) => ({ ...p, ...style })),
     sliceId,
     onSelectSlice: setSliceId,
     onAxesChange: (axes: Axes | null) => setView((v) => ({ ...v, axes })),
@@ -1345,6 +1444,8 @@ export function Editor({
           onSelect={setTool}
           hiddenTools={layout.hiddenTools}
           groupTools={layout.groupTools}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
           keyOf={(id) => keyOf(`tool:${id}`)}
         />
       ),
@@ -1387,6 +1488,7 @@ export function Editor({
           sprite={sprite}
           playback={playback}
           onTilemap={(convert) => setTiling({ convert })}
+          onSelectContent={selectLayerContent}
         />
       ),
     },
@@ -1556,6 +1658,8 @@ export function Editor({
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
           brushes={brushes}
+          brushStatus={brushStatus}
+          palette={sprite.palette}
           onSaveBrush={() =>
             stamp &&
             changeBrushes(withBrush(brushes, stamp, crypto.randomUUID()))
@@ -1567,6 +1671,9 @@ export function Editor({
           slice={slice}
           onSliceChange={changeSlice}
           onSliceDelete={deleteSlice}
+          slices={sprite.slices}
+          onSlicePick={setSliceId}
+          onSlicesChange={sprite.setSlices}
         />
       </div>
       <div className="flex min-h-0 flex-1">
@@ -1594,20 +1701,38 @@ export function Editor({
             <div hidden={canvasOnly} className="contents">
               <Dock side="innerLeft" {...dockProps} />
             </div>
-            <main
-              ref={workspace}
-              data-guide="canvas"
-              data-canvas-drop
-              {...pan.handlers}
-              className={cn(
-                "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
-                pan.panning && "cursor-grab [&_*]:cursor-grab!",
-              )}
-            >
-              <div className="m-auto">
-                <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
+            <div className="relative flex min-h-0 min-w-0 flex-1">
+              <main
+                ref={workspace}
+                data-guide="canvas"
+                data-canvas-drop
+                {...pan.handlers}
+                className={cn(
+                  "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
+                  pan.panning && "cursor-grab [&_*]:cursor-grab!",
+                )}
+              >
+                <div className="m-auto">
+                  <PixelCanvas
+                    ref={canvas}
+                    scale={scale}
+                    {...canvasProps}
+                    onPointerPosition={setPointerPosition}
+                  />
+                </div>
+              </main>
+              <div className="absolute top-2 right-2 z-10">
+                <ZoomControl
+                  scale={scale}
+                  onChange={zoomSet}
+                  onFit={zoomFit}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                  onReset={zoomReset}
+                />
+                <PointerPosition point={pointerPosition} />
               </div>
-            </main>
+            </div>
             {splitView && (
               <SecondView
                 canvas={canvasProps}
@@ -1635,6 +1760,11 @@ export function Editor({
           keyOf={(id) => keyOf(`tool:${id}`)}
           hiddenTools={layout.hiddenTools}
           onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
+          onOrderChange={(groupOrder, toolOrder) =>
+            setLayout((l) => ({ ...l, groupOrder, toolOrder }))
+          }
           onClose={() => setCustomizing(false)}
         />
       )}
@@ -1702,6 +1832,24 @@ export function Editor({
           onClose={() => setSheet(null)}
         />
       )}
+      {tweening && (
+        <TweenDialog
+          onApply={(offsets) => {
+            const mask = selection.mask;
+            if (!mask) return;
+            selection.drop();
+            sprite.tweenFrames(mask, offsets);
+          }}
+          onClose={() => setTweening(false)}
+        />
+      )}
+      {savingSelection && (
+        <SaveSelectionDialog
+          defaultName={nextSelectionName(sprite.selections)}
+          onSave={selection.saveSelection}
+          onClose={() => setSavingSelection(false)}
+        />
+      )}
       {modifying && (
         <ModifySelectionDialog
           kind={modifying}
@@ -1736,16 +1884,19 @@ export function Editor({
           palette={sprite.palette}
           from={pen.color}
           to={pen.secondary}
-          onApply={({ from, to, tolerance, keepShading }) =>
-            applyEffect((pixels, mask) =>
-              replacedColor(
-                pixels,
-                rgbaOf(from),
-                rgbaOf(to),
-                mask,
-                tolerance,
-                keepShading,
-              ),
+          frameCount={sprite.frames.length}
+          onApply={({ from, to, tolerance, keepShading, allFrames }) =>
+            applyEffect(
+              (pixels, mask) =>
+                replacedColor(
+                  pixels,
+                  rgbaOf(from),
+                  rgbaOf(to),
+                  mask,
+                  tolerance,
+                  keepShading,
+                ),
+              allFrames,
             )
           }
           onClose={() => setReplacing(null)}
@@ -1814,7 +1965,11 @@ export function Editor({
         />
       )}
       {previewing && (
-        <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
+        <PreviewWindow
+          userId={userId}
+          sprite={sprite}
+          onClose={() => setPreviewing(false)}
+        />
       )}
       {onionSettings && (
         <OnionSettingsDialog
@@ -1830,9 +1985,18 @@ export function Editor({
           mask={outlining.mask}
           palette={sprite.palette}
           color={pen.color}
-          onApply={({ color, ...settings }) =>
-            applyEffect((pixels, mask) =>
-              outlinedWith(pixels, sprite.size, rgbaOf(color), mask, settings),
+          frameCount={sprite.frames.length}
+          onApply={({ color, allFrames, ...settings }) =>
+            applyEffect(
+              (pixels, mask) =>
+                outlinedWith(
+                  pixels,
+                  sprite.size,
+                  rgbaOf(color),
+                  mask,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setOutlining(null)}
@@ -1844,15 +2008,20 @@ export function Editor({
           size={sprite.size}
           pixels={adjusting.pixels}
           mask={adjusting.mask}
-          onApply={(settings) =>
-            applyEffect((pixels, mask) =>
-              adjustedColors(
-                adjusting.kind,
-                pixels,
-                mask,
-                sprite.size,
-                settings,
-              ),
+          frameCount={sprite.frames.length}
+          colorMode={sprite.colorMode}
+          palette={sprite.palette}
+          onApply={(settings, allFrames) =>
+            applyEffect(
+              (pixels, mask) =>
+                adjustedColors(
+                  adjusting.kind,
+                  pixels,
+                  mask,
+                  sprite.size,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setAdjusting(null)}
@@ -1950,7 +2119,10 @@ export function Editor({
           }}
           pixelRatio={sprite.pixelRatio}
           settings={exportSettings}
-          onChange={setExportSettings}
+          onChange={(next) => {
+            setExportSettings(next);
+            keepExportSettings(userId, image.id, next);
+          }}
           onClose={() => setExporting(false)}
         />
       )}

@@ -35,3 +35,21 @@ export function toGpl(palette: string[], name: string) {
     "\n",
   );
 }
+
+export const toHexFile = (palette: string[]) =>
+  palette.map((color) => color.slice(1, 7)).join("\n") + "\n";
+
+export function paletteStrip(palette: string[]) {
+  const rgba = new Uint8ClampedArray(palette.length * 4);
+  palette.forEach((color, i) =>
+    rgba.set(
+      [1, 3, 5, 7].map((at) =>
+        at === 7 && color.length < 9
+          ? 255
+          : parseInt(color.slice(at, at + 2), 16),
+      ),
+      i * 4,
+    ),
+  );
+  return { rgba, w: palette.length, h: 1 };
+}

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import {
   CloudConflictError,
@@ -80,8 +86,10 @@ export function useTileFile({
   drive,
   notice,
   onOpen,
+  onDraft,
 }: {
   tile: RefObject<{ document: () => PigxelDocument } | null>;
+  onDraft?: (file: string) => void;
   fileInput: RefObject<HTMLInputElement | null>;
   userId: string;
   initial: Draft;
@@ -90,6 +98,10 @@ export function useTileFile({
   onOpen: (draftId: string) => void;
 }) {
   const [name, setName] = useState(initial.name);
+  const onDraftRef = useRef(onDraft);
+  useLayoutEffect(() => {
+    onDraftRef.current = onDraft;
+  });
   const [location, setLocation] = useState<TileLocation | null>(
     initial.location,
   );
@@ -122,6 +134,7 @@ export function useTileFile({
     if (!doc) return;
     const file = serializePigxel(doc);
     writeDraft(userId, { id: initial.id, name, file, location, dirty });
+    onDraftRef.current?.(file);
   }, [tile, userId, initial.id, name, location, dirty, revision]);
 
   const currentImage = () => {

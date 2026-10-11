@@ -8,6 +8,7 @@ export function RectCanvas(props: ToolCanvasProps) {
     <DragStroke
       {...props}
       square
+      fromCenter
       render={(canvas) =>
         paintShape(
           canvas,

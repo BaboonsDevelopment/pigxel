@@ -36,6 +36,38 @@ function decode(text: string) {
   return Uint8ClampedArray.from(atob(text), (c) => c.charCodeAt(0));
 }
 
+export const encodeBrush = ({ id, stamp }: SavedBrush) => ({
+  id,
+  w: stamp.w,
+  h: stamp.h,
+  pixels: encode(stamp.pixels),
+});
+
+export function decodeBrush(raw: unknown): SavedBrush | null {
+  if (!raw || typeof raw !== "object") return null;
+  const b = raw as Record<string, unknown>;
+  if (
+    typeof b.id !== "string" ||
+    !Number.isInteger(b.w) ||
+    !Number.isInteger(b.h) ||
+    typeof b.pixels !== "string" ||
+    (b.w as number) < 1 ||
+    (b.h as number) < 1 ||
+    (b.w as number) > MAX_BRUSH_SIDE ||
+    (b.h as number) > MAX_BRUSH_SIDE ||
+    b.pixels.length > 87384
+  )
+    return null;
+  try {
+    const pixels = decode(b.pixels);
+    return pixels.length === (b.w as number) * (b.h as number) * 4
+      ? { id: b.id, stamp: { w: b.w as number, h: b.h as number, pixels } }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function readBrushes(
   userId: string,
   storage: Storage | undefined = browserStorage(),

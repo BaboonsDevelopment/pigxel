@@ -1,9 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { compositeOver, flatten, orderedLayers } from "@/lib/layers/composite";
+import {
+  compositeOver,
+  flatten,
+  masked,
+  orderedLayers,
+} from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
+import {
+  replaceInlineText,
+  type InlineText,
+  type LayerText,
+} from "@/lib/layers/text";
+import {
+  liftPixels,
+  stampFloating,
+  type Floating,
+  type Mask,
+} from "./selection";
+import { rgbaOf } from "./paint";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
+import { lockedAlpha } from "@/lib/layers/alpha-lock";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
 import {
@@ -13,6 +31,7 @@ import {
   syncTilemap,
   tileCells,
   uniqueTiles,
+  usedTiles,
   withNewTiles,
   writeCell,
   type TileFlip,
@@ -21,6 +40,7 @@ import {
 } from "@/lib/tilemap/tilemap";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
 import type { Slice } from "@/lib/slices/slices";
+import type { SavedSelection } from "@/lib/selections/saved";
 import { movedSlices } from "@/lib/sprite/canvas-size";
 import {
   scalePicture,
@@ -51,7 +71,15 @@ import { describeStep } from "./history-steps";
 export type LayerPatch = Partial<
   Pick<
     Layer,
-    "name" | "visible" | "locked" | "opacity" | "blend" | "labelColor"
+    | "name"
+    | "visible"
+    | "locked"
+    | "opacity"
+    | "blend"
+    | "labelColor"
+    | "clip"
+    | "alphaLock"
+    | "above"
   >
 > & { collapsed?: boolean };
 
@@ -86,6 +114,7 @@ type Snapshot = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  selections: SavedSelection[];
   colorMode: ColorMode;
   pixelRatio: PixelRatio;
 };
@@ -114,6 +143,7 @@ export function useSprite(
   const [tree, setTree] = useState(initial.layers);
   const [soloId, setSoloId] = useState<string | null>(null);
   const [pickedFrames, setPickedFrames] = useState<string[]>([]);
+  const [pickedLayers, setPickedLayers] = useState<string[]>([]);
   const [tileMode, setTileMode] = useState<TileMode>("manual");
   const [activeTile, setActiveTile] = useState(0);
   const [tileFlip, setTileFlip] = useState<TileFlip>(NO_FLIP);
@@ -125,6 +155,7 @@ export function useSprite(
   const [celSettings, setCelSettings] = useState(initial.celSettings ?? []);
   const [palette, setPaletteState] = useState(initial.palette);
   const [slices, setSlicesState] = useState(initial.slices);
+  const [selections, setSelectionsState] = useState(initial.selections ?? []);
   const [colorMode, setColorModeState] = useState<ColorMode>(
     initial.colorMode ?? "rgb",
   );
@@ -168,6 +199,7 @@ export function useSprite(
         cels: initial.cels,
         palette: initial.palette,
         slices: initial.slices,
+        selections: initial.selections ?? [],
         colorMode: initial.colorMode ?? "rgb",
         pixelRatio: initial.pixelRatio ?? SQUARE,
       }),
@@ -251,9 +283,23 @@ export function useSprite(
     });
   };
 
+  const alphaLocked = (id: string) =>
+    !!layerTree.findLayer(tree, id)?.layer.alphaLock;
+
+  const keepAlpha = (canvas: HTMLCanvasElement) => {
+    if (!alphaLocked(layerId)) return;
+    const ctx = contextOf(canvas);
+    if (!ctx) return;
+    const before = frameList.celOf(past.current.present.cels, frameId, layerId);
+    const image = ctx.getImageData(0, 0, size.w, size.h);
+    image.data.set(lockedAlpha(before, image.data));
+    ctx.putImageData(image, 0, 0);
+  };
+
   const touched = () => {
     const canvas = cels.get(frameId, layerId);
     if (canvas) {
+      keepAlpha(canvas);
       cels.invalidate(canvas);
       changed.current.add(canvas);
     }
@@ -353,6 +399,7 @@ export function useSprite(
       size?: Size;
       palette?: string[];
       slices?: Slice[];
+      selections?: SavedSelection[];
       colorMode?: ColorMode;
       pixelRatio?: PixelRatio;
       recolor?: ReadonlyMap<string, string>;
@@ -451,6 +498,7 @@ export function useSprite(
       cels: new Map(),
       palette: next.palette ?? palette,
       slices: next.slices ?? slices,
+      selections: next.selections ?? selections,
       colorMode: mode,
       pixelRatio: next.pixelRatio ?? pixelRatio,
     };
@@ -527,6 +575,24 @@ export function useSprite(
     commit();
   };
 
+  const editLayerCels = (
+    change: (pixels: Uint8ClampedArray) => Uint8ClampedArray | null,
+  ) => {
+    if (!layerTree.canPaint(tree, layerId)) return;
+    const next = new Map<string, Uint8ClampedArray | null>();
+    const locked = alphaLocked(layerId);
+    for (const frame of frames) {
+      const pixels = cels.pixels(frame.id, layerId);
+      const out = pixels && change(pixels);
+      if (out)
+        next.set(
+          frame.id,
+          locked ? lockedAlpha(pixels, out) : new Uint8ClampedArray(out),
+        );
+    }
+    if (next.size) writeCels(layerId, next);
+  };
+
   const clearCel = () => {
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !layerTree.canPaint(tree, layerId)) return;
@@ -596,6 +662,7 @@ export function useSprite(
     setSize(snapshot.size);
     setPaletteState(snapshot.palette);
     setSlicesState(snapshot.slices);
+    setSelectionsState(snapshot.selections ?? []);
     setColorModeState(snapshot.colorMode);
     setPixelRatioState(snapshot.pixelRatio);
     if (!layerTree.findLayer(snapshot.tree, layerId))
@@ -665,6 +732,27 @@ export function useSprite(
       if (pixels) changed.current.add(addCel(frame, id, pixels));
       else cels.delete(frame, id);
     }
+  };
+
+  const canEditCels = (id: string) =>
+    !viewing.current && layerTree.canPaint(tree, id);
+
+  const pasteCel = (id: string, frame: string, pixels: Uint8ClampedArray) => {
+    if (!canEditCels(id) || pixels.length !== size.w * size.h * 4) return;
+    writeCels(id, new Map([[frame, new Uint8ClampedArray(pixels)]]));
+  };
+
+  const moveCel = (id: string, from: string, to: string) => {
+    const pixels = cels.pixels(from, id);
+    if (from === to || !pixels || !canEditCels(id) || isBackground(id)) return;
+    writeCels(
+      id,
+      new Map([
+        [to, new Uint8ClampedArray(pixels)],
+        [from, null],
+      ]),
+    );
+    setFrameId(to);
   };
 
   const linkCelRange = (
@@ -982,33 +1070,40 @@ export function useSprite(
     const below = layerTree.layerBelow(tree, id);
     if (!layer || !below || !canMergeDown(id)) return;
     const length = size.w * size.h * 4;
-    for (const frame of frames) {
-      const top =
-        layer.kind === "group"
-          ? flatten(
-              layer.children,
-              (child) => cels.pixels(frame.id, child),
-              length,
-              ["reference"],
-              (child) => settingsForFrame(celSettings, frame.id).get(child),
-            )
-          : cels.pixels(frame.id, layer.id);
-      if (!top) continue;
-      const own = cels.pixels(frame.id, below.id);
-      const base = own
-        ? new Uint8ClampedArray(own)
-        : new Uint8ClampedArray(length);
-      compositeOver(
-        base,
-        top,
-        layer.opacity *
-          ((settingsForFrame(celSettings, frame.id).get(layer.id)?.opacity ??
-            255) /
-            255),
-        layer.blend,
-      );
-      putCels(below.id, [[frame.id, base]]);
-    }
+    if (layer.mask)
+      for (const frame of frames) {
+        const own = cels.pixels(frame.id, below.id);
+        const mask = cels.pixels(frame.id, layer.id);
+        if (own && mask) putCels(below.id, [[frame.id, masked(own, mask)]]);
+      }
+    else
+      for (const frame of frames) {
+        const top =
+          layer.kind === "group"
+            ? flatten(
+                layer.children,
+                (child) => cels.pixels(frame.id, child),
+                length,
+                ["reference"],
+                (child) => settingsForFrame(celSettings, frame.id).get(child),
+              )
+            : cels.pixels(frame.id, layer.id);
+        if (!top) continue;
+        const own = cels.pixels(frame.id, below.id);
+        const base = own
+          ? new Uint8ClampedArray(own)
+          : new Uint8ClampedArray(length);
+        compositeOver(
+          base,
+          top,
+          layer.opacity *
+            ((settingsForFrame(celSettings, frame.id).get(layer.id)?.opacity ??
+              255) /
+              255),
+          layer.blend,
+        );
+        putCels(below.id, [[frame.id, base]]);
+      }
     for (const gone of layerTree.pixelLayerIds([layer])) cels.deleteLayer(gone);
     setLayerId(below.id);
     changeTree(layerTree.removeLayer(tree, id));
@@ -1112,10 +1207,13 @@ export function useSprite(
       : null;
   };
 
-  const placeTile = (col: number, row: number, index: number | null) => {
+  const placeTiles = (
+    cells: { col: number; row: number }[],
+    index: number | null,
+  ) => {
     const layer = activeTilemap();
     const tile = index === null ? null : layer?.tiles[index];
-    if (!layer || tile === undefined) return;
+    if (!layer || tile === undefined || !cells.length) return;
     const content =
       tile && flipTile(tile, layer.tile, layer.flips ? tileFlip : NO_FLIP);
     placing.current = true;
@@ -1123,7 +1221,8 @@ export function useSprite(
     const pixels = own
       ? new Uint8ClampedArray(own)
       : new Uint8ClampedArray(size.w * size.h * 4);
-    writeCell(pixels, size, layer.tile, col, row, content);
+    for (const { col, row } of cells)
+      writeCell(pixels, size, layer.tile, col, row, content);
     const ctx = context(true);
     if (!ctx) return;
     ctx.putImageData(
@@ -1161,6 +1260,30 @@ export function useSprite(
     setTileFlip(found.flip);
   };
 
+  const setTiles = (id: string, tiles: Uint8ClampedArray[]) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap" || !layerTree.canPaint(tree, id)) return;
+    changeTree(layerTree.updateLayer(tree, id, { tiles }));
+  };
+
+  const removeUnusedTiles = (id: string) => {
+    const layer = layerTree.findLayer(tree, id)?.layer;
+    if (layer?.kind !== "tilemap") return 0;
+    const used = usedTiles(
+      layer.tiles,
+      frames.map((frame) => cels.pixels(frame.id, id)),
+      size,
+      layer.tile,
+      layer.flips,
+    );
+    const removed = layer.tiles.length - used.length;
+    if (!removed) return 0;
+    const picked = layer.tiles[activeTile];
+    setActiveTile(Math.max(0, picked ? used.indexOf(picked) : 0));
+    setTiles(id, used);
+    return removed;
+  };
+
   const setTileFlips = (id: string, flips: boolean) => {
     const layer = layerTree.findLayer(tree, id)?.layer;
     if (layer?.kind !== "tilemap" || layer.flips === flips) return;
@@ -1170,6 +1293,77 @@ export function useSprite(
         flips,
         ...(flips && { tiles: uniqueTiles(layer.tiles, layer.tile, true) }),
       }),
+    );
+  };
+
+  const keepsPixelLayer = (next: Layer[]) =>
+    layerTree
+      .allLayers(next)
+      .some(
+        (layer) =>
+          layer.kind === "normal" ||
+          layer.kind === "background" ||
+          layer.kind === "tilemap",
+      );
+
+  const replaceTree = (next: Layer[]) => {
+    const kept = new Set(layerTree.pixelLayerIds(next));
+    for (const gone of layerTree.pixelLayerIds(tree))
+      if (!kept.has(gone)) cels.deleteLayer(gone);
+    if (!layerTree.findLayer(next, layerId))
+      setLayerId(layerTree.pixelLayerIds(next).at(-1)!);
+    setPickedLayers([]);
+    changeTree(next);
+  };
+
+  const canRemoveLayers = (ids: string[]) =>
+    keepsPixelLayer(layerTree.withoutLayers(tree, new Set(ids)));
+
+  const removeLayers = (ids: string[]) => {
+    const next = layerTree.withoutLayers(tree, new Set(ids));
+    if (keepsPixelLayer(next)) replaceTree(next);
+  };
+
+  const mergeLayers = (ids: string[]) => {
+    const picked = layerTree.topLayers(tree, ids);
+    if (picked.length < 2) return;
+    const pixelIds = layerTree.pixelLayerIds(picked);
+    const background = picked.find((layer) => layer.kind === "background");
+    const top = picked.at(-1)!;
+    const target = background ?? layerTree.createLayer("normal", top.name);
+    for (const frame of frames)
+      putCels(target.id, [[frame.id, compositeOf(pixelIds, frame.id)]]);
+    const gone = new Set(
+      picked.filter((layer) => layer !== background).map((layer) => layer.id),
+    );
+    const next = layerTree.withoutLayers(
+      background
+        ? tree
+        : layerTree.insertLayer(
+            tree,
+            target,
+            layerTree.placeAbove(tree, top.id),
+          ),
+      gone,
+    );
+    setLayerId(target.id);
+    const kept = new Set(layerTree.pixelLayerIds(next));
+    for (const gone of layerTree.pixelLayerIds(tree))
+      if (!kept.has(gone)) cels.deleteLayer(gone);
+    setPickedLayers([]);
+    changeTree(next);
+  };
+
+  const addMask = (id: string) => {
+    const target = layerTree.findLayer(tree, id)?.layer;
+    if (!target || target.mask) return;
+    const mask: Layer = {
+      ...layerTree.createLayer("normal", `${target.name} mask`),
+      mask: true,
+    };
+    setLayerId(mask.id);
+    changeTree(
+      layerTree.insertLayer(tree, mask, layerTree.placeAbove(tree, id)),
     );
   };
 
@@ -1214,6 +1408,48 @@ export function useSprite(
           ]
         : celSettings,
     );
+  };
+
+  const tweenFrames = (mask: Mask, offsets: { x: number; y: number }[]) => {
+    if (!offsets.length || !layerTree.canPaint(tree, layerId)) return;
+    const fill = fillOf(layerId);
+    const lifted = liftPixels(
+      cels.pixels(frameId, layerId) ??
+        new Uint8ClampedArray(size.w * size.h * 4),
+      size,
+      mask,
+      fill ? rgbaOf(fill) : null,
+    );
+    if (!lifted) return;
+    const current = frames.find((f) => f.id === frameId)!;
+    const at = frameList.frameIndex(frames, frameId) + 1;
+    let nextFrames = frames;
+    let nextTags = tags;
+    const nextSettings = [...celSettings];
+    offsets.forEach((offset, i) => {
+      const frame = frameList.createFrame(current.duration);
+      for (const layer of layerTree.allLayers(tree)) {
+        if (layer.kind === "group") continue;
+        const pixels =
+          layer.id === layerId
+            ? stampFloating(lifted.under, size, {
+                ...lifted.floating,
+                x: lifted.floating.x + offset.x,
+                y: lifted.floating.y + offset.y,
+              })
+            : cels.pixels(frameId, layer.id);
+        if (pixels) changed.current.add(addCel(frame.id, layer.id, pixels));
+      }
+      nextFrames = frameList.insertFrame(nextFrames, frame, at + i);
+      nextTags = insertAt(nextTags, at + i);
+      nextSettings.push(
+        ...celSettings
+          .filter((setting) => setting.frameId === frameId)
+          .map((setting) => ({ ...setting, frameId: frame.id })),
+      );
+    });
+    setFrameId(nextFrames[at]!.id);
+    changeFrames(nextFrames, nextTags, nextSettings);
   };
 
   const removeFrame = (id: string) => {
@@ -1289,6 +1525,11 @@ export function useSprite(
     finish({ slices: next });
   };
 
+  const setSelections = (next: SavedSelection[]) => {
+    setSelectionsState(next);
+    finish({ selections: next });
+  };
+
   const touchAll = () => {
     for (const { canvas } of cels.list()) changed.current.add(canvas);
   };
@@ -1339,6 +1580,8 @@ export function useSprite(
     setPixelRatio,
     slices,
     setSlices,
+    selections,
+    setSelections,
     layerId,
     activeLayer,
     eraseFill: fillOf(layerId),
@@ -1355,6 +1598,60 @@ export function useSprite(
     commit,
     revert,
     editCel,
+    placeText: (
+      piece: Floating,
+      text: LayerText,
+      existingId?: string,
+      textId?: string,
+      legacy?: InlineText,
+    ) => {
+      const targetId = existingId ?? layerId;
+      if (viewOnly || !layerTree.canPaint(tree, targetId)) return false;
+      beforeLeave.current?.();
+      const layer = layerTree.findLayer(tree, targetId)?.layer;
+      if (!layer || (layer.kind !== "normal" && layer.kind !== "background"))
+        return false;
+      const objects = layer.textObjects?.[frameId] ?? [];
+      const previous = textId
+        ? (objects.find((entry) => entry.id === textId) ??
+          (legacy && legacy.id === textId && layer.texts?.[frameId]
+            ? legacy
+            : undefined))
+        : undefined;
+      if (textId && !previous) return false;
+      const result = replaceInlineText(
+        cels.pixels(frameId, targetId) ??
+          new Uint8ClampedArray(size.w * size.h * 4),
+        size,
+        piece,
+        text,
+        previous,
+      );
+      if (!result) return false;
+      const updated = {
+        ...layer,
+        ...(legacy && {
+          texts: Object.fromEntries(
+            Object.entries(layer.texts ?? {}).filter(
+              ([frame]) => frame !== frameId,
+            ),
+          ),
+        }),
+        textObjects: {
+          ...layer.textObjects,
+          [frameId]: [
+            ...objects.filter((entry) => entry.id !== result.record.id),
+            result.record,
+          ],
+        },
+      };
+      const next = layerTree.replaceLayer(tree, layer.id, updated);
+      putCels(layer.id, [[frameId, result.pixels]]);
+      setTree(next);
+      setLayerIdState(layer.id);
+      finish({ tree: next });
+      return true;
+    },
     clearCel,
     resize,
     rescale,
@@ -1368,7 +1665,11 @@ export function useSprite(
     isCelLinked: (layer: string, frame: string) =>
       !!celLinks.linkOf(links, layer, frame),
     linkCelRange,
+    canEditCels,
+    pasteCel,
+    moveCel,
     unlinkCel,
+    editLayerCels,
     readCel: (layer: string, frame: string) =>
       cels.pixels(frame, layer) ?? new Uint8ClampedArray(size.w * size.h * 4),
     writeCels,
@@ -1381,12 +1682,14 @@ export function useSprite(
     addTilemapLayer,
     convertToTilemap,
     convertToNormal,
-    placeTile,
+    placeTiles,
     finishPlacing,
     pickTile,
     tileFlip,
     setTileFlip,
     setTileFlips,
+    setTiles,
+    removeUnusedTiles,
     canMergeDown,
     mergeDown,
     canFlatten,
@@ -1406,6 +1709,20 @@ export function useSprite(
       changeTree(layerTree.updateLayer(tree, id, patch)),
     moveLayer: (id: string, place: Place) =>
       changeTree(layerTree.moveLayer(tree, id, place)),
+    moveLayers: (ids: string[], place: Place) =>
+      changeTree(layerTree.moveLayers(tree, ids, place)),
+    removeLayers,
+    canRemoveLayers,
+    addMask,
+    mergeLayers,
+    selectedLayers: (() => {
+      const picked = layerTree
+        .allLayers(tree)
+        .filter((layer) => pickedLayers.includes(layer.id))
+        .map((layer) => layer.id);
+      return picked.length > 1 ? picked : [layerId];
+    })(),
+    pickLayers: setPickedLayers,
     selectFrame: setFrameId,
     selectedFrames: (() => {
       const picked = frames
@@ -1421,6 +1738,7 @@ export function useSprite(
     stepFrame: (step: number) =>
       setFrameId(frameList.stepFrame(frames, frameId, step).id),
     addFrame,
+    tweenFrames,
     removeFrame,
     moveFrame: (id: string, index: number) =>
       changeFrames(frameList.moveFrame(frames, id, index)),
@@ -1431,6 +1749,13 @@ export function useSprite(
         }),
       ),
     keep: (): KeptSprite => ({ history: past.current, layerId, frameId }),
+    adoptHistory: (kept: KeptSprite["history"]) => {
+      const now = past.current;
+      if (now.past.length || now.future.length || !kept.present) return;
+      restore(kept.present, false);
+      past.current = kept;
+      repaint();
+    },
     document: (): PigxelDocument => ({
       id: initial.id,
       width: size.w,
@@ -1438,6 +1763,7 @@ export function useSprite(
       background,
       palette,
       slices,
+      selections,
       colorMode,
       pixelRatio,
       layers: tree,

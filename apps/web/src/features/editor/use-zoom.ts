@@ -11,6 +11,7 @@ import {
 import { DEFAULT_SCALE } from "./pixel-canvas/constants";
 import {
   clampScale,
+  fitScale,
   pinchZoom,
   scrollToAnchor,
   stepZoom,
@@ -38,6 +39,8 @@ export function useZoom({
   const anchor = useRef<ZoomAnchor>(null);
   const [isTouchpad] = useState(wheelSource);
   const pinchFrom = useRef<number>(null);
+  const [fitRevision, setFitRevision] = useState(0);
+  const centerAfterFit = useRef(false);
 
   const zoomTo = (next: (scale: number) => number, x?: number, y?: number) => {
     const tile = tileRect();
@@ -52,6 +55,21 @@ export function useZoom({
   };
 
   const settle = useEffectEvent(() => {
+    if (centerAfterFit.current) {
+      centerAfterFit.current = false;
+      anchor.current = null;
+      const area = workspace.current;
+      const tile = tileRect();
+      if (area && tile) {
+        const view = area.getBoundingClientRect();
+        area.scrollBy({
+          left: tile.left + tile.width / 2 - view.left - area.clientWidth / 2,
+          top: tile.top + tile.height / 2 - view.top - area.clientHeight / 2,
+          behavior: "instant",
+        });
+      }
+      return;
+    }
     const at = anchor.current;
     anchor.current = null;
     const area = workspace.current;
@@ -60,7 +78,7 @@ export function useZoom({
     const by = scrollToAnchor(tile, at);
     area.scrollBy({ left: by.x, top: by.y, behavior: "instant" });
   });
-  useLayoutEffect(() => settle(), [scale]);
+  useLayoutEffect(() => settle(), [scale, fitRevision]);
 
   const onWheel = useEffectEvent((e: WheelEvent) => {
     const touchpad = isTouchpad(e);
@@ -104,6 +122,33 @@ export function useZoom({
 
   return {
     scale,
+    zoomFit: () => {
+      const area = workspace.current;
+      const tile = tileRect();
+      if (!area || !tile) return;
+      const style = getComputedStyle(area);
+      const roomW =
+        area.clientWidth -
+        (parseFloat(style.paddingLeft) || 0) -
+        (parseFloat(style.paddingRight) || 0);
+      const roomH =
+        area.clientHeight -
+        (parseFloat(style.paddingTop) || 0) -
+        (parseFloat(style.paddingBottom) || 0);
+      const next = fitScale(
+        tile.width / scale,
+        tile.height / scale,
+        roomW,
+        roomH,
+      );
+      if (next === null) return;
+      centerAfterFit.current = true;
+      setScale(next);
+      setFitRevision((revision) => revision + 1);
+    },
+    zoomSet: (value: number) => {
+      if (Number.isFinite(value) && value > 0) zoomTo(() => value);
+    },
     zoomIn: () => zoomTo((s) => stepZoom(s, -1)),
     zoomOut: () => zoomTo((s) => stepZoom(s, 1)),
     zoomReset: () => zoomTo(() => DEFAULT_SCALE),

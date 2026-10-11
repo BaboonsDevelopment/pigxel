@@ -4,6 +4,11 @@ import { readColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { DEFAULT_PALETTE, readPalette } from "@/lib/palette/presets";
 import { readSlices, type Slice } from "@/lib/slices/slices";
 import {
+  readSavedSelections,
+  writeSavedSelections,
+  type SavedSelection,
+} from "@/lib/selections/saved";
+import {
   isSquare,
   readPixelRatio,
   type PixelRatio,
@@ -11,6 +16,12 @@ import {
 import { flatten } from "@/lib/layers/composite";
 import { allLayers, createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
+import {
+  readLayerTexts,
+  readTextObjects,
+  type InlineText,
+  type LayerText,
+} from "@/lib/layers/text";
 import { MAX_TILE, MIN_TILE, type TileSize } from "@/lib/tilemap/tilemap";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
@@ -52,6 +63,7 @@ export type PigxelDocument = {
   cels: Cels;
   palette: string[];
   slices: Slice[];
+  selections?: SavedSelection[];
   colorMode?: ColorMode;
   pixelRatio?: PixelRatio;
 };
@@ -107,6 +119,8 @@ export function flattenDocument(
 }
 
 type FileLayer = {
+  texts?: Record<string, LayerText>;
+  textObjects?: Record<string, InlineText[]>;
   id: string;
   name: string;
   kind: LayerKind;
@@ -115,6 +129,10 @@ type FileLayer = {
   opacity: number;
   blend: string;
   labelColor?: string;
+  mask?: boolean;
+  clip?: boolean;
+  alphaLock?: boolean;
+  above?: boolean;
   collapsed?: boolean;
   children?: FileLayer[];
   tile?: TileSize;
@@ -141,6 +159,12 @@ export function serializePigxel(doc: PigxelDocument): string {
       opacity,
       blend,
       ...(labelColor && { labelColor }),
+      ...(layer.mask && { mask: true }),
+      ...(layer.clip && { clip: true }),
+      ...(layer.alphaLock && { alphaLock: true }),
+      ...(layer.above && { above: true }),
+      ...(layer.texts && { texts: layer.texts }),
+      ...(layer.textObjects && { textObjects: layer.textObjects }),
     };
     if (layer.kind === "tilemap")
       return {
@@ -182,6 +206,9 @@ export function serializePigxel(doc: PigxelDocument): string {
     cels,
     palette: doc.palette,
     slices: doc.slices,
+    ...(doc.selections?.length && {
+      selections: writeSavedSelections(doc.selections, doc.width * doc.height),
+    }),
     ...(doc.colorMode &&
       doc.colorMode !== "rgb" && { colorMode: doc.colorMode }),
     ...(!isSquare(doc.pixelRatio) && { pixelRatio: doc.pixelRatio }),
@@ -273,6 +300,7 @@ export function parsePigxel(text: string): PigxelDocument {
     cels,
     palette,
     slices,
+    selections: readSavedSelections(file.selections, width, height),
     colorMode: readColorMode(file.colorMode),
     pixelRatio: readPixelRatio(file.pixelRatio),
   };
@@ -322,6 +350,8 @@ function readLayers(
     );
     const id = uniqueId(entry.id, ids, layer.id);
     const settings = {
+      texts: readLayerTexts(entry.texts),
+      textObjects: readTextObjects(entry.textObjects),
       id,
       visible: entry.visible !== false,
       locked: entry.locked === true,
@@ -336,6 +366,12 @@ function readLayers(
         /^#[0-9a-fA-F]{6}$/.test(entry.labelColor)
           ? entry.labelColor
           : undefined,
+      ...(layer.kind === "normal" && entry.mask === true && { mask: true }),
+      ...(!isBackground && entry.clip === true && { clip: true }),
+      ...(layer.kind !== "group" &&
+        entry.alphaLock === true && { alphaLock: true }),
+      ...(layer.kind === "reference" &&
+        entry.above === true && { above: true }),
     };
     if (layer.kind === "group")
       return {

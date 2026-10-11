@@ -24,6 +24,22 @@ export function layerActions(
 ): MenuSections {
   const { activeLayer: layer, layerId } = sprite;
   const outside = placeOutside(sprite.tree, layerId);
+  const picked = sprite.selectedLayers;
+  if (picked.length > 1)
+    return [
+      [
+        {
+          label: `Merge ${picked.length} layers`,
+          onSelect: () => sprite.mergeLayers(picked),
+        },
+        {
+          label: `Delete ${picked.length} layers`,
+          onSelect: () => sprite.removeLayers(picked),
+          disabled: !sprite.canRemoveLayers(picked),
+        },
+      ],
+      [{ label: "Pick one layer", onSelect: () => sprite.pickLayers([]) }],
+    ];
   return [
     [
       {
@@ -75,6 +91,14 @@ export function layerActions(
           layer && sprite.updateLayer(layerId, { locked: !layer.locked }),
       },
       {
+        label: layer?.alphaLock
+          ? "Unlock transparent pixels"
+          : "Lock transparent pixels",
+        onSelect: () =>
+          layer && sprite.updateLayer(layerId, { alphaLock: !layer.alphaLock }),
+        hidden: !layer || layer.kind === "group",
+      },
+      {
         label: "Clear in this frame",
         shortcut: "Delete",
         onSelect: sprite.clearCel,
@@ -95,6 +119,31 @@ export function layerActions(
     ],
     [
       {
+        label: "Add layer mask",
+        onSelect: () => sprite.addMask(layerId),
+        hidden: !layer || !!layer.mask || layer.kind === "background",
+      },
+      {
+        label: "Apply mask",
+        onSelect: () => sprite.mergeDown(layerId),
+        hidden: !layer?.mask,
+        disabled: !sprite.canMergeDown(layerId),
+      },
+      {
+        label: layer?.clip ? "Release clipping" : "Clip to layer below",
+        onSelect: () =>
+          layer && sprite.updateLayer(layerId, { clip: !layer.clip }),
+        hidden: !layer || !!layer.mask || layer.kind === "background",
+      },
+      {
+        label: layer?.above ? "Show under the art" : "Show above the art",
+        onSelect: () =>
+          layer && sprite.updateLayer(layerId, { above: !layer.above }),
+        hidden: layer?.kind !== "reference",
+      },
+    ],
+    [
+      {
         label: "Move out of group",
         onSelect: () => outside && sprite.moveLayer(layerId, outside),
         hidden: !outside,
@@ -105,6 +154,7 @@ export function layerActions(
         label: "Merge down",
         onSelect: () => sprite.mergeDown(layerId),
         disabled: !sprite.canMergeDown(layerId),
+        hidden: !!layer?.mask,
       },
       {
         label: "Flatten visible",

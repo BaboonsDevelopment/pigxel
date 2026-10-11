@@ -58,10 +58,15 @@ export type Command =
   | "nudgeDown"
   | "nudgeLeft"
   | "nudgeRight"
+  | "nudgeUpFar"
+  | "nudgeDownFar"
+  | "nudgeLeftFar"
+  | "nudgeRightFar"
   | "toggleOnion"
   | "togglePreview"
   | "toggleCanvasOnly"
-  | "toggleFullScreen";
+  | "toggleFullScreen"
+  | "showShortcuts";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
 
