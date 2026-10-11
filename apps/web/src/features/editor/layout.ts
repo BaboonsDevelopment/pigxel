@@ -50,6 +50,8 @@ export type Layout = {
   hidden: PanelId[];
   hiddenTools: string[];
   groupTools: Record<string, string>;
+  groupOrder: string[];
+  toolOrder: string[];
   heights: Partial<Record<PanelId, number>>;
   tabs: Partial<Record<PanelId, PanelId[]>>;
   active: Partial<Record<PanelId, PanelId>>;
@@ -80,6 +82,8 @@ export const DEFAULT_LAYOUT: Layout = {
   hidden: ["tileset"],
   hiddenTools: [],
   groupTools: {},
+  groupOrder: [],
+  toolOrder: [],
   heights: {},
   tabs: {},
   active: {},
@@ -193,6 +197,8 @@ export function readLayout(raw: unknown): Layout {
     collapsed: panelList(v.collapsed),
     hidden: panelList(v.hidden),
     hiddenTools: stringList(v.hiddenTools),
+    groupOrder: [...new Set(stringList(v.groupOrder))],
+    toolOrder: [...new Set(stringList(v.toolOrder))],
     groupTools:
       typeof v.groupTools === "object" && v.groupTools !== null
         ? Object.fromEntries(

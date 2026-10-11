@@ -6,7 +6,7 @@ export type ResizeDrag = { edge: Edge; x: number; y: number } & Size;
 export type Area = { x: number; y: number } & Size;
 
 export const DEFAULT_SCALE = 16;
-export const MIN_SCALE = 2;
+export const MIN_SCALE = 0.04;
 export const MAX_SCALE = 48;
 export const ZOOM_FACTOR = 1.15;
 export type FrameEdges = {

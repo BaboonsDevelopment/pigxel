@@ -11,7 +11,7 @@ export const gradientTool = defineTool({
   shift: true,
   icon,
   group: "fill",
-  hint: "Drag from the primary colour to the secondary · Fills the selection, or the whole layer · Shift snaps to 45° · Right button swaps the colours",
+  hint: "Drag from the primary colour through the intermediate colours to the secondary · Fills the selection, or the whole layer · Shift snaps to 45° · Right button reverses the colours",
   tip: pointTip(),
   options: [GradientOptions],
   canvas: GradientCanvas,

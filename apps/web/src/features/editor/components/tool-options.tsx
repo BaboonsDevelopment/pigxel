@@ -8,9 +8,11 @@ import type { ToolOptionProps } from "../tools/types";
 
 export function ToolOptions({
   tool,
+  brushStatus,
   ...props
 }: Omit<ToolOptionProps, "tool"> & {
   tool: Tool;
+  brushStatus?: string | null;
   pen: PenSettings;
   selection: SelectionApi;
   stamp: Stamp | null;
@@ -24,6 +26,7 @@ export function ToolOptions({
       {options.map((Option, i) => (
         <Option key={i} tool={tool} {...props} />
       ))}
+      {tool.stamp && brushesStatus(brushStatus)}
 
       <span className="group relative ml-auto">
         <span
@@ -42,4 +45,12 @@ export function ToolOptions({
       </span>
     </div>
   );
+}
+
+function brushesStatus(status?: string | null) {
+  return status ? (
+    <span role="status" className="text-xs text-muted-foreground">
+      {status}
+    </span>
+  ) : null;
 }

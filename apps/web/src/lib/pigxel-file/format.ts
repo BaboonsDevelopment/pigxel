@@ -11,6 +11,12 @@ import {
 import { flatten } from "@/lib/layers/composite";
 import { allLayers, createLayer, pixelLayerIds } from "@/lib/layers/tree";
 import type { Layer, LayerKind } from "@/lib/layers/types";
+import {
+  readLayerTexts,
+  readTextObjects,
+  type InlineText,
+  type LayerText,
+} from "@/lib/layers/text";
 import { MAX_TILE, MIN_TILE, type TileSize } from "@/lib/tilemap/tilemap";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { celOf, clampDuration, createFrame } from "@/lib/sprite/frames";
@@ -107,6 +113,8 @@ export function flattenDocument(
 }
 
 type FileLayer = {
+  texts?: Record<string, LayerText>;
+  textObjects?: Record<string, InlineText[]>;
   id: string;
   name: string;
   kind: LayerKind;
@@ -141,6 +149,8 @@ export function serializePigxel(doc: PigxelDocument): string {
       opacity,
       blend,
       ...(labelColor && { labelColor }),
+      ...(layer.texts && { texts: layer.texts }),
+      ...(layer.textObjects && { textObjects: layer.textObjects }),
     };
     if (layer.kind === "tilemap")
       return {
@@ -322,6 +332,8 @@ function readLayers(
     );
     const id = uniqueId(entry.id, ids, layer.id);
     const settings = {
+      texts: readLayerTexts(entry.texts),
+      textObjects: readTextObjects(entry.textObjects),
       id,
       visible: entry.visible !== false,
       locked: entry.locked === true,

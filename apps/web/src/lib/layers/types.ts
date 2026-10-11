@@ -1,4 +1,5 @@
 import type { TileSize } from "@/lib/tilemap/tilemap";
+import type { InlineText, LayerText } from "./text";
 import type { BLEND_MODES, LAYER_KINDS } from "./constants";
 
 export type BlendMode = (typeof BLEND_MODES)[number]["id"];
@@ -13,6 +14,8 @@ type LayerBase = {
   opacity: number;
   blend: BlendMode;
   labelColor?: string;
+  texts?: Record<string, LayerText>;
+  textObjects?: Record<string, InlineText[]>;
 };
 
 export type PixelLayer = LayerBase & {

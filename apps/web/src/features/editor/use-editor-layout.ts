@@ -42,7 +42,7 @@ export function useEditorLayout(userId: string, open?: PanelId) {
   const [layout, setLayout] = useState<Layout>(() =>
     opened(read(userId), open),
   );
-  const first = useRef(true);
+  const initial = useRef(layout);
   const fromServer = useRef<Layout | null>(null);
 
   useEffect(() => {
@@ -79,11 +79,7 @@ export function useEditorLayout(userId: string, open?: PanelId) {
     try {
       storage()?.setItem(layoutKey(userId), JSON.stringify(layout));
     } catch {}
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    if (fromServer.current === layout) return;
+    if (layout === initial.current || layout === fromServer.current) return;
     const at = Date.now();
     try {
       storage()?.setItem(changedKey(userId), String(at));

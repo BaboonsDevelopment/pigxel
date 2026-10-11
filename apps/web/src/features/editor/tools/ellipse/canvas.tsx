@@ -8,6 +8,7 @@ export function EllipseCanvas(props: ToolCanvasProps) {
     <DragStroke
       {...props}
       square
+      fromCenter
       render={(canvas) =>
         paintShape(canvas, ellipsePoints, props.pen.fillShapes)
       }

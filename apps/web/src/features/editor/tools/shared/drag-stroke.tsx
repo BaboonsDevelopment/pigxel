@@ -5,6 +5,7 @@ import {
   snapLine,
   snapSpan,
   squareFrom,
+  rectangleSpan,
   type Point,
 } from "../../pixel-canvas/pen";
 import type { ToolCanvasProps } from "../types";
@@ -24,6 +25,7 @@ export function DragStroke({
   ink = colorInk,
   keepsColor,
   square,
+  fromCenter,
   continuesFromEnd,
   ...props
 }: ToolCanvasProps & {
@@ -31,6 +33,7 @@ export function DragStroke({
   ink?: StrokeInk;
   keepsColor?: boolean;
   square?: boolean;
+  fromCenter?: boolean;
   continuesFromEnd?: boolean;
 }) {
   const stroke = useRef<Stroke>(null);
@@ -68,6 +71,26 @@ export function DragStroke({
       const point = passed.at(-1);
       if (!current || !point) return;
       const span = snapSpan(origin.current ?? point, point, props.snap);
+      if (fromCenter) {
+        const next = rectangleSpan(
+          span.from,
+          span.to,
+          !!square && e.shiftKey,
+          e.altKey,
+        );
+        const previous = current.points[0]!;
+        if (
+          previous.x === next.from.x &&
+          previous.y === next.from.y &&
+          current.end.x === next.to.x &&
+          current.end.y === next.to.y
+        )
+          return;
+        current.points[0] = next.from;
+        current.end = next.to;
+        draw(current);
+        return;
+      }
       if (props.snap) current.points[0] = span.from;
       const from = current.points[0]!;
       const to = span.to;

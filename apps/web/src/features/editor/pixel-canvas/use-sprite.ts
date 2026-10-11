@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { compositeOver, flatten, orderedLayers } from "@/lib/layers/composite";
 import * as layerTree from "@/lib/layers/tree";
+import {
+  replaceInlineText,
+  type InlineText,
+  type LayerText,
+} from "@/lib/layers/text";
+import type { Floating } from "./selection";
 import { inColorMode, type ColorMode } from "@/lib/palette/color-mode";
 import { SQUARE, type PixelRatio } from "@/lib/sprite/pixel-ratio";
 import type { Layer, LayerKind, Place } from "@/lib/layers/types";
@@ -1355,6 +1361,60 @@ export function useSprite(
     commit,
     revert,
     editCel,
+    placeText: (
+      piece: Floating,
+      text: LayerText,
+      existingId?: string,
+      textId?: string,
+      legacy?: InlineText,
+    ) => {
+      const targetId = existingId ?? layerId;
+      if (viewOnly || !layerTree.canPaint(tree, targetId)) return false;
+      beforeLeave.current?.();
+      const layer = layerTree.findLayer(tree, targetId)?.layer;
+      if (!layer || (layer.kind !== "normal" && layer.kind !== "background"))
+        return false;
+      const objects = layer.textObjects?.[frameId] ?? [];
+      const previous = textId
+        ? (objects.find((entry) => entry.id === textId) ??
+          (legacy && legacy.id === textId && layer.texts?.[frameId]
+            ? legacy
+            : undefined))
+        : undefined;
+      if (textId && !previous) return false;
+      const result = replaceInlineText(
+        cels.pixels(frameId, targetId) ??
+          new Uint8ClampedArray(size.w * size.h * 4),
+        size,
+        piece,
+        text,
+        previous,
+      );
+      if (!result) return false;
+      const updated = {
+        ...layer,
+        ...(legacy && {
+          texts: Object.fromEntries(
+            Object.entries(layer.texts ?? {}).filter(
+              ([frame]) => frame !== frameId,
+            ),
+          ),
+        }),
+        textObjects: {
+          ...layer.textObjects,
+          [frameId]: [
+            ...objects.filter((entry) => entry.id !== result.record.id),
+            result.record,
+          ],
+        },
+      };
+      const next = layerTree.replaceLayer(tree, layer.id, updated);
+      putCels(layer.id, [[frameId, result.pixels]]);
+      setTree(next);
+      setLayerIdState(layer.id);
+      finish({ tree: next });
+      return true;
+    },
     clearCel,
     resize,
     rescale,

@@ -28,6 +28,19 @@ export function hexToRgba(hex: string): RGBA {
   };
 }
 
+export function polygonOutline(corners: Point[]): Point[] {
+  const points = new Map<string, Point>();
+  for (let i = 0; i < corners.length; i++) {
+    for (const point of linePoints(
+      corners[i]!,
+      corners[(i + 1) % corners.length]!,
+    )) {
+      points.set(`${point.x},${point.y}`, point);
+    }
+  }
+  return [...points.values()];
+}
+
 export function linePoints(a: Point, b: Point): Point[] {
   const points: Point[] = [];
   const dx = Math.abs(b.x - a.x);

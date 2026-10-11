@@ -25,6 +25,7 @@ import {
   clampPenSize,
   type ColorSlot,
   type PenSettings,
+  type TextStyle,
 } from "../pixel-canvas/pen";
 import {
   PixelCanvas,
@@ -57,6 +58,8 @@ import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
 import { PreviewWindow } from "./preview/preview-window";
 import { SecondView } from "./second-view";
+import { ZoomControl } from "./zoom-control";
+import { PointerPosition } from "./pointer-position";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
@@ -137,12 +140,8 @@ import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
 import { useLayoutPresets } from "../use-layout-presets";
 import { LAYOUT_PRESETS, presetLayout } from "../layout-presets";
-import {
-  readBrushes,
-  withBrush,
-  writeBrushes,
-  type SavedBrush,
-} from "../brush-library";
+import { withBrush } from "../brush-library";
+import { useBrushLibrary } from "../use-brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
@@ -271,6 +270,10 @@ export function Editor({
     else writeMark(userId, "opened", draft.id, true);
   }, [userId, draft.id, openedTile]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [pointerPosition, setPointerPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [exporting, setExporting] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
@@ -354,17 +357,17 @@ export function Editor({
     if (isStartKind(start)) router.replace(editorUrl(draft.id));
   }, [start, router, draft.id]);
   const [stamp, setStamp] = useState<Stamp | null>(null);
-  const [brushes, setBrushes] = useState(() => readBrushes(userId));
-  const changeBrushes = (next: SavedBrush[]) => {
-    setBrushes(next);
-    writeBrushes(userId, next);
-  };
+  const {
+    brushes,
+    changeBrushes,
+    status: brushStatus,
+  } = useBrushLibrary(userId);
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
-  const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
+  const { scale, zoomIn, zoomOut, zoomReset, zoomSet, zoomFit } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
     initial: kept?.scale,
@@ -1000,6 +1003,7 @@ export function Editor({
     ],
   ];
   const viewMenu: MenuSections = [
+    [{ label: "Fit to window", onSelect: zoomFit }],
     [
       {
         label: check(canvasOnly, "Canvas only"),
@@ -1321,7 +1325,7 @@ export function Editor({
     view,
     stamp,
     highlight,
-    onTextPlaced: () => setTool("move"),
+    onTextStyle: (style: TextStyle) => setPen((p) => ({ ...p, ...style })),
     sliceId,
     onSelectSlice: setSliceId,
     onAxesChange: (axes: Axes | null) => setView((v) => ({ ...v, axes })),
@@ -1345,6 +1349,8 @@ export function Editor({
           onSelect={setTool}
           hiddenTools={layout.hiddenTools}
           groupTools={layout.groupTools}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
           keyOf={(id) => keyOf(`tool:${id}`)}
         />
       ),
@@ -1556,6 +1562,8 @@ export function Editor({
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
           brushes={brushes}
+          brushStatus={brushStatus}
+          palette={sprite.palette}
           onSaveBrush={() =>
             stamp &&
             changeBrushes(withBrush(brushes, stamp, crypto.randomUUID()))
@@ -1594,20 +1602,38 @@ export function Editor({
             <div hidden={canvasOnly} className="contents">
               <Dock side="innerLeft" {...dockProps} />
             </div>
-            <main
-              ref={workspace}
-              data-guide="canvas"
-              data-canvas-drop
-              {...pan.handlers}
-              className={cn(
-                "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
-                pan.panning && "cursor-grab [&_*]:cursor-grab!",
-              )}
-            >
-              <div className="m-auto">
-                <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
+            <div className="relative flex min-h-0 min-w-0 flex-1">
+              <main
+                ref={workspace}
+                data-guide="canvas"
+                data-canvas-drop
+                {...pan.handlers}
+                className={cn(
+                  "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
+                  pan.panning && "cursor-grab [&_*]:cursor-grab!",
+                )}
+              >
+                <div className="m-auto">
+                  <PixelCanvas
+                    ref={canvas}
+                    scale={scale}
+                    {...canvasProps}
+                    onPointerPosition={setPointerPosition}
+                  />
+                </div>
+              </main>
+              <div className="absolute top-2 right-2 z-10">
+                <ZoomControl
+                  scale={scale}
+                  onChange={zoomSet}
+                  onFit={zoomFit}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                  onReset={zoomReset}
+                />
+                <PointerPosition point={pointerPosition} />
               </div>
-            </main>
+            </div>
             {splitView && (
               <SecondView
                 canvas={canvasProps}
@@ -1635,6 +1661,11 @@ export function Editor({
           keyOf={(id) => keyOf(`tool:${id}`)}
           hiddenTools={layout.hiddenTools}
           onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
+          onOrderChange={(groupOrder, toolOrder) =>
+            setLayout((l) => ({ ...l, groupOrder, toolOrder }))
+          }
           onClose={() => setCustomizing(false)}
         />
       )}
@@ -1814,7 +1845,11 @@ export function Editor({
         />
       )}
       {previewing && (
-        <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
+        <PreviewWindow
+          userId={userId}
+          sprite={sprite}
+          onClose={() => setPreviewing(false)}
+        />
       )}
       {onionSettings && (
         <OnionSettingsDialog

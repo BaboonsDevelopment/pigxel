@@ -5,13 +5,18 @@ import {
   tiny5,
 } from "@/lib/fonts/pixel";
 import type { Rgba } from "./paint";
+import { loadCustomFont, type WebFont } from "./custom-fonts";
 import type { Floating } from "./selection";
-import { TEXT_SCALES, type TextFont } from "./text-fonts";
+import {
+  TEXT_SCALES,
+  isCustomFont,
+  spacingOf,
+  type BuiltInFont,
+  type TextFont,
+  type TextSpacing,
+} from "./text-fonts";
 
-const WEB_FONTS: Record<
-  Exclude<TextFont, "tiny">,
-  { family: string; px: number }
-> = {
+const WEB_FONTS: Record<Exclude<BuiltInFont, "tiny">, WebFont> = {
   tiny5: { family: tiny5.style.fontFamily, px: 8 },
   dotGothic: { family: dotGothic16.style.fontFamily, px: 16 },
   pressStart: { family: pressStart2P.style.fontFamily, px: 8 },
@@ -94,36 +99,70 @@ function tinyGlyph(char: string): Bitmap | null {
   return { w, h: 5, on };
 }
 
-function tinyText(text: string): Bitmap {
+function tinyText(text: string, spacing: TextSpacing): Bitmap {
+  const lines = text.split("\n");
+  if (lines.length > 1) {
+    const rows = lines.map((line) => tinyText(line, spacing));
+    const advance = 6 + spacing.line;
+    const w = Math.max(...rows.map((row) => row.w));
+    const h = (lines.length - 1) * advance + 5;
+    const on = new Uint8Array(w * h);
+    rows.forEach((row, index) => {
+      for (let y = 0; y < row.h; y++)
+        for (let x = 0; x < row.w; x++)
+          if (row.on[y * row.w + x]) on[(index * advance + y) * w + x] = 1;
+    });
+    return { w, h, on };
+  }
+  const gap = 1 + spacing.letter;
   const glyphs = [...text].map(
     (char) => tinyGlyph(char) ?? { w: 2, h: 5, on: new Uint8Array(10) },
   );
-  const w = Math.max(0, glyphs.reduce((sum, g) => sum + g.w + 1, 0) - 1);
+  const w = Math.max(0, glyphs.reduce((sum, g) => sum + g.w + gap, 0) - gap);
   const on = new Uint8Array(w * 5);
   let left = 0;
   for (const g of glyphs) {
     for (let y = 0; y < 5; y++)
-      for (let x = 0; x < g.w; x++) on[y * w + left + x] = g.on[y * g.w + x]!;
-    left += g.w + 1;
+      for (let x = 0; x < g.w; x++)
+        if (g.on[y * g.w + x]) on[y * w + left + x] = 1;
+    left += g.w + gap;
   }
   return { w, h: 5, on };
 }
 
 async function webFontText(
   text: string,
-  { family, px }: { family: string; px: number },
+  { family, px }: WebFont,
+  spacing: TextSpacing,
 ): Promise<Bitmap> {
   const font = `${px}px ${family}`;
+  const lines = text.split("\n");
+  const lineHeight = Math.ceil(px * 1.25) + spacing.line;
   await document.fonts.load(font, text);
   const canvas = document.createElement("canvas");
   const measure = canvas.getContext("2d")!;
   measure.font = font;
-  canvas.width = Math.max(1, Math.ceil(measure.measureText(text).width) + 2);
-  canvas.height = px * 3;
+  const width = (line: string) =>
+    spacing.letter
+      ? [...line].reduce(
+          (sum, char) => sum + measure.measureText(char).width + spacing.letter,
+          -spacing.letter,
+        )
+      : measure.measureText(line).width;
+  canvas.width = Math.max(1, Math.ceil(Math.max(...lines.map(width))) + 2);
+  canvas.height = px * 3 + (lines.length - 1) * lineHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   ctx.font = font;
   ctx.textBaseline = "top";
-  ctx.fillText(text, 1, px);
+  lines.forEach((line, index) => {
+    const top = px + index * lineHeight;
+    if (!spacing.letter) return ctx.fillText(line, 1, top);
+    let left = 1;
+    for (const char of line) {
+      ctx.fillText(char, left, top);
+      left += ctx.measureText(char).width + spacing.letter;
+    }
+  });
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const on = new Uint8Array(canvas.width * canvas.height);
   for (let i = 0; i < on.length; i++) on[i] = data[i * 4 + 3]! >= 128 ? 1 : 0;
@@ -156,11 +195,20 @@ export async function textPiece(
   rgba: Rgba,
   x: number,
   y: number,
+  spacing: Partial<TextSpacing> = {},
 ): Promise<Floating | null> {
-  const web =
-    font === "tiny" ? undefined : (WEB_FONTS[font] ?? WEB_FONTS.tiny5);
+  const web = isCustomFont(font)
+    ? await loadCustomFont(font)
+    : font === "tiny"
+      ? undefined
+      : (WEB_FONTS[font] ?? WEB_FONTS.tiny5);
+  if (web === null) return null;
   const k = TEXT_SCALES.includes(scale) ? scale : 1;
-  const drawn = cropped(web ? await webFontText(text, web) : tinyText(text));
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const gaps = spacingOf(spacing.letter, spacing.line);
+  const drawn = cropped(
+    web ? await webFontText(normalized, web, gaps) : tinyText(normalized, gaps),
+  );
   if (!drawn) return null;
   const w = drawn.w * k;
   const h = drawn.h * k;
