@@ -25,7 +25,7 @@ One file or test:
 
 ```sh
 cd apps/web
-pnpm exec vitest run tests/auth.test.ts
+pnpm exec vitest run tests/auth/email.test.ts
 pnpm exec vitest run -t "rejects malformed ids"
 pnpm exec playwright test e2e/guest/auth.spec.ts
 pnpm exec playwright test --ui          # pick and watch tests in Playwright's UI
@@ -45,6 +45,24 @@ End-to-end runs build the app into `.next-e2e/`, so they never touch your own `.
 - The end-to-end server gets every variable from the env files set explicitly: Supabase points at the local one, everything else is blank. Paddle gets placeholder sandbox values because the pricing page needs them (`apps/web/e2e/support/server.ts`).
 - The test browser blocks every request that isn't to the app or local Supabase.
 - Unit and component tests fail if they make any HTTP request that no mock answers, even when the app code catches the error.
+
+## Where tests live
+
+Tests are grouped by product area, one folder each, like `src/features`:
+
+| Folder                                                            | What's in it                                                                                                               |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `tests/editor/`                                                   | Everything in the editor: one file per topic (`selection`, `layers`, `frames`, `tilemap`, `export`, `keyboard-shortcuts`…) |
+| `tests/files/`                                                    | The `.pigxel` format, drafts in the browser, Pigxel cloud                                                                  |
+| `tests/auth/`                                                     | Email and social sign-in, Google Drive, the login form and page                                                            |
+| `tests/billing/`                                                  | Subscriptions, plan changes, Paddle, pricing                                                                               |
+| `tests/explore/`                                                  | Search, the art page, comments, reports, moderation                                                                        |
+| `tests/profile/`, `tests/assets/`, `tests/feedback/`, `tests/ai/` | Those areas                                                                                                                |
+| `tests/app/`                                                      | App-wide pages and routing: 404, the proxy, load errors                                                                    |
+| `tests/infra/`                                                    | The test helpers themselves                                                                                                |
+| `tests/db/`                                                       | Database tests (see below)                                                                                                 |
+
+One topic is one file: add to the file that's already there rather than starting a new one. A `describe` names a feature as a person would ("layer masks and clipping"), never a function in the code, and each `it` says what that feature does ("hides the layer below where the mask is black").
 
 ## Unit and component tests
 
