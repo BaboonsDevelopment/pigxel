@@ -13,6 +13,8 @@ import { Input } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
 import { createFolder, moveTileToFolder } from "../../../actions";
 import { FOLDER_NAME_MAX, type Folder } from "../../../folders";
+import { movedMessage } from "../../../constants";
+import { showSuccess } from "@/components/ui/snackbar";
 
 export function MoveDialog({
   tiles,
@@ -52,6 +54,9 @@ export function MoveDialog({
     setSaving(false);
     const failed = results.find((result) => result.error);
     if (failed) return setError(failed.error ?? "Couldn’t move that.");
+    showSuccess(
+      newName.trim() ? "Folder created!" : movedMessage(tiles.length),
+    );
     onMoved(folderId);
     onClose();
   };

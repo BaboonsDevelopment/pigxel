@@ -11,6 +11,7 @@ import {
 } from "../actions";
 import type { MyCollection } from "../collections";
 import { COLLECTION_NAME_MAX } from "../constants";
+import { showSuccess } from "@/components/ui/snackbar";
 
 const PANEL_WIDTH = 256;
 const GUTTER = 8;
@@ -117,6 +118,7 @@ export function CollectButton({
               },
         ) ?? null,
     );
+    showSuccess("Collections updated!");
     setOpen(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
@@ -134,6 +136,7 @@ export function CollectButton({
     setCollections((all) => [created, ...(all ?? [])]);
     setChosen((ids) => new Set(ids).add(created.id));
     setName(null);
+    showSuccess("Collection created!");
   };
 
   return (

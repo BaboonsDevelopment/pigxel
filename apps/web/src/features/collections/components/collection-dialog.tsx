@@ -13,6 +13,7 @@ import { Input, Textarea } from "@pigxel/ui/components/input";
 import { updateCollection } from "../actions";
 import type { Collection } from "../collections";
 import { COLLECTION_DESCRIPTION_MAX, COLLECTION_NAME_MAX } from "../constants";
+import { showSuccess } from "@/components/ui/snackbar";
 
 export function CollectionDialog({
   collection,
@@ -33,8 +34,9 @@ export function CollectionDialog({
     setError(null);
     const result = await updateCollection(collection.id, name, description);
     setSaving(false);
-    if (result.error) setError(result.error);
-    else onClose();
+    if (result.error) return setError(result.error);
+    showSuccess("Collection updated!");
+    onClose();
   };
 
   return (

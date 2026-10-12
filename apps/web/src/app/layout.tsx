@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Mono, Fredoka, Poppins } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
+import { ConnectionWatch } from "@/components/layout/connection-watch";
 import { QueryProvider } from "@/components/providers/query-provider";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen" suppressHydrationWarning>
         <QueryProvider>{children}</QueryProvider>
+        <ConnectionWatch />
       </body>
     </html>
   );

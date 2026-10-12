@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
@@ -29,7 +30,14 @@ import { DownloadMenu } from "./download-menu";
 import type { Picture } from "../helpers";
 import { EditDetailsDialog } from "./edit-details-dialog";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  LINK_COPIED,
+  showSnackbar,
+  showSuccess,
+  showUndo,
+} from "@/components/ui/snackbar";
 import { CollectButton } from "@/features/collections/components/collect-button";
+import { projectKeys } from "@/features/tiles/queries/keys";
 
 const counting = new Set<string>();
 
@@ -85,6 +93,7 @@ export function ArtDetails({
   const [likePending, startLike] = useTransition();
   const [isSaved, setIsSaved] = useState(saved);
   const [savePending, startSave] = useTransition();
+  const client = useQueryClient();
   const own = viewerId === author.id;
   const [details, setDetails] = useState({
     tags: tile.tags,
@@ -111,6 +120,7 @@ export function ArtDetails({
   const download = async (format: DownloadFormat, scale: number) => {
     if (!picture) return;
     downloadPicture(picture, tile.name, format, scale);
+    showSuccess("Download complete!");
     const counted = await recordDownload(tile.id);
     if (counted !== null) setDownloads(counted);
   };
@@ -129,17 +139,25 @@ export function ArtDetails({
     });
   };
 
-  const toggleSave = () => {
-    if (!viewerId) return router.push("/login");
+  const saveAs = (next: boolean) =>
     startSave(async () => {
-      const next = !isSaved;
       setIsSaved(next);
       const result = await setTileSaved(tile.id, next);
+      void client.invalidateQueries({ queryKey: projectKeys.savedAll() });
       if (result.error) {
         setIsSaved(!next);
         setError(result.error);
-      }
+      } else if (next) showSuccess("Added to favorites");
+      else showUndo("Removed from favorites.", () => saveAs(true));
     });
+
+  const toggleSave = () => {
+    if (!viewerId)
+      return showSnackbar("Log in to save your project.", {
+        tone: "account",
+        action: { label: "Log in", onClick: () => router.push("/login") },
+      });
+    saveAs(!isSaved);
   };
 
   const remix = async () => {
@@ -162,6 +180,7 @@ export function ArtDetails({
   const copy = (text: string, label: string) => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(label);
+      if (label === "link") showSnackbar(LINK_COPIED, { tone: "action" });
       setTimeout(() => setCopied(null), 1500);
     });
   };

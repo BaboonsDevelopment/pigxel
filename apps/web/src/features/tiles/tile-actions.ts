@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CloudError, type CloudTileSummary } from "@/lib/pigxel-file/cloud";
-import { trashProjects } from "./actions";
+import { restoreProjects, trashProjects } from "./actions";
+import { useInvalidateProjects } from "./queries/project-list";
+import { showSnackbar, showUndo, withLoading } from "@/components/ui/snackbar";
 import { TRASH_DAYS } from "./constants";
 import {
   findDraftFor,
@@ -18,6 +20,7 @@ import { draftForCloudTile, editorUrl } from "@/lib/pigxel-file/open-tile";
 
 export function useCloudTileActions(userId: string) {
   const router = useRouter();
+  const invalidate = useInvalidateProjects();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
@@ -26,10 +29,9 @@ export function useCloudTileActions(userId: string) {
     setBusy(tile.id);
     setError(null);
     try {
-      const draftId = await draftForCloudTile(userId, {
-        id: tile.id,
-        name: tile.name,
-      });
+      const draftId = await withLoading("Opening project…", () =>
+        draftForCloudTile(userId, { id: tile.id, name: tile.name }),
+      );
       router.push(editorUrl(draftId));
     } catch (e) {
       setError(
@@ -50,15 +52,24 @@ export function useCloudTileActions(userId: string) {
     if (!confirmed) return;
     setError(null);
     setRemoved((ids) => new Set(ids).add(tile.id));
-    try {
-      await deleteCloudProject(userId, tile);
-      router.refresh();
-    } catch (e) {
+    const unremove = () =>
       setRemoved((ids) => {
         const next = new Set(ids);
         next.delete(tile.id);
         return next;
       });
+    try {
+      await deleteCloudProject(userId, tile);
+      router.refresh();
+      showUndo("Project moved to trash.", async () => {
+        const { error } = await restoreProjects([tile.id]);
+        if (error) return showSnackbar(error);
+        unremove();
+        router.refresh();
+        void invalidate();
+      });
+    } catch (e) {
+      unremove();
       setError(
         e instanceof CloudError ? e.message : "Couldn’t delete the tile.",
       );

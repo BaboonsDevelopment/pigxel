@@ -108,6 +108,7 @@ import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import { draftThumbnail, thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { showSnackbar } from "@/components/ui/snackbar";
 import { useProjectAccess } from "@/features/sharing/queries";
 import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -117,6 +118,8 @@ import {
   documentFromFrames,
   imageBaseName,
   isImageFile,
+  isSupportedFile,
+  UNSUPPORTED_FILE,
   pictureForTile,
   readPicture,
   sequenceOrder,
@@ -138,6 +141,8 @@ import {
 import {
   isStartKind,
   START_PANELS,
+  STORAGE_FULL_SHARE,
+  NO_EDIT_WARN_GAP,
   type Command,
   type EditorProps,
   type OpenSource,
@@ -286,6 +291,18 @@ export function Editor({
     if (openedTile) void markTileOpened(openedTile);
     else writeMark(userId, "opened", draft.id, true);
   }, [userId, draft.id, openedTile]);
+  useEffect(() => {
+    void navigator.storage
+      ?.estimate()
+      .then(({ usage = 0, quota = 0 }) => {
+        if (quota && usage / quota >= STORAGE_FULL_SHARE)
+          showSnackbar("Your storage is almost full.", {
+            tone: "warning",
+            action: { label: "Manage", onClick: () => router.push("/tiles") },
+          });
+      })
+      .catch(() => {});
+  }, [router]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [pointerPosition, setPointerPosition] = useState<{
     x: number;
@@ -451,7 +468,22 @@ export function Editor({
     [setPause, removed, heldBy],
   );
 
-  const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
+  const viewer = !!cloudTileId && access === "viewer";
+  const warnedAt = useRef(0);
+  const warnViewOnly = () => {
+    if (Date.now() - warnedAt.current < NO_EDIT_WARN_GAP) return;
+    warnedAt.current = Date.now();
+    showSnackbar("You don’t have permission to edit this project.", {
+      tone: "account",
+    });
+  };
+  const sprite = useSprite(
+    image,
+    file.markDirty,
+    kept?.sprite,
+    removed || viewer,
+    warnViewOnly,
+  );
   useEffect(() => {
     if (historyReady.current) return;
     let live = true;
@@ -1314,6 +1346,8 @@ export function Editor({
     const dropped = all[0];
     if (!dropped) return;
     const at = canvas.current?.tilePointAt(e.clientX, e.clientY) ?? null;
+    if (!isSupportedFile(dropped))
+      return showSnackbar(UNSUPPORTED_FILE, { tone: "warning" });
     if (!isImageFile(dropped)) {
       const open = await choiceDialog({
         title: "Open this tile?",

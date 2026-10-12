@@ -23,6 +23,9 @@ import {
   toPicture,
   type Picture,
 } from "@/features/explore/components/art-page/helpers";
+import { showSuccess } from "@/components/ui/snackbar";
+
+const DOWNLOADED = "Download complete!";
 
 const OPTION =
   "flex w-full cursor-pointer items-baseline justify-between gap-4 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-secondary disabled:cursor-default disabled:opacity-50";
@@ -125,6 +128,7 @@ export function DownloadDialog({
                     onClick={() => {
                       downloadPicture(picture, name, format.value, scale);
                       onDownload?.();
+                      showSuccess(DOWNLOADED);
                     }}
                     className={OPTION}
                   >
@@ -147,6 +151,7 @@ export function DownloadDialog({
                         pigxelFileName(name),
                       );
                       onDownload?.();
+                      showSuccess(DOWNLOADED);
                     }}
                     className={OPTION}
                   >

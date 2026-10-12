@@ -12,6 +12,7 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { createFolder, renameFolder } from "../../../actions";
 import { FOLDER_NAME_MAX } from "../../../folders";
+import { showSuccess } from "@/components/ui/snackbar";
 
 export function FolderNameDialog({
   folder,
@@ -31,8 +32,9 @@ export function FolderNameDialog({
       ? await renameFolder(folder.id, name)
       : await createFolder(name);
     setSaving(false);
-    if (result.error) setError(result.error);
-    else onClose();
+    if (result.error) return setError(result.error);
+    showSuccess(folder ? "Folder renamed!" : "Folder created!");
+    onClose();
   };
 
   return (

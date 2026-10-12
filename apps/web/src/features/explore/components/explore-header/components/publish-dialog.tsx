@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import {
@@ -15,6 +16,7 @@ import { Textarea } from "@pigxel/ui/components/input";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { showSnackbar, withLoading } from "@/components/ui/snackbar";
 import type { ProfileTile } from "@/features/profile/profile";
 import {
   loadArtDetails,
@@ -42,6 +44,7 @@ export function PublishDialog({
   onUnpublished?: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [tiles, setTiles] = useState<ProfileTile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<PublishTile | null>(tile ?? null);
@@ -82,8 +85,18 @@ export function PublishDialog({
     if (!selected) return;
     setPublishing(true);
     setError(null);
-    const result = await publishArt(selected.id, tags, description, allowRemix);
+    const result = await withLoading(
+      published ? "Saving…" : "Publishing…",
+      () => publishArt(selected.id, tags, description, allowRemix),
+    );
     setPublishing(false);
+    if (!result.error && !published) {
+      const id = selected.id;
+      showSnackbar("Project published!", {
+        tone: "action",
+        action: { label: "View", onClick: () => router.push(`/explore/${id}`) },
+      });
+    }
     if (result.error) setError(result.error);
     else if (tile) {
       onPublished?.();

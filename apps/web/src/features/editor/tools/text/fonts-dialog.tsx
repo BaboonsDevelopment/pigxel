@@ -33,6 +33,7 @@ import {
   useCustomFonts,
   type SavedFont,
 } from "./fonts";
+import { showSuccess, withLoading } from "@/components/ui/snackbar";
 
 const SAMPLE = "The quick brown fox\njumps over 0123456789";
 const UNREADABLE =
@@ -97,12 +98,14 @@ export function FontsDialog({
     setUploading((ids) => [...ids, font.id]);
     setPending(null);
     onPick(font.id);
-    void uploadFont(saved, font.file).then((message) => {
-      setUploading((ids) => ids.filter((id) => id !== font.id));
-      if (!message) return;
-      setFonts((list) => list.filter((f) => f.id !== font.id));
-      setError(message);
-    });
+    void withLoading("Uploading…", () => uploadFont(saved, font.file)).then(
+      (message) => {
+        setUploading((ids) => ids.filter((id) => id !== font.id));
+        if (!message) return showSuccess("Font uploaded!");
+        setFonts((list) => list.filter((f) => f.id !== font.id));
+        setError(message);
+      },
+    );
   };
 
   const remove = (font: SavedFont) => {

@@ -11,6 +11,9 @@ export type EditorProps = {
   canPublish?: boolean;
 };
 
+export const STORAGE_FULL_SHARE = 0.9;
+export const NO_EDIT_WARN_GAP = 4000;
+
 export const START_PANELS = {
   ai: "assistant",
   animation: "timeline",

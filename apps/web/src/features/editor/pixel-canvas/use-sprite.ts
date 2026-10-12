@@ -130,11 +130,16 @@ export function useSprite(
   onChange: () => void,
   kept?: KeptSprite,
   viewOnly = false,
+  onViewOnly?: () => void,
 ) {
   const viewing = useRef(viewOnly);
   useEffect(() => {
     viewing.current = viewOnly;
   }, [viewOnly]);
+  const blocked = useRef(onViewOnly);
+  useEffect(() => {
+    blocked.current = onViewOnly;
+  });
   const [background, setBackground] = useState(initial.background);
   const [size, setSize] = useState<Size>({
     w: initial.width,
@@ -407,6 +412,7 @@ export function useSprite(
   ) => {
     if (viewing.current) {
       restore(past.current.present, false);
+      blocked.current?.();
       return;
     }
     const mode = next.colorMode ?? colorMode;

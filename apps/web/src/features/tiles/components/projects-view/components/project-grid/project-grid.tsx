@@ -40,6 +40,7 @@ import { LabelsDialog } from "../labels-dialog";
 import { MoveDialog } from "../move-dialog";
 import { NewProjectCard } from "../new-project-card";
 import { RenameDialog } from "../rename-dialog";
+import { DuplicateDialog } from "../duplicate-dialog";
 import { SectionHeader } from "../section-header";
 import { LabelBadge, PinBadge, PublishedBadge } from "./badges";
 import { useLocalProjects } from "./use-local-projects";
@@ -127,6 +128,7 @@ function Grid({
   const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
   const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
   const [renaming, setRenaming] = useState<Project | null>(null);
+  const [duplicating, setDuplicating] = useState<Project | null>(null);
   const [downloading, setDownloading] = useState<Project | null>(null);
   const [sharing, setSharing] = useState<CloudTileSummary | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -271,7 +273,7 @@ function Grid({
       onSelect: () => actions.togglePin(project, pinOf(project) === null),
     },
     { label: "Rename…", onSelect: () => setRenaming(project) },
-    { label: "Duplicate", onSelect: () => actions.duplicate(project) },
+    { label: "Duplicate…", onSelect: () => setDuplicating(project) },
     { label: "Download…", onSelect: () => setDownloading(project) },
   ];
   const archiveItem = (project: Project) => ({
@@ -547,6 +549,18 @@ function Grid({
           name={renaming.name}
           onRename={(name) => actions.rename(renaming, name)}
           onClose={() => setRenaming(null)}
+        />
+      )}
+      {duplicating && (
+        <DuplicateDialog
+          name={duplicating.name}
+          folders={folders}
+          folderId={folderId ?? null}
+          withFolder={duplicating.kind === "cloud"}
+          onDuplicate={(name, target) =>
+            actions.duplicate(duplicating, name, target)
+          }
+          onClose={() => setDuplicating(null)}
         />
       )}
       {selecting && (

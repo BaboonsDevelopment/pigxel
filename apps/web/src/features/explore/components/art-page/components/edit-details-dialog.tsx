@@ -16,6 +16,7 @@ import { removeFromExplore } from "../../../remove-from-explore";
 import { DESCRIPTION_MAX } from "../../../constants";
 import { RemixToggle } from "../../explore-header/components/remix-toggle";
 import { TagPicker } from "../../explore-header/components/tag-picker";
+import { showSuccess } from "@/components/ui/snackbar";
 
 export function EditDetailsDialog({
   tileId,
@@ -59,6 +60,7 @@ export function EditDetailsDialog({
     );
     setSaving(false);
     if (result.error) return setError(result.error);
+    showSuccess("Details saved!");
     onSaved({
       name: title.trim(),
       tags,

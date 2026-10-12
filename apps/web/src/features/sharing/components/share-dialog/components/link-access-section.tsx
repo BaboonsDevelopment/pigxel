@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { LINK_COPIED, showSnackbar } from "@/components/ui/snackbar";
 import {
   LINK_ACCESS,
   LINK_LABELS,
@@ -40,6 +41,7 @@ export function LinkAccessSection({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      showSnackbar(LINK_COPIED, { tone: "action" });
       setTimeout(() => setCopied(false), 1500);
     } catch {}
   };
