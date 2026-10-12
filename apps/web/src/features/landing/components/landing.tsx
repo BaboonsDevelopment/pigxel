@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/ui/brand";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
-import { businessLine, LEGAL_LINKS } from "@/features/legal/legal";
+import { LEGAL_LINKS } from "@/features/legal/legal";
 import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
 import { ART, STRIP } from "../art";
 import { ArtWall } from "./art-wall";
@@ -450,7 +450,6 @@ export function Landing() {
         </div>
         <div className={styles.footerBottom}>
           <span>© {new Date().getFullYear()} Pigxel Studio</span>
-          <span>{businessLine()}</span>
         </div>
       </footer>
     </div>

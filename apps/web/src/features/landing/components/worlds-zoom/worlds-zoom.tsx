@@ -92,9 +92,6 @@ export function WorldsZoom({ header }: { header: ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const middle = useRef<HTMLLIElement>(null);
   const tiles = useRef<(HTMLLIElement | null)[]>([]);
-  const navCard = useRef<HTMLDivElement>(null);
-  const frameBox = useRef<HTMLSpanElement>(null);
-  const thumb = useRef<HTMLSpanElement>(null);
   const reducedMotion = useSyncExternalStore(
     subscribeMotion,
     () => window.matchMedia(motionQuery).matches,
@@ -278,19 +275,6 @@ export function WorldsZoom({ header }: { header: ReactNode }) {
       viewport.current?.style.setProperty("--intro", reveal.toFixed(3));
       heading.current?.toggleAttribute("data-revealed", reveal > 0.01);
 
-      // The navigator shows which part of the islands is on screen.
-      const box = frameBox.current;
-      if (box) {
-        const vx = clamp01(-x / iw);
-        const vy = clamp01(-y / ih);
-        box.style.left = `${vx * 100}%`;
-        box.style.top = `${vy * 100}%`;
-        box.style.width = `${(clamp01((W - x) / iw) - vx) * 100}%`;
-        box.style.height = `${(clamp01((H - y) / ih) - vy) * 100}%`;
-      }
-      if (navCard.current)
-        navCard.current.style.opacity = (1 - smooth(r / 0.45)).toFixed(3);
-      if (thumb.current) thumb.current.style.left = `${(1 - z) * 100}%`;
       viewport.current?.style.setProperty(
         "--fill",
         `${(smooth(z / 0.75) * 100).toFixed(1)}%`,
@@ -368,29 +352,6 @@ export function WorldsZoom({ header }: { header: ReactNode }) {
           </div>
 
           <canvas ref={canvas} className={styles.canvas} aria-hidden="true" />
-
-          <div className={styles.zoom} aria-hidden="true">
-            <svg viewBox="0 0 24 24">
-              <circle cx="10.5" cy="10.5" r="6.5" />
-              <path d="m20 20-4.5-4.5M7.5 10.5h6" />
-            </svg>
-            <span className={styles.slider}>
-              <span ref={thumb} />
-            </span>
-            <svg viewBox="0 0 24 24">
-              <circle cx="10.5" cy="10.5" r="6.5" />
-              <path d="m20 20-4.5-4.5M7.5 10.5h6M10.5 7.5v6" />
-            </svg>
-            <span className={styles.file}>sky-islands.pigxel</span>
-          </div>
-
-          <div ref={navCard} className={styles.navigator} aria-hidden="true">
-            <p>Navigator</p>
-            <span className={styles.map}>
-              <Image src={skyIslands} alt="" unoptimized />
-              <span ref={frameBox} className={styles.frame} />
-            </span>
-          </div>
         </div>
       </div>
     </div>
