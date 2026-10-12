@@ -15,7 +15,7 @@ import { showSuccess } from "@/components/ui/snackbar";
 import { deleteFolder } from "../../../actions";
 import { TRASH_DAYS } from "../../../constants";
 import type { Folder } from "../../../folders";
-import { PixelFolder } from "./pixel-folder";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 export function DeleteFolderDialog({
   folder,
@@ -61,7 +61,13 @@ function DeleteFolderForm({
       <ModalHeader title="Delete Folder" className="bg-attention-soft" />
       <DialogBody className="grid gap-4 py-5">
         <div className="flex items-center gap-4">
-          <PixelFolder className="h-10 w-12 shrink-0" />
+          <PixelImage
+            src="/art/new-folders-image.png"
+            alt=""
+            width={128}
+            height={85}
+            className="h-[85px] w-32 shrink-0"
+          />
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">
               {folder.name}

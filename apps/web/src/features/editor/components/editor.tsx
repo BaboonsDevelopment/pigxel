@@ -111,6 +111,7 @@ import { PixelImage } from "@/components/ui/pixel-image";
 import { showSnackbar } from "@/components/ui/snackbar";
 import { confirmClearCanvas } from "./clear-canvas-dialog";
 import { ImportImageDialog } from "./import-image-dialog";
+import { NewProjectDialog } from "./new-project-dialog";
 import { useProjectAccess } from "@/features/sharing/queries";
 import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -312,6 +313,7 @@ export function Editor({
   } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [creatingTile, setCreatingTile] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
     name: string;
@@ -1613,7 +1615,6 @@ export function Editor({
       )}
       <EditorHeader
         hidden={canvasOnly}
-        draftId={draft.id}
         file={file}
         fileInput={fileInput}
         drive={drive}
@@ -1703,6 +1704,7 @@ export function Editor({
         }
         onImportSheet={() => sheetInput.current?.click()}
         onImportImage={() => setImporting(true)}
+        onNewTile={() => setCreatingTile(true)}
         onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
         menus={[
@@ -1752,6 +1754,7 @@ export function Editor({
           <TileTabs
             hidden={canvasOnly}
             onSave={file.saveBeforeLeaving}
+            onNew={() => setCreatingTile(true)}
             userId={userId}
             current={{
               id: draft.id,
@@ -1890,6 +1893,14 @@ export function Editor({
           }
         }}
       />
+      {creatingTile && (
+        <NewProjectDialog
+          userId={userId}
+          from={draft.id}
+          drive={drive}
+          onClose={() => setCreatingTile(false)}
+        />
+      )}
       {importing && (
         <ImportImageDialog
           onImport={(picked) =>

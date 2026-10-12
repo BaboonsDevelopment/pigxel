@@ -7,7 +7,7 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { readDraft, removeDraft } from "@/lib/pigxel-file/draft";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
 import { LOCATION_LABELS, type TileLocation } from "@/lib/pigxel-file/location";
-import { editorUrl, newTileUrl } from "@/lib/pigxel-file/open-tile";
+import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   movedTab,
   readTabs,
@@ -54,9 +54,11 @@ export function TileTabs({
   picture,
   hidden,
   onSave,
+  onNew,
 }: {
   hidden?: boolean;
   onSave: () => Promise<boolean>;
+  onNew: () => void;
   userId: string;
   current: TabTile;
   revision: number;
@@ -221,14 +223,15 @@ export function TileTabs({
           </div>
         );
       })}
-      <Link
-        href={newTileUrl(current.id)}
+      <button
+        type="button"
+        onClick={onNew}
         aria-label="New tile"
         title="New tile"
         className="mb-1 ml-1 grid size-7 shrink-0 place-items-center rounded-md text-base text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         +
-      </Link>
+      </button>
     </nav>
   );
 }

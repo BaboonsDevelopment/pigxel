@@ -16,7 +16,8 @@ export type RemovedArt = {
   id: string;
   name: string;
   thumbnail?: string | null;
-  tags?: string[];
+  width?: number;
+  height?: number;
 };
 
 export function confirmRemoveFromExplore(art: RemovedArt): Promise<boolean> {
@@ -64,10 +65,9 @@ function RemoveBody({
   onConfirm: () => void;
 }) {
   const { close } = useDialog();
-  const tag = art.tags?.[0];
   return (
     <>
-      <ModalHeader title="Delete Published Art" className="bg-attention-soft" />
+      <ModalHeader title="Unpublish Artwork" className="bg-attention-soft" />
       <DialogBody className="grid gap-4 py-5">
         <div className="flex items-center gap-4">
           <span className="block size-20 shrink-0 overflow-hidden rounded-xl border border-primary-soft bg-pastel-pink-soft">
@@ -83,14 +83,28 @@ function RemoveBody({
             <span className="block truncate text-sm font-semibold">
               {art.name}
             </span>
-            <span className="block text-[11px] text-muted-foreground">
-              Published{tag ? ` · ${tag}` : ""}
-            </span>
+            {art.width && art.height && (
+              <span className="block text-[11px] text-muted-foreground tabular-nums">
+                {art.width} × {art.height} px
+              </span>
+            )}
           </span>
         </div>
-        <p id="remove-from-explore-message" className="text-sm">
-          This artwork will be permanently removed from the gallery, including
-          its likes and comments. This action cannot be undone.
+        <p
+          id="remove-from-explore-message"
+          className="flex items-start gap-3 rounded-xl bg-pastel-pink-soft px-4 py-3 text-sm"
+        >
+          <PixelImage
+            src="/art/icons/warning-icon.png"
+            alt=""
+            width={24}
+            height={24}
+            className="size-6 shrink-0"
+          />
+          The artwork will disappear from Explore but remain in My Projects.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          You can publish it again whenever you’re ready.
         </p>
       </DialogBody>
       <DialogFooter className={MODAL_FOOTER}>
@@ -109,7 +123,7 @@ function RemoveBody({
             close();
           }}
         >
-          Delete
+          Unpublish
         </ModalButton>
       </DialogFooter>
     </>

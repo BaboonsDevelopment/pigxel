@@ -104,7 +104,7 @@ export function PublishDialog({
     if (!selected) return;
     setError(null);
     setPublishing(true);
-    const result = await removeFromExplore({ ...selected, tags });
+    const result = await removeFromExplore(selected);
     setPublishing(false);
     if (result.error) setError(result.error);
     if (!result.removed) return;
@@ -305,7 +305,7 @@ export function PublishDialog({
               onClick={() => void unpublish()}
               className="border-transparent text-destructive hover:bg-destructive/10"
             >
-              Remove from Explore
+              Unpublish
             </ModalButton>
           ) : tile ? (
             <ModalButton

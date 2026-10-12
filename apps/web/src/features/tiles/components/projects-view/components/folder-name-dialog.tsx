@@ -9,7 +9,7 @@ import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { showSuccess } from "@/components/ui/snackbar";
 import { createFolder, renameFolder } from "../../../actions";
 import { FOLDER_NAME_MAX } from "../../../folders";
-import { PixelFolder } from "./pixel-folder";
+import { PixelImage } from "@/components/ui/pixel-image";
 
 export function FolderNameDialog({
   folder,
@@ -46,7 +46,13 @@ export function FolderNameDialog({
         <ModalHeader title={folder ? "Rename Folder" : "Create New Folder"} />
         <DialogBody className="grid gap-5 py-5">
           <div className="flex items-center gap-6">
-            <PixelFolder className="h-10 w-12 shrink-0" />
+            <PixelImage
+              src="/art/new-folders-image.png"
+              alt=""
+              width={128}
+              height={85}
+              className="h-[85px] w-32 shrink-0"
+            />
             <p className="text-sm text-muted-foreground">
               A cozy place to keep your pixels together.
             </p>

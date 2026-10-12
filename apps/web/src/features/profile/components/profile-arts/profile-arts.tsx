@@ -170,7 +170,7 @@ export function ProfileArts({
         { label: "Open in editor", onSelect: () => void cloud.open(tile) },
         copy,
         {
-          label: "Remove from Explore",
+          label: "Unpublish",
           destructive: true,
           onSelect: async () => {
             if (!(await confirmRemoveFromExplore(tile))) return;

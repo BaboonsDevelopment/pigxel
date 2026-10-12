@@ -15,33 +15,20 @@ import {
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { AssetImage } from "@/features/assets/components/asset-image";
-import { loadAssetDocument, type Asset } from "@/features/assets/assets";
+import type { Asset } from "@/features/assets/assets";
 import { PALETTE_PRESETS, type PalettePreset } from "@/lib/palette/presets";
-import { createDraft, loadDrafts } from "@/lib/pigxel-file/draft";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter } from "@/lib/pigxel-file/tabs";
 import {
   MAX_PIGXEL_SIZE,
   PIGXEL_EXTENSION,
-  blankDocument,
-  serializePigxel,
   type Background,
-  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
 import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
-import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
-import { moveTileToFolder } from "@/features/tiles/actions";
-import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
-import type { TileLocation } from "@/lib/pigxel-file/location";
-import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { useIsClient } from "@/lib/utils/use-is-client";
-import { createFrame } from "@/lib/sprite/frames";
-import {
-  readNewTileDefaults,
-  writeNewTileDefaults,
-  type NewTileStorage,
-} from "../new-tile-defaults";
+import { readNewTileDefaults, type NewTileStorage } from "../new-tile-defaults";
 import type { StartKind } from "@/features/editor/constants";
+import { createTile } from "../create-tile";
 
 const PRESETS = [16, 32, 64, 128];
 const BACKGROUND_OPTIONS: {
@@ -128,75 +115,28 @@ function Form({
   const create = async (w: number, h: number) => {
     setBusy(true);
     setError(null);
-    let image;
-    try {
-      image = asset
-        ? await loadAssetDocument(asset)
-        : blankDocument(w, h, background);
-    } catch {
-      setError("Couldn’t load the asset. Try again.");
-      setBusy(false);
-      return;
-    }
-    if (palette && !asset) image.palette = [...palette.colors];
-    if (start === "animation" && !asset) image = withFrames(image, 4);
-    const file = serializePigxel(image);
-    let location: TileLocation | null = null;
-    try {
-      if (storage === "cloud" || folder) {
-        const tile = await saveCloudTile(
-          { name },
-          file,
-          image,
-          thumbnailDataUrl(image),
-        );
-        if (folder) {
-          const moved = await moveTileToFolder(tile.id, folder.id);
-          if (moved.error) throw new CloudError(moved.error);
-        }
-        location = { kind: "cloud", tile };
-      }
-      if (storage === "drive")
-        location = {
-          kind: "drive",
-          file: await saveDriveFile({ name }, file),
-        };
-    } catch (e) {
-      setError(
-        e instanceof DriveError || e instanceof CloudError
-          ? e.message
-          : "Couldn’t create the tile. Try again.",
-      );
-      setBusy(false);
-      return;
-    }
-    await loadDrafts(userId);
-    const draft = createDraft(userId, {
+    const result = await createTile({
+      userId,
       name,
-      file,
-      location,
-      dirty: false,
+      width: w,
+      height: h,
+      background,
+      storage,
+      folder,
+      asset,
+      palette,
+      start,
     });
-    if (!draft) {
-      setError(
-        location
-          ? "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from My projects."
-          : "This browser won’t keep the tile. Allow site data for Pigxel, or remove some tiles from this browser.",
-      );
+    if ("error" in result) {
+      setError(result.error);
       setBusy(false);
       return;
     }
-    if (!asset)
-      writeNewTileDefaults(userId, {
-        width: w,
-        height: h,
-        background,
-        storage,
-      });
-    else writeNewTileDefaults(userId, { ...defaults, storage });
-    if (from) openTabAfter(userId, draft.id, from);
+    if (from) openTabAfter(userId, result.draftId, from);
     router.push(
-      start ? `${editorUrl(draft.id)}&start=${start}` : editorUrl(draft.id),
+      start
+        ? `${editorUrl(result.draftId)}&start=${start}`
+        : editorUrl(result.draftId),
     );
   };
 
@@ -446,25 +386,4 @@ function StartingAsset({ asset }: { asset: Asset }) {
       </div>
     </Field>
   );
-}
-
-function withFrames(doc: PigxelDocument, count: number): PigxelDocument {
-  const first = doc.frames[0]!;
-  const base = doc.cels.get(first.id) ?? new Map();
-  const frames = [
-    first,
-    ...Array.from({ length: count - 1 }, () => createFrame(first.duration)),
-  ];
-  const cels = new Map(doc.cels);
-  for (const frame of frames.slice(1))
-    cels.set(
-      frame.id,
-      new Map(
-        [...base].map(([layer, pixels]) => [
-          layer,
-          new Uint8ClampedArray(pixels),
-        ]),
-      ),
-    );
-  return { ...doc, frames, cels };
 }

@@ -12,32 +12,6 @@ import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { tokens } from "./tokens-button/components/usage-dialog/helpers";
 
-const ART = [
-  ".......oo........oo.......",
-  "......oppo......oppo......",
-  "......oppooooooooppo......",
-  ".......oppppppppppo...cc..",
-  ".......opeppppppepo..cYYc.",
-  ".......oppppppppppo..cYYc.",
-  ".......olpnnnnnnplo...cc..",
-  ".......oppnonnonppo.......",
-  ".cc....oppnnnnnnppo...cc..",
-  "cYYc...oppppppppppo..cYYc.",
-  "cYYc....oooooooooo...cYYc.",
-  ".cc.....opo....opo....cc..",
-  "........ooo....ooo........",
-];
-
-const COLORS: Record<string, string> = {
-  o: "fill-undo-surface",
-  e: "fill-undo-surface",
-  p: "fill-[#f6b3c8]",
-  l: "fill-[#fbd3df]",
-  n: "fill-progress-fill",
-  c: "fill-[#c98a1e]",
-  Y: "fill-[#f5c542]",
-};
-
 let open = false;
 
 export function showNoTokens(left: number, onGetTokens: () => void) {
@@ -73,27 +47,13 @@ function NoTokensBody({
     <>
       <ModalHeader title="Not Enough Tokens" className="bg-error-soft" />
       <DialogBody className="grid gap-4 py-5">
-        <svg
-          aria-hidden="true"
-          viewBox={`0 0 ${ART[0]!.length} ${ART.length}`}
-          shapeRendering="crispEdges"
-          className="mx-auto h-[78px] w-[156px]"
-        >
-          {ART.flatMap((row, y) =>
-            [...row].map((cell, x) =>
-              COLORS[cell] ? (
-                <rect
-                  key={`${x}-${y}`}
-                  x={x}
-                  y={y}
-                  width={1}
-                  height={1}
-                  className={COLORS[cell]}
-                />
-              ) : null,
-            ),
-          )}
-        </svg>
+        <PixelImage
+          src="/art/reach-pig.png"
+          alt=""
+          width={110}
+          height={88}
+          className="mx-auto h-[88px] w-[110px]"
+        />
         <p className="flex items-center justify-center gap-2 rounded-xl bg-attention-soft px-4 py-3 text-sm font-medium">
           <PixelImage
             src="/art/coins-icon.png"

@@ -249,6 +249,8 @@ export function ArtDetails({
         <EditDetailsDialog
           tileId={tile.id}
           thumbnail={tile.thumbnail}
+          width={tile.width}
+          height={tile.height}
           name={details.name}
           tags={details.tags}
           description={details.description}
