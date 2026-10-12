@@ -36,6 +36,12 @@ import {
   useInvalidateProjects,
 } from "../../../../queries/project-list";
 import { deleteCloudProject } from "../../../../tile-actions";
+import {
+  showSnackbar,
+  showSuccess,
+  showUndo,
+  withLoading,
+} from "@/components/ui/snackbar";
 import type { Project } from "../../helpers";
 import type { useLocalProjects } from "./use-local-projects";
 
@@ -53,7 +59,9 @@ const messageOf = (error: unknown, fallback: string) =>
     ? error.message
     : fallback;
 
-const copyName = (name: string) => `${name.slice(0, 93)} (copy)`;
+const PROJECT_DUPLICATED = "Project duplicated!";
+const PROJECT_RENAMED = "Project renamed!";
+const DUPLICATE_FAILED = "Couldn’t duplicate the project. Try again.";
 
 export function useProjectActions({
   userId,
@@ -72,6 +80,11 @@ export function useProjectActions({
   const fail = (e: unknown) => setError(messageOf(e, "Something went wrong."));
   const inThisFolder = (params: { folderId: string | null }) =>
     params.folderId === folderId;
+  const undoWith = (result: () => Promise<Result>) => async () => {
+    const { error } = await result();
+    if (error) showSnackbar(error);
+    void invalidate();
+  };
 
   const pinMutation = useMutation({
     mutationFn: ({ tile, on }: { tile: CloudTileSummary; on: boolean }) =>
@@ -95,6 +108,11 @@ export function useProjectActions({
         (params) => params.archived === archived,
       ),
     onError: fail,
+    onSuccess: (_, tile) =>
+      showUndo(
+        archived ? "Project unarchived." : "Project archived.",
+        undoWith(() => setProjectArchived(tile.id, archived)),
+      ),
     onSettled: invalidate,
   });
 
@@ -121,18 +139,27 @@ export function useProjectActions({
   });
 
   const duplicateMutation = useMutation({
-    mutationFn: async (tile: CloudTileSummary) => {
-      const file = await readCloudTile(tile.id);
-      const image = parsePigxel(file);
-      const copy = await saveCloudTile(
-        { name: copyName(tile.name) },
-        file,
-        image,
-        thumbnailDataUrl(image),
-      );
-      if (folderId) await ensure(moveTileToFolder(copy.id, folderId));
-    },
-    onError: fail,
+    mutationFn: ({
+      tile,
+      name,
+      target,
+    }: {
+      tile: CloudTileSummary;
+      name: string;
+      target: string | null;
+    }) =>
+      withLoading("Duplicating…", async () => {
+        const file = await readCloudTile(tile.id);
+        const image = parsePigxel(file);
+        const copy = await saveCloudTile(
+          { name },
+          file,
+          image,
+          thumbnailDataUrl(image),
+        );
+        if (target) await ensure(moveTileToFolder(copy.id, target));
+      }),
+    onSuccess: () => showSuccess(PROJECT_DUPLICATED),
     onSettled: invalidate,
   });
 
@@ -141,6 +168,11 @@ export function useProjectActions({
       ensure(moveTileToFolder(tile.id, null)),
     onMutate: (tile) => patchProjectLists(client, tile.id, null, inThisFolder),
     onError: fail,
+    onSuccess: (_, tile) =>
+      showUndo(
+        "Removed from folder.",
+        undoWith(() => moveTileToFolder(tile.id, folderId)),
+      ),
     onSettled: invalidate,
   });
 
@@ -174,6 +206,18 @@ export function useProjectActions({
           patchProjectLists(client, project.id, null);
       }),
     onError: fail,
+    onSuccess: (_, projects) => {
+      const ids = projects.flatMap((project) =>
+        project.kind === "cloud" ? [project.id] : [],
+      );
+      if (!ids.length) return;
+      showUndo(
+        ids.length === 1
+          ? "Project moved to trash."
+          : `${ids.length} projects moved to trash.`,
+        undoWith(() => restoreProjects(ids)),
+      );
+    },
     onSettled: invalidate,
   });
 
@@ -185,6 +229,12 @@ export function useProjectActions({
         patchProjectLists(client, tile.id, null, (params) => params.trashed),
       ),
     onError: fail,
+    onSuccess: (_, tiles) =>
+      showSuccess(
+        tiles.length === 1
+          ? "Project restored!"
+          : `${tiles.length} projects restored!`,
+      ),
     onSettled: invalidate,
   });
 
@@ -208,11 +258,8 @@ export function useProjectActions({
       image: PigxelDocument;
     }): Promise<CloudTileSummary> => {
       const thumbnail = thumbnailDataUrl(image);
-      const tile = await saveCloudTile(
-        { name: draft.name },
-        draft.file,
-        image,
-        thumbnail,
+      const tile = await withLoading("Uploading…", () =>
+        saveCloudTile({ name: draft.name }, draft.file, image, thumbnail),
       );
       writeDraft(userId, {
         id: draft.id,
@@ -241,7 +288,7 @@ export function useProjectActions({
     error,
     clearError: () => setError(null),
     duplicating: duplicateMutation.isPending
-      ? duplicateMutation.variables.id
+      ? duplicateMutation.variables.tile.id
       : null,
     uploading: uploadMutation.isPending
       ? uploadMutation.variables.draft.id
@@ -255,8 +302,11 @@ export function useProjectActions({
 
     toggleArchive: (project: Project) => {
       setError(null);
-      if (project.kind === "local") local.archive(project.id, !archived);
-      else archiveMutation.mutate(project.tile);
+      if (project.kind !== "local") return archiveMutation.mutate(project.tile);
+      local.archive(project.id, !archived);
+      showUndo(archived ? "Project unarchived." : "Project archived.", () =>
+        local.archive(project.id, archived),
+      );
     },
 
     rename: async (project: Project, name: string): Promise<string | null> => {
@@ -264,28 +314,44 @@ export function useProjectActions({
         if (!writeDraft(userId, { ...project.draft, name }))
           return "Couldn’t rename the project. Try again.";
         local.refresh();
+        showSuccess(PROJECT_RENAMED);
         return null;
       }
       try {
         await renameMutation.mutateAsync({ tile: project.tile, name });
+        showSuccess(PROJECT_RENAMED);
         return null;
       } catch (e) {
         return messageOf(e, "Couldn’t rename the project. Try again.");
       }
     },
 
-    duplicate: (project: Project) => {
-      setError(null);
+    duplicate: async (
+      project: Project,
+      name: string,
+      target: string | null,
+    ): Promise<string | null> => {
       if (project.kind === "cloud")
-        return duplicateMutation.mutate(project.tile);
+        try {
+          await duplicateMutation.mutateAsync({
+            tile: project.tile,
+            name,
+            target,
+          });
+          return null;
+        } catch (e) {
+          return messageOf(e, DUPLICATE_FAILED);
+        }
       const copy = createDraft(userId, {
-        name: copyName(project.name),
+        name,
         file: project.draft.file,
         location: null,
         dirty: true,
       });
-      if (copy) local.refresh();
-      else setError("Couldn’t duplicate the project. Try again.");
+      if (!copy) return DUPLICATE_FAILED;
+      local.refresh();
+      showSuccess(PROJECT_DUPLICATED);
+      return null;
     },
 
     removeFromFolder: (tile: CloudTileSummary) => {

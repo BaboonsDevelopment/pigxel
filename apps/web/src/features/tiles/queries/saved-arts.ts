@@ -12,6 +12,7 @@ import type { SavedArt } from "@/features/explore/server";
 import { searchSavedArts } from "../actions";
 import { PAGE_SIZE } from "../constants";
 import { projectKeys } from "./keys";
+import { showSnackbar, showUndo } from "@/components/ui/snackbar";
 
 type SavedPage = { arts: SavedArt[]; count: number | null };
 
@@ -64,6 +65,12 @@ export function useUnsaveArt() {
           },
       );
     },
+    onSuccess: (_, art) =>
+      showUndo("Removed from favorites.", async () => {
+        const result = await setTileSaved(art.id, true);
+        if (result.error) showSnackbar(result.error);
+        void client.invalidateQueries({ queryKey: projectKeys.savedAll() });
+      }),
     onSettled: () =>
       client.invalidateQueries({ queryKey: projectKeys.savedAll() }),
   });

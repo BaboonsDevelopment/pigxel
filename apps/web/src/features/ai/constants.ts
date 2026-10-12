@@ -1,5 +1,7 @@
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 
+export const LOW_TOKENS_SHARE = 0.1;
+
 export const TEXT_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 export const IMAGE_RETRY_DELAYS_MS = [2_000];
 export const TEXT_ATTEMPT_TIMEOUT_MS = 20_000;

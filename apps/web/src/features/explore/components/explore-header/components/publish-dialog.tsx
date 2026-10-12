@@ -1,20 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button, buttonVariants } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { ModalButton, modalButton } from "@/components/ui/modal-button";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Textarea } from "@pigxel/ui/components/input";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { showSnackbar, withLoading } from "@/components/ui/snackbar";
 import type { ProfileTile } from "@/features/profile/profile";
 import {
   loadArtDetails,
@@ -42,6 +40,7 @@ export function PublishDialog({
   onUnpublished?: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [tiles, setTiles] = useState<ProfileTile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<PublishTile | null>(tile ?? null);
@@ -82,8 +81,18 @@ export function PublishDialog({
     if (!selected) return;
     setPublishing(true);
     setError(null);
-    const result = await publishArt(selected.id, tags, description, allowRemix);
+    const result = await withLoading(
+      published ? "Saving…" : "Publishing…",
+      () => publishArt(selected.id, tags, description, allowRemix),
+    );
     setPublishing(false);
+    if (!result.error && !published) {
+      const id = selected.id;
+      showSnackbar("Project published!", {
+        tone: "action",
+        action: { label: "View", onClick: () => router.push(`/explore/${id}`) },
+      });
+    }
     if (result.error) setError(result.error);
     else if (tile) {
       onPublished?.();
@@ -104,30 +113,26 @@ export function PublishDialog({
   };
 
   return (
-    <Dialog onClose={onClose} size="lg" portal>
-      <DialogHeader
+    <Dialog onClose={onClose} size={step === "pick" ? "lg" : "sm"} portal>
+      <ModalHeader
         title={
           step === "pick"
-            ? "Publish to Explore"
+            ? "Publish Project"
             : step === "done"
               ? published
-                ? "Changes saved"
-                : "Your art is on Explore"
+                ? "Changes Saved"
+                : "Published!"
               : published
-                ? "Explore details"
-                : "Tell people about it"
-        }
-        description={
-          step === "pick"
-            ? "Pick an art from Pigxel cloud to share with the community."
-            : step === "done"
-              ? "Anyone can now find it, like it and download it."
-              : published
-                ? "This art is already on Explore. Change its tags or description."
-                : "Tags help people find it. The description shows on its page."
+                ? "Explore Details"
+                : "Publish Project"
         }
       />
-      <DialogBody>
+      <DialogBody className="py-5">
+        {step === "pick" && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            Pick an art from Pigxel cloud to share with the community.
+          </p>
+        )}
         {error && (
           <FormMessage tone="error" className="mb-3">
             {error}
@@ -162,46 +167,51 @@ export function PublishDialog({
             </Text>
           )
         ) : step === "details" && selected ? (
-          <div className="grid gap-5 sm:grid-cols-[10rem_minmax(0,1fr)]">
-            <div>
-              <span className="block aspect-[5/4] overflow-hidden rounded-xl border bg-checker">
+          <div className="grid gap-5">
+            <div className="flex items-center gap-4">
+              <span className="block size-20 shrink-0 overflow-hidden rounded-xl border border-primary-soft bg-pastel-pink-soft">
                 {selected.thumbnail && (
                   <PixelImage
                     src={selected.thumbnail}
                     alt=""
-                    className="size-full object-cover"
+                    className="size-full object-contain"
                   />
                 )}
               </span>
-              <span className="mt-2 block truncate text-sm font-semibold">
-                {selected.name}
-              </span>
-              <span className="block text-[11px] text-muted-foreground">
-                {selected.width} × {selected.height} px
-              </span>
-            </div>
-            <div className="grid content-start gap-4">
-              <div>
-                <span className="mb-1.5 block text-xs font-medium">Tags</span>
-                <TagPicker value={tags} onChange={setTags} />
-              </div>
-              <label className="block">
-                <span className="mb-1.5 flex justify-between text-xs font-medium">
-                  Description
-                  <span className="font-normal text-muted-foreground tabular-nums">
-                    {description.length}/{DESCRIPTION_MAX}
-                  </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">
+                  {selected.name}
                 </span>
-                <Textarea
-                  rows={5}
-                  maxLength={DESCRIPTION_MAX}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="A cozy cottage tucked between mountains…"
-                />
-              </label>
-              <RemixToggle value={allowRemix} onChange={setAllowRemix} />
+                <span className="block text-[11px] text-muted-foreground">
+                  {selected.width} × {selected.height} px
+                </span>
+              </span>
             </div>
+            <label className="block">
+              <span className="mb-2 flex justify-between text-xs font-semibold">
+                Description
+                <span className="font-normal text-muted-foreground tabular-nums">
+                  {description.length}/{DESCRIPTION_MAX}
+                </span>
+              </span>
+              <Textarea
+                rows={3}
+                maxLength={DESCRIPTION_MAX}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="A cozy cottage tucked between mountains…"
+                className="rounded-xl px-4 py-3"
+              />
+            </label>
+            <div>
+              <span className="mb-2 block text-xs font-semibold">Tags</span>
+              <TagPicker
+                value={tags}
+                onChange={setTags}
+                className="min-h-12 rounded-xl px-4"
+              />
+            </div>
+            <RemixToggle value={allowRemix} onChange={setAllowRemix} />
           </div>
         ) : !tiles ? (
           !error && (
@@ -284,48 +294,50 @@ export function PublishDialog({
         )}
       </DialogBody>
       {step === "details" && (
-        <DialogFooter className="items-center justify-between">
+        <DialogFooter
+          className={cn(MODAL_FOOTER, "items-center justify-between")}
+        >
           {tile && published ? (
-            <Button
+            <ModalButton
               type="button"
-              variant="ghost"
+              variant="secondary"
               disabled={publishing}
               onClick={() => void unpublish()}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="border-transparent text-destructive hover:bg-destructive/10"
             >
-              Remove from Explore
-            </Button>
+              Unpublish
+            </ModalButton>
           ) : tile ? (
-            <Button
+            <ModalButton
               type="button"
               variant="secondary"
               disabled={publishing}
               onClick={onClose}
             >
               Cancel
-            </Button>
+            </ModalButton>
           ) : (
-            <Button
+            <ModalButton
               type="button"
               variant="secondary"
               disabled={publishing}
               onClick={() => setStep("pick")}
             >
               Back
-            </Button>
+            </ModalButton>
           )}
           <span className="flex items-center gap-2">
             {tile && published && (
-              <Button
+              <ModalButton
                 type="button"
                 variant="secondary"
                 disabled={publishing}
                 onClick={onClose}
               >
                 Cancel
-              </Button>
+              </ModalButton>
             )}
-            <Button
+            <ModalButton
               type="button"
               disabled={publishing || !loaded}
               onClick={() => void publish()}
@@ -337,16 +349,18 @@ export function PublishDialog({
                 : publishing
                   ? "Publishing…"
                   : "Publish"}
-            </Button>
+            </ModalButton>
           </span>
         </DialogFooter>
       )}
       {step === "done" && selected && (
-        <DialogFooter className="items-center justify-between">
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <DialogFooter
+          className={cn(MODAL_FOOTER, "items-center justify-between")}
+        >
+          <ModalButton type="button" variant="secondary" onClick={onClose}>
             Done
-          </Button>
-          <Link href={`/explore/${selected.id}`} className={buttonVariants()}>
+          </ModalButton>
+          <Link href={`/explore/${selected.id}`} className={modalButton()}>
             View on Explore
           </Link>
         </DialogFooter>

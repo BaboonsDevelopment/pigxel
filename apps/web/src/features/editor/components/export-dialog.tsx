@@ -47,6 +47,7 @@ import { timelapseTiming } from "../export/timelapse";
 import { renderTimelapse } from "../export/timelapse-video";
 import { frameIndex } from "@/lib/sprite/frames";
 import { EditorSelect } from "./editor-select";
+import { showLoading, showSuccess } from "@/components/ui/snackbar";
 
 function Options<T extends string | number>({
   name,
@@ -135,6 +136,7 @@ export default function ExportDialog({
     setBusy(true);
     setError(null);
     await new Promise((resolve) => setTimeout(resolve));
+    const loading = showLoading("Exporting…");
     try {
       if (timelapse) {
         rendering.current = new AbortController();
@@ -142,11 +144,15 @@ export default function ExportDialog({
         const video = await renderTimelapse(
           source,
           settings,
-          (done) => setProgress(Math.floor(done * 100)),
+          (done) => {
+            setProgress(Math.floor(done * 100));
+            loading.progress(done);
+          },
           rendering.current.signal,
         );
         await saveExport([video]);
       } else await saveExport(exportFiles(source, settings));
+      showSuccess("Export complete!");
       dialog.current?.close();
     } catch (e) {
       if (rendering.current?.signal.aborted) return;
@@ -154,6 +160,7 @@ export default function ExportDialog({
       setBusy(false);
       setProgress(null);
     } finally {
+      loading.close();
       rendering.current = null;
     }
   };

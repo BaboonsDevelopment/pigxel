@@ -15,6 +15,7 @@ import { PixelImage } from "@/components/ui/pixel-image";
 import { editedAgo } from "@/features/tiles/components/projects-view/helpers";
 import { loadVersions, restoreVersion } from "../actions";
 import type { TileVersion } from "../versions";
+import { showSuccess, withLoading } from "@/components/ui/snackbar";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", {
@@ -52,12 +53,15 @@ export function VersionHistoryDialog({
     if (!confirmed) return;
     setError(null);
     setRestoring(version.id);
-    const result = await restoreVersion(tileId, version.id);
+    const result = await withLoading("Restoring version…", () =>
+      restoreVersion(tileId, version.id),
+    );
     if (result.error) {
       setError(result.error);
       setRestoring(null);
       return;
     }
+    showSuccess("Version restored!");
     onRestored();
   };
 

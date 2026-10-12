@@ -1,16 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
-import { FormMessage } from "@pigxel/ui/components/field";
+import { ModalButton } from "@/components/ui/modal-button";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
+import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { PROJECT_NAME_MAX } from "../../../constants";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 
 export function RenameDialog({
   name: current,
@@ -43,30 +39,30 @@ export function RenameDialog({
           e.preventDefault();
           void save();
         }}
+        className="flex min-h-0 flex-col"
       >
-        <DialogHeader title="Rename project" />
-        <DialogBody>
-          <Input
-            autoFocus
-            aria-label="Project name"
-            maxLength={PROJECT_NAME_MAX}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          {error && (
-            <FormMessage tone="error" className="mt-2">
-              {error}
-            </FormMessage>
-          )}
+        <ModalHeader title="Rename Project" />
+        <DialogBody className="grid gap-5 py-5">
+          <Field label="New name" htmlFor="rename-project">
+            <Input
+              id="rename-project"
+              autoFocus
+              maxLength={PROJECT_NAME_MAX}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
+              className="h-12 rounded-xl px-4 text-base"
+            />
+          </Field>
+          {error && <FormMessage tone="error">{error}</FormMessage>}
         </DialogBody>
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <DialogFooter className={MODAL_FOOTER}>
+          <ModalButton type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </Button>
-          <Button type="submit" disabled={saving || !name.trim()}>
+          </ModalButton>
+          <ModalButton type="submit" disabled={saving || !name.trim()}>
             {saving ? "Saving…" : "Rename"}
-          </Button>
+          </ModalButton>
         </DialogFooter>
       </form>
     </Dialog>

@@ -1,12 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../actions";
 import { REFERENCES_NOTE } from "../../constants";
 import { notifyAiSpent } from "../../spent-event";
+import { warnAboutTokens } from "../../token-warnings";
 import { loadChat, saveChat } from "../../chat/history";
 import { findPicture, forgetPictures, keepPicture } from "../../chat/pictures";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { showLoading } from "@/components/ui/snackbar";
 import { ChatComposer } from "./components/chat-composer";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
@@ -42,9 +45,21 @@ export function ChatPanel({
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState(false);
+  const router = useRouter();
+  const wasPending = useRef(false);
+  const loading = useRef<ReturnType<typeof showLoading> | null>(null);
   useEffect(() => {
+    if (pending) loading.current ??= showLoading("Generating with AI…");
+    else {
+      loading.current?.close();
+      loading.current = null;
+    }
     if (!pending) notifyAiSpent();
-  }, [pending]);
+    if (wasPending.current && !pending)
+      void warnAboutTokens(() => router.push("/pricing"));
+    wasPending.current = pending;
+  }, [pending, router]);
+  useEffect(() => () => loading.current?.close(), []);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [references, setReferences] = useState<string[]>([]);

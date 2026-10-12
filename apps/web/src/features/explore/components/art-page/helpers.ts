@@ -1,10 +1,15 @@
-import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
+import {
+  backgroundColor,
+  flattenDocument,
+  parsePigxel,
+} from "@/lib/pigxel-file/format";
 
 export type Picture = {
   width: number;
   height: number;
   frames: { pixels: ImageData; duration: number }[];
   animated: boolean;
+  background: string | null;
 };
 
 function samePixels(a: ImageData, b: ImageData) {
@@ -32,6 +37,7 @@ export function toPicture(text: string): Picture {
     height: doc.height,
     frames,
     animated: frames.some((f) => !samePixels(f.pixels, frames[0]!.pixels)),
+    background: backgroundColor(doc.background),
   };
 }
 

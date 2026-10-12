@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { CheckboxField } from "@pigxel/ui/components/choice";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { cn } from "@pigxel/ui/lib/utils";
 import { pigxelFileName, PIGXEL_MIME_TYPE } from "@/lib/pigxel-file/format";
@@ -18,14 +14,27 @@ import {
   DOWNLOAD_FORMATS,
   downloadPicture,
   downloadScales,
+  withBackground,
+  type DownloadFormat,
 } from "@/features/explore/components/art-page/download";
 import {
   toPicture,
   type Picture,
 } from "@/features/explore/components/art-page/helpers";
+import { showSuccess } from "@/components/ui/snackbar";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 
-const OPTION =
-  "flex w-full cursor-pointer items-baseline justify-between gap-4 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-secondary disabled:cursor-default disabled:opacity-50";
+type ExportFormat = DownloadFormat | "pigxel";
+
+const SECTION = "mb-2 flex justify-between text-xs font-semibold";
+
+const option = (chosen: boolean) =>
+  cn(
+    "h-10 rounded-xl border text-sm transition-colors",
+    chosen
+      ? "border-primary-soft bg-pastel-pink-soft font-medium"
+      : "border-border bg-background hover:bg-muted",
+  );
 
 export function DownloadDialog({
   name,
@@ -49,6 +58,8 @@ export function DownloadDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState<number | null>(null);
+  const [format, setFormat] = useState<ExportFormat>("png");
+  const [transparent, setTransparent] = useState(true);
 
   useEffect(() => {
     let stale = false;
@@ -73,17 +84,48 @@ export function DownloadDialog({
   }, [localFile, tileId, authorId]);
 
   const picture = file?.picture;
-  const formats = picture?.animated
-    ? DOWNLOAD_FORMATS
-    : DOWNLOAD_FORMATS.filter((format) => format.value !== "sheet");
+  const formats = [
+    ...(picture?.animated
+      ? DOWNLOAD_FORMATS
+      : DOWNLOAD_FORMATS.filter((f) => f.value !== "sheet")),
+    ...(withFile
+      ? [
+          {
+            value: "pigxel" as const,
+            label: "Pigxel file",
+            hint: "Layers and frames, opens in Pigxel",
+          },
+        ]
+      : []),
+  ];
+  const chosen = formats.find((f) => f.value === format);
+  const image = format !== "pigxel";
+
+  const exportFile = () => {
+    if (!file || scale === null) return;
+    if (format === "pigxel")
+      downloadBlob(
+        new Blob([file.text], { type: PIGXEL_MIME_TYPE }),
+        pigxelFileName(name),
+      );
+    else
+      downloadPicture(
+        transparent
+          ? file.picture
+          : withBackground(file.picture, file.picture.background ?? "#ffffff"),
+        name,
+        format,
+        scale,
+      );
+    onDownload?.();
+    showSuccess("Download complete!");
+    onClose();
+  };
 
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader
-        title="Download"
-        description={`Save “${name}” as an image, or as a Pigxel file to open later.`}
-      />
-      <DialogBody className="grid gap-4">
+      <ModalHeader title="Download Project" />
+      <DialogBody className="grid gap-5 py-5">
         {error ? (
           <FormMessage tone="error">{error}</FormMessage>
         ) : !picture || scale === null ? (
@@ -93,78 +135,78 @@ export function DownloadDialog({
         ) : (
           <>
             <div>
-              <span className="mb-1.5 flex justify-between text-xs font-medium">
-                Scale
-                <span className="font-normal text-muted-foreground tabular-nums">
-                  {picture.width * scale} × {picture.height * scale} px
-                </span>
-              </span>
-              <span role="group" aria-label="Scale" className="flex gap-1">
-                {downloadScales(picture.width, picture.height).map((option) => (
+              <p className={SECTION}>Format</p>
+              <div
+                role="radiogroup"
+                aria-label="Format"
+                className="grid grid-cols-3 gap-2"
+              >
+                {formats.map((f) => (
                   <button
-                    key={option}
+                    key={f.value}
                     type="button"
-                    aria-pressed={option === scale}
-                    onClick={() => setScale(option)}
-                    className={cn(
-                      "h-7 flex-1 cursor-pointer rounded-md border text-xs tabular-nums transition-colors hover:bg-muted",
-                      option === scale &&
-                        "border-transparent bg-pastel-pink hover:bg-pastel-pink",
-                    )}
+                    role="radio"
+                    aria-checked={f.value === format}
+                    onClick={() => setFormat(f.value)}
+                    className={option(f.value === format)}
                   >
-                    {option}×
+                    {f.label}
                   </button>
                 ))}
-              </span>
-            </div>
-            <ul className="-mx-1 grid gap-0.5 border-t pt-3">
-              {formats.map((format) => (
-                <li key={format.value}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      downloadPicture(picture, name, format.value, scale);
-                      onDownload?.();
-                    }}
-                    className={OPTION}
-                  >
-                    <span className="font-medium">{format.label}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {format.value === "png" && picture.animated
-                        ? "First frame"
-                        : format.hint}
-                    </span>
-                  </button>
-                </li>
-              ))}
-              {withFile && (
-                <li className="mt-1 border-t pt-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      downloadBlob(
-                        new Blob([file.text], { type: PIGXEL_MIME_TYPE }),
-                        pigxelFileName(name),
-                      );
-                      onDownload?.();
-                    }}
-                    className={OPTION}
-                  >
-                    <span className="font-medium">Pigxel file</span>
-                    <span className="text-xs text-muted-foreground">
-                      Layers and frames, opens in Pigxel
-                    </span>
-                  </button>
-                </li>
+              </div>
+              {chosen && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {chosen.value === "png" && picture.animated
+                    ? "First frame"
+                    : chosen.hint}
+                </p>
               )}
-            </ul>
+            </div>
+            {image && (
+              <div>
+                <p className={SECTION}>
+                  Scale
+                  <span className="font-normal text-muted-foreground tabular-nums">
+                    {picture.width * scale} × {picture.height * scale} px
+                  </span>
+                </p>
+                <div
+                  role="radiogroup"
+                  aria-label="Scale"
+                  className="grid grid-cols-3 gap-2"
+                >
+                  {downloadScales(picture.width, picture.height).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      role="radio"
+                      aria-checked={s === scale}
+                      onClick={() => setScale(s)}
+                      className={cn(option(s === scale), "tabular-nums")}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {image && (
+              <CheckboxField
+                label="Transparent background"
+                checked={transparent}
+                onChange={(e) => setTransparent(e.target.checked)}
+              />
+            )}
           </>
         )}
       </DialogBody>
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Done
-        </Button>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton type="button" variant="secondary" onClick={onClose}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="button" disabled={!file} onClick={exportFile}>
+          Download
+        </ModalButton>
       </DialogFooter>
     </Dialog>
   );

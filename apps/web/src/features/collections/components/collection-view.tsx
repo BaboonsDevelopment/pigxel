@@ -7,6 +7,7 @@ import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Heading } from "@pigxel/ui/components/typography";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { LINK_COPIED, showSnackbar, showUndo } from "@/components/ui/snackbar";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { PublicTile } from "@/features/profile/profile";
 import { PopularCard } from "@/features/explore/components/popular-card/popular-card";
@@ -38,13 +39,21 @@ export function CollectionView({
   const remove = async (tile: PublicTile) => {
     setError(null);
     setRemoved((ids) => new Set(ids).add(tile.id));
+    const unremove = () =>
+      setRemoved((ids) => {
+        const next = new Set(ids);
+        next.delete(tile.id);
+        return next;
+      });
     const result = await setInCollection(collection.id, tile.id, false);
-    if (!result.error) return;
-    setError(result.error);
-    setRemoved((ids) => {
-      const next = new Set(ids);
-      next.delete(tile.id);
-      return next;
+    if (result.error) {
+      setError(result.error);
+      return unremove();
+    }
+    showUndo("Removed from collection.", async () => {
+      const undone = await setInCollection(collection.id, tile.id, true);
+      if (undone.error) return showSnackbar(undone.error);
+      unremove();
     });
   };
 
@@ -56,6 +65,7 @@ export function CollectionView({
       else {
         await navigator.clipboard.writeText(url);
         setCopied(true);
+        showSnackbar(LINK_COPIED, { tone: "action" });
         setTimeout(() => setCopied(false), 1500);
       }
     } catch {}

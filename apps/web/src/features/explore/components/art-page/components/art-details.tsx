@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
@@ -24,12 +25,19 @@ import {
   setTileLiked,
   setTileSaved,
 } from "../../../actions";
-import { downloadPicture, type DownloadFormat } from "../download";
-import { DownloadMenu } from "./download-menu";
+import { DownloadDialog } from "@/features/tiles/components/projects-view/components/download-dialog";
 import type { Picture } from "../helpers";
 import { EditDetailsDialog } from "./edit-details-dialog";
-import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { ReportDialog } from "./report-dialog";
+import type { ReportReason } from "../../../constants";
+import {
+  LINK_COPIED,
+  showSnackbar,
+  showSuccess,
+  showUndo,
+} from "@/components/ui/snackbar";
 import { CollectButton } from "@/features/collections/components/collect-button";
+import { projectKeys } from "@/features/tiles/queries/keys";
 
 const counting = new Set<string>();
 
@@ -62,6 +70,7 @@ export function ArtDetails({
   const [follows, setFollows] = useState(following);
   const [followPending, startFollow] = useTransition();
   const [downloads, setDownloads] = useState(tile.downloads);
+  const [downloading, setDownloading] = useState(false);
   const [views, setViews] = useState(tile.views ?? 0);
 
   useEffect(() => {
@@ -85,6 +94,7 @@ export function ArtDetails({
   const [likePending, startLike] = useTransition();
   const [isSaved, setIsSaved] = useState(saved);
   const [savePending, startSave] = useTransition();
+  const client = useQueryClient();
   const own = viewerId === author.id;
   const [details, setDetails] = useState({
     tags: tile.tags,
@@ -95,24 +105,19 @@ export function ArtDetails({
   const canRemix = own || details.allowRemix;
   const [editing, setEditing] = useState(false);
   const [reported, setReported] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
-  const report = async () => {
-    const confirmed = await confirmDialog({
-      title: "Report this art?",
-      message: "We’ll take a look. The author won’t know who reported it.",
-      confirmLabel: "Report",
-    });
-    if (!confirmed) return;
-    const result = await reportArt(tile.id);
-    setError(result.error ?? null);
-    if (!result.error) setReported(true);
+  const report = async (reason: ReportReason, details: string) => {
+    const result = await reportArt(tile.id, reason, details);
+    if (result.error) return result.error;
+    setReported(true);
+    showSuccess("Thanks, we’ll take a look.");
+    return null;
   };
 
-  const download = async (format: DownloadFormat, scale: number) => {
-    if (!picture) return;
-    downloadPicture(picture, tile.name, format, scale);
-    const counted = await recordDownload(tile.id);
-    if (counted !== null) setDownloads(counted);
+  const counted = async () => {
+    const total = await recordDownload(tile.id);
+    if (total !== null) setDownloads(total);
   };
 
   const toggleLike = () => {
@@ -129,17 +134,25 @@ export function ArtDetails({
     });
   };
 
-  const toggleSave = () => {
-    if (!viewerId) return router.push("/login");
+  const saveAs = (next: boolean) =>
     startSave(async () => {
-      const next = !isSaved;
       setIsSaved(next);
       const result = await setTileSaved(tile.id, next);
+      void client.invalidateQueries({ queryKey: projectKeys.savedAll() });
       if (result.error) {
         setIsSaved(!next);
         setError(result.error);
-      }
+      } else if (next) showSuccess("Added to favorites");
+      else showUndo("Removed from favorites.", () => saveAs(true));
     });
+
+  const toggleSave = () => {
+    if (!viewerId)
+      return showSnackbar("Log in to save your project.", {
+        tone: "account",
+        action: { label: "Log in", onClick: () => router.push("/login") },
+      });
+    saveAs(!isSaved);
   };
 
   const remix = async () => {
@@ -162,6 +175,7 @@ export function ArtDetails({
   const copy = (text: string, label: string) => {
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(label);
+      if (label === "link") showSnackbar(LINK_COPIED, { tone: "action" });
       setTimeout(() => setCopied(null), 1500);
     });
   };
@@ -234,6 +248,9 @@ export function ArtDetails({
       {editing && (
         <EditDetailsDialog
           tileId={tile.id}
+          thumbnail={tile.thumbnail}
+          width={tile.width}
+          height={tile.height}
           name={details.name}
           tags={details.tags}
           description={details.description}
@@ -349,37 +366,35 @@ export function ArtDetails({
             </p>
           </div>
         </div>
-        <DownloadMenu
-          width={tile.width}
-          height={tile.height}
-          animated={!!picture?.animated}
-          disabled={!picture}
-          onDownload={(format, scale) => void download(format, scale)}
-          className="flex border-r border-[#f6dbe4]"
-          align="right"
-          triggerClassName="flex flex-1 cursor-pointer items-center justify-center gap-2 px-2 text-left transition-colors hover:text-primary disabled:cursor-default"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-5"
+        <div className="flex border-r border-[#f6dbe4]">
+          <button
+            type="button"
+            disabled={!picture}
+            onClick={() => setDownloading(true)}
+            className="flex flex-1 cursor-pointer items-center justify-center gap-2 px-2 text-left transition-colors hover:text-primary disabled:cursor-default"
           >
-            <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
-          </svg>
-          <span>
-            <span className="block text-sm font-semibold tabular-nums">
-              {formatCount(downloads)}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="size-5"
+            >
+              <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
+            </svg>
+            <span>
+              <span className="block text-sm font-semibold tabular-nums">
+                {formatCount(downloads)}
+              </span>
+              <span className="block text-[10px] text-muted-foreground">
+                downloads
+              </span>
             </span>
-            <span className="block text-[10px] text-muted-foreground">
-              downloads
-            </span>
-          </span>
-        </DownloadMenu>
+          </button>
+        </div>
         <div className="flex items-center justify-center gap-2 px-2">
           <svg
             aria-hidden="true"
@@ -444,13 +459,40 @@ export function ArtDetails({
       )}
 
       <div className="mt-3 flex flex-wrap justify-center gap-3">
-        <DownloadMenu
-          width={tile.width}
-          height={tile.height}
-          animated={!!picture?.animated}
+        <button
+          type="button"
           disabled={!picture}
-          onDownload={(format, scale) => void download(format, scale)}
-        />
+          onClick={() => setDownloading(true)}
+          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+          >
+            <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
+          </svg>
+          Download
+        </button>
+        {reporting && (
+          <ReportDialog onReport={report} onClose={() => setReporting(false)} />
+        )}
+        {downloading && (
+          <DownloadDialog
+            name={tile.name}
+            file={file ?? undefined}
+            tileId={tile.id}
+            authorId={author.id}
+            withFile={canRemix}
+            onDownload={() => void counted()}
+            onClose={() => setDownloading(false)}
+          />
+        )}
         <button
           type="button"
           aria-pressed={isSaved}
@@ -502,7 +544,7 @@ export function ArtDetails({
               type="button"
               aria-label={reported ? "Reported, thanks" : "Report art"}
               disabled={reported}
-              onClick={() => void report()}
+              onClick={() => setReporting(true)}
               className={cn(
                 "flex size-8 cursor-pointer items-center justify-center rounded-lg border bg-background transition-colors hover:bg-muted hover:text-destructive disabled:cursor-default disabled:hover:bg-background",
                 reported && "text-destructive",

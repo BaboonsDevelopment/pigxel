@@ -3,6 +3,7 @@ import { colorsOf } from "@/lib/palette/presets";
 import { clampDuration, createFrame } from "@/lib/sprite/frames";
 import {
   MAX_PIGXEL_SIZE,
+  PIGXEL_EXTENSION,
   PigxelFileError,
   blankDocument,
   type PigxelDocument,
@@ -15,6 +16,18 @@ const IMAGE_EXTENSION = /\.(png|gif|jpe?g|webp|bmp)$/i;
 
 export function isImageFile(file: File) {
   return file.type.startsWith("image/") || IMAGE_EXTENSION.test(file.name);
+}
+
+export const UNSUPPORTED_FILE = "This file type is not supported.";
+
+export function isSupportedFile(file: File) {
+  const name = file.name.toLowerCase();
+  return (
+    isImageFile(file) ||
+    file.type === "application/json" ||
+    name.endsWith(PIGXEL_EXTENSION) ||
+    name.endsWith(".json")
+  );
 }
 
 export function imageBaseName(name: string) {

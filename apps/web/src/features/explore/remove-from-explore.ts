@@ -1,19 +1,16 @@
 "use client";
 
-import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { unpublishArt } from "./actions";
+import {
+  confirmRemoveFromExplore,
+  type RemovedArt,
+} from "./components/remove-from-explore-dialog";
 
-export async function removeFromExplore(tile: {
-  id: string;
-  name: string;
-}): Promise<{ removed: boolean; error?: string }> {
-  const confirmed = await confirmDialog({
-    title: "Remove from Explore?",
-    message: `“${tile.name}” won’t be on Explore anymore. Its likes and comments come back if you publish it again.`,
-    confirmLabel: "Remove",
-  });
-  if (!confirmed) return { removed: false };
-  const result = await unpublishArt(tile.id);
+export async function removeFromExplore(
+  art: RemovedArt,
+): Promise<{ removed: boolean; error?: string }> {
+  if (!(await confirmRemoveFromExplore(art))) return { removed: false };
+  const result = await unpublishArt(art.id);
   return result.error
     ? { removed: false, error: result.error }
     : { removed: true };

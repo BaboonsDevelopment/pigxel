@@ -68,6 +68,7 @@ vi.mock("next/font/google", () => ({
   Pixelify_Sans: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
   Funnel_Display: () => ({ variable: "" }),
   Funnel_Sans: () => ({ variable: "" }),
 }));

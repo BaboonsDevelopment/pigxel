@@ -14,10 +14,13 @@ import {
   PAGE_SIZE,
   PERIODS,
   QUERY_MAX,
+  REPORT_DETAILS_MAX,
+  REPORT_REASONS,
   SIZES,
   SORTS,
   TAGS,
   type ExploreFilters,
+  type ReportReason,
 } from "./constants";
 import { findArtists, type ArtistResult } from "@/features/search/server";
 import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
@@ -400,14 +403,21 @@ export async function reportComment(
   return {};
 }
 
-export async function reportArt(tileId: string): Promise<{ error?: string }> {
+export async function reportArt(
+  tileId: string,
+  reason: ReportReason,
+  details: string,
+): Promise<{ error?: string }> {
   await requireUser();
-  if (!UUID.test(tileId)) return { error: "Invalid request." };
+  if (!UUID.test(tileId) || !REPORT_REASONS.some((r) => r.value === reason))
+    return { error: "Invalid request." };
   try {
     const supabase = await createClient();
-    const { error } = await supabase
-      .from("art_reports")
-      .insert({ tile_id: tileId });
+    const { error } = await supabase.from("art_reports").insert({
+      tile_id: tileId,
+      reason,
+      details: details.trim().slice(0, REPORT_DETAILS_MAX) || null,
+    });
     if (error && error.code !== "23505")
       return { error: "Couldn’t report that. Try again." };
   } catch {

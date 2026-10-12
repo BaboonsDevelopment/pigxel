@@ -253,7 +253,7 @@ export function soloTree(tree: Layer[], id: string): Layer[] {
   });
 }
 
-const isLocked = (tree: Layer[], id: string) =>
+export const isLocked = (tree: Layer[], id: string) =>
   withAncestors(tree, id).some((layer) => layer.locked);
 
 export function canPaint(tree: Layer[], id: string | null) {

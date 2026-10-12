@@ -13,11 +13,13 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { setTileSaved } from "@/features/explore/actions";
 import { PublishDialog } from "@/features/explore/components/explore-header/components/publish-dialog";
+import { LINK_COPIED, showSnackbar, showUndo } from "@/components/ui/snackbar";
 import { formatCount } from "@/features/explore/components/popular-card/helpers";
 import { ProjectCard } from "@/features/tiles/components/project-card/project-card";
 import { PinBadge } from "@/features/tiles/components/projects-view/components/project-grid/badges";
 import { StatIcon } from "@/features/tiles/components/projects-view/components/stat-icons";
 import { useCloudTileActions } from "@/features/tiles/tile-actions";
+import { confirmRemoveFromExplore } from "@/features/explore/components/remove-from-explore-dialog";
 import { useSortable } from "@/features/tiles/components/projects-view/drag/use-sortable";
 import {
   loadMoreProfileArts,
@@ -109,6 +111,17 @@ export function ProfileArts({
       if (result.error) setError(result.error);
     });
 
+  const unsave = async (tile: ProfileTile) => {
+    const result = await setTileSaved(tile.id, false);
+    if (!result.error)
+      showUndo("Removed from favorites.", async () => {
+        const undone = await setTileSaved(tile.id, true);
+        if (undone.error) showSnackbar(undone.error);
+        router.refresh();
+      });
+    return result;
+  };
+
   const togglePin = (tile: ProfileTile) => {
     if (tile.pinOrder) {
       run({ id: tile.id, pinOrder: null }, () => setTilePinned(tile.id, false));
@@ -129,6 +142,7 @@ export function ProfileArts({
         new URL(`/explore/${tile.id}`, window.location.origin).href,
       );
       setCopied(tile.id);
+      showSnackbar(LINK_COPIED, { tone: "action" });
       setTimeout(() => setCopied(null), 1500);
     } catch {}
   };
@@ -156,12 +170,14 @@ export function ProfileArts({
         { label: "Open in editor", onSelect: () => void cloud.open(tile) },
         copy,
         {
-          label: "Remove from Explore",
+          label: "Unpublish",
           destructive: true,
-          onSelect: () =>
+          onSelect: async () => {
+            if (!(await confirmRemoveFromExplore(tile))) return;
             run({ id: tile.id, remove: true }, () =>
               setTileVisibility(tile.id, "private"),
-            ),
+            );
+          },
         },
       ];
     if (kind === "saved" && isOwner)
@@ -171,9 +187,7 @@ export function ProfileArts({
           label: "Remove from saved",
           destructive: true,
           onSelect: () =>
-            run({ id: tile.id, remove: true }, () =>
-              setTileSaved(tile.id, false),
-            ),
+            run({ id: tile.id, remove: true }, () => unsave(tile)),
         },
       ];
     return [copy];
