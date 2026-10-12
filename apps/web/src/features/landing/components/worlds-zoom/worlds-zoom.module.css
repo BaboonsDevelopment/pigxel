@@ -1,0 +1,380 @@
+/*
+ * The zoom out of a pixel. Tokens come from the landing page. Tiles are kept
+ * at the sky islands' exact shape (240 × 161), so the zoom lands precisely in
+ * the middle tile.
+ */
+
+.track {
+  --per: 85vh;
+
+  position: relative;
+  height: calc(100vh + 2.4 * var(--per));
+}
+
+@supports (height: 1svh) {
+  .track {
+    --per: 85svh;
+
+    height: calc(100svh + 2.4 * var(--per));
+  }
+}
+
+.viewport {
+  --heading-top: 106px;
+
+  position: sticky;
+  top: 0;
+  isolation: isolate;
+  height: 100vh;
+  height: 100svh;
+  opacity: var(--arrival, 0);
+  transform: translateY(calc(-1 * var(--arrival-offset, 0px)));
+  pointer-events: none;
+}
+
+.viewport[data-arrived] {
+  pointer-events: auto;
+}
+
+.heading {
+  position: absolute;
+  top: var(--heading-top);
+  left: 0;
+  right: 0;
+  z-index: 4;
+  width: min(100%, calc(var(--max) + 2 * var(--gutter)));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+  opacity: var(--intro, 0);
+  visibility: hidden;
+  transform: translateY(calc((1 - var(--intro, 0)) * 24px));
+}
+
+.heading[data-revealed] {
+  visibility: visible;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  container: stage / size;
+  background-color: #f4f5fa;
+  background-image: radial-gradient(
+    rgb(14 14 17 / 0.07) 1px,
+    transparent 1.5px
+  );
+  background-size: 22px 22px;
+}
+
+.gallery {
+  position: absolute;
+  inset: calc(var(--heading-top) + var(--heading-height, 200px) + 28px)
+    var(--gutter) 76px;
+  display: grid;
+  place-items: center;
+  container: gallery / size;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ── The gallery of worlds ────────────────────────────────────────────── */
+
+.grid {
+  --gap: clamp(8px, 1.4cqw, 16px);
+  --pad: clamp(12px, 3cqw, 32px);
+
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--gap);
+  width: min(
+    100cqw - 2 * var(--pad),
+    (100cqh - 2 * var(--pad) - 2 * var(--gap)) / 3 * 1.4907 * 5 + 4 * var(--gap)
+  );
+  list-style: none;
+}
+
+@container gallery (orientation: portrait) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: min(
+      100cqw - 2 * var(--pad),
+      (100cqh - 2 * var(--pad) - 4 * var(--gap)) / 5 * 1.4907 * 3 + 2 *
+        var(--gap)
+    );
+  }
+}
+
+.tile,
+.middle {
+  position: relative;
+  aspect-ratio: 240 / 161;
+  border-radius: clamp(8px, 1.2cqw, 14px);
+}
+
+.tile {
+  overflow: hidden;
+  background: #e9e9ef;
+  box-shadow:
+    0 0 0 1px rgb(14 14 17 / 0.06),
+    0 14px 30px -18px rgb(30 20 60 / 0.45);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ease);
+}
+
+.stage[data-gallery] .tile:hover img {
+  transform: scale(1.06);
+}
+
+/* The middle tile is drawn on the canvas; its caption sits above it. */
+.middle {
+  z-index: 2;
+}
+
+.caption {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: calc(100% - 16px);
+  padding: 6px 9px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.9);
+  font: 500 11px/1.2 var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(6px);
+  transition:
+    opacity 0.3s,
+    transform 0.3s var(--ease);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.caption strong {
+  overflow: hidden;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--ink);
+  text-overflow: ellipsis;
+}
+
+.stage[data-gallery] .tile:hover .caption,
+.stage[data-gallery] .middle .caption {
+  opacity: 1;
+  transform: none;
+}
+
+@container stage (max-width: 560px) {
+  .caption {
+    display: none;
+  }
+}
+
+/* ── Editor chrome: zoom slider and navigator ─────────────────────────── */
+
+.zoom,
+.navigator {
+  background: rgb(255 255 255 / 0.88);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.9),
+    0 0 0 1px rgb(14 14 17 / 0.07),
+    0 18px 36px -20px rgb(30 20 60 / 0.45);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.zoom {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: var(--gutter);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.zoom svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.slider {
+  position: relative;
+  width: 84px;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.slider span {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 2px var(--blue),
+    0 2px 6px rgb(47 91 255 / 0.35);
+}
+
+.file {
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  font: 600 12px/1 var(--sans);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.navigator {
+  position: absolute;
+  right: var(--gutter);
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 3;
+  width: 188px;
+  padding: 10px;
+  border-radius: 16px;
+  pointer-events: none;
+}
+
+.navigator p {
+  margin-bottom: 8px;
+  font: 600 12px/1 var(--sans);
+  color: var(--ink);
+}
+
+.map {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.map img {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+
+/* What's on screen, with everything else dimmed. The spread only has to
+   cover the little map; Chrome drops shadows with a much larger one. */
+.frame {
+  position: absolute;
+  border: 2px solid var(--blue);
+  border-radius: 3px;
+  box-shadow: 0 0 0 260px rgb(14 14 17 / 0.3);
+}
+
+@container stage (max-width: 560px) {
+  .file {
+    display: none;
+  }
+
+  .navigator {
+    width: 124px;
+    padding: 8px;
+  }
+
+  .navigator p {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .viewport {
+    --heading-top: 96px;
+  }
+}
+
+/* A landscape phone needs the copy beside the gallery. */
+@media (max-height: 560px) and (min-aspect-ratio: 4/3) {
+  .heading {
+    right: auto;
+    width: 40%;
+    padding-right: 16px;
+  }
+
+  .gallery {
+    inset: var(--heading-top) var(--gutter) 64px 40%;
+  }
+
+  .navigator {
+    width: 124px;
+  }
+}
+
+/* Without motion: no pinning and no zoom, just the gallery. */
+@media (prefers-reduced-motion: reduce) {
+  .track {
+    height: auto;
+  }
+
+  .viewport {
+    position: relative;
+    height: auto;
+    padding-top: 48px;
+    background: #f4f5fa;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .heading {
+    position: relative;
+    top: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    width: min(100%, calc(var(--max) + 2 * var(--gutter)));
+  }
+
+  .stage {
+    position: relative;
+    height: min(76vh, 640px);
+    margin-top: 24px;
+  }
+
+  .gallery {
+    inset: 0 var(--gutter) 76px;
+  }
+
+  .tile {
+    opacity: 1;
+  }
+
+  .tile img,
+  .caption {
+    transition: none;
+  }
+}
