@@ -49,3 +49,15 @@ Third batch, for the wall's eighth column: scenes of a treehouse village at dusk
 ## Painting pig animation
 
 Assets: `apps/web/public/art/animate/paint-1.png` … `paint-4.png`, used by the Animate and Export demos. Generated with Gemini (`gemini-3.1-flash-image`) as one 2×2 sheet on flat magenta, with `pigxel-mascot-sitting.png` attached as the character reference: the same pig sitting at a small easel, brush raised, a green stroke, a yellow dot, then the finished flower with a happy closed-eye smile. The cells were cut apart, aligned on the parts that don't move (the tail and the feet and easel legs), and keyed to transparency.
+
+## Night garden (feature tour)
+
+Asset: `apps/web/public/art/feature/garden-night.png`, used by the AI helper and Export chapters of the features tour. Generated with Gemini (`gemini-3.1-flash-image`) as an edit of the day garden (`public/art/wall/garden.png`, attached): the same composition, objects and pixel style, with only the lighting changed to night, a crescent moon and stars, glowing lanterns, reflections on the pond and fireflies. Resized to the day image's exact size (960 × 644), so the tour can redraw one into the other block by block.
+
+## Sky islands with a hidden pig (Inspiration zoom)
+
+Asset: `apps/web/public/art/feature/sky-islands-pig.png`, used by the Inspiration section, which zooms out from one of its pixels. Not a new generation: it is the art wall's sky islands scene (`public/art/wall/skyislands.png`), taken from the original Gemini render and averaged down to 240 × 161 with a cubic resize, so each pixel of the file is one pixel of the art. It was reduced to a 48-colour palette with no dithering. The landing's 16 × 16 pig (`PIG` in `components/pixel-art.tsx`, in the Draw chapter's colours) was then placed by hand on the small floating rock in the middle, with its top-left corner at (127, 83).
+
+## Footer scene
+
+Assets: `apps/web/public/art/footer/pig.png` and `clouds.png`, the pixel scene in the landing footer. Generated with Gemini (`gemini-3.1-flash-image`) on flat magenta, keyed to transparency, trimmed and resized with nearest neighbour. The pig was made with `pigxel-mascot-sitting.png` attached as the character reference: the same pig on a patch of grass at a small laptop with a heart on its lid, with a pencil cup, a glowing lantern, mauve bushes, tiny flowers, and a crescent moon on a cloud. The clouds are a low cluster of dusky rose clouds and bushes with tiny flowers along a grassy base. The PIGXEL wordmark between them is live text set in Geist Pixel.

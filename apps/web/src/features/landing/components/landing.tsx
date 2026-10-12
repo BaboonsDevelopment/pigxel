@@ -3,16 +3,32 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/ui/brand";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
-import { businessLine, LEGAL_LINKS } from "@/features/legal/legal";
+import { LEGAL_LINKS } from "@/features/legal/legal";
 import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
-import { ART, STRIP, type Art } from "../art";
+import { ART, STRIP } from "../art";
 import { ArtWall } from "./art-wall";
-import { CountUp } from "./count-up";
-import { FeatureWorld } from "./feature-world/feature-world";
+import { FeatureTour } from "./feature-tour/feature-tour";
+import { WorldsZoom } from "./worlds-zoom/worlds-zoom";
+import { HeroCards } from "./hero-cards";
 import { HeroSpotlight } from "./hero-spotlight";
-import { geist, geistPixel } from "@/lib/fonts/geist";
+import { geistPixel } from "@/lib/fonts/geist";
+import { funnelDisplay, funnelSans } from "@/lib/fonts/landing";
 import { ICONS, PixelSprite } from "./pixel-art";
+import footerClouds from "../../../../public/art/footer/clouds.png";
+import footerPig from "../../../../public/art/footer/pig.png";
 import styles from "./landing.module.css";
+
+/** Footer sparkles: x and y in % of the scene, and size in px. */
+const SPARKS: [number, number, number][] = [
+  [14, 22, 14],
+  [22, 58, 10],
+  [37, 8, 12],
+  [55, 4, 10],
+  [63, 30, 14],
+  [72, 62, 9],
+  [86, 12, 12],
+  [93, 46, 10],
+];
 
 const delay = (seconds: number) =>
   ({ "--delay": `${seconds}s` }) as CSSProperties;
@@ -25,16 +41,44 @@ function Arrow() {
   );
 }
 
-function Words({ text, start }: { text: string; start: number }) {
-  return text.split(" ").map((word, index) => (
-    <span key={index}>
-      {index > 0 && " "}
-      <span className={styles.word} style={delay(start + index * 0.08)}>
-        {word}
+/**
+ * Splits words into letters that rise and inflate, from the font's thinnest
+ * weight to its boldest, one after another. Words stay unbroken.
+ */
+function Letters({ text, start }: { text: string; start: number }) {
+  let index = 0;
+  return text.split(" ").map((word, w) => (
+    <span key={w}>
+      {w > 0 && " "}
+      <span className={styles.word}>
+        {[...word].map((char) => {
+          const i = index++;
+          return (
+            <span
+              key={i}
+              className={styles.char}
+              style={{ "--i": i, "--start": `${start}s` } as CSSProperties}
+            >
+              {char}
+            </span>
+          );
+        })}
       </span>
     </span>
   ));
 }
+
+/** Pixels of the hero's grid that light up now and then: column, row, ink. */
+const CELLS: { x: number; y: number; c: string; d: number; o: number }[] = [
+  { x: -12, y: 2, c: "var(--pink-bright)", d: 0.4, o: 0.5 },
+  { x: -10, y: 6, c: "var(--blue)", d: 2.6, o: 0.22 },
+  { x: -13, y: 9, c: "#ffb36b", d: 4.8, o: 0.45 },
+  { x: 11, y: 3, c: "#ffb36b", d: 1.4, o: 0.45 },
+  { x: 13, y: 7, c: "var(--pink-bright)", d: 3.6, o: 0.4 },
+  { x: 10, y: 11, c: "var(--blue)", d: 5.6, o: 0.2 },
+  { x: -7, y: 13, c: "var(--pink-bright)", d: 6.2, o: 0.3 },
+  { x: 7, y: 14, c: "#ffb36b", d: 0.9, o: 0.35 },
+];
 
 const MAKES: { icon: keyof typeof ICONS; label: string }[] = [
   { icon: "heart", label: "Characters" },
@@ -46,13 +90,6 @@ const MAKES: { icon: keyof typeof ICONS; label: string }[] = [
   { icon: "potion", label: "Items & props" },
   { icon: "coin", label: "UI & HUD" },
   { icon: "cat", label: "Tiny pets" },
-];
-
-const BENTO: { art: Art; size: "large" | "wide" | "small" }[] = [
-  { art: ART.coast, size: "large" },
-  { art: ART.shrine, size: "wide" },
-  { art: ART.night, size: "small" },
-  { art: ART.cozyRooms, size: "small" },
 ];
 
 const FAQ = [
@@ -79,13 +116,9 @@ const FAQ = [
   {
     question: "What can I export?",
     answer:
-      "PNG and JPEG pictures scaled up to 20× with sharp pixels; looping GIF, animated PNG and WebP; PNG sequences; sprite sheets and slices, optionally with a JSON file in Aseprite’s format that game engines read; and a timelapse video of how you drew it.",
+      "PNG and JPEG pictures with crisp, sharp pixels; looping GIF, animated PNG and WebP; PNG sequences; sprite sheets and slices, optionally with a JSON file in Aseprite’s format that game engines read; and a timelapse video of how you drew it.",
   },
-  {
-    question: "How big can a canvas be?",
-    answer:
-      "Up to 256 × 256 pixels, on a transparent, white or black background.",
-  },
+
   {
     question: "What happens to my art if I stop paying?",
     answer:
@@ -95,7 +128,9 @@ const FAQ = [
 
 export function Landing() {
   return (
-    <div className={`${geist.variable} ${geistPixel.variable} ${styles.page}`}>
+    <div
+      className={`${funnelDisplay.variable} ${funnelSans.variable} ${geistPixel.variable} ${styles.page}`}
+    >
       <a href="#main" className={styles.skipLink}>
         Skip to content
       </a>
@@ -108,39 +143,78 @@ export function Landing() {
           aria-labelledby="hero-heading"
           data-header-reveal
         >
-          <HeroSpotlight />
-          <div className={styles.heroPixels} aria-hidden="true">
-            {Array.from({ length: 7 }, (_, index) => (
-              <i key={index} />
+          <div className={styles.heroGlow} aria-hidden="true" />
+          <div className={styles.heroGrid} aria-hidden="true" />
+          <div className={styles.heroCells} aria-hidden="true">
+            {CELLS.map((cell, index) => (
+              <i
+                key={index}
+                style={
+                  {
+                    "--x": cell.x,
+                    "--y": cell.y,
+                    "--c": cell.c,
+                    "--d": `${cell.d}s`,
+                    "--o": cell.o,
+                  } as CSSProperties
+                }
+              />
             ))}
           </div>
+          <HeroSpotlight />
+          <HeroCards />
+
           <a
             href="#features"
             className={`${styles.badge} ${styles.rise}`}
-            style={delay(0)}
+            style={delay(0.1)}
           >
             <span className={styles.badgeTag}>New</span>
             Animate and export GIFs
             <Arrow />
           </a>
           <h1 id="hero-heading" className={styles.heroTitle}>
-            <span className="sr-only">Pigxel Studio: </span>
-            <span className={styles.heroLine}>
-              <Words text="Small pixels." start={0.1} />
-            </span>{" "}
-            <span
-              className={`${styles.heroLine} ${styles.heroAccent} ${styles.rise}`}
-              style={delay(0.3)}
-            >
-              Wild imagination.
+            <span className="sr-only">
+              Pigxel Studio: Small pixels. Wild imagination.
+            </span>
+            <span className={styles.heroLine} aria-hidden="true">
+              <Letters text="Small pixels." start={0.25} />
+            </span>
+            <span className={styles.heroLine} aria-hidden="true">
+              <Letters text="Wild" start={0.55} />{" "}
+              {/* The word is selected, like in the editor. */}
+              <span className={styles.selection}>
+                <Letters text="imagination." start={0.68} />
+                <span className={styles.selectionBox}>
+                  <svg>
+                    <rect width="100%" height="100%" rx="6" />
+                  </svg>
+                  <i data-corner="tl" />
+                  <i data-corner="tr" />
+                  <i data-corner="bl" />
+                  <i data-corner="br" />
+                </span>
+                <span className={styles.cursor}>
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M4 2.8 19.2 13l-6.9 1.5-3.6 6.7Z"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>you</span>
+                </span>
+              </span>
             </span>
           </h1>
-          <p className={`${styles.heroText} ${styles.rise}`} style={delay(0.5)}>
+          <p
+            className={`${styles.heroText} ${styles.rise}`}
+            style={delay(1.15)}
+          >
             Draw, animate and build little worlds, right in your browser.
           </p>
           <div
             className={`${styles.heroActions} ${styles.rise}`}
-            style={delay(0.62)}
+            style={delay(1.28)}
           >
             <Link
               href="/login?mode=signup"
@@ -181,10 +255,12 @@ export function Landing() {
 
         <section
           id="features"
-          className={styles.section}
+          className={styles.features}
           aria-labelledby="features-heading"
         >
-          <div className={`${styles.sectionHead} ${styles.reveal}`}>
+          <div
+            className={`${styles.sectionHead} ${styles.sectionHeadCenter} ${styles.reveal}`}
+          >
             <p className={styles.eyebrow}>Features</p>
             <h2 id="features-heading">
               Everything you need.{" "}
@@ -195,80 +271,35 @@ export function Landing() {
               the final GIF.
             </p>
           </div>
-          <FeatureWorld />
+          <FeatureTour />
         </section>
 
-        <section className={styles.stats} aria-label="Pigxel in numbers">
-          <div className={`${styles.stat} ${styles.reveal}`}>
-            <strong>
-              <CountUp from={16} to={256} />
-              <span className={styles.times}>×</span>
-              <CountUp from={16} to={256} />
-            </strong>
-            <p>The biggest canvas, in pixels</p>
-          </div>
-          <div className={`${styles.stat} ${styles.reveal}`}>
-            <strong>
-              <CountUp from={1} to={20} />
-              <span className={styles.times}>×</span>
-            </strong>
-            <p>Export scale, with every pixel kept sharp</p>
-          </div>
-          <div className={`${styles.stat} ${styles.reveal}`}>
-            <strong>
-              <CountUp to={9} />
-            </strong>
-            <p>Export formats, from PNG and GIF to sprite sheets and video</p>
-          </div>
-          <div className={`${styles.stat} ${styles.reveal}`}>
-            <strong>0</strong>
-            <p>Things to install. It all runs in your browser</p>
-          </div>
-        </section>
-
-        <section className={styles.section} aria-labelledby="worlds-heading">
-          <div className={`${styles.sectionHeadRow} ${styles.reveal}`}>
-            <div className={styles.sectionHead}>
-              <p className={styles.eyebrow}>Inspiration</p>
-              <h2 id="worlds-heading">
-                A few pixels.{" "}
-                <span className={styles.muted}>Whole other worlds.</span>
-              </h2>
-              <p>
-                Little places to get lost in. Browse what people publish in
-                Explore, then go make your own.
-              </p>
-            </div>
-            <Link
-              href="/explore"
-              className={`${styles.button} ${styles.buttonLight}`}
-            >
-              Browse Explore <Arrow />
-            </Link>
-          </div>
-          <div className={styles.bento}>
-            {BENTO.map(({ art, size }) => (
-              <figure
-                key={art.name}
-                className={`${styles.bentoItem} ${styles.reveal}`}
-                data-size={size}
-              >
-                <Image
-                  src={art.image}
-                  alt={art.alt}
-                  sizes={
-                    size === "large"
-                      ? "(max-width: 768px) 100vw, 600px"
-                      : "(max-width: 768px) 50vw, 300px"
-                  }
-                />
-                <figcaption>
-                  <strong>{art.name}</strong>
-                  <span>AI art study</span>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+        <section className={styles.worlds} aria-labelledby="worlds-heading">
+          <WorldsZoom
+            header={
+              <div className={`${styles.sectionHeadRow} ${styles.worldsHead}`}>
+                <div className={styles.sectionHead}>
+                  <p className={styles.eyebrow}>Inspiration</p>
+                  <h2 id="worlds-heading">
+                    A few pixels.{" "}
+                    <span className={styles.worldsFill}>
+                      Whole other worlds.
+                    </span>
+                  </h2>
+                  <p>
+                    Little places to get lost in. Browse what people publish in
+                    Explore, then go make your own.
+                  </p>
+                </div>
+                <Link
+                  href="/explore"
+                  className={`${styles.button} ${styles.buttonLight}`}
+                >
+                  Browse Explore <Arrow />
+                </Link>
+              </div>
+            }
+          />
         </section>
 
         <section
@@ -360,7 +391,8 @@ export function Landing() {
         <div className={styles.footerTop}>
           <div className={styles.footerBrand}>
             <Brand />
-            <p>A little pig. A lot of possibility.</p>
+            <p className={styles.footerTagline}>Little pixels, big ideas.</p>
+            <p>Create, explore and share pixel art.</p>
           </div>
           <nav aria-label="Product" className={styles.footerColumn}>
             <h3>Product</h3>
@@ -381,13 +413,44 @@ export function Landing() {
             <CookieSettingsButton className={styles.footerButton} />
           </nav>
         </div>
+        <div className={styles.footerScene} aria-hidden="true">
+          <Image
+            src={footerClouds}
+            alt=""
+            sizes="(max-width: 640px) 40vw, 280px"
+            className={styles.footerClouds}
+          />
+          <p className={styles.wordmark}>
+            {"PIGXEL".split("").map((letter, i) => (
+              <span key={i} style={{ "--i": i } as CSSProperties}>
+                {letter}
+              </span>
+            ))}
+          </p>
+          <Image
+            src={footerPig}
+            alt=""
+            sizes="(max-width: 640px) 34vw, 240px"
+            className={styles.footerPig}
+          />
+          {SPARKS.map(([x, y, size], i) => (
+            <i
+              key={i}
+              className={styles.spark}
+              style={
+                {
+                  left: `${x}%`,
+                  top: `${y}%`,
+                  "--size": `${size}px`,
+                  "--d": `${(i * 0.37) % 2.4}s`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
         <div className={styles.footerBottom}>
           <span>© {new Date().getFullYear()} Pigxel Studio</span>
-          <span>{businessLine()}</span>
         </div>
-        <p className={styles.wordmark} aria-hidden="true">
-          pigxel
-        </p>
       </footer>
     </div>
   );

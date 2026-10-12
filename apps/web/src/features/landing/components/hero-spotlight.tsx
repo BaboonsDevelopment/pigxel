@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import styles from "./landing.module.css";
 
 /**
- * A pixel grid behind the hero that lights up around the pointer. It follows
- * the pointer through CSS variables, so React never re-renders on move.
+ * Lights up the hero's pixel grid around the pointer. It follows the pointer
+ * through CSS variables, so React never re-renders on move.
  */
 export function HeroSpotlight() {
   const ref = useRef<HTMLDivElement>(null);

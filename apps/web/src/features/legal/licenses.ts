@@ -7,6 +7,8 @@ export const FONTS: { name: string; designer: string }[] = [
   { name: "DM Mono", designer: "Colophon Foundry" },
   { name: "DotGothic16", designer: "Fontworks Inc." },
   { name: "Fredoka", designer: "Milena Brandão, Hafontia" },
+  { name: "Funnel Display", designer: "NORD ID, Kristian Möller" },
+  { name: "Funnel Sans", designer: "NORD ID, Kristian Möller" },
   {
     name: "Geist",
     designer:

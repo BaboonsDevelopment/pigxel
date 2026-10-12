@@ -165,7 +165,9 @@ describe("panel moves and heights", () => {
 });
 
 describe("tool groups", () => {
-  it("puts every tool in exactly one group", async () => {
+  // The first import of the editor's tools is slow when the whole suite
+  // runs in parallel, so this test gets more than the default 5 seconds.
+  it("puts every tool in exactly one group", { timeout: 20_000 }, async () => {
     const { TOOLS, TOOL_GROUPS } = await import("@/features/editor/tools");
     const grouped = TOOL_GROUPS.flatMap((g) => g.tools);
     expect([...grouped].sort()).toEqual(TOOLS.map((t) => t.id).sort());
