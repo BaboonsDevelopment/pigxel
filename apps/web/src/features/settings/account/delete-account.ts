@@ -9,12 +9,10 @@ import {
   deleteDriveConnection,
   isDriveAvailable,
 } from "@/lib/google-drive/server";
+import { DELETE_PHRASE } from "./delete-phrase";
 import { listFiles, USER_BUCKETS } from "./user-files";
 
 export type DeleteState = { error?: string };
-
-/** What people type to confirm. */
-export const DELETE_PHRASE = "delete my account";
 
 const REMOVE_BATCH = 100;
 
