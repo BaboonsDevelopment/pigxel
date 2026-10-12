@@ -3,6 +3,7 @@ import { DM_Mono, Fredoka, Poppins } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { CookieBanner } from "@/features/legal/components/cookie-banner";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
@@ -36,6 +37,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen" suppressHydrationWarning>
         <QueryProvider>{children}</QueryProvider>
+        <CookieBanner />
       </body>
     </html>
   );

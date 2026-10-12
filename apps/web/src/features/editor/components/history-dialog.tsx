@@ -69,7 +69,7 @@ export default function HistoryDialog({
               className={cn(
                 "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left hover:bg-muted",
                 i === current && "bg-primary/15 font-semibold text-foreground",
-                i > current && "text-muted-foreground/60 italic",
+                i > current && "text-muted-foreground italic",
               )}
             >
               <span className="w-7 shrink-0 text-right text-xs text-muted-foreground tabular-nums">

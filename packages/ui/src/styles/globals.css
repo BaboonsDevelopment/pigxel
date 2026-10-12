@@ -10,21 +10,21 @@
   --card-foreground: var(--foreground);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
-  --primary: #c65a7e;
-  --primary-hover: #b24c6f;
+  --primary: #ac3c61;
+  --primary-hover: #963353;
   --primary-foreground: #ffffff;
   --primary-soft: #e9c2d2;
   --primary-soft-foreground: #8a3d5c;
   --secondary: #f9f1f4;
   --secondary-foreground: var(--foreground);
   --muted: var(--secondary);
-  --muted-foreground: #8b7a84;
+  --muted-foreground: #6f6169;
   --accent: var(--secondary);
   --accent-foreground: var(--foreground);
-  --destructive: #c8372d;
-  --success: #3f7d4a;
+  --destructive: #ba332a;
+  --success: #397042;
   --border: #ecdfe5;
-  --input: #e4d3db;
+  --input: #b28299;
   --ring: var(--primary);
   --sidebar: #f8eef3;
   --sidebar-end: #f4e6ed;
@@ -38,7 +38,7 @@
   --pastel-blush: #f6e8f0;
   --pastel-lilac: #efe6f8;
   --lavender-foreground: #5b3f8f;
-  --link-accent: #9a78d0;
+  --link-accent: #794bc0;
   --radius: 0.625rem;
 }
 

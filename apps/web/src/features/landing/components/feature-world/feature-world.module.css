@@ -1,0 +1,809 @@
+.world {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  align-items: start;
+  gap: clamp(28px, 4.5vw, 64px);
+  margin-top: 40px;
+}
+
+/* ── Steps ───────────────────────────────────────────────────────────── */
+
+.steps {
+  position: relative;
+  padding-left: 34px;
+  list-style: none;
+}
+
+.rail {
+  position: absolute;
+  top: 12vh;
+  bottom: 12vh;
+  left: 7px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.rail span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(#d6254b, #7c3aed 55%, #0ea5e9);
+  transform: scaleY(var(--progress, 0));
+  transform-origin: top;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 78vh;
+  opacity: 0.3;
+  transition: opacity 0.6s var(--ease);
+}
+
+.step[data-active] {
+  opacity: 1;
+}
+
+/* A pixel on the rail for each step. */
+.step::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -32px;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px var(--line);
+  transform: translateY(-50%);
+  transition:
+    background-color 0.4s,
+    box-shadow 0.4s;
+}
+
+.step[data-active]::before {
+  background: var(--pink);
+  box-shadow:
+    inset 0 0 0 2px var(--pink),
+    0 0 0 6px rgb(214 37 75 / 0.14);
+}
+
+.stepTitle {
+  font: 600 clamp(32px, 3.6vw, 52px) / 1.02 var(--sans);
+  letter-spacing: -0.045em;
+}
+
+.stepButton {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepNumber {
+  font: 14px/1 var(--pixel);
+  letter-spacing: 0.04em;
+  color: var(--pink);
+}
+
+.stepText {
+  max-width: 28rem;
+  margin-top: 18px;
+  font: 400 17px/1.6 var(--sans);
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 24px;
+  list-style: none;
+}
+
+.chips li {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 4px 12px -8px rgb(10 10 10 / 0.25);
+  font: 500 13px/1 var(--sans);
+  color: var(--ink-2);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 0.5s var(--ease),
+    transform 0.5s var(--ease);
+}
+
+.step[data-active] .chips li {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i) * 70ms + 150ms);
+}
+
+/* ── Stage ───────────────────────────────────────────────────────────── */
+
+.stageWrap {
+  position: sticky;
+  top: calc(50vh - min(38vh, 330px));
+  height: min(76vh, 660px);
+}
+
+.stage {
+  position: relative;
+  isolation: isolate;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 32px;
+  background: #fbf9fe;
+  box-shadow:
+    inset 0 0 0 1px rgb(10 10 10 / 0.05),
+    0 40px 80px -48px rgb(60 30 110 / 0.35);
+}
+
+/* A faint dot grid over the colour, like a canvas. */
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(rgb(60 30 110 / 0.07) 1px, transparent 0);
+  background-size: 20px 20px;
+  pointer-events: none;
+}
+
+.glow {
+  position: absolute;
+  inset: -10%;
+  z-index: -2;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 22% 18%, var(--a) 0, transparent 46%),
+    radial-gradient(circle at 82% 86%, var(--b) 0, transparent 50%);
+  transition: opacity 1s var(--ease);
+}
+
+.glow[data-active] {
+  opacity: 1;
+}
+
+.glow[data-step="draw"] {
+  --a: #ffd6e3;
+  --b: #ffe9d2;
+}
+
+.glow[data-step="animate"] {
+  --a: #e3d9ff;
+  --b: #ffd9ec;
+}
+
+.glow[data-step="ai"] {
+  --a: #d3ecff;
+  --b: #e0dcff;
+}
+
+.glow[data-step="export"] {
+  --a: #ffeac4;
+  --b: #d9f3e3;
+}
+
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Floating glass ──────────────────────────────────────────────────── */
+
+.stats {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stat,
+.card {
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.9),
+    0 0 0 1px rgb(60 30 110 / 0.06),
+    0 18px 40px -22px rgb(60 30 110 / 0.35);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.stat {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  column-gap: 8px;
+  padding: 10px 14px;
+}
+
+.statLabel {
+  grid-column: 1 / -1;
+  font: 500 11px/1.2 var(--sans);
+  color: var(--muted);
+}
+
+.statValue {
+  margin-top: 3px;
+  font: 600 20px/1 var(--sans);
+  letter-spacing: -0.03em;
+  animation: tick 0.5s var(--ease);
+}
+
+.statDetail {
+  font: 500 11px/1 var(--sans);
+  color: var(--faint);
+}
+
+@keyframes tick {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.card {
+  position: absolute;
+  bottom: 16px;
+  padding: 14px;
+  opacity: 0;
+  filter: blur(6px);
+  transform: translateY(18px) scale(0.97);
+  transition:
+    opacity 0.6s var(--ease),
+    transform 0.6s var(--ease),
+    filter 0.6s var(--ease);
+  pointer-events: none;
+}
+
+.card[data-active] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+  transition-delay: 0.12s;
+  pointer-events: auto;
+}
+
+.card[data-position="left"] {
+  left: 16px;
+}
+
+.card[data-position="right"] {
+  right: 16px;
+  width: min(300px, calc(100% - 32px));
+}
+
+.card[data-position="bottom"] {
+  left: 16px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font: 600 13px/1 var(--sans);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eefbf2;
+  font: 500 11px/1 var(--sans);
+  color: #1f6b3a;
+}
+
+.pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.textButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 500 12px/1 var(--sans);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.textButton:hover {
+  color: var(--ink);
+}
+
+/* Paint */
+
+.paintCanvas {
+  display: block;
+  width: 160px;
+  height: 160px;
+  border-radius: 10px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(
+      45deg,
+      #f1eef6 25%,
+      transparent 25%,
+      transparent 75%,
+      #f1eef6 75%
+    ),
+    linear-gradient(
+      45deg,
+      #f1eef6 25%,
+      transparent 25%,
+      transparent 75%,
+      #f1eef6 75%
+    );
+  background-position:
+    0 0,
+    10px 10px;
+  background-size: 20px 20px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  image-rendering: pixelated;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.swatches {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.swatch,
+.eraser {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgb(10 10 10 / 0.12);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease);
+}
+
+.swatch:hover,
+.eraser:hover {
+  transform: translateY(-2px);
+}
+
+.swatch[aria-pressed="true"],
+.eraser[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--ink);
+}
+
+.eraser {
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--ink-2);
+}
+
+.eraser svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Timeline: frames light up in step with the painting (600 ms each). */
+
+.frames {
+  display: flex;
+  gap: 8px;
+}
+
+.frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: frameOn 2.4s step-end infinite;
+  animation-delay: calc(var(--i) * 600ms - 2.4s);
+}
+
+.frame small {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font: 9px/1 var(--pixel);
+  color: var(--faint);
+}
+
+.thumb {
+  width: 48px;
+  height: auto;
+}
+
+@keyframes frameOn {
+  0% {
+    background: #fff0f4;
+    box-shadow:
+      inset 0 0 0 2px var(--pink),
+      0 6px 14px -8px rgb(214 37 75 / 0.6);
+  }
+  25%,
+  100% {
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+}
+
+.playhead {
+  position: relative;
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 3px;
+  background: var(--line);
+}
+
+.playhead span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--pink);
+  transform-origin: left;
+  animation: playhead 2.4s linear infinite;
+}
+
+@keyframes playhead {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Chat: one 7.4 s loop, in step with the canvas's recolour wave. */
+
+.chat p {
+  font: 13px/1.45 var(--sans);
+}
+
+.ask {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  padding: 9px 12px;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--ink);
+  color: #fff;
+  animation: chatAsk 7.4s var(--ease) infinite;
+}
+
+.ask span {
+  display: inline-block;
+  max-width: calc(var(--chars) * 1ch);
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  vertical-align: bottom;
+  animation: type 7.4s steps(31) infinite;
+}
+
+@keyframes type {
+  0% {
+    width: 0;
+  }
+  30%,
+  100% {
+    width: calc(var(--chars) * 1ch);
+  }
+}
+
+@keyframes chatAsk {
+  0%,
+  90% {
+    opacity: 1;
+  }
+  96%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.thinking {
+  display: flex;
+  gap: 4px;
+  height: 0;
+  margin-top: 10px;
+  overflow: visible;
+  opacity: 0;
+  animation: thinking 7.4s linear infinite;
+}
+
+.thinking i {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--faint);
+  animation: bounce 0.9s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes thinking {
+  0%,
+  30% {
+    opacity: 0;
+  }
+  31%,
+  41% {
+    opacity: 1;
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.reply {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 14px 14px 14px 4px;
+  background: #eef5ff;
+  color: #1d3f7a;
+  animation: reply 7.4s var(--ease) infinite;
+}
+
+.check {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 10px;
+}
+
+@keyframes reply {
+  0%,
+  41% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  46%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+  95%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+.replyActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+  animation: reply 7.4s var(--ease) infinite;
+}
+
+.replyActions span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: 500 12px/1 var(--sans);
+}
+
+.replyActions span:last-child {
+  background: var(--ink);
+  box-shadow: none;
+  color: #fff;
+}
+
+/* Export: rows fill one after another, then tick. */
+
+.export ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+}
+
+.export li {
+  display: grid;
+  grid-template-columns: 52px 1fr 18px;
+  align-items: center;
+  gap: 10px;
+}
+
+.format {
+  padding: 6px 0;
+  border-radius: 8px;
+  background: #fff3df;
+  font: 600 11px/1 var(--sans);
+  color: #92400e;
+  text-align: center;
+}
+
+.exportText {
+  display: grid;
+  gap: 6px;
+  font: 500 12px/1.2 var(--sans);
+  color: var(--ink-2);
+}
+
+.bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #d6254b);
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: fill 0.9s var(--ease) forwards;
+  animation-delay: calc(var(--i) * 0.55s + 0.35s);
+}
+
+@keyframes fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.done {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 10px;
+  opacity: 0;
+  transform: scale(0.4);
+  animation: done 0.4s var(--ease) forwards;
+  animation-delay: calc(var(--i) * 0.55s + 1.2s);
+}
+
+@keyframes done {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Small screens: the stage pins to the top, steps scroll beneath. ─── */
+
+@media (max-width: 900px) {
+  .world {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .stageWrap {
+    z-index: 2;
+    order: -1;
+    top: 76px;
+    height: min(56vh, 460px);
+  }
+
+  .step {
+    justify-content: flex-end;
+    min-height: 82vh;
+    padding-bottom: 9vh;
+  }
+
+  .step::before {
+    display: none;
+  }
+
+  .paintCanvas {
+    width: 112px;
+    height: 112px;
+  }
+
+  .rail {
+    top: 0;
+    bottom: 0;
+  }
+
+  .statDetail {
+    display: none;
+  }
+
+  .card {
+    transform-origin: bottom left;
+    scale: 0.82;
+  }
+
+  .card[data-position="right"] {
+    transform-origin: bottom right;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .chips li,
+  .card,
+  .glow {
+    transition: none;
+  }
+
+  .statValue,
+  .pill i,
+  .frame,
+  .playhead span,
+  .ask,
+  .ask span,
+  .thinking,
+  .thinking i,
+  .reply,
+  .replyActions,
+  .bar span,
+  .done {
+    animation: none;
+  }
+
+  .thinking {
+    display: none;
+  }
+
+  .bar span,
+  .done {
+    opacity: 1;
+    transform: none;
+  }
+}

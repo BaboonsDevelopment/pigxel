@@ -1,6 +1,8 @@
-import Image from "next/image";
-import type { CSSProperties, SVGProps } from "react";
-import mascot from "../../../../public/art/pigxel-mascot-sitting.png";
+import type { SVGProps } from "react";
+import paint1 from "../../../../public/art/animate/paint-1.png";
+import paint2 from "../../../../public/art/animate/paint-2.png";
+import paint3 from "../../../../public/art/animate/paint-3.png";
+import paint4 from "../../../../public/art/animate/paint-4.png";
 
 export function PixelSprite({
   rows,
@@ -167,55 +169,25 @@ export const ICONS = {
   { rows: readonly string[]; colors: Record<string, string> }
 >;
 
-export const FLOWER = [
+/** Pigxel's pig, the picture the Draw playground starts from. */
+export const PIG = [
   "................",
-  "................",
-  "......pp........",
-  ".....pppp.......",
-  "....pppppp......",
-  "...pppyyppp.....",
-  "...ppyyyypp.....",
-  "....ppyypp......",
-  ".....pppp.......",
-  ".......g........",
-  "....gg.g........",
-  ".....ggg.gg.....",
-  ".......ggg......",
-  ".......g........",
-  "................",
+  "..rr........rr..",
+  ".rbbr......rbbr.",
+  ".rbbrrrrrrrrbbr.",
+  "..rbbbbbbbbbbr..",
+  ".rbbbbbbbbbbbbr.",
+  ".rbbkbbbbbbkbbr.",
+  ".rbbkbbbbbbkbbr.",
+  ".rbbbrrrrrrbbbr.",
+  ".rbbbrkbbkrbbbr.",
+  ".rbbbrrrrrrbbbr.",
+  "..rrbbbbbbbbrr..",
+  "..rbbrbbbbrbbr..",
+  "..rbbrbbbbrbbr..",
+  "..rkkrrrrrrkkr..",
   "................",
 ] as const;
 
-export function MascotFrame({
-  lift = 0,
-  squash = false,
-  className,
-  style,
-}: {
-  lift?: number;
-  squash?: boolean;
-  className?: string;
-  style?: CSSProperties;
-}) {
-  return (
-    <span className={className} style={style} aria-hidden="true">
-      <Image
-        src={mascot}
-        alt=""
-        sizes="180px"
-        draggable={false}
-        style={{
-          transform: `translateY(${-lift * 6}%)${squash ? " scale(1.05, 0.94)" : ""}`,
-          transformOrigin: "50% 100%",
-        }}
-      />
-    </span>
-  );
-}
-
-export const HOP_FRAMES = [
-  { lift: 0, squash: true },
-  { lift: 1 },
-  { lift: 2 },
-  { lift: 1 },
-] as const;
+/** The pig painting a flower: four frames, drawn to line up exactly. */
+export const PAINT_FRAMES = [paint1, paint2, paint3, paint4];
