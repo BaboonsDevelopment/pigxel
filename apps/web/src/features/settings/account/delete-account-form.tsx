@@ -4,11 +4,8 @@ import { useActionState, useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
-import {
-  DELETE_PHRASE,
-  deleteAccount,
-  type DeleteState,
-} from "./delete-account";
+import { deleteAccount, type DeleteState } from "./delete-account";
+import { DELETE_PHRASE } from "./delete-phrase";
 
 export function DeleteAccountForm() {
   const [state, action, pending] = useActionState(
