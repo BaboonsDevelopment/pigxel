@@ -71,3 +71,14 @@ export const SORTS = [
 ] as const;
 
 export type Sort = (typeof SORTS)[number]["value"];
+
+export const REPORT_REASONS = [
+  { value: "spam", label: "Spam" },
+  { value: "inappropriate", label: "Inappropriate Content" },
+  { value: "copyright", label: "Copyright" },
+  { value: "other", label: "Other" },
+] as const;
+
+export type ReportReason = (typeof REPORT_REASONS)[number]["value"];
+
+export const REPORT_DETAILS_MAX = 500;

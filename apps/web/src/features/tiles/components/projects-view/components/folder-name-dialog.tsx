@@ -1,18 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
-import { FormMessage } from "@pigxel/ui/components/field";
+import { ModalButton } from "@/components/ui/modal-button";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
+import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { showSuccess } from "@/components/ui/snackbar";
 import { createFolder, renameFolder } from "../../../actions";
 import { FOLDER_NAME_MAX } from "../../../folders";
-import { showSuccess } from "@/components/ui/snackbar";
+import { PixelFolder } from "./pixel-folder";
 
 export function FolderNameDialog({
   folder,
@@ -44,30 +41,36 @@ export function FolderNameDialog({
           e.preventDefault();
           void save();
         }}
+        className="flex min-h-0 flex-col"
       >
-        <DialogHeader title={folder ? "Rename folder" : "New folder"} />
-        <DialogBody>
-          <Input
-            autoFocus
-            aria-label="Folder name"
-            placeholder="Characters"
-            maxLength={FOLDER_NAME_MAX}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          {error && (
-            <FormMessage tone="error" className="mt-2">
-              {error}
-            </FormMessage>
-          )}
+        <ModalHeader title={folder ? "Rename Folder" : "Create New Folder"} />
+        <DialogBody className="grid gap-5 py-5">
+          <div className="flex items-center gap-6">
+            <PixelFolder className="h-10 w-12 shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              A cozy place to keep your pixels together.
+            </p>
+          </div>
+          <Field label="Folder name" htmlFor="folder-name">
+            <Input
+              id="folder-name"
+              autoFocus
+              placeholder="Little worlds"
+              maxLength={FOLDER_NAME_MAX}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-12 rounded-xl px-4 text-base"
+            />
+          </Field>
+          {error && <FormMessage tone="error">{error}</FormMessage>}
         </DialogBody>
-        <DialogFooter>
-          <Button type="button" variant="secondary" onClick={onClose}>
+        <DialogFooter className={MODAL_FOOTER}>
+          <ModalButton type="button" variant="secondary" onClick={onClose}>
             Cancel
-          </Button>
-          <Button type="submit" disabled={saving || !name.trim()}>
+          </ModalButton>
+          <ModalButton type="submit" disabled={saving || !name.trim()}>
             {saving ? "Saving…" : folder ? "Rename" : "Create"}
-          </Button>
+          </ModalButton>
         </DialogFooter>
       </form>
     </Dialog>

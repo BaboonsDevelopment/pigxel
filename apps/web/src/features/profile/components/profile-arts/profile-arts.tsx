@@ -19,6 +19,7 @@ import { ProjectCard } from "@/features/tiles/components/project-card/project-ca
 import { PinBadge } from "@/features/tiles/components/projects-view/components/project-grid/badges";
 import { StatIcon } from "@/features/tiles/components/projects-view/components/stat-icons";
 import { useCloudTileActions } from "@/features/tiles/tile-actions";
+import { confirmRemoveFromExplore } from "@/features/explore/components/remove-from-explore-dialog";
 import { useSortable } from "@/features/tiles/components/projects-view/drag/use-sortable";
 import {
   loadMoreProfileArts,
@@ -171,10 +172,12 @@ export function ProfileArts({
         {
           label: "Remove from Explore",
           destructive: true,
-          onSelect: () =>
+          onSelect: async () => {
+            if (!(await confirmRemoveFromExplore(tile))) return;
             run({ id: tile.id, remove: true }, () =>
               setTileVisibility(tile.id, "private"),
-            ),
+            );
+          },
         },
       ];
     if (kind === "saved" && isOwner)

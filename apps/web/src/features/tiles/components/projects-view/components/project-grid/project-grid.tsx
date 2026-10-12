@@ -20,6 +20,11 @@ import {
   useCloudTileActions,
 } from "../../../../tile-actions";
 import { ProjectCard } from "../../../project-card/project-card";
+import { draftThumbnail } from "@/lib/pigxel-file/thumbnail";
+import {
+  confirmDeleteProject,
+  DELETE_FOR_GOOD,
+} from "../../../delete-project-dialog";
 import { TileThumbnail } from "../../../tile-thumbnail";
 import { TRASH_DAYS } from "../../../../constants";
 import {
@@ -207,8 +212,16 @@ function Grid({
   };
   const deleteChosen = async () => {
     const local = chosen.length - chosenTiles.length;
-    const confirmed = await confirmDialog({
-      title: `Delete ${chosen.length === 1 ? "1 project" : `${chosen.length} projects`}?`,
+    const first = chosen[0];
+    const confirmed = await confirmDeleteProject({
+      title: chosen.length === 1 ? "Delete Project" : "Delete Projects",
+      name:
+        chosen.length === 1 ? (first?.name ?? "") : `${chosen.length} projects`,
+      thumbnail: !first
+        ? null
+        : first.kind === "cloud"
+          ? first.tile.thumbnail
+          : draftThumbnail(first.draft),
       message: [
         chosenTiles.length > 0 &&
           `${chosenTiles.length} from Pigxel cloud will move to Trash for ${TRASH_DAYS} days.`,
@@ -217,26 +230,28 @@ function Grid({
       ]
         .filter(Boolean)
         .join(" "),
-      confirmLabel: "Delete",
     });
     if (!confirmed) return;
     await actions.deleteMany(chosen).then(stopSelecting, () => {});
   };
 
   const forget = async (tile: CloudTileSummary) => {
-    const confirmed = await confirmDialog({
-      title: "Delete forever?",
-      message: `“${tile.name}” will be gone for good. This can’t be undone.`,
-      confirmLabel: "Delete forever",
+    const confirmed = await confirmDeleteProject({
+      name: tile.name,
+      thumbnail: tile.thumbnail,
+      size: tile,
+      message: DELETE_FOR_GOOD,
     });
     if (confirmed) actions.deleteForever([tile]);
   };
   const emptyTrash = async () => {
-    const confirmed = await confirmDialog({
-      title: "Empty Trash?",
-      message:
-        "Every project in Trash will be gone for good. This can’t be undone.",
+    const confirmed = await confirmDeleteProject({
+      title: "Empty Trash",
       confirmLabel: "Empty Trash",
+      name: "Trash",
+      detail: total === 1 ? "1 project" : `${total} projects`,
+      message:
+        "Are you sure you want to delete every project in Trash? This action cannot be undone.",
     });
     if (confirmed) actions.deleteForever(list.tiles, true);
   };

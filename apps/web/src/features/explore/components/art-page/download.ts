@@ -80,3 +80,26 @@ export function downloadPicture(
   const data = encodePng(scaled(picture.frames[0]!.pixels), w, h);
   downloadBlob(new Blob([data], { type: "image/png" }), `${fileName}.png`);
 }
+
+export function withBackground(picture: Picture, color: string): Picture {
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  return {
+    ...picture,
+    frames: picture.frames.map((frame) => {
+      const data = new Uint8ClampedArray(frame.pixels.data);
+      for (let i = 0; i < data.length; i += 4) {
+        const alpha = data[i + 3]! / 255;
+        data[i] = data[i]! * alpha + r * (1 - alpha);
+        data[i + 1] = data[i + 1]! * alpha + g * (1 - alpha);
+        data[i + 2] = data[i + 2]! * alpha + b * (1 - alpha);
+        data[i + 3] = 255;
+      }
+      return {
+        ...frame,
+        pixels: new ImageData(data, picture.width, picture.height),
+      };
+    }),
+  };
+}

@@ -154,11 +154,28 @@ export async function reorderFolders(folderIds: string[]): Promise<Result> {
   return {};
 }
 
-export async function deleteFolder(folderId: string): Promise<Result> {
+export async function deleteFolder(
+  folderId: string,
+  withProjects = false,
+): Promise<Result> {
   const user = await requireUser();
   if (!UUID.test(folderId)) return { error: "Invalid request." };
   try {
     const supabase = await createClient();
+    if (withProjects) {
+      const trashed = await supabase
+        .from("tiles")
+        .update({
+          deleted_at: new Date().toISOString(),
+          visibility: "private",
+          review: null,
+        })
+        .eq("folder_id", folderId)
+        .eq("user_id", user.id)
+        .is("deleted_at", null);
+      if (trashed.error)
+        return { error: "Couldn’t move the projects to Trash. Try again." };
+    }
     const { error } = await supabase
       .from("folders")
       .delete()

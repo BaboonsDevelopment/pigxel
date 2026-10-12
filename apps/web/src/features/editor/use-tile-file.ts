@@ -507,5 +507,22 @@ export function useTileFile({
     saveToCloudFirst,
     saveToDrive: () => saveNow("drive"),
     save,
+    saveBeforeLeaving: async () => {
+      if (!location) return true;
+      const savedRevision = latestRevision.current;
+      setSync("saving");
+      try {
+        saved(
+          await withLoading(SAVING, () => saveTo(location.kind, location)),
+          savedRevision,
+        );
+        showSuccess(PROJECT_SAVED);
+        return true;
+      } catch (error) {
+        setSync(error instanceof CloudConflictError ? "conflict" : "failed");
+        showSnackbar(SAVE_FAILED);
+        return false;
+      }
+    },
   };
 }

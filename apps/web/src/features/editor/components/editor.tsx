@@ -109,6 +109,8 @@ import { draftThumbnail, thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { showSnackbar } from "@/components/ui/snackbar";
+import { confirmClearCanvas } from "./clear-canvas-dialog";
+import { ImportImageDialog } from "./import-image-dialog";
 import { useProjectAccess } from "@/features/sharing/queries";
 import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -309,6 +311,7 @@ export function Editor({
     y: number;
   } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
     name: string;
@@ -341,9 +344,13 @@ export function Editor({
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [sharing, setSharing] = useState<{
+    id: string;
+    name: string;
+    thumbnail: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const [explore, setExplore] = useState<{
     tileId: string;
     published: boolean;
@@ -484,6 +491,11 @@ export function Editor({
     removed || viewer,
     warnViewOnly,
   );
+  const sharePreview = () => ({
+    thumbnail: thumbnailDataUrl(sprite.document()),
+    width: sprite.size.w,
+    height: sprite.size.h,
+  });
   useEffect(() => {
     if (historyReady.current) return;
     let live = true;
@@ -815,6 +827,12 @@ export function Editor({
         label: "Delete",
         shortcut: keyOf("command:clearLayer"),
         onSelect: commands.clearLayer,
+      },
+      {
+        label: "Clear canvas…",
+        onSelect: async () => {
+          if (await confirmClearCanvas()) sprite.clearCanvas();
+        },
       },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
@@ -1370,9 +1388,15 @@ export function Editor({
       ],
     });
     if (choice === "new") return file.onFileChosen(dropped);
-    if (choice !== "place") return;
+    if (choice === "place") await placePicture(dropped, at);
+  };
+
+  const placePicture = async (
+    picked: File,
+    at: { x: number; y: number } | null,
+  ) => {
     try {
-      const { rgba, w, h } = await pictureForTile(dropped, sprite.size);
+      const { rgba, w, h } = await pictureForTile(picked, sprite.size);
       const centre = at ?? { x: sprite.size.w / 2, y: sprite.size.h / 2 };
       const placed = selection.paste({
         x: Math.round(centre.x - w / 2),
@@ -1386,7 +1410,7 @@ export function Editor({
     } catch {
       await choiceDialog({
         title: "Couldn’t read the picture",
-        message: `“${dropped.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
+        message: `“${picked.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
         choices: [],
         cancelLabel: "OK",
       });
@@ -1656,7 +1680,11 @@ export function Editor({
           owner && (cloudTile || !file.location)
             ? async () => {
                 if (cloudTile)
-                  return setSharing({ id: cloudTile.id, name: file.name });
+                  return setSharing({
+                    id: cloudTile.id,
+                    name: file.name,
+                    ...sharePreview(),
+                  });
                 const confirmed = await confirmDialog({
                   title: "Save to Pigxel cloud first?",
                   message: `Only cloud projects can be shared, so “${file.name}” will be saved to Pigxel cloud first.`,
@@ -1664,11 +1692,17 @@ export function Editor({
                 });
                 if (!confirmed) return;
                 const target = await file.saveToCloudFirst();
-                if (target) setSharing({ id: target.id, name: file.name });
+                if (target)
+                  setSharing({
+                    id: target.id,
+                    name: file.name,
+                    ...sharePreview(),
+                  });
               }
             : undefined
         }
         onImportSheet={() => sheetInput.current?.click()}
+        onImportImage={() => setImporting(true)}
         onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
         menus={[
@@ -1717,6 +1751,7 @@ export function Editor({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TileTabs
             hidden={canvasOnly}
+            onSave={file.saveBeforeLeaving}
             userId={userId}
             current={{
               id: draft.id,
@@ -1855,6 +1890,16 @@ export function Editor({
           }
         }}
       />
+      {importing && (
+        <ImportImageDialog
+          onImport={(picked) =>
+            sprite.canPaint
+              ? void placePicture(picked, null)
+              : file.onFileChosen(picked)
+          }
+          onClose={() => setImporting(false)}
+        />
+      )}
       {sheet && (
         <ImportSheetDialog
           name={sheet.name}
@@ -2091,7 +2136,6 @@ export function Editor({
       {resizing && (
         <CanvasSizeDialog
           size={sprite.size}
-          picture={sprite.composite(["reference"])}
           onApply={(next, offset) => {
             selection.deselect();
             sprite.resize(next, offset);

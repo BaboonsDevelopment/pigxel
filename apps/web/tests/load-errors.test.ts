@@ -14,6 +14,7 @@ vi.mock("next/font/google", () => ({
   Pixelify_Sans: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),

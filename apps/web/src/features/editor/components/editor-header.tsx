@@ -43,6 +43,7 @@ export function EditorHeader({
   renameLocked = false,
   explorePublished = false,
   onImportSheet,
+  onImportImage,
   onTilemap,
   keyOf,
   menus,
@@ -66,6 +67,7 @@ export function EditorHeader({
   renameLocked?: boolean;
   explorePublished?: boolean;
   onImportSheet: () => void;
+  onImportImage: () => void;
   onTilemap: (convert: boolean) => void;
   keyOf: (id: ActionId) => string | undefined;
   menus: { label: string; sections: MenuSections }[];
@@ -133,6 +135,7 @@ export function EditorHeader({
               label: "Import",
               submenu: [
                 [
+                  { label: "Image…", onSelect: onImportImage },
                   {
                     label: "Pictures as frames…",
                     onSelect: () => framesInput.current?.click(),

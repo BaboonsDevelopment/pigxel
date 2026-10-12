@@ -28,6 +28,8 @@
   --undo-surface: #4a2434;
   --account-soft: #ffe4ee;
   --pink-base: #fff7fa;
+  --pink-strong: #d9508a;
+  --pink-strong-hover: #c4457b;
   --progress-track: #d4508a;
   --progress-fill: #f08db3;
   --success: #3f7d4a;
@@ -75,6 +77,8 @@
   --color-undo-surface: var(--undo-surface);
   --color-account-soft: var(--account-soft);
   --color-pink-base: var(--pink-base);
+  --color-pink-strong: var(--pink-strong);
+  --color-pink-strong-hover: var(--pink-strong-hover);
   --color-progress-track: var(--progress-track);
   --color-progress-fill: var(--progress-fill);
   --color-success: var(--success);

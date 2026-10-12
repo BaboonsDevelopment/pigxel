@@ -20,6 +20,7 @@ import { showSuccess } from "@/components/ui/snackbar";
 
 export function EditDetailsDialog({
   tileId,
+  thumbnail,
   name,
   tags: initialTags,
   description: initialDescription,
@@ -28,6 +29,7 @@ export function EditDetailsDialog({
   onClose,
 }: {
   tileId: string;
+  thumbnail: string | null;
   name: string;
   tags: string[];
   description: string | null;
@@ -74,7 +76,12 @@ export function EditDetailsDialog({
   const unpublish = async () => {
     setSaving(true);
     setError(null);
-    const result = await removeFromExplore({ id: tileId, name });
+    const result = await removeFromExplore({
+      id: tileId,
+      name,
+      thumbnail,
+      tags,
+    });
     if (result.error) setError(result.error);
     if (result.removed) router.push("/tiles");
     else setSaving(false);

@@ -4,30 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
-import { FormMessage } from "@pigxel/ui/components/field";
 import { Heading } from "@pigxel/ui/components/typography";
-import { confirmDialog } from "@/components/ui/confirm-dialog";
-import { deleteFolder } from "../../../actions";
 import type { Folder } from "../../../folders";
+import { DeleteFolderDialog } from "./delete-folder-dialog";
 import { FolderNameDialog } from "./folder-name-dialog";
 
 export function FolderHeader({ folder }: { folder: Folder }) {
   const router = useRouter();
   const [renaming, setRenaming] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const remove = async () => {
-    const confirmed = await confirmDialog({
-      title: "Delete folder?",
-      message: `“${folder.name}” will be deleted. Its projects stay in My projects.`,
-      confirmLabel: "Delete",
-    });
-    if (!confirmed) return;
-    setError(null);
-    const result = await deleteFolder(folder.id);
-    if (result.error) setError(result.error);
-    else router.push("/tiles");
-  };
+  const [deleting, setDeleting] = useState(false);
 
   return (
     <header className="mb-8">
@@ -64,17 +49,19 @@ export function FolderHeader({ folder }: { folder: Folder }) {
           <Button
             type="button"
             variant="secondary"
-            onClick={() => void remove()}
+            onClick={() => setDeleting(true)}
             className="text-destructive"
           >
             Delete folder
           </Button>
         </div>
       </div>
-      {error && (
-        <FormMessage tone="error" className="mt-3">
-          {error}
-        </FormMessage>
+      {deleting && (
+        <DeleteFolderDialog
+          folder={folder}
+          onDeleted={() => router.push("/tiles")}
+          onClose={() => setDeleting(false)}
+        />
       )}
       {renaming && (
         <FolderNameDialog folder={folder} onClose={() => setRenaming(false)} />

@@ -1,28 +1,26 @@
 "use client";
 
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { cn } from "@pigxel/ui/lib/utils";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
-import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { PixelImage } from "@/components/ui/pixel-image";
 import { useProjectSharing } from "../../queries";
-import { InviteForm } from "./components/invite-form";
 import { LinkAccessSection } from "./components/link-access-section";
-import { PersonRow } from "./components/person-row";
-import { ShareBadge } from "./components/share-badge";
-import { ACTION_WIDTH, PILL_WIDTH, ROW, SECTION_TITLE } from "./constants";
 
 export function ShareDialog({
   tile,
   onClose,
 }: {
-  tile: { id: string; name: string };
+  tile: {
+    id: string;
+    name: string;
+    thumbnail?: string | null;
+    width?: number;
+    height?: number;
+  };
   onClose: () => void;
 }) {
   const share = useProjectSharing(tile.id);
@@ -43,48 +41,29 @@ export function ShareDialog({
 
   return (
     <Dialog onClose={onClose} size="md" portal>
-      <DialogHeader title={`Share “${tile.name}”`} />
-      <DialogBody className="grid grid-cols-1 gap-5">
-        <InviteForm
-          people={share.sharing?.people ?? []}
-          inviting={share.inviting}
-          onInvite={share.invite}
-        />
-
-        <section aria-labelledby="share-people">
-          <h3 id="share-people" className={SECTION_TITLE}>
-            People with access
-          </h3>
-          <ul className="-mx-2 grid gap-0.5">
-            <li className={ROW}>
-              <ProfileAvatar name="You" url={null} className="size-8 text-xs" />
-              <span className="ml-1 flex min-w-0 flex-1 items-center gap-2">
-                <span className="text-sm font-medium">You</span>
-                <ShareBadge tone="owner">Owner</ShareBadge>
-              </span>
-              <span
-                className={cn(
-                  PILL_WIDTH,
-                  "shrink-0 px-3 text-xs text-muted-foreground",
-                )}
-              >
-                Full access
-              </span>
-              <span aria-hidden="true" className={ACTION_WIDTH} />
-            </li>
-            {share.loading && (
-              <li className="mx-2 h-12 animate-pulse rounded-lg bg-muted" />
-            )}
-            {share.sharing?.people.map((person) => (
-              <PersonRow
-                key={person.id}
-                person={person}
-                onRoleChange={(value) => share.setRole(person.id, value)}
-                onRemove={() => share.remove(person.id)}
+      <ModalHeader title="Share Project" />
+      <DialogBody className="grid grid-cols-1 gap-5 py-5">
+        <div className="flex items-center gap-4">
+          <span className="block size-20 shrink-0 overflow-hidden rounded-xl border border-primary-soft bg-pastel-pink-soft">
+            {tile.thumbnail && (
+              <PixelImage
+                src={tile.thumbnail}
+                alt=""
+                className="size-full object-contain"
               />
-            ))}
-          </ul>
-        </section>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold">
+              {tile.name}
+            </span>
+            {tile.width && tile.height && (
+              <span className="block text-[11px] text-muted-foreground tabular-nums">
+                {tile.width} × {tile.height} px
+              </span>
+            )}
+          </span>
+        </div>
 
         {share.sharing && (
           <LinkAccessSection
@@ -101,7 +80,7 @@ export function ShareDialog({
           </FormMessage>
         )}
       </DialogBody>
-      <DialogFooter className="items-center">
+      <DialogFooter className={cn(MODAL_FOOTER, "items-center")}>
         {shared && (
           <button
             type="button"
@@ -111,9 +90,9 @@ export function ShareDialog({
             Stop sharing
           </button>
         )}
-        <Button type="button" onClick={onClose}>
-          Done
-        </Button>
+        <ModalButton variant="secondary" onClick={onClose}>
+          Close
+        </ModalButton>
       </DialogFooter>
     </Dialog>
   );

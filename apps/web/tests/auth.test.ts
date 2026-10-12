@@ -62,6 +62,7 @@ vi.mock("next/font/google", () => ({
   Pixelify_Sans: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
 }));
 
 import { authenticate, signOut, updatePassword } from "@/features/auth/actions";

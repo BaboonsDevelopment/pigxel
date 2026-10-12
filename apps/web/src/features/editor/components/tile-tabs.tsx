@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { readDraft } from "@/lib/pigxel-file/draft";
+import { readDraft, removeDraft } from "@/lib/pigxel-file/draft";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
 import { LOCATION_LABELS, type TileLocation } from "@/lib/pigxel-file/location";
 import { editorUrl, newTileUrl } from "@/lib/pigxel-file/open-tile";
@@ -17,6 +17,7 @@ import {
   writeTabs,
 } from "@/lib/pigxel-file/tabs";
 import { forgetTile } from "../kept-tiles";
+import { confirmUnsaved } from "./unsaved-dialog";
 
 type Picture = { rgba: Uint8ClampedArray; w: number; h: number };
 
@@ -52,8 +53,10 @@ export function TileTabs({
   revision,
   picture,
   hidden,
+  onSave,
 }: {
   hidden?: boolean;
+  onSave: () => Promise<boolean>;
   userId: string;
   current: TabTile;
   revision: number;
@@ -78,8 +81,14 @@ export function TileTabs({
   }, [userId, tabs, dragging]);
 
   const closable = tabs.length > 1;
-  const close = (id: string) => {
+  const close = async (id: string) => {
     if (!closable) return;
+    if (id === current.id && current.dirty && current.location) {
+      const choice = await confirmUnsaved(current.name);
+      if (!choice) return;
+      if (choice === "save" && !(await onSave())) return;
+      if (choice === "discard") removeDraft(userId, id);
+    }
     const next = withoutTab(tabs, id);
     writeTabs(userId, next);
     forgetTile(id);
@@ -160,7 +169,7 @@ export function TileTabs({
               onAuxClick={(e) => {
                 if (e.button !== 1) return;
                 e.preventDefault();
-                close(id);
+                void close(id);
               }}
               className="flex h-full min-w-0 flex-1 items-center gap-2 pr-1 pl-2.5 outline-none focus-visible:underline"
             >
@@ -174,7 +183,7 @@ export function TileTabs({
                 type="button"
                 aria-label={`Close ${tile.name}`}
                 title="Close tab (middle click)"
-                onClick={() => close(id)}
+                onClick={() => void close(id)}
                 className={cn(
                   "mr-1 grid size-5 shrink-0 place-items-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
                   !active &&

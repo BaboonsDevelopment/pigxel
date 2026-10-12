@@ -3,7 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "@pigxel/ui/components/button";
+import { ModalButton } from "@/components/ui/modal-button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
@@ -11,7 +11,7 @@ import { EditorSelect } from "@/features/editor/components/editor-select";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { searchPeople } from "../../../actions";
 import type { PersonMatch, SharePerson, ShareRole } from "../../../sharing";
-import { ACTION_WIDTH, PILL, PILL_WIDTH, ROLE_OPTIONS } from "../constants";
+import { PILL, PILL_WIDTH, ROLE_OPTIONS } from "../constants";
 
 const ROW_HEIGHT = 44;
 const VISIBLE_ROWS = 4.5;
@@ -139,7 +139,7 @@ export function InviteForm({
           autoComplete="off"
           spellCheck={false}
           maxLength={50}
-          className="h-9"
+          className="h-12 rounded-xl px-4"
           value={username}
           onChange={(e) => {
             setUsername(e.target.value);
@@ -174,15 +174,11 @@ export function InviteForm({
           value={role}
           options={ROLE_OPTIONS}
           onChange={(value) => setRole(value as ShareRole)}
-          className={cn(PILL, PILL_WIDTH)}
+          className={cn(PILL, PILL_WIDTH, "h-12 rounded-xl")}
         />
-        <Button
-          type="submit"
-          disabled={inviting || !username.trim()}
-          className={ACTION_WIDTH}
-        >
+        <ModalButton type="submit" disabled={inviting || !username.trim()}>
           {inviting ? "Inviting…" : "Invite"}
-        </Button>
+        </ModalButton>
       </form>
       {notice && (
         <FormMessage className="animate-in fade-in duration-150">

@@ -599,6 +599,23 @@ export function useSprite(
     if (next.size) writeCels(layerId, next);
   };
 
+  const clearCanvas = () => {
+    if (viewing.current) return blocked.current?.();
+    const ids = layerTree
+      .allLayers(tree)
+      .filter(
+        (layer) =>
+          layer.kind === "normal" && !layerTree.isLocked(tree, layer.id),
+      )
+      .map((layer) => layer.id);
+    for (const id of ids)
+      putCels(
+        id,
+        frames.map((frame) => [frame.id, null] as const),
+      );
+    finish();
+  };
+
   const clearCel = () => {
     const canvas = cels.get(frameId, layerId);
     if (!canvas || !layerTree.canPaint(tree, layerId)) return;
@@ -1659,6 +1676,7 @@ export function useSprite(
       return true;
     },
     clearCel,
+    clearCanvas,
     resize,
     rescale,
     transformAll,

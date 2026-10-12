@@ -1,4 +1,3 @@
-import { pixelifySans } from "@/lib/fonts/pixelify";
 import { ROLE_LABELS, SHARE_ROLES } from "../../sharing";
 
 export const ROLE_OPTIONS = SHARE_ROLES.map((role) => ({
@@ -6,7 +5,7 @@ export const ROLE_OPTIONS = SHARE_ROLES.map((role) => ({
   label: ROLE_LABELS[role],
 }));
 
-export const SECTION_TITLE = `${pixelifySans.className} mb-2 text-sm`;
+export const SECTION_TITLE = "mb-2 block text-sm font-semibold";
 
 export const ROW = "flex h-12 items-center gap-2 rounded-lg px-2";
 
