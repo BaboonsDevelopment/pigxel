@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { readFeedOrder } from "../../../feed-order";
 
 const subscribe = () => () => {};
 
@@ -11,8 +12,19 @@ function headerSlot() {
   return target && getComputedStyle(target).display !== "none" ? target : null;
 }
 
-export function Breadcrumb({ name }: { name: string }) {
+export function Breadcrumb({
+  name,
+  children,
+}: {
+  name: string;
+  children?: ReactNode;
+}) {
   const slot = useSyncExternalStore(subscribe, headerSlot, () => null);
+  const back = useSyncExternalStore(
+    subscribe,
+    () => readFeedOrder()?.url ?? "/explore",
+    () => "/explore",
+  );
 
   const nav = (
     <nav
@@ -20,7 +32,7 @@ export function Breadcrumb({ name }: { name: string }) {
       className="flex min-w-0 shrink-0 items-center gap-2 text-xs"
     >
       <Link
-        href="/explore"
+        href={back}
         className="flex items-center gap-2 whitespace-nowrap transition-colors hover:text-primary"
       >
         <svg
@@ -43,6 +55,7 @@ export function Breadcrumb({ name }: { name: string }) {
       <span aria-current="page" className="truncate text-muted-foreground">
         {name}
       </span>
+      {children}
     </nav>
   );
 

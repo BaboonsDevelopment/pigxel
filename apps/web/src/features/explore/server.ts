@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { avatarUrlOf, type ProfileRow } from "@/features/profile/profile";
-import { COMMENT_COLUMNS, type ArtComment } from "./comments";
+import { COMMENT_COLUMNS, COMMENT_PAGE, type ArtComment } from "./comments";
 
 export type SavedArt = {
   id: string;
@@ -11,6 +11,8 @@ export type SavedArt = {
   height: number;
   thumbnail: string | null;
   author: string;
+  authorId: string;
+  allowRemix: boolean;
   savedAt: string;
 };
 
@@ -22,6 +24,8 @@ type SavedRow = {
     width: number;
     height: number;
     thumbnail: string | null;
+    user_id: string;
+    allow_remix: boolean;
     author: { username: string };
   };
 };
@@ -40,34 +44,53 @@ export async function isTileSaved(
   return !error && !!data;
 }
 
-export async function listSavedArts(userId: string): Promise<SavedArt[]> {
-  if (!isSupabaseConfigured()) return [];
+export async function listSavedArts(
+  userId: string,
+  {
+    match = null,
+    from = 0,
+    limit,
+  }: { match?: string | null; from?: number; limit: number },
+): Promise<{ arts: SavedArt[]; count: number | null }> {
+  if (!isSupabaseConfigured()) return { arts: [], count: 0 };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  const base = supabase
     .from("saved_tiles")
     .select(
-      "created_at, tile:tiles!inner(id, name, width, height, thumbnail, author:profiles!tiles_user_id_profiles_fkey!inner(username))",
+      "created_at, tile:tiles!inner(id, name, width, height, thumbnail, user_id, allow_remix, author:profiles!tiles_user_id_profiles_fkey!inner(username))",
+      from === 0 ? { count: "exact" } : undefined,
     )
     .eq("user_id", userId)
-    .eq("tile.visibility", "public")
+    .eq("tile.visibility", "public");
+  const { data, error, count } = await (
+    match ? base.or(match, { referencedTable: "tile" }) : base
+  )
     .order("created_at", { ascending: false })
-    .limit(120);
+    .order("tile_id")
+    .range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load saved arts: ${error.message}`);
-  return (data as unknown as SavedRow[]).map((row) => ({
-    id: row.tile.id,
-    name: row.tile.name,
-    width: row.tile.width,
-    height: row.tile.height,
-    thumbnail: row.tile.thumbnail,
-    author: row.tile.author.username,
-    savedAt: row.created_at,
-  }));
+  return {
+    count: from === 0 ? (count ?? data.length) : null,
+    arts: (data as unknown as SavedRow[]).map((row) => ({
+      id: row.tile.id,
+      name: row.tile.name,
+      width: row.tile.width,
+      height: row.tile.height,
+      thumbnail: row.tile.thumbnail,
+      author: row.tile.author.username,
+      authorId: row.tile.user_id,
+      allowRemix: row.tile.allow_remix,
+      savedAt: row.created_at,
+    })),
+  };
 }
 
 type CommentRow = {
   id: string;
   body: string;
   created_at: string;
+  edited_at: string | null;
+  parent_id: string | null;
   user_id: string;
   author: Pick<
     ProfileRow,
@@ -84,6 +107,9 @@ export function toComment(row: CommentRow): ArtComment {
     id: row.id,
     body: row.body,
     createdAt: row.created_at,
+    edited: row.edited_at !== null,
+    parentId: row.parent_id,
+    replies: [],
     author: {
       id: row.user_id,
       username: row.author?.username ?? null,
@@ -95,15 +121,39 @@ export function toComment(row: CommentRow): ArtComment {
 
 export async function listComments(
   tileId: string,
+  before?: string,
 ): Promise<{ comments: ArtComment[]; count: number }> {
   const supabase = await createClient();
-  const { data, count, error } = await supabase
+  const query = supabase
     .from("tile_comments")
     .select(COMMENT_COLUMNS, { count: "exact" })
     .eq("tile_id", tileId)
+    .is("parent_id", null);
+  const { data, count, error } = await (
+    before ? query.lt("created_at", before) : query
+  )
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(COMMENT_PAGE);
   if (error) throw new Error(`Couldn’t load comments: ${error.message}`);
   const rows = data as unknown as CommentRow[];
-  return { comments: rows.map(toComment), count: count ?? rows.length };
+  const comments = rows.map(toComment);
+  if (comments.length) {
+    const replies = await supabase
+      .from("tile_comments")
+      .select(COMMENT_COLUMNS)
+      .in(
+        "parent_id",
+        comments.map((c) => c.id),
+      )
+      .order("created_at", { ascending: true });
+    if (replies.error)
+      throw new Error(`Couldn’t load replies: ${replies.error.message}`);
+    const byId = new Map(comments.map((c) => [c.id, c]));
+    for (const row of replies.data as unknown as CommentRow[]) {
+      const reply = toComment(row);
+      byId.set(reply.id, reply);
+      byId.get(row.parent_id!)?.replies.push(reply);
+    }
+  }
+  return { comments, count: count ?? rows.length };
 }

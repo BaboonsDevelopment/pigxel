@@ -24,15 +24,26 @@ export type PenSettings = {
   spraySpeed: number;
   contiguous: boolean;
   fillFrom: "layer" | "all";
+  pickFrom: "layer" | "all";
+  wandFrom: "layer" | "all";
   tolerance: number;
   gradientShape: GradientShape;
   gradientDither: GradientDither;
+  gradientColors: string[];
+  gradientPaletteOnly: boolean;
   textFont: TextFont;
   textScale: number;
+  textLetterSpacing: number;
+  textLineSpacing: number;
   stabilizer: number;
   stampPattern: boolean;
   cornerRadius: number;
 };
+
+export type TextStyle = Pick<
+  PenSettings,
+  "textFont" | "textScale" | "textLetterSpacing" | "textLineSpacing"
+>;
 
 export const MIN_PEN_SIZE = 1;
 export const MAX_PEN_SIZE = 16;
@@ -55,10 +66,16 @@ export const DEFAULT_PEN: PenSettings = {
   contiguous: true,
   tolerance: 0,
   fillFrom: "layer",
+  pickFrom: "all",
+  wandFrom: "layer",
   gradientShape: "linear",
   gradientDither: "bayer4",
+  gradientColors: [],
+  gradientPaletteOnly: false,
   textFont: "tiny5",
   textScale: 1,
+  textLetterSpacing: 0,
+  textLineSpacing: 0,
   stabilizer: 0,
   stampPattern: false,
   cornerRadius: 0,
@@ -254,6 +271,19 @@ export function fourConnected(stroke: Point[]): Point[] {
       ? [{ x: p.x, y: prev.y }, p]
       : [p];
   });
+}
+
+export function rectangleSpan(
+  from: Point,
+  to: Point,
+  square: boolean,
+  centered: boolean,
+) {
+  const end = squareFrom(from, to, square);
+  return {
+    from: centered ? { x: 2 * from.x - end.x, y: 2 * from.y - end.y } : from,
+    to: end,
+  };
 }
 
 export function squareFrom(from: Point, to: Point, square: boolean): Point {

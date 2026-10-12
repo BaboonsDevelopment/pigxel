@@ -3,15 +3,15 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/ui/brand";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
-import { LEGAL_LINKS } from "@/features/legal/legal";
+import { businessLine, LEGAL_LINKS } from "@/features/legal/legal";
+import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
 import { ART, STRIP, type Art } from "../art";
 import { ArtWall } from "./art-wall";
 import { CountUp } from "./count-up";
-import { AiDemo, AnimateDemo, ExportDemo } from "./demos";
-import { FeatureTabs } from "./feature-tabs";
+import { FeatureWorld } from "./feature-world/feature-world";
+import { HeroSpotlight } from "./hero-spotlight";
 import { geist, geistPixel } from "@/lib/fonts/geist";
 import { ICONS, PixelSprite } from "./pixel-art";
-import { PixelPlayground } from "./pixel-playground";
 import styles from "./landing.module.css";
 
 const delay = (seconds: number) =>
@@ -21,18 +21,6 @@ function Arrow() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path d="M5 12h13m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function Check() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="m5 12.5 4.5 4.5L19 7.5"
-        stroke="currentColor"
-        strokeWidth="2.2"
-      />
     </svg>
   );
 }
@@ -58,33 +46,6 @@ const MAKES: { icon: keyof typeof ICONS; label: string }[] = [
   { icon: "potion", label: "Items & props" },
   { icon: "coin", label: "UI & HUD" },
   { icon: "cat", label: "Tiny pets" },
-];
-
-const FEATURES = [
-  {
-    id: "draw",
-    title: "Draw",
-    text: "Pens, shapes, selections, shading and dither, with layers, palettes, mirror drawing and tiled mode. Try it right here.",
-    panel: <PixelPlayground />,
-  },
-  {
-    id: "animate",
-    title: "Animate",
-    text: "Add frames, set their timing and turn on onion skin. Watch a tiny character come alive.",
-    panel: <AnimateDemo />,
-  },
-  {
-    id: "ai",
-    title: "Ask the AI helper",
-    text: "Describe a change in plain words, and the helper edits your pixels for you.",
-    panel: <AiDemo />,
-  },
-  {
-    id: "export",
-    title: "Export anywhere",
-    text: "PNG and JPEG up to 20× with sharp pixels, looping GIFs, and sprite sheets with Aseprite JSON for game engines.",
-    panel: <ExportDemo />,
-  },
 ];
 
 const BENTO: { art: Art; size: "large" | "wide" | "small" }[] = [
@@ -118,7 +79,7 @@ const FAQ = [
   {
     question: "What can I export?",
     answer:
-      "PNG and JPEG pictures scaled up to 20× with sharp pixels, looping GIFs of every frame, and sprite sheets, optionally with a JSON file in Aseprite’s format that game engines read.",
+      "PNG and JPEG pictures scaled up to 20× with sharp pixels; looping GIF, animated PNG and WebP; PNG sequences; sprite sheets and slices, optionally with a JSON file in Aseprite’s format that game engines read; and a timelapse video of how you drew it.",
   },
   {
     question: "How big can a canvas be?",
@@ -147,38 +108,39 @@ export function Landing() {
           aria-labelledby="hero-heading"
           data-header-reveal
         >
+          <HeroSpotlight />
+          <div className={styles.heroPixels} aria-hidden="true">
+            {Array.from({ length: 7 }, (_, index) => (
+              <i key={index} />
+            ))}
+          </div>
           <a
             href="#features"
             className={`${styles.badge} ${styles.rise}`}
             style={delay(0)}
           >
             <span className={styles.badgeTag}>New</span>
-            Animate frame by frame, export GIFs
+            Animate and export GIFs
             <Arrow />
           </a>
           <h1 id="hero-heading" className={styles.heroTitle}>
-            <span
-              className={`${styles.heroBrand} ${styles.rise}`}
-              style={delay(0.05)}
-            >
-              Pigxel Studio
-            </span>
+            <span className="sr-only">Pigxel Studio: </span>
             <span className={styles.heroLine}>
               <Words text="Small pixels." start={0.1} />
-            </span>
-            <span className={`${styles.heroLine} ${styles.muted}`}>
-              <Words text="Wild imagination." start={0.26} />
+            </span>{" "}
+            <span
+              className={`${styles.heroLine} ${styles.heroAccent} ${styles.rise}`}
+              style={delay(0.3)}
+            >
+              Wild imagination.
             </span>
           </h1>
           <p className={`${styles.heroText} ${styles.rise}`} style={delay(0.5)}>
-            Pigxel Studio is a pixel art editor that runs in your browser. Draw,
-            animate tiny characters and build little worlds, then sign in with
-            Google to save your projects to Pigxel cloud or your own Google
-            Drive.
+            Draw, animate and build little worlds, right in your browser.
           </p>
           <div
             className={`${styles.heroActions} ${styles.rise}`}
-            style={delay(0.6)}
+            style={delay(0.62)}
           >
             <Link
               href="/login?mode=signup"
@@ -193,17 +155,6 @@ export function Landing() {
               See plans <Arrow />
             </Link>
           </div>
-          <ul className={`${styles.perks} ${styles.rise}`} style={delay(0.7)}>
-            <li>
-              <Check /> No downloads
-            </li>
-            <li>
-              <Check /> Free plan, forever
-            </li>
-            <li>
-              <Check /> Pigxel cloud or Google Drive
-            </li>
-          </ul>
         </section>
 
         <ArtWall />
@@ -244,7 +195,7 @@ export function Landing() {
               the final GIF.
             </p>
           </div>
-          <FeatureTabs features={FEATURES} />
+          <FeatureWorld />
         </section>
 
         <section className={styles.stats} aria-label="Pigxel in numbers">
@@ -265,9 +216,9 @@ export function Landing() {
           </div>
           <div className={`${styles.stat} ${styles.reveal}`}>
             <strong>
-              <CountUp to={4} />
+              <CountUp to={9} />
             </strong>
-            <p>Ways out: PNG, JPEG, GIF and sprite sheets</p>
+            <p>Export formats, from PNG and GIF to sprite sheets and video</p>
           </div>
           <div className={`${styles.stat} ${styles.reveal}`}>
             <strong>0</strong>
@@ -427,11 +378,12 @@ export function Landing() {
                 </Link>
               ),
             )}
+            <CookieSettingsButton className={styles.footerButton} />
           </nav>
         </div>
         <div className={styles.footerBottom}>
           <span>© {new Date().getFullYear()} Pigxel Studio</span>
-          <span>Small pixels. Big heart.</span>
+          <span>{businessLine()}</span>
         </div>
         <p className={styles.wordmark} aria-hidden="true">
           pigxel

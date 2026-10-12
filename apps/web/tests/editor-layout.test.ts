@@ -171,3 +171,76 @@ describe("tool groups", () => {
     expect([...grouped].sort()).toEqual(TOOLS.map((t) => t.id).sort());
   });
 });
+
+describe("panel tabs and floating panels", () => {
+  it("groups a panel onto another as a tab and shows the dropped one", () => {
+    const grouped = movePanel(DEFAULT_LAYOUT, "palette", {
+      kind: "panel",
+      anchor: "assistant",
+      where: "tab",
+    });
+    expect(stacks(grouped, "right")).toEqual([["assistant"]]);
+    const [item] = shownStacks(grouped, "right")[0]!.items;
+    expect(item!.group).toEqual(["assistant", "palette"]);
+    expect(item!.active).toBe("palette");
+  });
+
+  it("drags a tab back out, and moving the host keeps the group in place", () => {
+    const grouped = movePanel(DEFAULT_LAYOUT, "palette", {
+      kind: "panel",
+      anchor: "assistant",
+      where: "tab",
+    });
+    const out = movePanel(grouped, "palette", {
+      kind: "panel",
+      anchor: "colors",
+      where: "below",
+    });
+    expect(stacks(out, "left")).toEqual([["tools", "colors", "palette"]]);
+    expect(out.tabs).toEqual({});
+    const hostMoved = movePanel(grouped, "assistant", {
+      kind: "panel",
+      anchor: "tools",
+      where: "above",
+    });
+    expect(stacks(hostMoved, "right")).toEqual([["palette"]]);
+    expect(stacks(hostMoved, "left")).toEqual([
+      ["assistant", "tools", "colors"],
+    ]);
+  });
+
+  it("floats a panel, moves it and docks it back", () => {
+    const rect = { x: 40, y: 50, w: 300, h: 200 };
+    const floated = movePanel(DEFAULT_LAYOUT, "palette", {
+      kind: "float",
+      rect,
+    });
+    expect(stacks(floated, "right")).toEqual([["assistant"]]);
+    expect(floated.floating.palette).toEqual(rect);
+    expect(movesPanel(floated, "palette", { kind: "float", rect })).toBe(true);
+    const docked = movePanel(floated, "palette", {
+      kind: "dock",
+      dock: "right",
+      where: "end",
+    });
+    expect(docked.floating).toEqual({});
+    expect(stacks(docked, "right")).toEqual([["assistant"], ["palette"]]);
+  });
+
+  it("keeps tabs and floating panels when the layout is read back", () => {
+    const grouped = movePanel(
+      movePanel(DEFAULT_LAYOUT, "palette", {
+        kind: "panel",
+        anchor: "assistant",
+        where: "tab",
+      }),
+      "colors",
+      { kind: "float", rect: { x: 1, y: 2, w: 300, h: 300 } },
+    );
+    const read = readLayout(JSON.parse(JSON.stringify(grouped)));
+    expect(read.tabs).toEqual({ assistant: ["palette"] });
+    expect(read.active).toEqual({ assistant: "palette" });
+    expect(read.floating.colors).toEqual({ x: 1, y: 2, w: 300, h: 300 });
+    expect(stacks(read, "left")).toEqual([["tools"]]);
+  });
+});

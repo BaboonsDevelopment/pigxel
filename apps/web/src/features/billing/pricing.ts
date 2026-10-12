@@ -15,7 +15,7 @@ export const FREE_PLAN = {
     "Every drawing tool",
     "Layers, frames, onion skin",
     "Palettes, mirror and tiled mode",
-    "PNG, GIF and sprite sheet export",
+    "Every export format",
     "Pigxel cloud or Google Drive",
     "A few AI generations to try",
   ],

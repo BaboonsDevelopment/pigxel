@@ -13,6 +13,18 @@ pnpm dev
 
 Open http://localhost:3000. The landing page works without credentials. Connect Supabase to enable email/password login and signup.
 
+## Tests
+
+```sh
+pnpm test            # unit and component tests, no services needed
+pnpm test:coverage   # the same, with coverage
+pnpm db:start        # local Supabase in Docker, for the next two
+pnpm test:db         # row-level security and database rules
+pnpm test:e2e        # end-to-end flows in Chromium
+```
+
+Database and end-to-end tests only run against local Supabase, never the project in `.env.local`. See [the testing guide](docs/testing.md) for helpers, conventions and CI.
+
 ## Structure
 
 ```text
@@ -25,9 +37,12 @@ apps/web/                    Next.js App Router + TypeScript
   src/lib/supabase/          Browser/server clients and configuration
   src/lib/paddle/            Paddle environment checks and the server-only client
   src/proxy.ts               Supabase session refresh when configured
+  tests/                     Unit, component and database tests (see docs/testing.md)
+  e2e/                       End-to-end tests (Playwright)
 packages/ui/                 Tailwind theme, shadcn configuration, cn utility
 packages/typescript-config/  Shared TypeScript settings
 packages/eslint-config/      Shared ESLint settings
+packages/vitest-config/      Shared Vitest options and browser polyfills for component tests
 supabase/                    Local configuration and password reset email template
 ```
 

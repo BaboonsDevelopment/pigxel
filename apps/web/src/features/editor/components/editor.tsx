@@ -25,6 +25,7 @@ import {
   clampPenSize,
   type ColorSlot,
   type PenSettings,
+  type TextStyle,
 } from "../pixel-canvas/pen";
 import {
   PixelCanvas,
@@ -32,9 +33,12 @@ import {
 } from "../pixel-canvas/pixel-canvas";
 import {
   borderMask,
+  colorMask,
+  contentMask,
   contractMask,
   expandMask,
   maskBounds,
+  type SelectMode,
 } from "../pixel-canvas/selection";
 import {
   copiedPiece,
@@ -51,35 +55,63 @@ import {
   type CanvasView,
 } from "../pixel-canvas/view";
 import type { MenuSections } from "./menu/constants";
-import { useSprite, type SpriteApi } from "../pixel-canvas/use-sprite";
+import {
+  useSprite,
+  type KeptSprite,
+  type SpriteApi,
+} from "../pixel-canvas/use-sprite";
 import { Timeline } from "../timeline/timeline";
 import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
 import { PreviewWindow } from "./preview/preview-window";
 import { SecondView } from "./second-view";
+import { ZoomControl } from "./zoom-control";
+import { PointerPosition } from "./pointer-position";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
-import { DEFAULT_EXPORT, type ExportSettings } from "../export/constants";
+import type { ExportSettings } from "../export/constants";
+import {
+  keepExportSettings,
+  loadExportSettings,
+} from "../export/saved-settings";
 import { decodeImage } from "@/lib/image/decode";
 import { connectDriveUrl } from "@/lib/google-drive/status";
-import { allLayers, isShown, panelRows } from "@/lib/layers/tree";
+import {
+  allLayers,
+  findLayer,
+  isShown,
+  panelRows,
+  pixelLayerIds,
+} from "@/lib/layers/tree";
+import { nextSelectionName } from "@/lib/selections/saved";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
 import { colorsOf, pushRecent } from "@/lib/palette/presets";
 import {
+  listDrafts,
   readDraft,
   readPen,
   writePen,
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
+import { LOCATION_LABELS } from "@/lib/pigxel-file/location";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
 import { PIXEL_RATIOS, sameRatio } from "@/lib/sprite/pixel-ratio";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
+import { markTileOpened } from "@/features/tiles/actions";
+import { writeMark } from "@/features/tiles/local-marks";
 import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
+import { draftThumbnail, thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { PixelImage } from "@/components/ui/pixel-image";
+import { useProjectAccess } from "@/features/sharing/queries";
+import { useEditLock } from "@/features/sharing/use-edit-lock";
+import { loadArtDetails } from "@/features/explore/actions";
+import type { PublishTile } from "@/features/explore/components/explore-header/components/publish-dialog";
 import {
   IMAGE_FILE_TYPES,
   documentFromFrames,
@@ -103,26 +135,26 @@ import {
   setToolShown,
   type PanelId,
 } from "../layout";
-import type { Command, EditorProps, OpenSource, ToolId } from "../constants";
-import { isTyping, sizeKey } from "../helpers";
 import {
-  actionFor,
-  keysLabel,
-  readKeymap,
-  writeKeymap,
-  type ActionId,
-  type Keymap,
-} from "../keymap";
+  isStartKind,
+  START_PANELS,
+  type Command,
+  type EditorProps,
+  type OpenSource,
+  type ToolId,
+} from "../constants";
+import { isTyping, sizeKey } from "../helpers";
+import { actionFor, keysLabel, type ActionId } from "../keymap";
 import { keepTile, type KeptTile } from "../kept-tiles";
+import { useKeymap } from "../use-keymap";
+import { keepHistory, loadHistory } from "@/lib/pigxel-file/history-store";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
 import { useEditorLayout } from "../use-editor-layout";
-import {
-  readBrushes,
-  withBrush,
-  writeBrushes,
-  type SavedBrush,
-} from "../brush-library";
+import { useLayoutPresets } from "../use-layout-presets";
+import { LAYOUT_PRESETS, presetLayout } from "../layout-presets";
+import { withBrush } from "../brush-library";
+import { useBrushLibrary } from "../use-brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
@@ -132,6 +164,7 @@ import { PaletteActions } from "./colors/palette-actions";
 import { PalettePanel } from "./colors/palette-panel";
 import { Dock, type PanelContent } from "./dock/dock";
 import { DragOverlay } from "./dock/drag-overlay";
+import { FloatingPanels } from "./dock/floating-panels";
 import { usePanelDrag } from "./dock/use-panel-drag";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
@@ -140,9 +173,15 @@ import type { ModifyKind } from "./modify-selection-dialog";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
 
+const RECENT_FILES = 10;
+
 const EditorChat = dynamic(() => import("./editor-chat"), {
   ssr: false,
   loading: ChatPlaceholder,
+});
+const TweenDialog = dynamic(() => import("./tween-dialog"), { ssr: false });
+const SaveSelectionDialog = dynamic(() => import("./save-selection-dialog"), {
+  ssr: false,
 });
 const OpenTileDialog = dynamic(() => import("./open-tile-dialog"), {
   ssr: false,
@@ -192,6 +231,35 @@ const ModifySelectionDialog = dynamic(
   () => import("./modify-selection-dialog"),
   { ssr: false },
 );
+const PublishArtDialog = dynamic(
+  () =>
+    import("@/features/explore/components/explore-header/components/publish-dialog").then(
+      (m) => m.PublishDialog,
+    ),
+  { ssr: false },
+);
+const ShareDialog = dynamic(
+  () =>
+    import("@/features/sharing/components/share-dialog/share-dialog").then(
+      (m) => m.ShareDialog,
+    ),
+  { ssr: false },
+);
+const VersionHistoryDialog = dynamic(
+  () =>
+    import("@/features/versions/components/version-history-dialog").then(
+      (m) => m.VersionHistoryDialog,
+    ),
+  { ssr: false },
+);
+const ConflictDialog = dynamic(
+  () => import("./conflict-dialog").then((m) => m.ConflictDialog),
+  { ssr: false },
+);
+const LargePictureDialog = dynamic(
+  () => import("./large-picture-dialog").then((m) => m.LargePictureDialog),
+  { ssr: false },
+);
 const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
   ssr: false,
 });
@@ -201,6 +269,7 @@ export function Editor({
   drive,
   driveError,
   guide,
+  start,
   canPublish,
   draft,
   image,
@@ -211,7 +280,17 @@ export function Editor({
   kept: KeptTile | null;
 }) {
   const router = useRouter();
+  const openedTile =
+    draft.location?.kind === "cloud" ? draft.location.tile.id : null;
+  useEffect(() => {
+    if (openedTile) void markTileOpened(openedTile);
+    else writeMark(userId, "opened", draft.id, true);
+  }, [userId, draft.id, openedTile]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [pointerPosition, setPointerPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [exporting, setExporting] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
@@ -240,17 +319,34 @@ export function Editor({
     picture: Uint8ClampedArray;
   } | null>(null);
   const [modifying, setModifying] = useState<ModifyKind | null>(null);
+  const [savingSelection, setSavingSelection] = useState(false);
+  const [tweening, setTweening] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [explore, setExplore] = useState<{
+    tileId: string;
+    published: boolean;
+  } | null>(null);
   const [inserted, setInserted] = useState(0);
   const tutorial = findTutorial(guide);
-  const [exportSettings, setExportSettings] =
-    useState<ExportSettings>(DEFAULT_EXPORT);
+  const [exportSettings, setExportSettings] = useState<ExportSettings>(() =>
+    loadExportSettings(userId, image.id),
+  );
   const [tool, setTool] = useState<ToolId>("pen");
-  const [layout, setLayout] = useEditorLayout(userId);
+  const [layout, setLayout] = useEditorLayout(
+    userId,
+    isStartKind(start) ? START_PANELS[start] : undefined,
+  );
   const panelDrag = usePanelDrag(
     (id, target) => setLayout((l) => movePanel(l, id, target)),
     (id, target) => movesPanel(layout, id, target),
+    (id) => layout.floating[id],
   );
+  const layoutPresets = useLayoutPresets(userId);
   const [customizing, setCustomizing] = useState(false);
   const toolGroup = groupOf(tool)?.id;
   if (toolGroup && layout.groupTools[toolGroup] !== tool)
@@ -265,35 +361,42 @@ export function Editor({
   const [gridding, setGridding] = useState(false);
   const [showingHistory, setShowingHistory] = useState(false);
   const [editingKeys, setEditingKeys] = useState(false);
-  const [keymap, setKeymap] = useState(() => readKeymap(userId));
-  const changeKeymap = (next: Keymap) => {
-    setKeymap(next);
-    writeKeymap(userId, next);
-  };
+  const [keymap, changeKeymap] = useKeymap(userId);
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
-  const [tiling, setTiling] = useState<{ convert: boolean } | null>(null);
+  const [tiling, setTiling] = useState<{ convert: boolean } | null>(() =>
+    start === "tileset" ? { convert: false } : null,
+  );
+  const [startedWith] = useState(start);
+  useEffect(() => {
+    if (isStartKind(start)) router.replace(editorUrl(draft.id));
+  }, [start, router, draft.id]);
   const [stamp, setStamp] = useState<Stamp | null>(null);
-  const [brushes, setBrushes] = useState(() => readBrushes(userId));
-  const changeBrushes = (next: SavedBrush[]) => {
-    setBrushes(next);
-    writeBrushes(userId, next);
-  };
+  const {
+    brushes,
+    changeBrushes,
+    status: brushStatus,
+  } = useBrushLibrary(userId);
   const mod = useModifierLabel();
   const [highlight, setHighlight] = useState<Area | null>(null);
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
-  const { scale, zoomIn, zoomOut, zoomReset } = useZoom({
+  const { scale, zoomIn, zoomOut, zoomReset, zoomSet, zoomFit } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
     initial: kept?.scale,
   });
   const fileInput = useRef<HTMLInputElement>(null);
   const tile = useRef<SpriteApi>(null);
+  const historyReady = useRef(!!kept);
   const file = useTileFile({
     tile,
+    onDraft: (text) => {
+      if (historyReady.current)
+        keepHistory(userId, image.id, text, () => tile.current?.keep().history);
+    },
     fileInput,
     userId,
     initial: draft,
@@ -309,8 +412,60 @@ export function Editor({
         }
       : undefined,
   });
+  const cloudTile = file.location?.kind === "cloud" ? file.location.tile : null;
+  const cloudTileId = cloudTile?.id;
+  useEffect(() => {
+    if (!cloudTileId) return;
+    let live = true;
+    loadArtDetails(cloudTileId).then(
+      (details) => {
+        if (live && details)
+          setExplore({ tileId: cloudTileId, published: details.published });
+      },
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [cloudTileId]);
+  const published =
+    !!cloudTileId && explore?.tileId === cloudTileId && explore.published;
+  const access = useProjectAccess(cloudTileId ?? null);
+  const owner = !cloudTileId || access === undefined || access === "owner";
+  const heldBy = useEditLock(
+    cloudTileId && (access === "owner" || access === "editor")
+      ? cloudTileId
+      : null,
+  );
+  const removed = !!cloudTileId && access === null;
+  const { setPause } = file;
+  useEffect(
+    () =>
+      setPause(
+        removed
+          ? "You no longer have access to this project, so it’s view-only now."
+          : heldBy
+            ? `${heldBy} is editing now. Your changes here won’t be saved.`
+            : null,
+      ),
+    [setPause, removed, heldBy],
+  );
 
-  const sprite = useSprite(image, file.markDirty, kept?.sprite);
+  const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
+  useEffect(() => {
+    if (historyReady.current) return;
+    let live = true;
+    void loadHistory<KeptSprite["history"]>(userId, image.id, draft.file).then(
+      (history) => {
+        if (!live) return;
+        if (history) tile.current?.adoptHistory(history);
+        historyReady.current = true;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [userId, image.id, draft.file]);
   const layerIds = allLayers(sprite.tree).map((layer) => layer.id);
   const [seenLayers, setSeenLayers] = useState(layerIds);
   if (seenLayers.join() !== layerIds.join()) {
@@ -362,6 +517,7 @@ export function Editor({
           cels: now.cels,
           palette: now.palette,
           slices: now.slices,
+          selections: now.selections,
           colorMode: now.colorMode,
           pixelRatio: now.pixelRatio,
         },
@@ -371,7 +527,10 @@ export function Editor({
     },
     [userId, draft.id, image],
   );
-  const playback = usePlayback(sprite);
+  const playback = usePlayback(
+    sprite,
+    `pigxel:playback:v1:${userId}:${sprite.id}`,
+  );
   const selection = useSelection(sprite);
 
   const [sliceId, setSliceId] = useState<string | null>(null);
@@ -448,9 +607,14 @@ export function Editor({
     nudgeDown: () => void selection.nudge(0, 1),
     nudgeLeft: () => void selection.nudge(-1, 0),
     nudgeRight: () => void selection.nudge(1, 0),
+    nudgeUpFar: () => void selection.nudge(0, -10),
+    nudgeDownFar: () => void selection.nudge(0, 10),
+    nudgeLeftFar: () => void selection.nudge(-10, 0),
+    nudgeRightFar: () => void selection.nudge(10, 0),
     toggleOnion: () => setView((v) => ({ ...v, onion: v.onion ? 0 : 1 })),
     togglePreview: () => setPreviewing((on) => !on),
     toggleCanvasOnly: () => setCanvasOnly((on) => !on),
+    showShortcuts: () => setEditingKeys(true),
     toggleFullScreen: () => {
       if (document.fullscreenElement) {
         void document.exitFullscreen();
@@ -469,9 +633,12 @@ export function Editor({
       pixels: Uint8ClampedArray,
       mask: Uint8Array | null,
     ) => Uint8ClampedArray,
+    allFrames = false,
   ) => {
     selection.drop();
-    sprite.editCel((pixels) => change(pixels, selection.mask));
+    const mask = selection.mask;
+    if (allFrames) sprite.editLayerCels((pixels) => change(pixels, mask));
+    else sprite.editCel((pixels) => change(pixels, mask));
   };
 
   const adjust = (kind: AdjustKind) => {
@@ -774,6 +941,16 @@ export function Editor({
         onSelect: commands.reselect,
         disabled: !selection.canReselect,
       },
+      {
+        label: "Select by colour",
+        onSelect: () =>
+          selection.select(
+            colorMask(
+              sprite.readCel(sprite.layerId, sprite.frameId),
+              rgbaOf(pen.color),
+            ),
+          ),
+      },
     ],
     [
       {
@@ -787,20 +964,54 @@ export function Editor({
           ],
         ],
       },
+      {
+        label: "Tween into new frames…",
+        onSelect: () => setTweening(true),
+        disabled: !selection.mask || !sprite.canPaint,
+      },
     ],
     [
       {
-        label: "Save selection",
-        onSelect: selection.saveSelection,
+        label: "Save selection…",
+        onSelect: () => setSavingSelection(true),
         disabled: !selection.mask,
       },
       {
-        label: "Load saved selection",
-        onSelect: selection.loadSelection,
-        disabled: !selection.hasSaved,
+        label: "Load selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.loadSelection(saved.id),
+          })),
+        ],
+      },
+      {
+        label: "Delete saved selection",
+        disabled: !selection.saved.length,
+        submenu: [
+          selection.saved.map((saved) => ({
+            label: saved.name,
+            onSelect: () => selection.deleteSelection(saved.id),
+          })),
+        ],
       },
     ],
   ];
+  const selectLayerContent = (id: string, mode: SelectMode) => {
+    const layer = findLayer(sprite.tree, id)?.layer;
+    if (!layer) return;
+    const mask = new Uint8Array(sprite.size.w * sprite.size.h);
+    for (const pixelLayer of layer.kind === "group"
+      ? pixelLayerIds(layer.children)
+      : [id])
+      contentMask(sprite.readCel(pixelLayer, sprite.frameId)).forEach(
+        (on, i) => {
+          if (on) mask[i] = 1;
+        },
+      );
+    selection.select(mask, mode);
+  };
   const transformTile = (t: TileTransform) => {
     selection.deselect();
     sprite.transformAll(t);
@@ -883,6 +1094,7 @@ export function Editor({
     ],
   ];
   const viewMenu: MenuSections = [
+    [{ label: "Fit to window", onSelect: zoomFit }],
     [
       {
         label: check(canvasOnly, "Canvas only"),
@@ -1000,6 +1212,46 @@ export function Editor({
     ],
   ];
   const windowMenu: MenuSections = [
+    [
+      {
+        label: "Layout presets",
+        submenu: [
+          LAYOUT_PRESETS.map((name) => ({
+            label: name,
+            onSelect: () =>
+              setLayout(
+                structuredClone(
+                  layoutPresets.presets[name]?.layout ?? presetLayout(name),
+                ),
+              ),
+          })),
+          [
+            {
+              label: "Save current layout as",
+              submenu: [
+                LAYOUT_PRESETS.map((name) => ({
+                  label: name,
+                  onSelect: () => {
+                    void layoutPresets.save(name, layout);
+                  },
+                })),
+              ],
+            },
+          ],
+          ...(layoutPresets.status
+            ? [
+                [
+                  {
+                    label: layoutPresets.status,
+                    disabled: true,
+                    onSelect: () => {},
+                  },
+                ],
+              ]
+            : []),
+        ],
+      },
+    ],
     PANELS.map((id) => ({
       label: check(!layout.hidden.includes(id), PANEL_LABELS[id]),
       onSelect: () =>
@@ -1114,6 +1366,10 @@ export function Editor({
   }, []);
 
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === "?" && !isTyping(e.target) && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      return setEditingKeys(true);
+    }
     const shortcut = actionFor(e, keymap, isTyping(e.target));
     if (!shortcut) return;
     e.preventDefault();
@@ -1164,7 +1420,7 @@ export function Editor({
     view,
     stamp,
     highlight,
-    onTextPlaced: () => setTool("move"),
+    onTextStyle: (style: TextStyle) => setPen((p) => ({ ...p, ...style })),
     sliceId,
     onSelectSlice: setSliceId,
     onAxesChange: (axes: Axes | null) => setView((v) => ({ ...v, axes })),
@@ -1188,6 +1444,8 @@ export function Editor({
           onSelect={setTool}
           hiddenTools={layout.hiddenTools}
           groupTools={layout.groupTools}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
           keyOf={(id) => keyOf(`tool:${id}`)}
         />
       ),
@@ -1230,6 +1488,7 @@ export function Editor({
           sprite={sprite}
           playback={playback}
           onTilemap={(convert) => setTiling({ convert })}
+          onSelectContent={selectLayerContent}
         />
       ),
     },
@@ -1237,6 +1496,7 @@ export function Editor({
       fill: true,
       body: (
         <EditorChat
+          autoFocus={startedWith === "ai"}
           canvas={canvas}
           sprite={sprite}
           playback={playback}
@@ -1302,9 +1562,78 @@ export function Editor({
         sprite={sprite}
         playback={playback}
         onOpenFrom={setOpening}
+        recent={listDrafts(userId)
+          .filter((other) => other.id !== draft.id)
+          .sort((a, b) => b.savedAt - a.savedAt)
+          .slice(0, RECENT_FILES)
+          .map((other) => ({
+            label: other.name,
+            icon: (
+              <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded border bg-checker">
+                {draftThumbnail(other) && (
+                  <PixelImage
+                    src={draftThumbnail(other)}
+                    alt=""
+                    className="size-full object-contain"
+                  />
+                )}
+              </span>
+            ),
+            shortcut: other.location
+              ? LOCATION_LABELS[other.location.kind]
+              : "This browser",
+            onSelect: () => {
+              const at = other.location;
+              if (at?.kind === "cloud") file.openCloudTile(at.tile);
+              else if (at?.kind === "drive") file.openDriveFile(at.file);
+              else {
+                openTabAfter(userId, other.id, draft.id);
+                router.push(editorUrl(other.id));
+              }
+            },
+          }))}
         onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
+        explorePublished={published}
+        renameLocked={!owner}
+        onVersionHistory={
+          cloudTile && (owner || access === "editor")
+            ? () => setHistoryOpen(true)
+            : undefined
+        }
+        onPublishArt={
+          owner && (cloudTile || !file.location)
+            ? async () => {
+                const target = cloudTile ?? (await file.saveToCloudFirst());
+                if (!target) return;
+                const image = sprite.document();
+                setPublishingArt({
+                  id: target.id,
+                  name: file.name,
+                  width: image.width,
+                  height: image.height,
+                  thumbnail: thumbnailDataUrl(image),
+                });
+              }
+            : undefined
+        }
+        onShare={
+          owner && (cloudTile || !file.location)
+            ? async () => {
+                if (cloudTile)
+                  return setSharing({ id: cloudTile.id, name: file.name });
+                const confirmed = await confirmDialog({
+                  title: "Save to Pigxel cloud first?",
+                  message: `Only cloud projects can be shared, so “${file.name}” will be saved to Pigxel cloud first.`,
+                  confirmLabel: "Save and share",
+                });
+                if (!confirmed) return;
+                const target = await file.saveToCloudFirst();
+                if (target) setSharing({ id: target.id, name: file.name });
+              }
+            : undefined
+        }
         onImportSheet={() => sheetInput.current?.click()}
         onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
@@ -1329,6 +1658,8 @@ export function Editor({
           onClearStamp={() => setStamp(null)}
           onUseAsBrush={useAsBrush}
           brushes={brushes}
+          brushStatus={brushStatus}
+          palette={sprite.palette}
           onSaveBrush={() =>
             stamp &&
             changeBrushes(withBrush(brushes, stamp, crypto.randomUUID()))
@@ -1340,6 +1671,9 @@ export function Editor({
           slice={slice}
           onSliceChange={changeSlice}
           onSliceDelete={deleteSlice}
+          slices={sprite.slices}
+          onSlicePick={setSliceId}
+          onSlicesChange={sprite.setSlices}
         />
       </div>
       <div className="flex min-h-0 flex-1">
@@ -1367,20 +1701,38 @@ export function Editor({
             <div hidden={canvasOnly} className="contents">
               <Dock side="innerLeft" {...dockProps} />
             </div>
-            <main
-              ref={workspace}
-              data-guide="canvas"
-              data-canvas-drop
-              {...pan.handlers}
-              className={cn(
-                "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
-                pan.panning && "cursor-grab [&_*]:cursor-grab!",
-              )}
-            >
-              <div className="m-auto">
-                <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
+            <div className="relative flex min-h-0 min-w-0 flex-1">
+              <main
+                ref={workspace}
+                data-guide="canvas"
+                data-canvas-drop
+                {...pan.handlers}
+                className={cn(
+                  "flex min-h-0 min-w-0 flex-1 overflow-auto bg-muted p-12",
+                  pan.panning && "cursor-grab [&_*]:cursor-grab!",
+                )}
+              >
+                <div className="m-auto">
+                  <PixelCanvas
+                    ref={canvas}
+                    scale={scale}
+                    {...canvasProps}
+                    onPointerPosition={setPointerPosition}
+                  />
+                </div>
+              </main>
+              <div className="absolute top-2 right-2 z-10">
+                <ZoomControl
+                  scale={scale}
+                  onChange={zoomSet}
+                  onFit={zoomFit}
+                  onZoomIn={zoomIn}
+                  onZoomOut={zoomOut}
+                  onReset={zoomReset}
+                />
+                <PointerPosition point={pointerPosition} />
               </div>
-            </main>
+            </div>
             {splitView && (
               <SecondView
                 canvas={canvasProps}
@@ -1399,12 +1751,20 @@ export function Editor({
           <Dock side="right" {...dockProps} />
         </div>
       </div>
+      <div hidden={canvasOnly} className="contents">
+        <FloatingPanels {...dockProps} />
+      </div>
       <DragOverlay drag={panelDrag} />
       {customizing && (
         <CustomizeToolsDialog
           keyOf={(id) => keyOf(`tool:${id}`)}
           hiddenTools={layout.hiddenTools}
           onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
+          groupOrder={layout.groupOrder}
+          toolOrder={layout.toolOrder}
+          onOrderChange={(groupOrder, toolOrder) =>
+            setLayout((l) => ({ ...l, groupOrder, toolOrder }))
+          }
           onClose={() => setCustomizing(false)}
         />
       )}
@@ -1416,6 +1776,21 @@ export function Editor({
           file={file}
           onClose={() => setOpening(null)}
         />
+      )}
+      {publishingArt && (
+        <PublishArtDialog
+          tile={publishingArt}
+          onPublished={() =>
+            setExplore({ tileId: publishingArt.id, published: true })
+          }
+          onUnpublished={() =>
+            setExplore({ tileId: publishingArt.id, published: false })
+          }
+          onClose={() => setPublishingArt(null)}
+        />
+      )}
+      {sharing && (
+        <ShareDialog tile={sharing} onClose={() => setSharing(null)} />
       )}
       {publishing && (
         <PublishAssetDialog
@@ -1457,6 +1832,24 @@ export function Editor({
           onClose={() => setSheet(null)}
         />
       )}
+      {tweening && (
+        <TweenDialog
+          onApply={(offsets) => {
+            const mask = selection.mask;
+            if (!mask) return;
+            selection.drop();
+            sprite.tweenFrames(mask, offsets);
+          }}
+          onClose={() => setTweening(false)}
+        />
+      )}
+      {savingSelection && (
+        <SaveSelectionDialog
+          defaultName={nextSelectionName(sprite.selections)}
+          onSave={selection.saveSelection}
+          onClose={() => setSavingSelection(false)}
+        />
+      )}
       {modifying && (
         <ModifySelectionDialog
           kind={modifying}
@@ -1491,19 +1884,45 @@ export function Editor({
           palette={sprite.palette}
           from={pen.color}
           to={pen.secondary}
-          onApply={({ from, to, tolerance, keepShading }) =>
-            applyEffect((pixels, mask) =>
-              replacedColor(
-                pixels,
-                rgbaOf(from),
-                rgbaOf(to),
-                mask,
-                tolerance,
-                keepShading,
-              ),
+          frameCount={sprite.frames.length}
+          onApply={({ from, to, tolerance, keepShading, allFrames }) =>
+            applyEffect(
+              (pixels, mask) =>
+                replacedColor(
+                  pixels,
+                  rgbaOf(from),
+                  rgbaOf(to),
+                  mask,
+                  tolerance,
+                  keepShading,
+                ),
+              allFrames,
             )
           }
           onClose={() => setReplacing(null)}
+        />
+      )}
+      {historyOpen && cloudTile && (
+        <VersionHistoryDialog
+          tileId={cloudTile.id}
+          name={file.name}
+          onRestored={file.reloadFromCloud}
+          onClose={() => setHistoryOpen(false)}
+        />
+      )}
+      {file.conflict && (
+        <ConflictDialog
+          name={file.name}
+          busy={file.busy}
+          onKeepMine={file.keepMine}
+          onTakeTheirs={file.reloadFromCloud}
+        />
+      )}
+      {file.largePicture && (
+        <LargePictureDialog
+          picture={file.largePicture}
+          onOpen={file.openLargePicture}
+          onClose={file.cancelLargePicture}
         />
       )}
       {tiling && (
@@ -1546,7 +1965,11 @@ export function Editor({
         />
       )}
       {previewing && (
-        <PreviewWindow sprite={sprite} onClose={() => setPreviewing(false)} />
+        <PreviewWindow
+          userId={userId}
+          sprite={sprite}
+          onClose={() => setPreviewing(false)}
+        />
       )}
       {onionSettings && (
         <OnionSettingsDialog
@@ -1562,9 +1985,18 @@ export function Editor({
           mask={outlining.mask}
           palette={sprite.palette}
           color={pen.color}
-          onApply={({ color, ...settings }) =>
-            applyEffect((pixels, mask) =>
-              outlinedWith(pixels, sprite.size, rgbaOf(color), mask, settings),
+          frameCount={sprite.frames.length}
+          onApply={({ color, allFrames, ...settings }) =>
+            applyEffect(
+              (pixels, mask) =>
+                outlinedWith(
+                  pixels,
+                  sprite.size,
+                  rgbaOf(color),
+                  mask,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setOutlining(null)}
@@ -1576,15 +2008,20 @@ export function Editor({
           size={sprite.size}
           pixels={adjusting.pixels}
           mask={adjusting.mask}
-          onApply={(settings) =>
-            applyEffect((pixels, mask) =>
-              adjustedColors(
-                adjusting.kind,
-                pixels,
-                mask,
-                sprite.size,
-                settings,
-              ),
+          frameCount={sprite.frames.length}
+          colorMode={sprite.colorMode}
+          palette={sprite.palette}
+          onApply={(settings, allFrames) =>
+            applyEffect(
+              (pixels, mask) =>
+                adjustedColors(
+                  adjusting.kind,
+                  pixels,
+                  mask,
+                  sprite.size,
+                  settings,
+                ),
+              allFrames,
             )
           }
           onClose={() => setAdjusting(null)}
@@ -1682,7 +2119,10 @@ export function Editor({
           }}
           pixelRatio={sprite.pixelRatio}
           settings={exportSettings}
-          onChange={setExportSettings}
+          onChange={(next) => {
+            setExportSettings(next);
+            keepExportSettings(userId, image.id, next);
+          }}
           onClose={() => setExporting(false)}
         />
       )}

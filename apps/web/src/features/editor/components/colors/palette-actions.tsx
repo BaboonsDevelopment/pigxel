@@ -15,14 +15,18 @@ import {
 } from "@/lib/palette/arrange";
 import {
   PALETTE_FILE_TYPES,
+  paletteStrip,
   parsePaletteFile,
   toGpl,
+  toHexFile,
 } from "@/lib/palette/files";
 import { MAX_PALETTE, PALETTE_PRESETS, colorsOf } from "@/lib/palette/presets";
 import { safeFileBase } from "@/lib/pigxel-file/format";
+import { encodePng } from "../../export/apng";
 import { HeaderButton } from "../dock/header-button";
 import { swatchStyle } from "./helpers";
 import { PALETTE_ICONS } from "./icons";
+import { useSavedPalettes } from "./saved-palettes";
 
 type PaletteChange = { loaded?: boolean };
 
@@ -44,6 +48,15 @@ export function PaletteActions({
 }) {
   const [rampSteps, setRampSteps] = useState(6);
   const [problem, setProblem] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const saved = useSavedPalettes();
+  const savePalette = (close: () => void) => {
+    const name = saveName.trim().slice(0, 60);
+    if (!name || !palette.length) return;
+    setSaveName("");
+    close();
+    void saved.save(name, palette).then(setProblem);
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const ramp = rampBetween(pen.color, pen.secondary, rampSteps);
   const inPalette = palette.includes(pen.color);
@@ -172,6 +185,67 @@ export function PaletteActions({
               </button>
             ))}
             <span className="my-1 border-t" />
+            <span className="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+              Your palettes
+            </span>
+            {saved.palettes.isPending ? (
+              <span className="px-2 py-1.5 text-xs text-muted-foreground">
+                Loading…
+              </span>
+            ) : saved.palettes.isError ? (
+              <span className="px-2 py-1.5 text-xs text-destructive">
+                {saved.palettes.error.message}
+              </span>
+            ) : (
+              saved.palettes.data.map((item) => (
+                <span key={item.id} className="group/saved flex items-center">
+                  <button
+                    type="button"
+                    title={`${item.colors.length} colours`}
+                    onClick={() => {
+                      close();
+                      onPaletteChange([...item.colors], { loaded: true });
+                    }}
+                    className={`${ITEM} min-w-0 flex-1 truncate`}
+                  >
+                    {item.name}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${item.name}`}
+                    title="Delete from your palettes"
+                    onClick={() => void saved.remove(item.id).then(setProblem)}
+                    className="size-6 shrink-0 rounded text-muted-foreground opacity-0 group-hover/saved:opacity-100 hover:bg-muted hover:text-foreground focus-visible:opacity-100"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+            <form
+              className="flex gap-1 px-1 py-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                savePalette(close);
+              }}
+            >
+              <input
+                value={saveName}
+                maxLength={60}
+                placeholder="Name this palette"
+                aria-label="Name for the saved palette"
+                onChange={(e) => setSaveName(e.target.value)}
+                className="h-6 min-w-0 flex-1 rounded border bg-background px-1.5 text-xs"
+              />
+              <button
+                type="submit"
+                disabled={!saveName.trim() || !palette.length}
+                className="h-6 rounded border px-2 text-xs hover:bg-muted disabled:opacity-30"
+              >
+                Save
+              </button>
+            </form>
+            <span className="my-1 border-t" />
             <button
               type="button"
               onClick={() => {
@@ -208,6 +282,38 @@ export function PaletteActions({
               className={ITEM}
             >
               Save as .gpl
+            </button>
+            <button
+              type="button"
+              disabled={!palette.length}
+              onClick={() => {
+                close();
+                downloadBlob(
+                  new Blob([toHexFile(palette)], { type: "text/plain" }),
+                  `${safeFileBase(fileName)}.hex`,
+                );
+              }}
+              className={ITEM}
+            >
+              Save as .hex
+            </button>
+            <button
+              type="button"
+              disabled={!palette.length}
+              title="One pixel per colour, in palette order"
+              onClick={() => {
+                close();
+                const strip = paletteStrip(palette);
+                downloadBlob(
+                  new Blob([encodePng(strip.rgba, strip.w, strip.h)], {
+                    type: "image/png",
+                  }),
+                  `${safeFileBase(fileName)}-palette.png`,
+                );
+              }}
+              className={ITEM}
+            >
+              Save as PNG strip
             </button>
           </>
         )}

@@ -9,6 +9,7 @@ import type { PaintOptions, Stamp } from "../pixel-canvas/paint";
 import type {
   ColorSlot,
   PenSettings,
+  TextStyle,
   Point,
   SnapGrid,
 } from "../pixel-canvas/pen";
@@ -35,6 +36,7 @@ export type TipShape = "square" | "round" | "line";
 export type ToolTip = { size: number; shape: TipShape; outline: boolean };
 
 export type ToolOptionProps = {
+  palette?: string[];
   tool: ToolDefinition;
   pen: PenSettings;
   onChange: (pen: PenSettings) => void;
@@ -49,6 +51,9 @@ export type ToolOptionProps = {
   slice: Slice | null;
   onSliceChange: (slice: Slice) => void;
   onSliceDelete: () => void;
+  slices: Slice[];
+  onSlicePick: (id: string) => void;
+  onSlicesChange: (slices: Slice[]) => void;
 };
 
 export type ToolOption = ComponentType<ToolOptionProps>;
@@ -78,6 +83,7 @@ export type ToolContext = {
   pickColor: (point: Point, slot: ColorSlot) => void;
   onUseColor?: (color: string) => void;
   onTextPlaced?: () => void;
+  onTextStyle?: (style: TextStyle) => void;
   sliceId: string | null;
   onSelectSlice?: (id: string | null) => void;
 };
@@ -96,6 +102,7 @@ export type ToolDefinition<Id extends string = string> = {
   stamp?: boolean;
   selects?: boolean;
   anyLayer?: boolean;
+  altFromCenter?: boolean;
   wholeLayer?: boolean;
   cursor?: "move" | "text" | "selection";
   tip?: (pen: PenSettings) => ToolTip;

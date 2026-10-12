@@ -20,6 +20,30 @@ export function isProtectedPath(pathname: string) {
   );
 }
 
+/** Where people go to accept updated terms; never itself gated. */
+export const ACCEPT_PATH = "/accept";
+
+const ungatedPaths = [
+  ACCEPT_PATH,
+  "/login",
+  "/auth",
+  "/api",
+  "/terms",
+  "/privacy",
+  "/cookies",
+  "/refunds",
+  "/licenses",
+  "/account-deletion",
+  "/settings/account",
+];
+
+/** Pages a signed-in person can open before accepting the current terms. */
+export function isUngatedPath(pathname: string) {
+  return ungatedPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
+
 const returnPaths = [
   "/home",
   "/tiles",
@@ -43,6 +67,7 @@ export function safeNext(next: string | null | undefined) {
   }
   if (url.origin !== BASE) return HOME_PATH;
   if (/^\/u\/[a-z0-9_]{3,20}$/.test(url.pathname)) return url.pathname;
+  if (/^\/share\/[0-9a-f-]{36}$/i.test(url.pathname)) return url.pathname;
   if (!returnPaths.includes(url.pathname)) return HOME_PATH;
   const id = url.searchParams.get("id");
   return url.pathname === "/tiles/edit" && id && /^[\w-]{1,64}$/.test(id)

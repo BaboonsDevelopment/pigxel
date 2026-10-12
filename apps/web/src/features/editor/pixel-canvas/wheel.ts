@@ -28,6 +28,17 @@ export function clampScale(scale: number) {
   return Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
 }
 
+export function fitScale(
+  tileWidth: number,
+  tileHeight: number,
+  roomWidth: number,
+  roomHeight: number,
+) {
+  if (tileWidth <= 0 || tileHeight <= 0 || roomWidth <= 0 || roomHeight <= 0)
+    return null;
+  return clampScale(Math.min(roomWidth / tileWidth, roomHeight / tileHeight));
+}
+
 export function pinchZoom(scale: number, deltaY: number) {
   return clampScale(scale * Math.exp(-deltaY / 100));
 }

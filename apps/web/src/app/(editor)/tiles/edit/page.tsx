@@ -9,10 +9,15 @@ export const dynamic = "force-dynamic";
 export default async function EditTile({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string; drive?: string; guide?: string }>;
+  searchParams: Promise<{
+    id?: string;
+    drive?: string;
+    guide?: string;
+    start?: string;
+  }>;
 }) {
   const user = await requireUser();
-  const [{ id, drive: driveResult, guide }, drive] = await Promise.all([
+  const [{ id, drive: driveResult, guide, start }, drive] = await Promise.all([
     searchParams,
     getDriveStatus(user.id),
   ]);
@@ -23,6 +28,7 @@ export default async function EditTile({
       drive={drive}
       driveError={driveResult === "error"}
       guide={guide}
+      start={start}
       canPublish={isAdmin(user)}
     />
   );

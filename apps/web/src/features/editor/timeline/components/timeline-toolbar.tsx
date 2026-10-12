@@ -8,6 +8,7 @@ import { ICONS } from "../icons";
 import type { Playback } from "../use-playback";
 import { ControlGroup } from "./control-group";
 import { FrameDuration } from "./frame-duration";
+import { FramesPerSecond } from "./frames-per-second";
 import { LayerOptions } from "./layer-options";
 
 export function TimelineToolbar({
@@ -142,6 +143,16 @@ export function TimelineToolbar({
           duration={frame.duration}
           count={sprite.selectedFrames.length}
           onChange={(ms) => sprite.setFramesDuration(sprite.selectedFrames, ms)}
+        />
+        <FramesPerSecond
+          key={sprite.frames.map((f) => f.duration).join()}
+          durations={sprite.frames.map((f) => f.duration)}
+          onChange={(ms) =>
+            sprite.setFramesDuration(
+              sprite.frames.map((f) => f.id),
+              ms,
+            )
+          }
         />
       </ControlGroup>
     </header>

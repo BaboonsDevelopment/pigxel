@@ -91,6 +91,29 @@ export function wandMask(
   return mask;
 }
 
+export function colorMask(
+  pixels: Uint8ClampedArray,
+  rgba: readonly number[],
+): Mask {
+  const mask = new Uint8Array(pixels.length / 4);
+  for (let i = 0; i < mask.length; i++)
+    if (
+      pixels[i * 4 + 3] &&
+      pixels[i * 4] === rgba[0] &&
+      pixels[i * 4 + 1] === rgba[1] &&
+      pixels[i * 4 + 2] === rgba[2] &&
+      pixels[i * 4 + 3] === rgba[3]
+    )
+      mask[i] = 1;
+  return mask;
+}
+
+export function contentMask(pixels: Uint8ClampedArray): Mask {
+  const mask = new Uint8Array(pixels.length / 4);
+  for (let i = 0; i < mask.length; i++) if (pixels[i * 4 + 3]) mask[i] = 1;
+  return mask;
+}
+
 export function combineMasks(
   base: Mask | null,
   next: Mask,

@@ -3,6 +3,11 @@ node_modules/
 .turbo/
 dist/
 coverage/
+.next-e2e/
+test-results/
+playwright-report/
+blob-report/
+apps/web/e2e/.auth/
 *.tsbuildinfo
 .env*
 !.env.example
@@ -16,3 +21,6 @@ supabase/.branches/
 
 # Visual Studio
 .vs/
+
+# Generated asset packs (pnpm --filter @pigxel/web assets:generate)
+apps/web/scripts/assets/out/

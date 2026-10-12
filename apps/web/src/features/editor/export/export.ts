@@ -1,4 +1,5 @@
 import { resizeNearest, type Bitmap, type Size } from "@/lib/image/bitmap";
+import { encodeSvg } from "./svg";
 import {
   backgroundColor,
   safeFileBase,
@@ -281,6 +282,15 @@ export function exportFiles(
 
   if (format === "png")
     return [{ name: base + extension, mime, image: scaled(source.frameId) }];
+
+  if (format === "svg")
+    return [
+      {
+        name: base + extension,
+        mime,
+        data: encodeSvg(source.picture(source.frameId), tile.w, tile.h, scale),
+      },
+    ];
 
   if (format === "jpeg") {
     const image = scaled(source.frameId);

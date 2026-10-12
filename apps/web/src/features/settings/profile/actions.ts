@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { AVATAR_BUCKET, type AvatarKind } from "@/features/profile/profile";
 import {
   BIO_MAX,
+  LOCATION_MAX,
   NAME_MAX,
   normalizeUsername,
   parseLinks,
@@ -14,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ProfileFormState = {
   error?: string;
-  field?: "name" | "username" | "bio" | "links";
+  field?: "name" | "username" | "bio" | "location" | "links";
   message?: string;
 };
 
@@ -43,6 +44,12 @@ export async function updateProfile(
       field: "bio",
       error: `Keep your description to ${BIO_MAX} characters.`,
     };
+  const location = text(formData, "location").replace(/\s+/g, " ").trim();
+  if (location.length > LOCATION_MAX)
+    return {
+      field: "location",
+      error: `Keep your location to ${LOCATION_MAX} characters.`,
+    };
   const parsed = parseLinks(
     formData.getAll("linkUrl").map(String),
     formData.getAll("linkLabel").map(String),
@@ -53,7 +60,13 @@ export async function updateProfile(
     const supabase = await createClient();
     const { error } = await supabase
       .from("profiles")
-      .update({ display_name: name, username, bio, links: parsed.links })
+      .update({
+        display_name: name,
+        username,
+        bio,
+        location,
+        links: parsed.links,
+      })
       .eq("id", user.id);
     if (error?.code === "23505")
       return { field: "username", error: "This username is taken." };
@@ -115,6 +128,37 @@ export async function setAvatar(
       .eq("id", user.id);
     if (error) return { error: "Couldn’t change your picture. Try again." };
     const old = before?.avatar_path;
+    if (old && old !== path)
+      await supabase.storage.from(AVATAR_BUCKET).remove([old]);
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  refresh();
+  return {};
+}
+
+export async function setCover(
+  path: string | null,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (
+    path !== null &&
+    !new RegExp(`^${user.id}/cover-[\\w-]+\\.(png|webp)$`).test(path)
+  )
+    return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { data: before } = await supabase
+      .from("profiles")
+      .select("cover_path")
+      .eq("id", user.id)
+      .maybeSingle<{ cover_path: string | null }>();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ cover_path: path })
+      .eq("id", user.id);
+    if (error) return { error: "Couldn’t change your cover. Try again." };
+    const old = before?.cover_path;
     if (old && old !== path)
       await supabase.storage.from(AVATAR_BUCKET).remove([old]);
   } catch {

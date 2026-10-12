@@ -5,7 +5,8 @@ import { sendMessage } from "../../actions";
 import { REFERENCES_NOTE } from "../../constants";
 import { notifyAiSpent } from "../../spent-event";
 import { loadChat, saveChat } from "../../chat/history";
-import { findPicture, keepPicture } from "../../chat/pictures";
+import { findPicture, forgetPictures, keepPicture } from "../../chat/pictures";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { ChatComposer } from "./components/chat-composer";
 import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
@@ -23,12 +24,20 @@ import { drawOnNewLayer, generate } from "./flows/generate";
 
 const SAVE_DELAY = 800;
 
+class Stopped extends Error {}
+
+const ignoreStop = (error: unknown) => {
+  if (!(error instanceof Stopped)) throw error;
+};
+
 export function ChatPanel({
   canvas,
   tileId,
+  autoFocus,
 }: {
   canvas: CanvasBridge;
   tileId: string;
+  autoFocus?: boolean;
 }) {
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -41,6 +50,9 @@ export function ChatPanel({
   const [references, setReferences] = useState<string[]>([]);
   const [selectArea, setSelectArea] = useState(false);
   const kept = useRef(new Map<string, string>());
+  const runs = useRef(0);
+  const running = useRef(new Set<number>());
+  const stopped = useRef(new Set<number>());
 
   useEffect(() => {
     let active = true;
@@ -89,16 +101,75 @@ export function ChatPanel({
       all.map((m, i) => (i === index ? { ...m, ...patch } : m)),
     );
 
-  const chatWith = (history: ChatEntry[], references: string[] = []): Chat => ({
-    canvas,
-    messages: history,
-    selectArea,
-    references,
-    append,
-    say: (content) => append({ role: "assistant", content }),
-    setPending,
-    setError,
-  });
+  const chatWith = (
+    history: ChatEntry[],
+    references: string[] = [],
+    token = ++runs.current,
+  ): Chat => {
+    const alive = () => !stopped.current.has(token);
+    return {
+      canvas: new Proxy(canvas, {
+        get(target, key) {
+          const value = Reflect.get(target, key) as unknown;
+          if (typeof value !== "function") return value;
+          return (...args: unknown[]) => {
+            if (!alive()) throw new Stopped();
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        },
+      }),
+      messages: history,
+      selectArea,
+      references,
+      append: (entry) => {
+        if (alive()) append(entry);
+      },
+      say: (content) => {
+        if (alive()) append({ role: "assistant", content });
+      },
+      setPending: (on) => {
+        if (!alive()) return;
+        if (on) running.current.add(token);
+        else running.current.delete(token);
+        setPending(on);
+      },
+      setError: (message) => {
+        if (alive()) setError(message);
+      },
+    };
+  };
+
+  const clear = async () => {
+    const confirmed = await confirmDialog({
+      title: "Clear this chat?",
+      message:
+        "Every message and picture in the chat for this tile is deleted. The tile itself doesn’t change.",
+      confirmLabel: "Clear chat",
+    });
+    if (!confirmed) return;
+    const pictures = [
+      ...new Set(
+        messages.flatMap(({ picture, image }) => {
+          const id = picture ?? (image ? kept.current.get(image) : undefined);
+          return id ? [id] : [];
+        }),
+      ),
+    ];
+    kept.current.clear();
+    setMessages([]);
+    setError(null);
+    void forgetPictures(pictures);
+  };
+
+  const stop = () => {
+    for (const token of running.current) stopped.current.add(token);
+    running.current.clear();
+    setPending(false);
+    append({
+      role: "assistant",
+      content: "Stopped. Nothing more will change from that request.",
+    });
+  };
 
   const send = async (text: string) => {
     const attached = references;
@@ -114,12 +185,16 @@ export function ChatPanel({
     setReferences([]);
     setError(null);
     setPending(true);
+    const token = ++runs.current;
+    running.current.add(token);
     const result = await sendMessage(
       conversation.map(({ role, content, references }) => ({
         role,
         content: references?.length ? `${content} ${REFERENCES_NOTE}` : content,
       })),
     ).catch(() => UNREACHABLE);
+    if (stopped.current.has(token)) return;
+    running.current.delete(token);
     setPending(false);
 
     if (!result.ok) {
@@ -130,17 +205,21 @@ export function ChatPanel({
       return;
     }
     const { action } = result.value;
-    const chat = chatWith(conversation, attached);
-    if (!action) append(result.value);
-    else if (action.kind === "generate") await generate(chat, action);
-    else if (action.kind === "animate") await animate(chat, action);
-    else if (action.kind === "undo")
-      chat.say(
-        canvas.undo()
-          ? "Took back the last change. Ask again (or press Ctrl+Z) to go further back."
-          : "There is nothing to take back.",
-      );
-    else await edit(chat, action);
+    const chat = chatWith(conversation, attached, token);
+    try {
+      if (!action) append(result.value);
+      else if (action.kind === "generate") await generate(chat, action);
+      else if (action.kind === "animate") await animate(chat, action);
+      else if (action.kind === "undo")
+        chat.say(
+          canvas.undo()
+            ? "Took back the last change. Ask again (or press Ctrl+Z) to go further back."
+            : "There is nothing to take back.",
+        );
+      else await edit(chat, action);
+    } catch (error) {
+      ignoreStop(error);
+    }
   };
 
   const choose = async (index: number, placement: Placement) => {
@@ -162,7 +241,10 @@ export function ChatPanel({
       action.name || "Picture",
       [area],
       replace,
-    );
+    ).catch((error: unknown) => {
+      ignoreStop(error);
+      return false;
+    });
     if (!drawn) change(index, { placements: entry.placements });
   };
 
@@ -170,11 +252,32 @@ export function ChatPanel({
     const button = messages[index]?.button;
     if (!button || pending) return;
     change(index, { button: undefined });
-    if (!(await button.run())) change(index, { button });
+    const done = await button.run().catch((error: unknown) => {
+      ignoreStop(error);
+      return false;
+    });
+    if (!done) change(index, { button });
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {messages.length > 0 && (
+        <div className="flex shrink-0 justify-end border-b px-3 py-1">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => void clear()}
+            title={
+              pending
+                ? "Stop the request first"
+                : "Delete every message of this tile’s chat"
+            }
+            className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+          >
+            Clear chat
+          </button>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <ChatWelcome />
@@ -190,6 +293,7 @@ export function ChatPanel({
         )}
       </div>
       <ChatComposer
+        autoFocus={autoFocus}
         draft={draft}
         onDraft={setDraft}
         references={references}
@@ -198,6 +302,7 @@ export function ChatPanel({
         onSelectArea={setSelectArea}
         pending={pending || !loaded}
         onSend={send}
+        onStop={pending ? stop : undefined}
       />
     </div>
   );

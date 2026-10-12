@@ -17,6 +17,7 @@ import {
 } from "@/features/settings/account/account-forms";
 import { disconnectDrive } from "@/features/settings/account/actions";
 import { SignOutButton } from "@/features/settings/account/sign-out-button";
+import { DeleteAccountForm } from "@/features/settings/account/delete-account-form";
 import { SettingsSection } from "@/features/settings/components/settings-section";
 
 export const metadata: Metadata = { title: "Account settings · Pigxel" };
@@ -183,6 +184,42 @@ export default async function AccountSettings({
       <SettingsSection title="Sign out">
         <Lead className="mt-2 mb-4">Sign out of Pigxel on this device.</Lead>
         <SignOutButton />
+      </SettingsSection>
+
+      <SettingsSection id="your-data" title="Your data">
+        <Lead className="mt-2 mb-4">
+          Download a ZIP of everything Pigxel stores about you: your profile,
+          tiles as .pigxel files, comments, likes, AI chats and more.
+        </Lead>
+        {/* A plain link: the browser downloads the file. */}
+        <a href="/api/account/export" download className={secondaryButton}>
+          Download my data
+        </a>
+      </SettingsSection>
+
+      <SettingsSection id="delete-account" title="Delete account">
+        <Lead className="mt-2">
+          This permanently deletes your account, profile, saved tiles and their
+          versions, published art, comments, likes, collections and AI chats.
+          Projects you share are removed for the people you shared them with. It
+          can’t be undone.
+        </Lead>
+        <ul className="mt-3 mb-5 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+          <li>Download your data first if you want to keep anything.</li>
+          <li>
+            A paid plan is cancelled right away. For a refund within the refund
+            period, see the{" "}
+            <Link href="/refunds" className="underline underline-offset-2">
+              Refund Policy
+            </Link>{" "}
+            before deleting.
+          </li>
+          <li>
+            Files in your Google Drive and drafts in this browser aren’t
+            touched.
+          </li>
+        </ul>
+        <DeleteAccountForm />
       </SettingsSection>
     </div>
   );

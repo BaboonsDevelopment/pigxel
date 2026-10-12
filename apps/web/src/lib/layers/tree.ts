@@ -117,6 +117,56 @@ export function moveLayer(tree: Layer[], id: string, place: Place): Layer[] {
   return insertLayer(removeLayer(tree, id), found.layer, { ...place, index });
 }
 
+export function topLayers(tree: Layer[], ids: string[]): Layer[] {
+  const picked = new Set(ids);
+  const walk = (list: Layer[]): Layer[] =>
+    list.flatMap((layer) =>
+      picked.has(layer.id)
+        ? [layer]
+        : layer.kind === "group"
+          ? walk(layer.children)
+          : [],
+    );
+  return walk(tree);
+}
+
+export function moveLayers(
+  tree: Layer[],
+  ids: string[],
+  place: Place,
+): Layer[] {
+  const moving = topLayers(tree, ids).filter(
+    (layer) => layer.kind !== "background",
+  );
+  if (!moving.length) return tree;
+  if (
+    place.parentId &&
+    moving.some((layer) => isInside(tree, place.parentId!, layer.id))
+  )
+    return tree;
+  const listOf = (inTree: Layer[]) => {
+    if (place.parentId === null) return inTree;
+    const parent = findLayer(inTree, place.parentId)?.layer;
+    return parent?.kind === "group" ? parent.children : [];
+  };
+  const anchor = listOf(tree)
+    .slice(place.index)
+    .find((layer) => !moving.includes(layer));
+  let next = tree;
+  for (const layer of moving) next = removeLayer(next, layer.id);
+  const list = listOf(next);
+  const index = anchor
+    ? list.findIndex((layer) => layer.id === anchor.id)
+    : list.length;
+  moving.forEach((layer, k) => {
+    next = insertLayer(next, layer, {
+      parentId: place.parentId,
+      index: index + k,
+    });
+  });
+  return next;
+}
+
 export function placeAbove(tree: Layer[], id: string | null): Place {
   const found = id ? findLayer(tree, id) : null;
   if (!found) return { parentId: null, index: tree.length };

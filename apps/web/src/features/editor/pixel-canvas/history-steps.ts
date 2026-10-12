@@ -12,6 +12,7 @@ type Step = {
   celSettings: unknown[];
   palette: string[];
   slices: unknown[];
+  selections?: { id: string; name: string }[];
   colorMode: string;
   pixelRatio: { w: number; h: number };
   background: string;
@@ -81,6 +82,14 @@ export function describeStep(before: Step, after: Step): string {
     return "Change cel properties";
   if (!same(before.palette, after.palette)) return "Change the palette";
   if (!same(before.slices, after.slices)) return "Change slices";
+  if (before.selections !== after.selections) {
+    const saved = after.selections?.find(
+      (selection) => !before.selections?.some((old) => old.id === selection.id),
+    );
+    return saved
+      ? `Save selection “${saved.name}”`
+      : "Delete a saved selection";
+  }
   if (!same(before.colorMode, after.colorMode)) return "Change colour mode";
   if (!same(before.pixelRatio, after.pixelRatio)) return "Change pixel ratio";
   if (!same(before.background, after.background))

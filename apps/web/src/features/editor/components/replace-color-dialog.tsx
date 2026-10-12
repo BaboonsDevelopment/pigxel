@@ -13,6 +13,7 @@ import { withAlpha } from "@/lib/palette/hsv";
 import { colorsOf } from "@/lib/palette/presets";
 import { ColorPicker } from "./colors/color-picker";
 import { swatchStyle } from "./colors/helpers";
+import { AllFramesOption } from "./all-frames-option";
 
 type Size = { w: number; h: number };
 
@@ -21,6 +22,7 @@ export type ReplaceChoice = {
   to: string;
   tolerance: number;
   keepShading: boolean;
+  allFrames: boolean;
 };
 
 const PREVIEW = { w: 320, h: 140 };
@@ -31,6 +33,7 @@ export default function ReplaceColorDialog({
   pixels,
   mask,
   palette,
+  frameCount,
   from: initialFrom,
   to: initialTo,
   onApply,
@@ -40,6 +43,7 @@ export default function ReplaceColorDialog({
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
   palette: string[];
+  frameCount: number;
   from: string;
   to: string;
   onApply: (choice: ReplaceChoice) => void;
@@ -51,6 +55,7 @@ export default function ReplaceColorDialog({
   const [to, setTo] = useState(initialTo);
   const [tolerance, setTolerance] = useState(0);
   const [keepShading, setKeepShading] = useState(false);
+  const [allFrames, setAllFrames] = useState(false);
   useEffect(() => dialog.current?.showModal(), []);
 
   const result = useMemo(
@@ -188,7 +193,8 @@ export default function ReplaceColorDialog({
         <div>
           <SectionTitle id="replace-color-title">Replace colour</SectionTitle>
           <Lead className="mt-1">
-            {mask ? "In the selection" : "On the whole layer"}, in this frame.
+            {mask ? "In the selection" : "On the whole layer"},{" "}
+            {allFrames ? "in every frame" : "in this frame"}.
           </Lead>
         </div>
         <Button
@@ -207,8 +213,8 @@ export default function ReplaceColorDialog({
         className="max-h-[80dvh] space-y-5 overflow-y-auto p-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!changed) return;
-          onApply({ from, to, tolerance, keepShading });
+          if (!changed && !allFrames) return;
+          onApply({ from, to, tolerance, keepShading, allFrames });
           dialog.current?.close();
         }}
       >
@@ -339,8 +345,13 @@ export default function ReplaceColorDialog({
         <FormMessage tone="muted" className="tabular-nums">
           {changed
             ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
-            : "No pixel matches. Raise the tolerance or pick another colour."}
+            : "No pixel matches in this frame. Raise the tolerance or pick another colour."}
         </FormMessage>
+        <AllFramesOption
+          frameCount={frameCount}
+          checked={allFrames}
+          onChange={setAllFrames}
+        />
 
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button
@@ -350,7 +361,7 @@ export default function ReplaceColorDialog({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={!changed}>
+          <Button type="submit" disabled={!changed && !allFrames}>
             Replace
           </Button>
         </div>

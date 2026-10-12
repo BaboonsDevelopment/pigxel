@@ -21,6 +21,7 @@ import {
   buildPlanPrompt,
   buildRedrawPrompt,
   buildSetPrompt,
+  buildSheetAnimatePrompt,
   buildSheetPrompt,
   buildSheetRedrawPrompt,
   clampAnimationPlan,
@@ -441,6 +442,43 @@ export async function redrawFrames(args: {
       buildSheetRedrawPrompt({
         instruction: args.instruction.slice(0, 1000),
         count: args.count,
+        cellW: args.cellW,
+        cellH: args.cellH,
+        layout,
+      }),
+      { mimeType: "image/png", base64: png! },
+      layout.aspectRatio,
+      false,
+    );
+    return { image: `data:${mimeType};base64,${base64}`, layout };
+  });
+}
+
+export async function animateSheet(args: {
+  subject: string;
+  poses: string[];
+  sheet: string;
+  cellW: number;
+  cellH: number;
+}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
+  await requireUser();
+  const png = PNG_DATA_URL.exec(args.sheet)?.[1];
+  const valid =
+    typeof args.subject === "string" &&
+    png &&
+    Array.isArray(args.poses) &&
+    args.poses.length >= 1 &&
+    args.poses.length <= MAX_FRAMES &&
+    args.poses.every((p) => typeof p === "string" && p.trim()) &&
+    validSize(args.cellW) &&
+    validSize(args.cellH);
+  if (!valid) return { ok: false, error: "That animation cannot be drawn." };
+  return attempt("animateSheet", async () => {
+    const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
+    const { mimeType, base64 } = await getAiProvider().redraw(
+      buildSheetAnimatePrompt({
+        subject: args.subject.slice(0, 1000),
+        poses: args.poses.map((p) => p.slice(0, 500)),
         cellW: args.cellW,
         cellH: args.cellH,
         layout,

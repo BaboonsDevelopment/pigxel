@@ -16,6 +16,7 @@ import {
 import { rgbaOf } from "../pixel-canvas/paint";
 import { ColorPicker } from "./colors/color-picker";
 import { swatchStyle } from "./colors/helpers";
+import { AllFramesOption } from "./all-frames-option";
 
 type Size = { w: number; h: number };
 
@@ -24,6 +25,7 @@ export type OutlineChoice = {
   place: OutlinePlace;
   shape: OutlineShape;
   width: number;
+  allFrames: boolean;
 };
 
 const PLACES: { value: OutlinePlace; label: string }[] = [
@@ -43,6 +45,7 @@ export default function OutlineDialog({
   pixels,
   mask,
   palette,
+  frameCount,
   color: initialColor,
   onApply,
   onClose,
@@ -51,6 +54,7 @@ export default function OutlineDialog({
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
   palette: string[];
+  frameCount: number;
   color: string;
   onApply: (choice: OutlineChoice) => void;
   onClose: () => void;
@@ -61,6 +65,7 @@ export default function OutlineDialog({
   const [place, setPlace] = useState<OutlinePlace>("outside");
   const [shape, setShape] = useState<OutlineShape>("round");
   const [width, setWidth] = useState(1);
+  const [allFrames, setAllFrames] = useState(false);
   useEffect(() => dialog.current?.showModal(), []);
 
   const result = useMemo(
@@ -112,7 +117,8 @@ export default function OutlineDialog({
         <div>
           <SectionTitle id="outline-title">Outline</SectionTitle>
           <Lead className="mt-1">
-            {mask ? "In the selection" : "On the whole layer"}, in this frame.
+            {mask ? "In the selection" : "On the whole layer"},{" "}
+            {allFrames ? "in every frame" : "in this frame"}.
           </Lead>
         </div>
         <Button
@@ -131,8 +137,8 @@ export default function OutlineDialog({
         className="max-h-[80dvh] space-y-5 overflow-y-auto p-5"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!changed) return;
-          onApply({ color, place, shape, width });
+          if (!changed && !allFrames) return;
+          onApply({ color, place, shape, width, allFrames });
           dialog.current?.close();
         }}
       >
@@ -226,8 +232,13 @@ export default function OutlineDialog({
         <FormMessage tone="muted" className="tabular-nums">
           {changed
             ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
-            : "Nothing to outline here."}
+            : "Nothing to outline in this frame."}
         </FormMessage>
+        <AllFramesOption
+          frameCount={frameCount}
+          checked={allFrames}
+          onChange={setAllFrames}
+        />
 
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button
@@ -237,7 +248,7 @@ export default function OutlineDialog({
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={!changed}>
+          <Button type="submit" disabled={!changed && !allFrames}>
             Outline
           </Button>
         </div>

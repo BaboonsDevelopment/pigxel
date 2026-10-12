@@ -1,6 +1,7 @@
 "use client";
 
 import { useImperativeHandle, useState } from "react";
+import { areaAround } from "../../pixel-canvas/helpers";
 import type { Point } from "../../pixel-canvas/pen";
 import {
   isSelected,
@@ -8,7 +9,7 @@ import {
   selectModeOf,
   type SelectMode,
 } from "../../pixel-canvas/selection";
-import { Corners, PathGuide, ToolSvg } from "../shared/overlays";
+import { Corners, PathGuide, SizeLabel, ToolSvg } from "../shared/overlays";
 import { useSelectionMove } from "../shared/use-selection-move";
 import { useShapeKeys } from "../shared/use-shape-keys";
 import type { ToolCanvasProps } from "../types";
@@ -16,7 +17,7 @@ import type { ToolCanvasProps } from "../types";
 type Polygon = { points: Point[]; pointer: Point; mode: SelectMode };
 
 export function PolygonLassoCanvas({ ref, ...props }: ToolCanvasProps) {
-  const { selection, sprite } = props;
+  const { selection, sprite, scale } = props;
   const { size } = sprite;
   const moving = useSelectionMove(props);
   const [polygon, setPolygon] = useState<Polygon | null>(null);
@@ -63,10 +64,16 @@ export function PolygonLassoCanvas({ ref, ...props }: ToolCanvasProps) {
 
   return (
     polygon && (
-      <ToolSvg size={size}>
-        <PathGuide points={[...polygon.points, polygon.pointer]} />
-        <Corners points={polygon.points} pointer={polygon.pointer} />
-      </ToolSvg>
+      <>
+        <ToolSvg size={size}>
+          <PathGuide points={[...polygon.points, polygon.pointer]} />
+          <Corners points={polygon.points} pointer={polygon.pointer} />
+        </ToolSvg>
+        <SizeLabel
+          box={areaAround([...polygon.points, polygon.pointer], size)}
+          scale={scale}
+        />
+      </>
     )
   );
 }

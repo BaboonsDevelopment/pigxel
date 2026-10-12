@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   CONVOLUTIONS,
+  STRAIGHT_CHANNELS,
   STRAIGHT_CURVE,
   adjustedBrightnessContrast,
+  adjustedColors,
   adjustedHueSaturation,
   convolved,
   curveTable,
@@ -85,6 +87,35 @@ describe("invert, despeckle, curve", () => {
     );
     const out = despeckled(tile, null, { w: 3, h: 3 }, 1);
     expect([...out.slice(16, 20)]).toEqual(grey);
+  });
+  it("bends one channel, then the shared curve", () => {
+    const pixel = new Uint8ClampedArray([100, 100, 100, 255]);
+    const out = adjustedColors(
+      "curve",
+      pixel,
+      null,
+      { w: 1, h: 1 },
+      {
+        values: {},
+        matrix: [],
+        curve: [
+          [0, 10],
+          [255, 255],
+        ],
+        channels: {
+          ...STRAIGHT_CHANNELS,
+          blue: [
+            [0, 255],
+            [255, 255],
+          ],
+        },
+      },
+    );
+    const shared = curveTable([
+      [0, 10],
+      [255, 255],
+    ]);
+    expect([...out]).toEqual([shared[100], shared[100], 255, 255]);
   });
   it("keeps a straight curve and follows its points", () => {
     expect([...curveTable(STRAIGHT_CURVE)]).toEqual(

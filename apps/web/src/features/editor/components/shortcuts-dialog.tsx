@@ -7,10 +7,12 @@ import { cn } from "@pigxel/ui/lib/utils";
 import {
   COMMANDS,
   COMMAND_LABELS,
+  DEFAULT_KEYMAP,
   KEY_PRESETS,
   comboOf,
   keyLabel,
   ownerOf,
+  resetAction,
   withKey,
   type ActionId,
   type Keymap,
@@ -91,7 +93,8 @@ export default function ShortcutsDialog({
         <div>
           <SectionTitle id="shortcuts-title">Keyboard shortcuts</SectionTitle>
           <Lead className="mt-1">
-            Click + next to an action, then press the keys you want.
+            Click + next to an action, then press the keys you want. ↺ puts its
+            default keys back. Press ? anywhere in the editor to open this list.
           </Lead>
         </div>
         <Button
@@ -191,6 +194,31 @@ export default function ShortcutsDialog({
                   >
                     {listening === id ? "Press keys… (Esc cancels)" : "+"}
                   </button>
+                  {keymap[id].join() !== (DEFAULT_KEYMAP[id] ?? []).join() && (
+                    <button
+                      type="button"
+                      aria-label={`Reset ${label(id)} to its default keys`}
+                      title={
+                        DEFAULT_KEYMAP[id]?.length
+                          ? `Back to ${DEFAULT_KEYMAP[id]!.map((combo) => keyLabel(combo, mod)).join(", ")}`
+                          : "Back to no keys"
+                      }
+                      onClick={() => {
+                        const taken = (DEFAULT_KEYMAP[id] ?? [])
+                          .map((combo) => ownerOf(keymap, combo))
+                          .find((owner) => owner && owner !== id);
+                        setNotice(
+                          taken
+                            ? `Default keys moved here from “${label(taken)}”.`
+                            : null,
+                        );
+                        onChange(resetAction(keymap, id));
+                      }}
+                      className="h-6 rounded px-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      ↺
+                    </button>
+                  )}
                 </div>
               ))}
             </section>

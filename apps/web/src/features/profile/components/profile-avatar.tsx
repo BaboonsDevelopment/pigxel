@@ -16,10 +16,7 @@ export function ProfileAvatar({
         src={url}
         alt=""
         referrerPolicy="no-referrer"
-        className={cn(
-          "shrink-0 rounded-full object-cover [image-rendering:pixelated]",
-          className,
-        )}
+        className={cn("shrink-0 rounded-full object-cover", className)}
       />
     );
   return (

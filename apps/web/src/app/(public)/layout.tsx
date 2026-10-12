@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
 import { getUser } from "@/lib/auth/session";
-import { LEGAL_LINKS } from "@/features/legal/legal";
+import { businessLine, LEGAL_LINKS } from "@/features/legal/legal";
+import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
 
 export default async function PublicLayout({
   children,
@@ -29,7 +30,9 @@ export default async function PublicLayout({
                 {link.label}
               </Link>
             ))}
+            <CookieSettingsButton className="hover:text-foreground hover:underline" />
           </nav>
+          <p className="basis-full text-xs">{businessLine()}</p>
         </div>
       </footer>
     </div>

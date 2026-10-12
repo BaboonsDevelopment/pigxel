@@ -222,7 +222,7 @@ export function uniqueTiles(
   return out;
 }
 
-function usedTiles(
+export function usedTiles(
   tiles: Uint8ClampedArray[],
   cels: Cel[],
   size: Size,
@@ -238,6 +238,52 @@ function usedTiles(
         if (found) used.add(found.index);
       });
   return tiles.filter((_, i) => used.has(i));
+}
+
+export function cellArea(
+  pixels: Cel,
+  size: Size,
+  tile: TileSize,
+  start: { col: number; row: number },
+): { col: number; row: number }[] {
+  const { cols, rows } = gridOf(size, tile);
+  if (start.col < 0 || start.row < 0 || start.col >= cols || start.row >= rows)
+    return [];
+  const target = readCell(pixels, size, tile, start.col, start.row);
+  const empty = isEmptyTile(target);
+  const matches = (col: number, row: number) => {
+    const content = readCell(pixels, size, tile, col, row);
+    return empty ? isEmptyTile(content) : sameTile(content, target);
+  };
+  const seen = new Uint8Array(cols * rows);
+  const out: { col: number; row: number }[] = [];
+  const queue = [start];
+  seen[start.row * cols + start.col] = 1;
+  while (queue.length) {
+    const cell = queue.pop()!;
+    out.push(cell);
+    for (const [dc, dr] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const col = cell.col + dc;
+      const row = cell.row + dr;
+      if (col < 0 || row < 0 || col >= cols || row >= rows) continue;
+      if (seen[row * cols + col]) continue;
+      seen[row * cols + col] = 1;
+      if (matches(col, row)) queue.push({ col, row });
+    }
+  }
+  return out;
+}
+
+export function movedTile<T>(list: T[], from: number, to: number): T[] {
+  const out = [...list];
+  const [item] = out.splice(from, 1);
+  if (item !== undefined) out.splice(to, 0, item);
+  return out;
 }
 
 export function syncTilemap({

@@ -19,11 +19,13 @@ import { findObjects } from "@/lib/edit/objects";
 import { allLayers, canPaint, isShown } from "@/lib/layers/tree";
 
 export default function EditorChat({
+  autoFocus,
   canvas,
   sprite,
   playback,
   onHighlight,
 }: {
+  autoFocus?: boolean;
   canvas: RefObject<PixelCanvasHandle | null>;
   sprite: SpriteApi;
   playback: Playback;
@@ -40,7 +42,7 @@ export default function EditorChat({
       () => canvas.current,
     ),
   );
-  return <ChatPanel canvas={bridge} tileId={sprite.id} />;
+  return <ChatPanel canvas={bridge} tileId={sprite.id} autoFocus={autoFocus} />;
 }
 
 type Latest = {
