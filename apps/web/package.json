@@ -16,7 +16,11 @@
     "test:e2e": "playwright test",
     "test:e2e:dev": "E2E_SERVER=dev playwright test",
     "test:e2e:serve": "node e2e/support/serve.ts",
-    "assets:generate": "node scripts/assets/generate.ts --preview scripts/assets/out/preview.png"
+    "assets:check": "node scripts/assets/check.ts",
+    "assets:render": "node scripts/assets/render.ts",
+    "assets:review": "node scripts/assets/review.ts",
+    "assets:build": "node scripts/assets/build.ts",
+    "assets:import": "node --env-file-if-exists=.env.local scripts/assets/import.ts"
   },
   "dependencies": {
     "@paddle/paddle-js": "1.6.5",

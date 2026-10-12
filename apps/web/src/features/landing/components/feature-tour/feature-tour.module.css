@@ -1,0 +1,1695 @@
+/*
+ * The feature tour. Colours, type and easing come from the landing page's
+ * tokens. Every one-off animation starts from its hidden state and ends on
+ * the element's own styles, so without motion the finished scene shows.
+ */
+
+/* ── Scroll track and pinned view ─────────────────────────────────────── */
+
+.tour {
+  --chapters: 4;
+  --per: 82vh;
+
+  position: relative;
+  height: calc(
+    100vh + var(--chapters) * var(--per) + var(--scene-handoff, 0px)
+  );
+}
+
+@supports (height: 1svh) {
+  .tour {
+    --per: 82svh;
+
+    height: calc(
+      100svh + var(--chapters) * var(--per) + var(--scene-handoff, 0px)
+    );
+  }
+}
+
+.viewport {
+  position: sticky;
+  top: 0;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  height: 100vh;
+  height: 100svh;
+  padding: 106px var(--gutter) 24px;
+}
+
+.tabs,
+.ledes,
+.window {
+  opacity: calc(var(--entrance, 1) * var(--departure, 1));
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+
+.tabs {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  flex-shrink: 0;
+  width: min(580px, 100%);
+  padding: 5px;
+  border-radius: 999px;
+  background: rgb(243 243 244 / 0.85);
+  box-shadow: inset 0 0 0 1px var(--line);
+  backdrop-filter: blur(10px);
+}
+
+.tabIndicator {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / 4);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(14 14 17 / 0.06),
+    0 8px 18px -10px rgb(14 14 17 / 0.3);
+  transform: translateX(calc(var(--active) * 100%));
+  transition: transform 0.55s var(--spring);
+}
+
+.tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  font: 600 14px/1 var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.tab svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.tab:hover,
+.tab[aria-current="step"] {
+  color: var(--ink);
+}
+
+.tab[aria-current="step"] svg {
+  color: var(--pink);
+}
+
+/* How far through its chapter the page has scrolled. */
+.tabFill {
+  position: absolute;
+  right: 24%;
+  bottom: 6px;
+  left: 24%;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgb(14 14 17 / 0.08);
+}
+
+.tabFill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--pink);
+  transform: scaleX(var(--p, 0));
+  transform-origin: left;
+}
+
+.ledes {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  flex-shrink: 0;
+  width: min(640px, 100%);
+  text-align: center;
+}
+
+.ledes > p {
+  grid-area: 1 / 1;
+  font: 400 clamp(15px, 1.5vw, 17px) / 1.5 var(--sans);
+  color: var(--muted);
+  text-wrap: balance;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease),
+    color 0.9s var(--ease);
+}
+
+.ledes > p[data-active] {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.08s;
+}
+
+.viewport[data-night] .ledes > p,
+.viewport[data-chapter="export"] .ledes > p {
+  color: #e1e5f5;
+}
+
+/* ── Stage: tinted per chapter, night for the AI helper ───────────────── */
+
+.stage {
+  --tint: #fff4f7;
+
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  padding: var(--scene-top, 240px) var(--gutter)
+    max(24px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background: var(--tint);
+  transition: background-color 0.9s var(--ease);
+}
+
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: radial-gradient(
+    rgb(14 14 17 / 0.08) 1px,
+    transparent 1.5px
+  );
+  background-size: 22px 22px;
+  mask-image: radial-gradient(85% 85% at 50% 50%, #000 35%, transparent 100%);
+  transition: opacity 0.9s;
+}
+
+/* The white page gradually becomes the first scene, with no colored edge. */
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #fff;
+  opacity: calc(1 - var(--warmup, 0));
+  pointer-events: none;
+}
+
+.stage[data-chapter="animate"] {
+  --tint: #fff5ea;
+}
+
+.stage[data-chapter="ai"] {
+  --tint: #eef1ff;
+}
+
+.stage[data-chapter="export"] {
+  --tint: #0b1230;
+}
+
+.stage[data-night] {
+  --tint: #0b1230;
+}
+
+.stage[data-night]::before,
+.stage[data-chapter="export"]::before {
+  opacity: 0;
+}
+
+.stageBackdrop {
+  z-index: -1;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(24px) saturate(1.2);
+  transform: scale(1.08);
+  transition: opacity 0.9s var(--ease);
+  pointer-events: none;
+}
+
+.stage[data-chapter="export"] .stageBackdrop {
+  opacity: 0.5;
+}
+
+.stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 6% 14%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 14% 68%, #fff 50%, transparent 52%),
+    radial-gradient(2px 2px at 22% 32%, #ffe9a8 50%, transparent 52%),
+    radial-gradient(1px 1px at 31% 8%, #fff 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 38% 88%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 47% 22%, #fff 50%, transparent 52%),
+    radial-gradient(2px 2px at 55% 93%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 63% 6%, #fff 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 71% 78%, #ffe9a8 50%, transparent 52%),
+    radial-gradient(1px 1px at 79% 18%, #fff 50%, transparent 52%),
+    radial-gradient(2px 2px at 86% 52%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 93% 9%, #fff 50%, transparent 52%),
+    radial-gradient(1.5px 1.5px at 96% 84%, #fff 50%, transparent 52%),
+    radial-gradient(1px 1px at 3% 92%, #fff 50%, transparent 52%);
+  transition: opacity 1.2s var(--ease);
+}
+
+.stage[data-night] .stars {
+  opacity: 1;
+  animation: twinkle 3.6s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* The demos float directly on the full-screen stage. */
+.window {
+  position: relative;
+  width: min(1440px, 100%);
+  height: 100%;
+}
+
+.area {
+  position: absolute;
+  inset: 0;
+}
+
+/* One body per chapter, stacked; the current one fades in. */
+.body {
+  position: absolute;
+  inset: 0;
+  container: body / size;
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.985);
+  transition:
+    opacity 0.45s var(--ease),
+    transform 0.45s var(--ease),
+    visibility 0s linear 0.45s;
+}
+
+.body[data-active] {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition-delay: 0.06s, 0.06s, 0s;
+}
+
+.body:not([data-active]) * {
+  animation-play-state: paused !important;
+}
+
+/* ── Shared floating glass ────────────────────────────────────────────── */
+
+.layersCard,
+.dock,
+.drawHint,
+.timeline,
+.chat,
+.exportStatus {
+  background: rgb(255 255 255 / 0.88);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.9),
+    0 0 0 1px rgb(14 14 17 / 0.07),
+    0 22px 44px -24px rgb(40 20 50 / 0.42);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+
+.floatHead {
+  margin-bottom: 10px;
+  font: 600 13px/1 var(--sans);
+  color: var(--ink);
+}
+
+.chip {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--surface);
+  font: 500 11px/1 var(--sans);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip[data-on] {
+  background: #eef2ff;
+  color: var(--blue);
+}
+
+.live {
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 0 4px rgb(47 91 255 / 0.15);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 7px rgb(47 91 255 / 0);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+}
+
+/* ── Draw ─────────────────────────────────────────────────────────────── */
+
+.drawBoard {
+  position: absolute;
+  inset: 0;
+}
+
+.drawCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  /* Swiping over the board still scrolls the page; taps draw. */
+  touch-action: pan-y;
+}
+
+.drawCanvas:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -4px;
+}
+
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  will-change: transform;
+}
+
+.cursor[data-shown] {
+  opacity: 1;
+}
+
+.cursor svg {
+  position: absolute;
+  top: -3px;
+  left: -4px;
+  width: 24px;
+  height: 24px;
+  fill: var(--blue);
+  stroke: #fff;
+  stroke-width: 1.5px;
+  filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.2));
+}
+
+.cursor span {
+  position: absolute;
+  top: 17px;
+  left: 14px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--blue);
+  font: 600 12px/1 var(--sans);
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px -6px rgb(47 91 255 / 0.7);
+}
+
+.cursorRing {
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--blue);
+  border-radius: 50%;
+  opacity: 0;
+}
+
+.drawHint {
+  position: absolute;
+  top: 14px;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  min-height: 34px;
+  margin: 0 auto;
+  padding: 5px 5px 5px 12px;
+  border-radius: 999px;
+  font: 600 13px/1 var(--sans);
+  color: var(--ink);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition:
+    opacity 0.35s var(--ease),
+    transform 0.35s var(--ease);
+  pointer-events: none;
+}
+
+.drawHint[data-shown] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.drawHint svg {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--pink);
+}
+
+.drawHint button {
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  font: 600 12px/1 var(--sans);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.drawHint button:hover {
+  background: #e9e9ec;
+}
+
+.layersCard {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 178px;
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.layers {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+}
+
+.layers li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  font: 500 12px/1 var(--sans);
+  color: var(--ink-2);
+}
+
+.layers li[data-active] {
+  background: var(--pink-soft);
+  color: var(--pink);
+}
+
+.layers svg {
+  width: 14px;
+  height: 14px;
+  color: var(--faint);
+}
+
+.layers li[data-active] svg {
+  color: var(--pink);
+}
+
+.dock {
+  position: absolute;
+  right: 0;
+  bottom: 14px;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 16px;
+}
+
+.dockTool {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.dockTool svg {
+  width: 19px;
+  height: 19px;
+}
+
+.dockTool:hover {
+  background: var(--surface);
+}
+
+.dockTool[aria-pressed="true"] {
+  background: var(--pink);
+  color: #fff;
+}
+
+.dockTool[data-mirror][aria-pressed="true"] {
+  background: #eef2ff;
+  color: var(--blue);
+}
+
+.dockDivider {
+  width: 1px;
+  height: 24px;
+  margin: 0 5px;
+  background: var(--line);
+}
+
+.swatch {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin: 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgb(14 14 17 / 0.12);
+  cursor: pointer;
+  transition:
+    transform 0.2s var(--ease),
+    box-shadow 0.2s;
+}
+
+.swatch:hover {
+  transform: translateY(-2px);
+}
+
+.swatch[aria-pressed="true"] {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--ink);
+}
+
+@container body (max-width: 720px) {
+  .layersCard {
+    display: none;
+  }
+}
+
+@container body (max-width: 480px) {
+  .fan {
+    --step: 7.5deg;
+
+    bottom: 33%;
+  }
+}
+
+@container body (max-width: 420px) {
+  .dockTool {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dockTool svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .swatch {
+    width: 20px;
+    height: 20px;
+    margin: 0 1px;
+  }
+}
+
+/* ── Animate ──────────────────────────────────────────────────────────── */
+
+.animateBoard {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 16px 14px;
+}
+
+.animateArt {
+  position: relative;
+  flex: 1;
+  width: min(100%, 520px);
+  min-height: 0;
+}
+
+.frame,
+.onion,
+.gifFrame {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.frame img,
+.onion img,
+.gifFrame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 600 ms a frame: each shows for its quarter of the 2.4 s loop. */
+.frame,
+.gifFrame {
+  animation: show 2.4s step-end infinite;
+  animation-delay: calc(var(--i) * 600ms - 2.4s);
+}
+
+@keyframes show {
+  0% {
+    opacity: 1;
+  }
+  25%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Onion skin: a frame lingers, tinted, through the next one. */
+.onion {
+  filter: sepia(1) saturate(5) hue-rotate(295deg);
+  animation: ghost 2.4s step-end infinite;
+  animation-delay: calc(var(--i) * 600ms - 2.4s);
+}
+
+@keyframes ghost {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.32;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.timeline {
+  flex-shrink: 0;
+  width: min(100%, 600px);
+  padding: 12px;
+  border-radius: 16px;
+  animation: slideUp 0.75s var(--spring) 0.1s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(120%);
+  }
+}
+
+.timelineHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.play {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--pink);
+  color: #fff;
+}
+
+.play svg {
+  width: 13px;
+  height: 13px;
+}
+
+.timelineName {
+  margin-right: auto;
+  overflow: hidden;
+  font: 600 13px/1 var(--sans);
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+}
+
+.tag {
+  display: block;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgb(219 20 88 / 0.1);
+  font: 600 11px/1 var(--sans);
+  color: var(--pink);
+}
+
+.cells {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 56px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  animation: cellOn 2.4s step-end infinite;
+  animation-delay: calc(var(--i) * 600ms - 2.4s);
+}
+
+@keyframes cellOn {
+  0% {
+    background: #fff1f5;
+    box-shadow: inset 0 0 0 2px var(--pink);
+  }
+  25%,
+  100% {
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+}
+
+.cellDrop {
+  display: block;
+  width: min(62%, 64px);
+  animation: drop 0.6s var(--spring) both;
+  animation-delay: calc(0.4s + var(--i) * 90ms);
+}
+
+.cellDrop img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.6);
+  }
+}
+
+.cell small {
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  font: 10px/1 var(--pixel);
+  color: var(--faint);
+}
+
+.playhead {
+  position: absolute;
+  top: -5px;
+  bottom: -4px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--pink);
+  animation: playhead 2.4s linear infinite;
+}
+
+.playhead::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--pink);
+}
+
+@keyframes playhead {
+  from {
+    left: 0;
+  }
+  to {
+    left: calc(100% - 2px);
+  }
+}
+
+/* ── AI helper ────────────────────────────────────────────────────────── */
+
+.aiBoard {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 286px;
+  align-items: center;
+  gap: 20px;
+  padding: 22px;
+}
+
+.aiArt {
+  position: relative;
+  justify-self: center;
+  width: min(100%, calc((100cqh - 44px) * 960 / 644));
+  aspect-ratio: 960 / 644;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgb(14 14 17 / 0.08),
+    0 28px 50px -26px rgb(20 20 50 / 0.5);
+}
+
+.aiCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The helper looks the picture over before redrawing it. */
+.scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.6) 48%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  animation: scan 1s var(--ease) 2.3s forwards;
+  pointer-events: none;
+}
+
+@keyframes scan {
+  to {
+    transform: translateX(130%);
+  }
+}
+
+.fireflies i {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #eaffa0;
+  box-shadow: 0 0 8px 3px rgb(220 255 140 / 0.7);
+  opacity: 0;
+  animation: firefly 3.2s ease-in-out infinite;
+  animation-delay: calc(4.7s + var(--d));
+}
+
+@keyframes firefly {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.9;
+    transform: translate(6px, -9px);
+  }
+  80% {
+    opacity: 0.25;
+  }
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  height: min(100%, 400px);
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.chatHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  font: 600 13px/1 var(--sans);
+  color: var(--ink);
+}
+
+.chatHead svg {
+  width: 16px;
+  height: 16px;
+  color: var(--pink);
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 12px;
+}
+
+.suggestions span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: 500 12px/1 var(--sans);
+  color: var(--ink-2);
+}
+
+.suggestions span[data-picked] {
+  box-shadow: inset 0 0 0 1px var(--blue);
+  color: var(--blue);
+  animation: picked 0.3s var(--ease) 0.25s both;
+}
+
+@keyframes picked {
+  from {
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: var(--ink-2);
+  }
+}
+
+.messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px 0;
+  overflow: hidden;
+}
+
+.bot,
+.me {
+  max-width: 90%;
+  padding: 9px 12px;
+  font: 500 13px/1.4 var(--sans);
+}
+
+.bot {
+  align-self: flex-start;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.me {
+  align-self: flex-end;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--ink);
+  color: #fff;
+  animation: grow 0.45s var(--spring) 2.05s both;
+}
+
+/* Messages take no room until they're sent. */
+@keyframes grow {
+  from {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: -8px;
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    max-height: 120px;
+  }
+}
+
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-height: 0;
+  margin-top: -8px;
+  overflow: hidden;
+  font: 500 12px/1 var(--sans);
+  color: var(--muted);
+  opacity: 0;
+  animation: think 1.15s linear 2.3s both;
+}
+
+@keyframes think {
+  0% {
+    max-height: 0;
+    margin-top: -8px;
+    opacity: 0;
+  }
+  10%,
+  88% {
+    max-height: 24px;
+    margin-top: 0;
+    opacity: 1;
+  }
+  100% {
+    max-height: 0;
+    margin-top: -8px;
+    opacity: 0;
+  }
+}
+
+.thinking span {
+  display: flex;
+  gap: 3px;
+}
+
+.thinking i {
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--pink);
+  animation: bounce 0.9s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.reply {
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  animation: grow 0.5s var(--spring) 4.95s both;
+}
+
+.replyActions {
+  display: flex;
+  gap: 6px;
+}
+
+.replyActions span {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+  font: 600 12px/1 var(--sans);
+  color: var(--ink);
+}
+
+.replyActions span:last-child {
+  background: var(--pink);
+  box-shadow: none;
+  color: #fff;
+}
+
+.input {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 6px 0 12px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.placeholder {
+  position: absolute;
+  left: 12px;
+  font: 500 13px/1 var(--sans);
+  color: var(--faint);
+  animation: placeholder 2.1s step-end both;
+}
+
+@keyframes placeholder {
+  0% {
+    opacity: 1;
+  }
+  14%,
+  97% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.typed {
+  width: 0;
+  max-width: calc(100% - 44px);
+  overflow: hidden;
+  font: 500 12.5px/1 var(--mono);
+  color: var(--ink);
+  white-space: nowrap;
+  animation:
+    type 1.6s steps(var(--chars)) 0.3s forwards,
+    sent 0.01s linear 2.05s forwards;
+}
+
+@keyframes type {
+  to {
+    width: calc(var(--chars) * 1ch);
+  }
+}
+
+@keyframes sent {
+  to {
+    opacity: 0;
+  }
+}
+
+.send {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--faint);
+  animation:
+    ready 0.2s linear 1.85s forwards,
+    press 0.3s ease 1.95s,
+    idle 0.2s linear 2.15s forwards;
+}
+
+.send svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes ready {
+  to {
+    background: var(--pink);
+    color: #fff;
+  }
+}
+
+@keyframes press {
+  50% {
+    transform: scale(0.86);
+  }
+}
+
+@keyframes idle {
+  to {
+    background: var(--surface);
+    color: var(--faint);
+  }
+}
+
+@container body (max-width: 680px) {
+  .aiBoard {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    padding: 14px;
+  }
+
+  .aiArt {
+    width: 100%;
+  }
+
+  .chat {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    height: auto;
+    max-height: 56%;
+  }
+
+  .suggestions {
+    display: none;
+  }
+}
+
+/* ── Export ───────────────────────────────────────────────────────────── */
+
+.exportBoard {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.exportStatus {
+  position: absolute;
+  top: 16px;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font: 600 13px/1 var(--sans);
+  color: var(--ink);
+}
+
+.exportStatus > span {
+  display: flex;
+  grid-area: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.exporting {
+  opacity: 0;
+  animation: hideLater 2.7s step-end both;
+}
+
+.exporting i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pink);
+  animation: blink 0.9s step-end infinite;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.exported {
+  color: #17703f;
+  animation: showLater 2.7s step-end both;
+}
+
+@keyframes hideLater {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes showLater {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* A hand of cards: each turns about a point far below the hand. */
+.fan {
+  --step: 11deg;
+
+  position: absolute;
+  bottom: 22%;
+  left: 50%;
+  z-index: 1;
+  width: clamp(108px, min(26cqw, 31cqh), 176px);
+  aspect-ratio: 3 / 4.1;
+  list-style: none;
+  transform: translateX(-50%);
+}
+
+.fanCard {
+  position: absolute;
+  inset: 0;
+  transform: rotate(calc(var(--o) * var(--step)));
+  transform-origin: 50% 230%;
+}
+
+.fanCard:hover {
+  z-index: 5;
+}
+
+.fanInner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 7px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgb(14 14 17 / 0.08),
+    0 26px 44px -20px rgb(5 8 30 / 0.65);
+  transition: translate 0.35s var(--ease);
+  animation: deal 0.85s var(--spring) both;
+  animation-delay: calc(0.15s + var(--i) * 0.12s);
+}
+
+.fanCard:hover .fanInner {
+  translate: 0 -18px;
+}
+
+/* Dealt from a single upright stack, then spread. */
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(60%) rotate(calc(var(--o) * var(--step) * -1))
+      scale(0.86);
+  }
+}
+
+.fanPreview {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f3f3f6;
+}
+
+.fanMeta {
+  display: grid;
+  gap: 3px;
+  padding: 7px 2px 5px;
+}
+
+.format {
+  justify-self: start;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--pink-soft);
+  font: 600 10px/1 var(--sans);
+  color: var(--pink);
+}
+
+.fanFile {
+  overflow: hidden;
+  font: 600 12px/1.2 var(--sans);
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fanNote {
+  overflow: hidden;
+  font: 500 11px/1.2 var(--sans);
+  color: var(--faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fanBar {
+  display: block;
+  height: 4px;
+  margin: 0 2px 2px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.fanBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff9f43, var(--pink-bright));
+  transform-origin: left;
+  animation: fill 0.9s var(--ease) both;
+  animation-delay: calc(0.95s + var(--i) * 0.15s);
+}
+
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+.fanDone {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #22a35a;
+  box-shadow: 0 0 0 3px #fff;
+  font: 700 12px/1 var(--sans);
+  color: #fff;
+  animation: popIn 0.4s var(--spring) both;
+  animation-delay: calc(1.85s + var(--i) * 0.15s);
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+.gif {
+  position: absolute;
+  inset: 6%;
+}
+
+.cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sheet {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  background-color: #fff;
+  background-image:
+    linear-gradient(
+      45deg,
+      #f1f1f4 25%,
+      transparent 25%,
+      transparent 75%,
+      #f1f1f4 75%
+    ),
+    linear-gradient(
+      45deg,
+      #f1f1f4 25%,
+      transparent 25%,
+      transparent 75%,
+      #f1f1f4 75%
+    );
+  background-position:
+    0 0,
+    6px 6px;
+  background-size: 12px 12px;
+}
+
+.sheet img {
+  width: 100%;
+  height: auto;
+}
+
+.code {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 9px;
+  overflow: hidden;
+  background: #11131c;
+  font: 500 9px/1.5 var(--mono);
+  color: #c9cad6;
+  white-space: pre;
+}
+
+.code [data-s] {
+  color: #ff8fb3;
+}
+
+.code [data-v] {
+  color: #8fd6a8;
+}
+
+.code [data-k] {
+  color: #9aa7ff;
+}
+
+.timelapse {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--pink-soft);
+}
+
+.timelapse svg {
+  width: 58%;
+  height: auto;
+}
+
+.timelapsePlay {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgb(14 14 17 / 0.72);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.timelapsePlay svg {
+  width: 15px;
+  margin-left: 2px;
+}
+
+/* ── Small screens ────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .viewport {
+    gap: 10px;
+    padding: 96px 12px 16px;
+  }
+
+  .tab {
+    gap: 5px;
+    height: 38px;
+    font-size: 13px;
+  }
+
+  .stage {
+    padding: var(--scene-top, 240px) 12px max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 420px) {
+  .tab svg {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) and (min-aspect-ratio: 4/3) {
+  .viewport {
+    align-items: flex-start;
+    gap: 12px;
+    padding-top: 106px;
+  }
+
+  .tabs,
+  .ledes {
+    width: 240px;
+  }
+
+  .tab {
+    font-size: 11px;
+  }
+
+  .tab svg {
+    display: none;
+  }
+
+  .ledes > p {
+    font-size: 14px;
+  }
+
+  .stage {
+    padding: 100px 16px 16px calc(var(--gutter) + 256px);
+  }
+}
+
+/* Without motion, every scene shows finished. */
+@media (prefers-reduced-motion: reduce) {
+  .tabIndicator,
+  .ledes > p,
+  .body,
+  .stage,
+  .stageBackdrop,
+  .stars,
+  .fanInner {
+    transition: none;
+  }
+
+  .stage[data-night] .stars,
+  .frame,
+  .onion,
+  .gifFrame,
+  .timeline,
+  .cell,
+  .cellDrop,
+  .playhead,
+  .scan,
+  .fireflies i,
+  .me,
+  .thinking,
+  .thinking i,
+  .reply,
+  .placeholder,
+  .typed,
+  .send,
+  .live,
+  .suggestions span,
+  .exporting,
+  .exporting i,
+  .exported,
+  .fanInner,
+  .fanBar span,
+  .fanDone {
+    animation: none;
+  }
+
+  .animateArt > span:last-child,
+  .gif > span:last-child {
+    opacity: 1;
+  }
+
+  .playhead {
+    display: none;
+  }
+
+  .fireflies i {
+    opacity: 0.85;
+  }
+}

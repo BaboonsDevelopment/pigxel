@@ -35,6 +35,9 @@ for (const [path, title] of [
   ["/privacy", "Privacy Policy"],
   ["/terms", "Terms of Service"],
   ["/refunds", "Refund Policy"],
+  ["/cookies", "Cookie Policy"],
+  ["/licenses", "Licenses"],
+  ["/account-deletion", "Delete your account"],
   ["/pricing", "Pricing"],
 ] as const) {
   test(`serves ${path} @mobile`, async ({ page }) => {

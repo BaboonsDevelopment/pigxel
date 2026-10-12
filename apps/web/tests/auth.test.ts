@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
     exchangeCodeForSession: vi.fn(),
     verifyOtp: vi.fn(),
     getClaims: vi.fn(),
+    refreshSession: vi.fn(),
   },
+  insert: vi.fn(),
   revalidate: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
@@ -38,6 +40,10 @@ vi.mock("@/lib/supabase/server", () => ({
         "limit",
       ])
         query[method] = () => query;
+      query.insert = (row: unknown) => {
+        mocks.insert(row);
+        return Promise.resolve({ error: null });
+      };
       return query;
     },
   }),
@@ -63,6 +69,8 @@ vi.mock("next/font/google", () => ({
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
   Madimi_One: () => ({ className: "" }),
+  Funnel_Display: () => ({ variable: "" }),
+  Funnel_Sans: () => ({ variable: "" }),
 }));
 
 import { authenticate, signOut, updatePassword } from "@/features/auth/actions";
@@ -76,11 +84,14 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import Tiles from "@/app/(app)/tiles/page";
 import NewTile from "@/app/(app)/tiles/new/page";
 import { proxy } from "@/proxy";
+import { LEGAL, LEGAL_VERSION } from "@/features/legal/legal";
 
 function form(
   values: Record<string, string> = {
     email: "person@example.com",
     password: "test-password",
+    age: "on",
+    terms: "on",
   },
 ) {
   const data = new FormData();
@@ -109,8 +120,14 @@ beforeEach(() => {
     error: null,
   });
   mocks.auth.verifyOtp.mockResolvedValue({ data: { session }, error: null });
+  mocks.auth.refreshSession.mockResolvedValue({ error: null });
   mocks.auth.getClaims.mockResolvedValue({
-    data: { claims: { sub: "user-1" } },
+    data: {
+      claims: {
+        sub: "user-1",
+        user_metadata: { legal_version: LEGAL_VERSION },
+      },
+    },
     error: null,
   });
 });
@@ -133,7 +150,11 @@ describe("email/password authentication", () => {
   it("returns to a safe page after logging in or signing up", async () => {
     const values = { email: "person@example.com", password: "test-password" };
     await expect(
-      authenticate("signup", {}, form({ ...values, next: "/pricing" })),
+      authenticate(
+        "signup",
+        {},
+        form({ ...values, age: "on", terms: "on", next: "/pricing" }),
+      ),
     ).rejects.toThrow("REDIRECT:/pricing");
     await expect(
       authenticate(
@@ -170,6 +191,31 @@ describe("email/password authentication", () => {
       password: "test-password",
     });
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
+  });
+  it("needs both consent boxes ticked to sign up", async () => {
+    for (const missing of ["age", "terms"]) {
+      const data = form();
+      data.delete(missing);
+      expect((await authenticate("signup", {}, data)).error).toContain(
+        `at least ${LEGAL.minAge}`,
+      );
+    }
+    expect(mocks.auth.signUp).not.toHaveBeenCalled();
+  });
+  it("records what a new account agreed to", async () => {
+    await expect(authenticate("signup", {}, form())).rejects.toThrow(
+      "REDIRECT:/home",
+    );
+    expect(mocks.insert).toHaveBeenCalledWith({
+      terms_version: LEGAL_VERSION,
+      privacy_version: LEGAL_VERSION,
+      min_age: LEGAL.minAge,
+      source: "signup",
+    });
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({
+      data: { legal_version: LEGAL_VERSION },
+    });
+    expect(mocks.auth.refreshSession).toHaveBeenCalled();
   });
   it("does not grant access when signup returns no session", async () => {
     mocks.auth.signUp.mockResolvedValue({
@@ -457,6 +503,32 @@ describe("proxy", () => {
     for (const path of ["/", "/login", "/login?mode=signup", "/u/someone"]) {
       expect((await visit(path)).headers.get("location")).toBeNull();
     }
+  });
+  it("asks signed-in people to accept the current terms first", async () => {
+    mocks.auth.getClaims.mockResolvedValue({
+      data: { claims: { sub: "user-1", user_metadata: {} } },
+      error: null,
+    });
+    expect((await visit("/tiles/edit?id=t1")).headers.get("location")).toBe(
+      "http://localhost:3000/accept?next=%2Ftiles%2Fedit%3Fid%3Dt1",
+    );
+    expect((await visit("/")).headers.get("location")).toBe(
+      "http://localhost:3000/home",
+    );
+    for (const path of [
+      "/accept",
+      "/terms",
+      "/privacy",
+      "/settings/account",
+      "/account-deletion",
+      "/api/account/export",
+      "/?code=abc",
+    ])
+      expect((await visit(path)).headers.get("location")).toBeNull();
+    const post = await proxy(
+      new NextRequest("http://localhost:3000/tiles", { method: "POST" }),
+    );
+    expect(post.headers.get("location")).toBeNull();
   });
   it("sends returning signed-in visitors to Home", async () => {
     for (const path of ["/", "/login"]) {

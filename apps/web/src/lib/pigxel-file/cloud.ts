@@ -134,9 +134,12 @@ export function saveCloudTile(
     .catch(() => {})
     .then(() => writeCloudTile(tile, contents, image, thumbnail));
   saving.set(id, next);
-  void next.finally(() => {
+  const forget = () => {
     if (saving.get(id) === next) saving.delete(id);
-  });
+  };
+  // Not finally(): its promise would reject again, unhandled. The caller
+  // gets the error from `next`.
+  void next.then(forget, forget);
   return next;
 }
 

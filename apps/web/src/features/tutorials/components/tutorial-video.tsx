@@ -1,17 +1,14 @@
 import Image from "next/image";
 import { Badge } from "@pigxel/ui/components/badge";
 import { videoEmbedUrl, type Tutorial } from "../tutorials";
+import { VideoEmbed } from "./video-embed";
 
 export function TutorialVideo({ tutorial }: { tutorial: Tutorial }) {
   if (tutorial.youtubeId)
     return (
-      <iframe
+      <VideoEmbed
         src={videoEmbedUrl(tutorial.youtubeId)}
         title={`${tutorial.title} video`}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerPolicy="strict-origin-when-cross-origin"
-        allowFullScreen
-        className="aspect-video w-full rounded-2xl border bg-black"
       />
     );
   return (

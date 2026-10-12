@@ -1,0 +1,42 @@
+{
+  "id": "grass",
+  "name": "Grass",
+  "category": "tiles",
+  "tags": [
+    "tile",
+    "ground",
+    "grass",
+    "seamless"
+  ],
+  "colors": {
+    "d": "#265c42",
+    "g": "#3e8948",
+    "l": "#63c74d"
+  },
+  "clips": [
+    {
+      "name": "still",
+      "kind": "variant",
+      "frames": [
+        [
+          "gggggggggggggggg",
+          "gglglggggggggggl",
+          "ggdldggdgggggggg",
+          "gggdgggggglglggg",
+          "ggggggggggdldggg",
+          "gggggggggggdgggg",
+          "gggdggggggggggdg",
+          "gggggggggggglggg",
+          "gggggglglggggggg",
+          "ggggggdldggggggg",
+          "gggggggdgdgggggg",
+          "ggggggggggggglgl",
+          "ggggglgggggggdld",
+          "glglggggggggggdg",
+          "gdldggggggdggggg",
+          "ggdggggggggggggg"
+        ]
+      ]
+    }
+  ]
+}

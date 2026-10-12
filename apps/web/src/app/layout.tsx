@@ -4,6 +4,7 @@ import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
 import { ConnectionWatch } from "@/components/layout/connection-watch";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { CookieBanner } from "@/features/legal/components/cookie-banner";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body className="min-h-screen" suppressHydrationWarning>
         <QueryProvider>{children}</QueryProvider>
         <ConnectionWatch />
+        <CookieBanner />
       </body>
     </html>
   );

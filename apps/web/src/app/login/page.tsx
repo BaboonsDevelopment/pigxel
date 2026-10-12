@@ -13,6 +13,7 @@ import {
 } from "@/lib/google-drive/server";
 import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { AuthForm } from "@/features/auth/components/auth-form";
+import { SignupChoices } from "@/features/auth/components/signup-choices";
 import {
   AppleLogo,
   GoogleLogo,
@@ -63,45 +64,63 @@ export default async function Login({
               : "This link is invalid or has expired. Request a new password reset link below."}
         </FormMessage>
       )}
-      {authMode !== "forgot" && (
+      {authMode === "signup" ? (
+        <SignupChoices
+          googleHref={google ? connectDriveUrl(next) : undefined}
+          googleHint={
+            isDriveAvailable()
+              ? "Also connects your Google Drive for saving tiles."
+              : undefined
+          }
+          appleHref={
+            apple ? `/auth/apple?next=${encodeURIComponent(next)}` : undefined
+          }
+          configured={configured}
+          next={next}
+        />
+      ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <ProviderButton
-              href={google ? connectDriveUrl(next) : undefined}
-              logo={<GoogleLogo />}
-              name="Google"
-              hint={
-                isDriveAvailable()
-                  ? "Also connects your Google Drive for saving tiles."
-                  : undefined
-              }
-            />
-            <ProviderButton
-              href={
-                apple
-                  ? `/auth/apple?next=${encodeURIComponent(next)}`
-                  : undefined
-              }
-              logo={<AppleLogo />}
-              name="Apple"
-            />
-          </div>
-          <div className="my-6 flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="h-px flex-1 bg-border" />
-            or
-            <span className="h-px flex-1 bg-border" />
-          </div>
+          {authMode === "login" && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <ProviderButton
+                  href={google ? connectDriveUrl(next) : undefined}
+                  logo={<GoogleLogo />}
+                  name="Google"
+                  hint={
+                    isDriveAvailable()
+                      ? "Also connects your Google Drive for saving tiles."
+                      : undefined
+                  }
+                />
+                <ProviderButton
+                  href={
+                    apple
+                      ? `/auth/apple?next=${encodeURIComponent(next)}`
+                      : undefined
+                  }
+                  logo={<AppleLogo />}
+                  name="Apple"
+                />
+              </div>
+              <div className="my-6 flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or
+                <span className="h-px flex-1 bg-border" />
+              </div>
+            </>
+          )}
+          <AuthForm
+            key={authMode}
+            mode={authMode}
+            configured={configured}
+            next={next}
+          />
         </>
       )}
-      <AuthForm
-        key={authMode}
-        mode={authMode}
-        configured={configured}
-        next={next}
-      />
-      {authMode !== "forgot" && (
+      {authMode === "login" && (
         <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-          By continuing, you agree to Pigxel’s{" "}
+          By logging in, you agree to Pigxel’s{" "}
           <Link
             href="/terms"
             className="underline underline-offset-2 hover:text-foreground"
