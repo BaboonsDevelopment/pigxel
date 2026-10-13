@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import { Checkbox, Radio } from "@pigxel/ui/components/choice";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { Checkbox } from "@pigxel/ui/components/choice";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { ModalHeader } from "@/components/ui/modal-header";
 import {
   DEFAULT_ONION,
   ONION_SIDES,
@@ -61,39 +62,52 @@ export default function OnionSettingsDialog({
   const set = (patch: Partial<OnionSettings>) =>
     onChange({ ...settings, ...patch });
 
+  const close = () => dialog.current?.close();
+  const option = (on: boolean) =>
+    cn(
+      "h-10 rounded-xl border px-3 text-sm transition-colors",
+      on
+        ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+        : "bg-background hover:bg-pink-base",
+    );
+
   return (
     <dialog
       ref={dialog}
       onClose={onClose}
       aria-labelledby="onion-settings-title"
       style={{ translate: offset.x + "px " + offset.y + "px" }}
-      className="m-auto mr-4 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-transparent"
+      className="m-auto mr-4 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-transparent"
     >
       <div
+        title="Drag to move"
         onPointerDown={startMove}
-        className="cursor-move touch-none space-y-5 p-5 select-none [&_button]:cursor-pointer [&_label]:cursor-default"
+        className="cursor-move touch-none select-none"
       >
-        <div title="Drag to move">
-          <SectionTitle id="onion-settings-title">Onion skin</SectionTitle>
-          <Lead className="mt-1">Changes show on the canvas right away.</Lead>
-        </div>
+        <ModalHeader
+          title="Onion Skin"
+          titleId="onion-settings-title"
+          onClose={close}
+        />
+      </div>
 
+      <div className="grid gap-5 p-5">
         <label className="flex items-center gap-3 text-sm">
-          <span className="w-16 font-medium">Opacity</span>
+          <span className="w-16 font-semibold">Opacity</span>
           <input
             type="range"
             min={5}
             max={100}
             value={settings.opacity}
             onChange={(e) => set({ opacity: Number(e.target.value) })}
-            className="min-w-0 flex-1 accent-primary"
+            className="min-w-0 flex-1 accent-pink-strong"
           />
           <span className="w-10 text-right tabular-nums">
             {settings.opacity}%
           </span>
         </label>
 
-        <div className="space-y-2 text-sm">
+        <div className="grid gap-3 text-sm">
           <label className="flex items-center gap-2">
             <Checkbox
               checked={settings.tint}
@@ -101,45 +115,58 @@ export default function OnionSettingsDialog({
             />
             Tint the frames
           </label>
-          <div className="flex gap-4 pl-6">
-            <label className="flex items-center gap-2">
-              <input
-                type="color"
-                aria-label="Colour of frames behind"
-                value={settings.before}
-                disabled={!settings.tint}
-                onChange={(e) => set({ before: e.target.value })}
-                className="h-6 w-8 cursor-pointer rounded border bg-background disabled:opacity-40"
-              />
-              Behind
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="color"
-                aria-label="Colour of frames ahead"
-                value={settings.after}
-                disabled={!settings.tint}
-                onChange={(e) => set({ after: e.target.value })}
-                className="h-6 w-8 cursor-pointer rounded border bg-background disabled:opacity-40"
-              />
-              Ahead
-            </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["before", "Behind"],
+                ["after", "Ahead"],
+              ] as const
+            ).map(([key, label]) => (
+              <label
+                key={key}
+                className={cn(
+                  "flex h-10 items-center gap-2 rounded-xl border px-3",
+                  settings.tint
+                    ? "cursor-pointer hover:bg-pink-base"
+                    : "opacity-50",
+                )}
+              >
+                <span className="relative size-5 shrink-0 overflow-hidden rounded-md ring-1 ring-black/10">
+                  <span
+                    className="absolute inset-0"
+                    style={{ backgroundColor: settings[key] }}
+                  />
+                  <input
+                    type="color"
+                    aria-label={`Colour of frames ${label.toLowerCase()}`}
+                    value={settings[key]}
+                    disabled={!settings.tint}
+                    onChange={(e) => set({ [key]: e.target.value })}
+                    className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
+                  />
+                </span>
+                {label}
+              </label>
+            ))}
           </div>
         </div>
 
-        <fieldset className="space-y-2 text-sm">
-          <legend className="mb-1 font-medium">Show</legend>
-          {ONION_SIDES.map(({ value, label }) => (
-            <label key={value} className="flex items-center gap-2">
-              <Radio
-                name="onion-side"
-                className="mt-0"
-                checked={settings.side === value}
-                onChange={() => set({ side: value })}
-              />
-              {label}
-            </label>
-          ))}
+        <fieldset>
+          <legend className="mb-2 block text-sm font-semibold">Show</legend>
+          <div role="radiogroup" className="grid grid-cols-3 gap-2">
+            {ONION_SIDES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={settings.side === value}
+                onClick={() => set({ side: value })}
+                className={option(settings.side === value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </fieldset>
 
         <label className="flex items-start gap-2 text-sm">
@@ -149,19 +176,17 @@ export default function OnionSettingsDialog({
           />
           Only frames in the current frame’s tag
         </label>
+      </div>
 
-        <div className="flex justify-between gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => onChange(DEFAULT_ONION)}
-          >
-            Reset
-          </Button>
-          <Button type="button" onClick={() => dialog.current?.close()}>
-            Done
-          </Button>
-        </div>
+      <div className="flex items-center gap-2 border-t bg-pink-base px-5 py-4">
+        <button
+          type="button"
+          onClick={() => onChange(DEFAULT_ONION)}
+          className="mr-auto text-xs text-link-accent transition-colors hover:text-lavender-foreground"
+        >
+          Reset
+        </button>
+        <ModalButton onClick={close}>Done</ModalButton>
       </div>
     </dialog>
   );

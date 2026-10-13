@@ -21,6 +21,7 @@ import {
   type SelectMode,
 } from "./selection";
 import type { SpriteApi } from "./use-sprite";
+import { MAX_SAVED_SELECTIONS } from "@/lib/selections/saved";
 
 export type SelectionApi = ReturnType<typeof useSelection>;
 
@@ -38,8 +39,6 @@ type Lifted = {
 };
 
 let clipboard: Floating | null = null;
-
-const savedSelections = new Map<string, Mask>();
 
 async function pngOf(piece: Floating): Promise<Blob | null> {
   const canvas = document.createElement("canvas");
@@ -87,9 +86,6 @@ export function useSelection(sprite: SpriteApi) {
   const [ownMask, setMask] = useState<Mask | null>(null);
   const [lifted, setLifted] = useState<Lifted | null>(null);
   const [previous, setPrevious] = useState<Mask | null>(null);
-  const [saved, setSaved] = useState(
-    () => savedSelections.get(sprite.id) ?? null,
-  );
   const dragFrom = useRef<{
     x: number;
     y: number;
@@ -187,17 +183,25 @@ export function useSelection(sprite: SpriteApi) {
       const back = fitting(previous);
       if (back) select(back);
     },
-    hasSaved: fitting(saved) !== null,
-    saveSelection: () => {
+    saved: sprite.selections.filter((saved) => fitting(saved.mask)),
+    saveSelection: (name: string) => {
       if (!mask) return;
       const copy = new Uint8Array(mask);
-      savedSelections.set(sprite.id, copy);
-      setSaved(copy);
+      drop();
+      sprite.setSelections(
+        [
+          ...sprite.selections,
+          { id: crypto.randomUUID(), name, mask: copy },
+        ].slice(-MAX_SAVED_SELECTIONS),
+      );
     },
-    loadSelection: () => {
-      const back = fitting(saved);
+    loadSelection: (id: string) => {
+      const saved = sprite.selections.find((s) => s.id === id);
+      const back = saved && fitting(saved.mask);
       if (back) select(new Uint8Array(back));
     },
+    deleteSelection: (id: string) =>
+      sprite.setSelections(sprite.selections.filter((s) => s.id !== id)),
     invert: () => {
       drop();
       setMask(invertMask(mask, size));

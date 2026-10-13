@@ -1,43 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   PIGXEL_EXTENSION,
   stripPigxelExtension,
 } from "@/lib/pigxel-file/format";
-import { Button } from "@pigxel/ui/components/button";
-import { FormMessage } from "@pigxel/ui/components/field";
 import {
-  Lead,
-  SectionTitle,
-  textLinkClassName,
-} from "@pigxel/ui/components/typography";
-import type { FileItem, Listing } from "../constants";
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { FormMessage } from "@pigxel/ui/components/field";
+import { textLinkClassName } from "@pigxel/ui/components/typography";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
+import type { FileItem, Listing } from "../constants";
 
-export function FilesDialog({
-  title,
-  subtitle,
-  empty,
-  load,
-  errorAction,
-  onPick,
-  onClose,
-}: {
+type FilesProps = {
   title: string;
   subtitle?: string | null;
   empty: string;
   load: () => Promise<FileItem[]>;
   errorAction?: (error: unknown) => { label: string; href: string } | null;
   onPick: (item: FileItem) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export function FilesDialog({
+  onClose,
+  ...props
+}: FilesProps & { onClose: () => void }) {
+  return (
+    <Dialog onClose={onClose} size="md" portal>
+      <FilesList {...props} />
+    </Dialog>
+  );
+}
+
+function FilesList({
+  title,
+  subtitle,
+  empty,
+  load,
+  errorAction,
+  onPick,
+}: FilesProps) {
+  const { close } = useDialog();
   const [listing, setListing] = useState<Listing>({ state: "loading" });
   const [failure, setFailure] = useState<unknown>(null);
 
   useEffect(() => {
-    dialog.current?.showModal();
     let active = true;
     load().then(
       (items) => active && setListing({ state: "ready", items }),
@@ -62,40 +75,24 @@ export function FilesDialog({
   const fix = listing.state === "error" ? errorAction?.(failure) : null;
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="files-dialog-title"
-      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
-    >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="files-dialog-title">{title}</SectionTitle>
-          {subtitle && <Lead className="mt-1">{subtitle}</Lead>}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-
-      <div className="max-h-96 overflow-y-auto p-2">
+    <>
+      <ModalHeader title={title} />
+      <DialogBody className="grid gap-4 py-5">
+        {subtitle && (
+          <p className="-mb-1 text-sm text-muted-foreground">{subtitle}</p>
+        )}
         {listing.state === "loading" && (
-          <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            Loading…
+          </p>
         )}
         {listing.state === "error" && (
-          <div className="p-4 text-sm">
+          <div className="rounded-xl bg-error-soft px-4 py-3 text-sm">
             <FormMessage tone="error">{listing.message}</FormMessage>
             {fix && (
               <a
                 href={fix.href}
-                className={`mt-3 inline-block ${textLinkClassName}`}
+                className={`mt-2 inline-block ${textLinkClassName}`}
               >
                 {fix.label}
               </a>
@@ -103,44 +100,57 @@ export function FilesDialog({
           </div>
         )}
         {listing.state === "ready" && listing.items.length === 0 && (
-          <p className="p-4 text-sm text-muted-foreground">{empty}</p>
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            {empty}
+          </p>
         )}
-        {listing.state === "ready" &&
-          listing.items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                dialog.current?.close();
-                onPick(item);
-              }}
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-muted"
-            >
-              {item.thumbnail !== undefined && (
-                <span className="flex size-10 shrink-0 items-center justify-center rounded border bg-checker">
-                  {item.thumbnail && (
-                    <PixelImage
-                      src={item.thumbnail}
-                      alt=""
-                      className="max-h-full max-w-full"
-                    />
+        {listing.state === "ready" && listing.items.length > 0 && (
+          <ul className="grid max-h-96 gap-1 overflow-y-auto rounded-xl border bg-background p-2">
+            {listing.items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    onPick(item);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-muted/60"
+                >
+                  {item.thumbnail !== undefined && (
+                    <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-checker">
+                      {item.thumbnail && (
+                        <PixelImage
+                          src={item.thumbnail}
+                          alt=""
+                          className="max-h-full max-w-full"
+                        />
+                      )}
+                    </span>
                   )}
-                </span>
-              )}
-              <span className="min-w-0 flex-1 truncate text-sm">
-                {stripPigxelExtension(item.name)}
-                <span className="text-muted-foreground">
-                  {PIGXEL_EXTENSION}
-                </span>
-              </span>
-              {item.modified && (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {new Date(item.modified).toLocaleString()}
-                </span>
-              )}
-            </button>
-          ))}
-      </div>
-    </dialog>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {stripPigxelExtension(item.name)}
+                      <span className="font-normal text-muted-foreground">
+                        {PIGXEL_EXTENSION}
+                      </span>
+                    </span>
+                    {item.modified && (
+                      <span className="block text-[11px] text-muted-foreground">
+                        Edited {new Date(item.modified).toLocaleString()}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Close
+        </ModalButton>
+      </DialogFooter>
+    </>
   );
 }

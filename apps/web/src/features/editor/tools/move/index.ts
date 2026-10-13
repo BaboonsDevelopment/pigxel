@@ -10,7 +10,7 @@ export const moveTool = defineTool({
   shortcut: "V",
   icon,
   group: "move",
-  hint: "Drag moves the selection, or the whole layer · Handles scale it, the knob turns it (Shift snaps) · Arrow keys nudge · Enter puts it down, Esc cancels",
+  hint: "Drag moves the selection, or the whole layer · Handles scale it, the knob turns it (Shift snaps) · Arrow keys nudge, Shift + arrows by 10 px · Enter puts it down, Esc cancels",
   selects: true,
   wholeLayer: true,
   cursor: "move",

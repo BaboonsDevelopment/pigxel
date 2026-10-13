@@ -1,6 +1,6 @@
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { safeFileBase } from "@/lib/pigxel-file/format";
-import { tiledMap, tilesetImage } from "@/lib/tilemap/export";
+import { godotTileSet, tiledMap, tilesetImage } from "@/lib/tilemap/export";
 import type { ExportFile } from "./export";
 
 export function tilemapFiles(
@@ -35,6 +35,15 @@ export function tilemapFiles(
             ? sprite.readCel(layer.id, frame.id)
             : undefined,
         })),
+      }),
+    },
+    {
+      name: `${base}.tres`,
+      mime: "text/plain",
+      data: godotTileSet({
+        tile: layer.tile,
+        count: layer.tiles.length,
+        image: { file: image, columns: sheet.columns },
       }),
     },
   ];

@@ -9,15 +9,29 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --project unit --project dom",
+    "test:watch": "vitest --project unit --project dom",
+    "test:coverage": "vitest run --project unit --project dom --coverage",
+    "test:db": "vitest run --project db",
+    "test:e2e": "playwright test",
+    "test:e2e:dev": "E2E_SERVER=dev playwright test",
+    "test:e2e:serve": "node e2e/support/serve.ts",
+    "assets:check": "node scripts/assets/check.ts",
+    "assets:render": "node scripts/assets/render.ts",
+    "assets:review": "node scripts/assets/review.ts",
+    "assets:build": "node scripts/assets/build.ts",
+    "assets:import": "node --env-file-if-exists=.env.local scripts/assets/import.ts"
   },
   "dependencies": {
     "@pigxel/ui": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.80.0",
+    "@tanstack/react-query": "5.104.1",
+    "@tensorflow/tfjs": "4.22.0",
     "fflate": "0.8.3",
     "mediabunny": "1.61.1",
     "next": "catalog:",
+    "nsfwjs": "4.4.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "server-only": "^0.0.1"
@@ -25,13 +39,22 @@
   "devDependencies": {
     "@pigxel/eslint-config": "workspace:*",
     "@pigxel/typescript-config": "workspace:*",
+    "@pigxel/vitest-config": "workspace:*",
+    "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "^4.1.17",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "eslint": "catalog:",
+    "jsdom": "catalog:",
+    "msw": "2.15.0",
     "postcss": "8.5.28",
     "typescript": "catalog:",
-    "vitest": "4.1.11"
+    "vitest": "catalog:"
   }
 }

@@ -1,69 +1,175 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { ModalButton, modalButton } from "@/components/ui/modal-button";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Textarea } from "@pigxel/ui/components/input";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { showSnackbar, withLoading } from "@/components/ui/snackbar";
 import type { ProfileTile } from "@/features/profile/profile";
-import { loadUnpublishedTiles, publishArt } from "../../../actions";
+import {
+  loadArtDetails,
+  loadUnpublishedTiles,
+  publishArt,
+} from "../../../actions";
 import { DESCRIPTION_MAX } from "../../../constants";
+import { removeFromExplore } from "../../../remove-from-explore";
+import { RemixToggle } from "./remix-toggle";
 import { TagPicker } from "./tag-picker";
 
-export function PublishDialog({ onClose }: { onClose: () => void }) {
+export type PublishTile = Pick<
+  ProfileTile,
+  "id" | "name" | "width" | "height" | "thumbnail"
+>;
+
+export function PublishDialog({
+  tile,
+  onPublished,
+  onUnpublished,
+  onClose,
+}: {
+  tile?: PublishTile;
+  onPublished?: () => void;
+  onUnpublished?: () => void;
+  onClose: () => void;
+}) {
+  const router = useRouter();
   const [tiles, setTiles] = useState<ProfileTile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<ProfileTile | null>(null);
-  const [step, setStep] = useState<"pick" | "details">("pick");
+  const [selected, setSelected] = useState<PublishTile | null>(tile ?? null);
+  const [step, setStep] = useState<"pick" | "details" | "done">(
+    tile ? "details" : "pick",
+  );
   const [tags, setTags] = useState<string[]>([]);
   const [description, setDescription] = useState("");
+  const [allowRemix, setAllowRemix] = useState(true);
   const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
+  const [loaded, setLoaded] = useState(!tile);
 
+  const tileId = tile?.id;
   useEffect(() => {
+    if (tileId) {
+      loadArtDetails(tileId)
+        .then((details) => {
+          if (!details) {
+            setError("Couldn’t find this art in Pigxel cloud.");
+            return;
+          }
+          setTags(details.tags);
+          setDescription(details.description);
+          setAllowRemix(details.allowRemix);
+          setPublished(details.published);
+          setLoaded(true);
+        })
+        .catch(() => setError("Couldn’t load this art. Try again."));
+      return;
+    }
     loadUnpublishedTiles()
       .then(setTiles)
       .catch(() => setError("Couldn’t load your arts. Try again."));
-  }, []);
+  }, [tileId]);
 
   const publish = async () => {
     if (!selected) return;
     setPublishing(true);
     setError(null);
-    const result = await publishArt(selected.id, tags, description);
+    const result = await withLoading(
+      published ? "Saving…" : "Publishing…",
+      () => publishArt(selected.id, tags, description, allowRemix),
+    );
+    setPublishing(false);
+    if (!result.error && !published) {
+      const id = selected.id;
+      showSnackbar("Project published!", {
+        tone: "action",
+        action: { label: "View", onClick: () => router.push(`/explore/${id}`) },
+      });
+    }
+    if (result.error) setError(result.error);
+    else if (tile) {
+      onPublished?.();
+      setStep("done");
+    } else onClose();
+  };
+
+  const unpublish = async () => {
+    if (!selected) return;
+    setError(null);
+    setPublishing(true);
+    const result = await removeFromExplore(selected);
     setPublishing(false);
     if (result.error) setError(result.error);
-    else onClose();
+    if (!result.removed) return;
+    onUnpublished?.();
+    onClose();
   };
 
   return (
-    <Dialog onClose={onClose} size="lg" portal>
-      <DialogHeader
-        title={step === "pick" ? "Publish to Explore" : "Tell people about it"}
-        description={
+    <Dialog onClose={onClose} size={step === "pick" ? "lg" : "sm"} portal>
+      <ModalHeader
+        title={
           step === "pick"
-            ? "Pick an art from Pigxel cloud to share with the community."
-            : "Tags help people find it. The description shows on its page."
+            ? "Publish Project"
+            : step === "done"
+              ? published
+                ? "Changes Saved"
+                : "Published!"
+              : published
+                ? "Explore Details"
+                : "Publish Project"
         }
       />
-      <DialogBody>
+      <DialogBody className="py-5">
+        {step === "pick" && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            Pick an art from Pigxel cloud to share with the community.
+          </p>
+        )}
         {error && (
           <FormMessage tone="error" className="mb-3">
             {error}
           </FormMessage>
         )}
-        {step === "details" && selected ? (
-          <div className="grid gap-5 sm:grid-cols-[10rem_minmax(0,1fr)]">
-            <div>
-              <span className="block aspect-[5/4] overflow-hidden rounded-xl border bg-checker">
+        {step === "done" && selected ? (
+          <div className="flex items-center gap-4 animate-in fade-in zoom-in-95">
+            <span className="block aspect-[5/4] w-32 shrink-0 overflow-hidden rounded-xl border bg-checker">
+              {selected.thumbnail && (
+                <PixelImage
+                  src={selected.thumbnail}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              )}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate font-semibold">
+                {selected.name}
+              </span>
+              {tags.length > 0 && (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  {tags.join(" · ")}
+                </span>
+              )}
+            </span>
+          </div>
+        ) : step === "details" && selected && !loaded ? (
+          !error && (
+            <Text as="span" tone="muted">
+              Loading…
+            </Text>
+          )
+        ) : step === "details" && selected ? (
+          <div className="grid gap-5">
+            <div className="flex items-center gap-4">
+              <span className="block size-20 shrink-0 overflow-hidden rounded-xl border border-primary-soft bg-pastel-pink-soft">
                 {selected.thumbnail && (
                   <PixelImage
                     src={selected.thumbnail}
@@ -72,34 +178,40 @@ export function PublishDialog({ onClose }: { onClose: () => void }) {
                   />
                 )}
               </span>
-              <span className="mt-2 block truncate text-sm font-semibold">
-                {selected.name}
-              </span>
-              <span className="block text-[11px] text-muted-foreground">
-                {selected.width} × {selected.height} px
-              </span>
-            </div>
-            <div className="grid content-start gap-4">
-              <div>
-                <span className="mb-1.5 block text-xs font-medium">Tags</span>
-                <TagPicker value={tags} onChange={setTags} />
-              </div>
-              <label className="block">
-                <span className="mb-1.5 flex justify-between text-xs font-medium">
-                  Description
-                  <span className="font-normal text-muted-foreground tabular-nums">
-                    {description.length}/{DESCRIPTION_MAX}
-                  </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold">
+                  {selected.name}
                 </span>
-                <Textarea
-                  rows={5}
-                  maxLength={DESCRIPTION_MAX}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="A cozy cottage tucked between mountains…"
-                />
-              </label>
+                <span className="block text-[11px] text-muted-foreground">
+                  {selected.width} × {selected.height} px
+                </span>
+              </span>
             </div>
+            <label className="block">
+              <span className="mb-2 flex justify-between text-xs font-semibold">
+                Description
+                <span className="font-normal text-muted-foreground tabular-nums">
+                  {description.length}/{DESCRIPTION_MAX}
+                </span>
+              </span>
+              <Textarea
+                rows={3}
+                maxLength={DESCRIPTION_MAX}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="A cozy cottage tucked between mountains…"
+                className="rounded-xl px-4 py-3"
+              />
+            </label>
+            <div>
+              <span className="mb-2 block text-xs font-semibold">Tags</span>
+              <TagPicker
+                value={tags}
+                onChange={setTags}
+                className="min-h-12 rounded-xl px-4"
+              />
+            </div>
+            <RemixToggle value={allowRemix} onChange={setAllowRemix} />
           </div>
         ) : !tiles ? (
           !error && (
@@ -139,7 +251,7 @@ export function PublishDialog({ onClose }: { onClose: () => void }) {
                           src={tile.thumbnail}
                           alt=""
                           loading="lazy"
-                          className="size-full object-contain"
+                          className="size-full object-cover"
                         />
                       )}
                     </span>
@@ -182,22 +294,75 @@ export function PublishDialog({ onClose }: { onClose: () => void }) {
         )}
       </DialogBody>
       {step === "details" && (
-        <DialogFooter className="items-center justify-between">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={publishing}
-            onClick={() => setStep("pick")}
-          >
-            Back
-          </Button>
-          <Button
-            type="button"
-            disabled={publishing}
-            onClick={() => void publish()}
-          >
-            {publishing ? "Publishing…" : "Publish"}
-          </Button>
+        <DialogFooter
+          className={cn(MODAL_FOOTER, "items-center justify-between")}
+        >
+          {tile && published ? (
+            <ModalButton
+              type="button"
+              variant="secondary"
+              disabled={publishing}
+              onClick={() => void unpublish()}
+              className="border-transparent text-destructive hover:bg-destructive/10"
+            >
+              Unpublish
+            </ModalButton>
+          ) : tile ? (
+            <ModalButton
+              type="button"
+              variant="secondary"
+              disabled={publishing}
+              onClick={onClose}
+            >
+              Cancel
+            </ModalButton>
+          ) : (
+            <ModalButton
+              type="button"
+              variant="secondary"
+              disabled={publishing}
+              onClick={() => setStep("pick")}
+            >
+              Back
+            </ModalButton>
+          )}
+          <span className="flex items-center gap-2">
+            {tile && published && (
+              <ModalButton
+                type="button"
+                variant="secondary"
+                disabled={publishing}
+                onClick={onClose}
+              >
+                Cancel
+              </ModalButton>
+            )}
+            <ModalButton
+              type="button"
+              disabled={publishing || !loaded}
+              onClick={() => void publish()}
+            >
+              {published
+                ? publishing
+                  ? "Saving…"
+                  : "Save"
+                : publishing
+                  ? "Publishing…"
+                  : "Publish"}
+            </ModalButton>
+          </span>
+        </DialogFooter>
+      )}
+      {step === "done" && selected && (
+        <DialogFooter
+          className={cn(MODAL_FOOTER, "items-center justify-between")}
+        >
+          <ModalButton type="button" variant="secondary" onClick={onClose}>
+            Done
+          </ModalButton>
+          <Link href={`/explore/${selected.id}`} className={modalButton()}>
+            View on Explore
+          </Link>
         </DialogFooter>
       )}
     </Dialog>

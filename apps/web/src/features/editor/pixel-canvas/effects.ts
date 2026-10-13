@@ -323,13 +323,29 @@ export function curveTable(points: CurvePoint[]): Uint8ClampedArray {
   return table;
 }
 
+export const CURVE_CHANNELS = ["red", "green", "blue"] as const;
+
+export type CurveChannel = (typeof CURVE_CHANNELS)[number];
+
+export type ChannelCurves = Record<CurveChannel, CurvePoint[]>;
+
+export const STRAIGHT_CHANNELS: ChannelCurves = {
+  red: STRAIGHT_CURVE,
+  green: STRAIGHT_CURVE,
+  blue: STRAIGHT_CURVE,
+};
+
 function curvedColors(
   pixels: Uint8ClampedArray,
   mask: Uint8Array | null,
   points: CurvePoint[],
+  channels: ChannelCurves = STRAIGHT_CHANNELS,
 ): Uint8ClampedArray {
   const table = curveTable(points);
-  return adjusted(pixels, mask, (...rgb) => rgb.map((v) => table[v]!));
+  const tables = CURVE_CHANNELS.map((channel) => curveTable(channels[channel]));
+  return adjusted(pixels, mask, (...rgb) =>
+    rgb.map((v, i) => table[tables[i]![v]!]!),
+  );
 }
 
 export type ConvolutionPreset = {
@@ -385,6 +401,7 @@ export type AdjustKind =
 export type AdjustSettings = {
   values: Record<string, number>;
   curve: CurvePoint[];
+  channels?: ChannelCurves;
   matrix: number[];
 };
 
@@ -393,13 +410,13 @@ export function adjustedColors(
   pixels: Uint8ClampedArray,
   mask: Uint8Array | null,
   size: Size,
-  { values, curve, matrix }: AdjustSettings,
+  { values, curve, channels, matrix }: AdjustSettings,
 ): Uint8ClampedArray {
   if (kind === "convolution")
     return convolved(pixels, mask, size, matrix, values.bias ?? 0);
   if (kind === "despeckle")
     return despeckled(pixels, mask, size, values.radius ?? 1);
-  if (kind === "curve") return curvedColors(pixels, mask, curve);
+  if (kind === "curve") return curvedColors(pixels, mask, curve, channels);
   return kind === "hueSaturation"
     ? adjustedHueSaturation(pixels, mask, {
         hue: values.hue ?? 0,

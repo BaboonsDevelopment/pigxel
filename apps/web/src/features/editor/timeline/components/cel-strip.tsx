@@ -10,6 +10,10 @@ export function CelStrip({
   activeLayer,
   hasCel,
   isLinked,
+  canDrag,
+  dragged,
+  onDragCel,
+  onDropCel,
   onSelect,
   onContextMenu,
 }: {
@@ -19,6 +23,10 @@ export function CelStrip({
   activeLayer: boolean;
   hasCel: (frameId: string) => boolean;
   isLinked: (frameId: string) => boolean;
+  canDrag: boolean;
+  dragged: string | null;
+  onDragCel: (frameId: string | null) => void;
+  onDropCel: (frameId: string) => void;
   onSelect: (frameId: string) => void;
   onContextMenu: (frameId: string, event: React.MouseEvent) => void;
 }) {
@@ -31,6 +39,33 @@ export function CelStrip({
         key={frame.id}
         type="button"
         disabled={layer.kind === "group"}
+        draggable={canDrag && filled}
+        title={
+          canDrag && filled
+            ? "Drag to move this cel to another frame"
+            : undefined
+        }
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = "move";
+          onDragCel(frame.id);
+        }}
+        onDragEnd={(e) => {
+          e.stopPropagation();
+          onDragCel(null);
+        }}
+        onDragOver={(e) => {
+          if (!dragged || dragged === frame.id) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(e) => {
+          if (!dragged) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDropCel(frame.id);
+        }}
         aria-label={`Frame ${frames.indexOf(frame) + 1}${linked ? ", linked cel" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
@@ -46,6 +81,7 @@ export function CelStrip({
           FRAME_COLUMN,
           current && "bg-primary/10",
           current && activeLayer && "ring-2 ring-primary ring-inset",
+          dragged === frame.id && "opacity-40",
         )}
       >
         {layer.kind !== "group" &&

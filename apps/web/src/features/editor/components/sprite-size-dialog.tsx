@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
 import {
-  Checkbox,
-  ChoiceCard,
-  ChoiceText,
-  Radio,
-} from "@pigxel/ui/components/choice";
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { MAX_SIZE, MIN_SIZE } from "../pixel-canvas/constants";
 import {
   SCALE_METHODS,
@@ -17,7 +18,7 @@ import {
   sizeAtPercent,
   type ScaleMethod,
 } from "@/lib/sprite/sprite-size";
-import { NumberField } from "./number-field";
+import { LockSwitch, SIZE_LABEL, SizeField } from "./size-controls";
 
 type Size = { w: number; h: number };
 
@@ -41,12 +42,27 @@ export default function SpriteSizeDialog({
   onApply: (next: Size, method: ScaleMethod) => void;
   onClose: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  return (
+    <Dialog onClose={onClose} size="md" portal>
+      <ScaleForm size={size} picture={picture} onApply={onApply} />
+    </Dialog>
+  );
+}
+
+function ScaleForm({
+  size,
+  picture,
+  onApply,
+}: {
+  size: Size;
+  picture: Uint8ClampedArray;
+  onApply: (next: Size, method: ScaleMethod) => void;
+}) {
+  const { close } = useDialog();
   const preview = useRef<HTMLCanvasElement>(null);
   const [next, setNext] = useState<Size>(size);
   const [locked, setLocked] = useState(true);
   const [method, setMethod] = useState<ScaleMethod>("nearest");
-  useEffect(() => dialog.current?.showModal(), []);
 
   const problem =
     next.w < MIN_SIZE || next.h < MIN_SIZE
@@ -102,41 +118,18 @@ export default function SpriteSizeDialog({
   }, [scaled, next, zoom]);
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="sprite-size-title"
-      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (problem || unchanged) return;
+        onApply(next, method);
+        close();
+      }}
+      className="flex min-h-0 flex-col"
     >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="sprite-size-title">Sprite size</SectionTitle>
-          <Lead className="mt-1">
-            Scale the whole drawing, in every layer and frame.
-          </Lead>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (problem || unchanged) return;
-          onApply(next, method);
-          dialog.current?.close();
-        }}
-      >
-        <div className="flex min-h-24 justify-center overflow-hidden rounded-lg border bg-muted p-3">
+      <ModalHeader title="Sprite Size" />
+      <DialogBody className="grid gap-6 py-6">
+        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-background p-3">
           {scaled && (
             <div className="self-center bg-checker">
               <canvas
@@ -149,81 +142,79 @@ export default function SpriteSizeDialog({
             </div>
           )}
         </div>
-
-        <div className="grid grid-cols-3 items-end gap-3">
-          <NumberField
+        <div className="grid grid-cols-3 gap-4">
+          <SizeField
             id="sprite-w"
-            label="Width, px"
-            value={next.w}
-            onChange={setWidth}
+            label="Width"
+            unit="px"
+            value={String(next.w)}
+            onChange={(text) => setWidth(Number(text) || 0)}
           />
-          <NumberField
+          <SizeField
             id="sprite-h"
-            label="Height, px"
-            value={next.h}
-            onChange={setHeight}
+            label="Height"
+            unit="px"
+            value={String(next.h)}
+            onChange={(text) => setHeight(Number(text) || 0)}
           />
-          <NumberField
+          <SizeField
             id="sprite-percent"
-            label="Scale, %"
-            value={percent}
+            label="Scale"
+            unit="%"
+            value={String(percent)}
             disabled={!locked}
-            onChange={(p) => setNext(sizeAtPercent(size.w, size.h, p))}
+            onChange={(text) =>
+              setNext(sizeAtPercent(size.w, size.h, Number(text) || 0))
+            }
           />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox
-            checked={locked}
-            onChange={(e) => {
-              setLocked(e.target.checked);
-              if (e.target.checked)
-                setNext((n) => ({
-                  w: n.w,
-                  h: Math.max(1, Math.round((n.w * size.h) / size.w)),
-                }));
-            }}
-          />
-          Keep proportions
-        </label>
-
-        <fieldset className="space-y-2">
-          <legend className="mb-2 text-sm font-medium">Method</legend>
-          {SCALE_METHODS.map(({ value, label }) => (
-            <ChoiceCard key={value} className="p-3">
-              <Radio
-                name="scale-method"
-                value={value}
-                checked={method === value}
-                onChange={() => setMethod(value)}
-              />
-              <ChoiceText title={label}>{METHOD_HINTS[value]}</ChoiceText>
-            </ChoiceCard>
-          ))}
+        <LockSwitch
+          label="Lock aspect ratio"
+          on={locked}
+          onChange={(on) => {
+            setLocked(on);
+            if (on)
+              setNext((n) => ({
+                w: n.w,
+                h: Math.max(1, Math.round((n.w * size.h) / size.w)),
+              }));
+          }}
+        />
+        <fieldset>
+          <legend className={SIZE_LABEL}>Method</legend>
+          <div role="radiogroup" className="grid grid-cols-3 gap-2">
+            {SCALE_METHODS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={method === value}
+                onClick={() => setMethod(value)}
+                className={cn(
+                  "h-11 rounded-xl border px-2 text-sm transition-colors",
+                  method === value
+                    ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+                    : "bg-background hover:bg-pink-base",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {METHOD_HINTS[method]}
+          </p>
         </fieldset>
-
-        <FormMessage
-          tone={problem ? "error" : "muted"}
-          className="tabular-nums"
-        >
-          {problem ??
-            (unchanged
-              ? "Type a new width, height or scale."
-              : `${size.w} × ${size.h} → ${next.w} × ${next.h} px, in every layer and frame.`)}
-        </FormMessage>
-
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => dialog.current?.close()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!!problem || unchanged}>
-            Scale
-          </Button>
-        </div>
-      </form>
-    </dialog>
+        {problem && <FormMessage tone="error">{problem}</FormMessage>}
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!!problem || unchanged}>
+          Scale
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }

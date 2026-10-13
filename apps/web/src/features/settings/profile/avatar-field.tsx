@@ -8,41 +8,9 @@ import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { AVATAR_BUCKET, type ArtistProfile } from "@/features/profile/profile";
 import { createClient } from "@/lib/supabase/client";
 import { setAvatar } from "./actions";
+import { AvatarCropDialog } from "./avatar-crop/avatar-crop-dialog";
 
-const AVATAR_SIDE = 256;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-
-async function squarePng(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
-  const out =
-    side >= AVATAR_SIDE
-      ? AVATAR_SIDE
-      : side * Math.max(1, Math.floor(AVATAR_SIDE / side));
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = out;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("no canvas");
-  ctx.imageSmoothingEnabled = side > AVATAR_SIDE;
-  ctx.drawImage(
-    bitmap,
-    (bitmap.width - side) / 2,
-    (bitmap.height - side) / 2,
-    side,
-    side,
-    0,
-    0,
-    out,
-    out,
-  );
-  bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("no image"))),
-      "image/png",
-    ),
-  );
-}
 
 export function AvatarField({
   userId,
@@ -55,6 +23,7 @@ export function AvatarField({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [avatarUrl, showAvatar] = useOptimistic(profile.avatarUrl);
+  const [cropping, setCropping] = useState<File | null>(null);
 
   const choose = (kind: "none" | "provider") =>
     startTransition(async () => {
@@ -64,21 +33,20 @@ export function AvatarField({
       if (result.error) setError(result.error);
     });
 
-  const upload = (file: File | undefined) => {
+  const pick = (file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/") || file.size > MAX_FILE_BYTES) {
       setError("Choose a PNG, JPEG or WebP picture under 10 MB.");
       return;
     }
+    setError(null);
+    setCropping(file);
+  };
+
+  const upload = (png: Blob) => {
+    setCropping(null);
     startTransition(async () => {
       setError(null);
-      let png: Blob;
-      try {
-        png = await squarePng(file);
-      } catch {
-        setError("This picture couldn’t be read. Try another one.");
-        return;
-      }
       const preview = URL.createObjectURL(png);
       showAvatar(preview);
       const path = `${userId}/${crypto.randomUUID()}.png`;
@@ -150,10 +118,17 @@ export function AvatarField({
         accept="image/png,image/jpeg,image/webp,image/gif"
         className="hidden"
         onChange={(e) => {
-          upload(e.target.files?.[0]);
+          pick(e.target.files?.[0]);
           e.target.value = "";
         }}
       />
+      {cropping && (
+        <AvatarCropDialog
+          file={cropping}
+          onCrop={upload}
+          onClose={() => setCropping(null)}
+        />
+      )}
     </div>
   );
 }

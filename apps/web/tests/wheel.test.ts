@@ -6,6 +6,7 @@ import {
 } from "@/features/editor/pixel-canvas/constants";
 import {
   fromTouchpad,
+  fitScale,
   pinchZoom,
   scrollToAnchor,
   stepZoom,
@@ -15,6 +16,19 @@ import {
 
 const rect = (left: number, top: number, width: number, height: number) =>
   ({ left, top, width, height }) as DOMRect;
+
+describe("fit to window", () => {
+  it("fits both dimensions, including large tiles", () => {
+    expect(fitScale(128, 128, 512, 256)).toBe(2);
+    expect(fitScale(2048, 1024, 512, 512)).toBe(0.25);
+    expect(fitScale(100, 400, 600, 300)).toBe(0.75);
+  });
+  it("caps enlargement and ignores unavailable dimensions", () => {
+    expect(fitScale(1, 1, 1000, 1000)).toBe(MAX_SCALE);
+    expect(fitScale(0, 100, 500, 500)).toBeNull();
+    expect(fitScale(100, 100, 0, 500)).toBeNull();
+  });
+});
 
 describe("telling a touchpad from a mouse wheel", () => {
   it("takes Firefox's line scrolling for a mouse wheel", () => {

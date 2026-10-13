@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { ContextMenu } from "../components/menu/context-menu";
+import { selectModeOf, type SelectMode } from "../pixel-canvas/selection";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { panelRows } from "@/lib/layers/tree";
 import { frameActions, layerActions } from "./actions";
@@ -26,10 +27,12 @@ export function Timeline({
   sprite,
   playback,
   onTilemap,
+  onSelectContent,
 }: {
   sprite: SpriteApi;
   playback: Playback;
   onTilemap: (convert: boolean) => void;
+  onSelectContent: (layerId: string, mode: SelectMode) => void;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; zone: DropZone } | null>(null);
@@ -41,6 +44,11 @@ export function Timeline({
     id: string;
     x: number;
     y: number;
+  } | null>(null);
+  const [copiedCel, setCopiedCel] = useState<Uint8ClampedArray | null>(null);
+  const [draggedCel, setDraggedCel] = useState<{
+    layerId: string;
+    frameId: string;
   } | null>(null);
   const [celMenu, setCelMenu] = useState<{
     layerId: string;
@@ -212,15 +220,35 @@ export function Timeline({
                 key={row.layer.id}
                 row={row}
                 active={row.layer.id === layerId}
+                picked={
+                  sprite.selectedLayers.length > 1 &&
+                  sprite.selectedLayers.includes(row.layer.id)
+                }
                 solo={sprite.soloId === row.layer.id}
                 drop={over?.id === row.layer.id ? over.zone : null}
                 renaming={renaming === row.layer.id}
                 onRenamingChange={(on) => setRenaming(on ? row.layer.id : null)}
-                onSelect={() => sprite.selectLayer(row.layer.id)}
+                onSelect={(e) => {
+                  if (e.ctrlKey || e.metaKey)
+                    return onSelectContent(row.layer.id, selectModeOf(e));
+                  if (e.shiftKey) {
+                    const picked = sprite.selectedLayers;
+                    return sprite.pickLayers(
+                      picked.includes(row.layer.id)
+                        ? picked.filter((id) => id !== row.layer.id)
+                        : [...picked, row.layer.id],
+                    );
+                  }
+                  sprite.pickLayers([]);
+                  sprite.selectLayer(row.layer.id);
+                }}
                 onSolo={() => sprite.toggleSolo(row.layer.id)}
                 onChange={(patch) => sprite.updateLayer(row.layer.id, patch)}
                 onContextMenu={(e) => {
-                  sprite.selectLayer(row.layer.id);
+                  if (!sprite.selectedLayers.includes(row.layer.id)) {
+                    sprite.pickLayers([]);
+                    sprite.selectLayer(row.layer.id);
+                  }
                   openMenu("layer", e);
                 }}
                 onDragStart={() => setDragging(row.layer.id)}
@@ -231,8 +259,13 @@ export function Timeline({
                 }}
                 onDragLeave={() => setOver(null)}
                 onDrop={() => {
-                  if (dragging && over)
-                    sprite.moveLayer(dragging, dropPlace(row, over.zone));
+                  if (dragging && over) {
+                    const place = dropPlace(row, over.zone);
+                    const picked = sprite.selectedLayers;
+                    if (picked.length > 1 && picked.includes(dragging))
+                      sprite.moveLayers(picked, place);
+                    else sprite.moveLayer(dragging, place);
+                  }
                   endDrag();
                 }}
                 onDragEnd={endDrag}
@@ -244,6 +277,25 @@ export function Timeline({
                   activeLayer={row.layer.id === layerId}
                   hasCel={(frame) => sprite.hasCel(frame, row.layer.id)}
                   isLinked={(frame) => sprite.isCelLinked(row.layer.id, frame)}
+                  canDrag={
+                    row.layer.kind !== "background" &&
+                    sprite.canEditCels(row.layer.id)
+                  }
+                  dragged={
+                    draggedCel?.layerId === row.layer.id
+                      ? draggedCel.frameId
+                      : null
+                  }
+                  onDragCel={(frame) =>
+                    setDraggedCel(
+                      frame ? { layerId: row.layer.id, frameId: frame } : null,
+                    )
+                  }
+                  onDropCel={(frame) => {
+                    if (draggedCel?.layerId === row.layer.id)
+                      sprite.moveCel(row.layer.id, draggedCel.frameId, frame);
+                    setDraggedCel(null);
+                  }}
                   onSelect={(frame) => {
                     sprite.selectLayer(row.layer.id);
                     sprite.selectFrame(frame);
@@ -313,6 +365,28 @@ export function Timeline({
           x={celMenu.x}
           y={celMenu.y}
           sections={[
+            [
+              {
+                label: "Copy cel",
+                onSelect: () =>
+                  setCopiedCel(
+                    new Uint8ClampedArray(
+                      sprite.readCel(celMenu.layerId, celMenu.frameId),
+                    ),
+                  ),
+                disabled: !sprite.hasCel(celMenu.frameId, celMenu.layerId),
+              },
+              {
+                label: "Paste cel",
+                onSelect: () =>
+                  copiedCel &&
+                  sprite.pasteCel(celMenu.layerId, celMenu.frameId, copiedCel),
+                disabled:
+                  !copiedCel ||
+                  copiedCel.length !== sprite.size.w * sprite.size.h * 4 ||
+                  !sprite.canEditCels(celMenu.layerId),
+              },
+            ],
             [
               {
                 label: "Cel properties…",

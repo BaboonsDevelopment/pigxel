@@ -14,6 +14,7 @@ vi.mock("next/font/google", () => ({
   Pixelify_Sans: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
@@ -37,6 +38,7 @@ vi.mock("@/features/assets/server", () => ({
 }));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
+  countPublicTilesByTag: async () => ({}),
 }));
 
 import Feedback from "@/app/(app)/feedback/page";

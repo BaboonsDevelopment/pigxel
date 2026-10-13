@@ -1,34 +1,27 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
+import { cn } from "@pigxel/ui/lib/utils";
 import { setFollowing } from "../actions";
+import { BANNER_BUTTON } from "./profile-hero/constants";
 
 export function FollowButton({
   profileId,
   name,
   following,
-  followers,
 }: {
   profileId: string;
   name: string;
   following: boolean;
-  followers: number;
 }) {
-  const [state, apply] = useOptimistic(
-    { following, followers },
-    (_, next: boolean) => ({
-      following: next,
-      followers: followers + (next === following ? 0 : next ? 1 : -1),
-    }),
-  );
+  const [shown, apply] = useOptimistic(following, (_, next: boolean) => next);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const toggle = () =>
     startTransition(async () => {
-      const next = !state.following;
+      const next = !shown;
       apply(next);
       setError(null);
       const result = await setFollowing(profileId, next);
@@ -36,36 +29,25 @@ export function FollowButton({
     });
 
   return (
-    <div className="flex flex-col items-start gap-2 sm:items-end">
-      <Button
+    <div className="flex flex-col items-end gap-1">
+      <button
         type="button"
-        size="lg"
-        variant={state.following ? "secondary" : "primary"}
-        aria-pressed={state.following}
-        aria-label={state.following ? `Unfollow ${name}` : `Follow ${name}`}
+        aria-pressed={shown}
+        aria-label={shown ? `Unfollow ${name}` : `Follow ${name}`}
         disabled={pending}
         onClick={toggle}
-        className="rounded-full px-6 aria-pressed:border-border aria-pressed:bg-white/80 aria-pressed:text-foreground"
+        className={cn(
+          BANNER_BUTTON,
+          !shown && "bg-primary text-primary-foreground hover:bg-primary-hover",
+        )}
       >
-        {state.following ? "Following" : "+ Follow"}
-      </Button>
-      <FollowerCount count={state.followers} />
+        {shown ? "Following" : "+ Follow"}
+      </button>
       {error && (
-        <FormMessage tone="error" className="text-xs">
+        <FormMessage tone="error" className="rounded-md bg-white px-2 text-xs">
           {error}
         </FormMessage>
       )}
     </div>
-  );
-}
-
-export function FollowerCount({ count }: { count: number }) {
-  return (
-    <p className="text-sm">
-      <span className="font-semibold tabular-nums">{count}</span>{" "}
-      <span className="text-muted-foreground">
-        {count === 1 ? "follower" : "followers"}
-      </span>
-    </p>
   );
 }

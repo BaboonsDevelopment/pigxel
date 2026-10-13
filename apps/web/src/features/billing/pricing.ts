@@ -41,8 +41,14 @@ export const FREE_PLAN: {
     "Every drawing tool",
     "Layers, frames, onion skin",
     "Palettes, mirror and tiled mode",
+<<<<<<< HEAD
     "PNG, GIF and sprite sheet export",
     `${FREE_LIMITS.cloudTiles} arts in Pigxel cloud, unlimited in Google Drive`,
+=======
+    "Every export format",
+    "Pigxel cloud or Google Drive",
+    "A few AI generations to try",
+>>>>>>> origin/dev
   ],
 };
 

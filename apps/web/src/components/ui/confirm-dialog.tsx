@@ -2,9 +2,15 @@
 
 import { useRef, type RefObject } from "react";
 import { createRoot } from "react-dom/client";
-import { Button, type ButtonVariant } from "@pigxel/ui/components/button";
-import { Dialog, useDialog } from "@pigxel/ui/components/dialog";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import type { ButtonVariant } from "@pigxel/ui/components/button";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { ModalButton } from "./modal-button";
+import { MODAL_FOOTER, ModalHeader } from "./modal-header";
 
 type ConfirmOptions = {
   title: string;
@@ -63,7 +69,7 @@ function ChoiceDialog<T extends string>({
   const answer = useRef<T | null>(null);
   return (
     <Dialog
-      size="sm"
+      size={props.choices.length > 1 ? "md" : "sm"}
       onClose={() => onDone(answer.current)}
       aria-describedby="confirm-dialog-message"
     >
@@ -84,32 +90,33 @@ function ChoiceBody<T extends string>({
     answerRef.current = value;
     close();
   };
+  const risky = choices.some((choice) => choice.variant === "destructive");
   return (
-    <div className="p-5">
-      <SectionTitle id={titleId}>{title}</SectionTitle>
-      <Lead id="confirm-dialog-message" className="mt-2">
-        {message}
-      </Lead>
-      <div className="mt-5 flex flex-wrap justify-end gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          autoFocus
-          onClick={() => choose(null)}
-        >
+    <>
+      <ModalHeader
+        title={title}
+        titleId={titleId}
+        className={risky ? "bg-attention-soft" : undefined}
+      />
+      <DialogBody className="py-5">
+        <p id="confirm-dialog-message" className="text-sm">
+          {message}
+        </p>
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" autoFocus onClick={() => choose(null)}>
           {cancelLabel}
-        </Button>
+        </ModalButton>
         {choices.map((choice) => (
-          <Button
+          <ModalButton
             key={choice.value}
-            type="button"
-            variant={choice.variant ?? "primary"}
+            variant={choice.variant === "secondary" ? "secondary" : "primary"}
             onClick={() => choose(choice.value)}
           >
             {choice.label}
-          </Button>
+          </ModalButton>
         ))}
-      </div>
-    </div>
+      </DialogFooter>
+    </>
   );
 }

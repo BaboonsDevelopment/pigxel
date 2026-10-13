@@ -7,6 +7,7 @@ import {
   isGoogleSignInAvailable,
 } from "@/lib/google-drive/server";
 import { createClient } from "@/lib/supabase/server";
+import { rememberAcceptance } from "@/features/legal/accept-cookie";
 
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
@@ -46,9 +47,12 @@ export async function GET(request: NextRequest) {
         ? await supabase.auth.linkIdentity({ provider: "google", options })
         : await supabase.auth.signInWithOAuth({ provider: "google", options });
     if (!error && data?.url)
-      return NextResponse.redirect(data.url, {
-        headers: { "Cache-Control": "private, no-store" },
-      });
+      return rememberAcceptance(
+        request,
+        NextResponse.redirect(data.url, {
+          headers: { "Cache-Control": "private, no-store" },
+        }),
+      );
   } catch {
     // Keep OAuth setup and network failures in the sign-in/linking flow.
   }

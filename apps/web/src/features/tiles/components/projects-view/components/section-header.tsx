@@ -7,12 +7,14 @@ export function SectionHeader({
   count,
   className,
   onViewAll,
+  action,
 }: {
   id: string;
   title: string;
   count: string;
   className?: string;
   onViewAll?: () => void;
+  action?: React.ReactNode;
 }) {
   return (
     <div className={cn("flex items-center justify-between gap-4", className)}>
@@ -24,6 +26,7 @@ export function SectionHeader({
           {count}
         </span>
       </div>
+      {action}
       {onViewAll && (
         <button
           type="button"

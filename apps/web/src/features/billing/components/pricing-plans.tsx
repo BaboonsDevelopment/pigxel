@@ -92,11 +92,7 @@ export function PricingPlans({
               description={FREE_PLAN.description}
               features={FREE_PLAN.features}
               price={
-                <Price
-                  amount="Free"
-                  period="forever"
-                  note="No subscription needed"
-                />
+                <Price amount="Free" note="No card or subscription needed" />
               }
               action={
                 <Link
@@ -129,6 +125,7 @@ export function PricingPlans({
                   features={tier.features}
                   highlighted={tier.highlighted}
                   price={
+<<<<<<< HEAD
                     <Price
                       amount={quote(tier.price[cycle]).formattedTotal}
                       period={`/ ${cycle}`}
@@ -139,6 +136,25 @@ export function PricingPlans({
                           : "Billed monthly"
                       }
                     />
+=======
+                    quote ? (
+                      <Price
+                        amount={quote.formattedTotal}
+                        period={`/ ${cycle}`}
+                        comparison={comparison}
+                        note={`Renews ${cycle === "year" ? "yearly" : "monthly"} until you cancel · ${country ? "Tax included" : "Plus any tax"}`}
+                      />
+                    ) : failed ? (
+                      <Text as="span" tone="muted">
+                        Price unavailable
+                      </Text>
+                    ) : (
+                      <Skeleton
+                        aria-label="Loading price"
+                        className="h-10 w-32"
+                      />
+                    )
+>>>>>>> origin/dev
                   }
                   action={
                     currentProductId === productId ? (
@@ -213,7 +229,7 @@ function Price({
   comparison,
 }: {
   amount: string;
-  period: string;
+  period?: string;
   note: string;
   comparison?: ReturnType<typeof annualComparison>;
 }) {
@@ -223,12 +239,14 @@ function Price({
         <Heading as="span" size="page">
           {amount}
         </Heading>
-        <Text as="span" tone="muted">
-          {period}
-        </Text>
+        {period && (
+          <Text as="span" tone="muted">
+            {period}
+          </Text>
+        )}
       </div>
       <div className="mt-2 flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-        {comparison ? (
+        {comparison && (
           <>
             <span className="sr-only">Twelve months at the monthly rate: </span>
             <s className="decoration-1">{comparison.regularPrice}</s>
@@ -238,9 +256,8 @@ function Price({
                 : "Annual savings"}
             </Badge>
           </>
-        ) : (
-          note
         )}
+        <span className={comparison ? "basis-full" : undefined}>{note}</span>
       </div>
     </div>
   );

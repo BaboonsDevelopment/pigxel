@@ -8,6 +8,7 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { getOwnProfile } from "@/features/profile/server";
 import { AvatarField } from "@/features/settings/profile/avatar-field";
+import { CoverField } from "@/features/settings/profile/cover-field";
 import { ProfileForm } from "@/features/settings/profile/profile-form";
 
 export const metadata: Metadata = { title: "Profile settings · Pigxel" };
@@ -28,6 +29,10 @@ export default async function ProfileSettings() {
       <section aria-labelledby="avatar-heading">
         <SectionTitle id="avatar-heading">Profile picture</SectionTitle>
         <AvatarField userId={user.id} profile={profile} />
+      </section>
+      <section aria-labelledby="cover-heading" className="border-t pt-10">
+        <SectionTitle id="cover-heading">Profile cover</SectionTitle>
+        <CoverField userId={user.id} profile={profile} />
       </section>
       <section aria-labelledby="details-heading" className="border-t pt-10">
         <div className="flex items-baseline justify-between gap-4">

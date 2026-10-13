@@ -23,7 +23,9 @@ export function LegalPage({
           will be filled in before Pigxel takes payments.
         </Notice>
       )}
-      <div className="mt-8 text-[15px] leading-relaxed">{intro}</div>
+      <div className="mt-8 text-[15px] leading-relaxed [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_p+p]:mt-3">
+        {intro}
+      </div>
       <div className="mt-6 space-y-10 text-[15px] leading-relaxed [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_li]:mt-1.5 [&_p]:mt-3 [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:pl-5">
         {children}
       </div>
@@ -49,7 +51,14 @@ export function LegalSection({
 export function ContactDetails() {
   return (
     <p>
+<<<<<<< HEAD
       Questions about this policy? Contact us at{" "}
+=======
+      {LEGAL.operator} is run by {LEGAL.legalName}
+      {LEGAL.registrationNumber &&
+        `, registration number ${LEGAL.registrationNumber}`}
+      , {LEGAL.address}. Email:{" "}
+>>>>>>> origin/dev
       <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
     </p>
   );

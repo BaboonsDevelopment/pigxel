@@ -2,12 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { PixelImage } from "@/components/ui/pixel-image";
 import { getAiBalance } from "../../actions";
 import { AI_SPENT_EVENT } from "../../spent-event";
 import { UsageDialog } from "./components/usage-dialog/usage-dialog";
 import { tokens } from "./components/usage-dialog/helpers";
 
-export function TokensButton({ className }: { className?: string }) {
+export function TokensButton({
+  className,
+  card = false,
+}: {
+  className?: string;
+  card?: boolean;
+}) {
   const [left, setLeft] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -30,20 +37,57 @@ export function TokensButton({ className }: { className?: string }) {
   const empty = left !== null && left <= 0;
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Your AI tokens — see what you spent"
-        className={cn(
-          "group flex h-9 shrink-0 items-center gap-1.5 rounded-full border bg-background py-1 pr-3 pl-1.5 font-mono text-sm font-semibold tabular-nums shadow-sm transition-colors hover:bg-muted",
-          empty && "text-destructive",
-          className,
-        )}
-      >
-        <PixelCoin className="size-6 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
-        {left === null ? "…" : tokens(left)}
-        <span className="sr-only"> AI tokens left</span>
-      </button>
+      {card ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Your AI tokens — see what you spent"
+          className={cn(
+            "group flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border bg-background py-2 pr-2.5 pl-2 text-left shadow-sm transition-colors hover:bg-muted",
+            className,
+          )}
+        >
+          <PixelCoin className="h-8 transition-transform duration-300 group-hover:rotate-12" />
+          <span className="grid leading-tight">
+            <span className="text-xs font-medium">AI tokens</span>
+            <span
+              className={cn(
+                "text-[10px] text-muted-foreground tabular-nums",
+                empty && "text-destructive",
+              )}
+            >
+              {left === null ? "…" : `${tokens(left)} left in your plan`}
+            </span>
+          </span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            className="ml-2 size-4 text-muted-foreground"
+          >
+            <circle cx="8" cy="8" r="6" />
+            <path d="M8 7.3v3.7M8 5v.2" />
+          </svg>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Your AI tokens — see what you spent"
+          className={cn(
+            "group flex h-9 shrink-0 items-center gap-1.5 rounded-full border bg-background py-1 pr-3 pl-1.5 font-mono text-sm font-semibold tabular-nums shadow-sm transition-colors hover:bg-muted",
+            empty && "text-destructive",
+            className,
+          )}
+        >
+          <PixelCoin className="h-6 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
+          {left === null ? "…" : tokens(left)}
+          <span className="sr-only"> AI tokens left</span>
+        </button>
+      )}
       {open && (
         <UsageDialog
           onClose={() => {
@@ -57,49 +101,13 @@ export function TokensButton({ className }: { className?: string }) {
 }
 
 function PixelCoin({ className }: { className?: string }) {
-  const px = (x: number, y: number, w: number, h: number, fill: string) => (
-    <rect
-      key={`${x}-${y}-${fill}`}
-      x={x}
-      y={y}
-      width={w}
-      height={h}
-      fill={fill}
-    />
-  );
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 12 12"
-      shapeRendering="crispEdges"
-      className={className}
-    >
-      {px(3, 0, 5, 1, "#8a4b08")}
-      {px(1, 1, 2, 1, "#8a4b08")}
-      {px(8, 1, 2, 1, "#8a4b08")}
-      {px(0, 3, 1, 5, "#8a4b08")}
-      {px(1, 2, 1, 1, "#8a4b08")}
-      {px(9, 2, 1, 1, "#8a4b08")}
-      {px(10, 3, 1, 5, "#8a4b08")}
-      {px(1, 8, 1, 1, "#8a4b08")}
-      {px(9, 8, 1, 1, "#8a4b08")}
-      {px(1, 9, 2, 1, "#8a4b08")}
-      {px(8, 9, 2, 1, "#8a4b08")}
-      {px(3, 10, 5, 1, "#8a4b08")}
-      {px(3, 1, 5, 9, "#f5b41a")}
-      {px(2, 2, 7, 7, "#f5b41a")}
-      {px(1, 3, 9, 5, "#f5b41a")}
-      {px(8, 3, 1, 5, "#d98a0b")}
-      {px(3, 8, 6, 1, "#d98a0b")}
-      {px(9, 4, 1, 3, "#d98a0b")}
-      {px(4, 3, 1, 5, "#b86a08")}
-      {px(5, 3, 2, 1, "#b86a08")}
-      {px(6, 4, 1, 1, "#b86a08")}
-      {px(5, 5, 2, 1, "#b86a08")}
-      {px(2, 3, 1, 2, "#fff1b8")}
-      {px(3, 2, 1, 1, "#fff1b8")}
-      {px(10, 0, 1, 1, "#fff6d6")}
-      {px(11, 1, 1, 1, "#fff6d6")}
-    </svg>
+    <PixelImage
+      src="/art/coins-icon.png"
+      alt=""
+      width={23}
+      height={30}
+      className={cn("w-auto", className)}
+    />
   );
 }

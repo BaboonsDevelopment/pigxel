@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { DriveStatus } from "@/lib/google-drive/status";
-import { CloudError, saveCloudTile } from "@/lib/pigxel-file/cloud";
+import {
+  CloudConflictError,
+  CloudError,
+  readCloudTileVersion,
+  saveCloudTile,
+} from "@/lib/pigxel-file/cloud";
 import {
   canStoreDrafts,
   writeDraft,
@@ -32,13 +43,27 @@ import {
   draftFromFile,
 } from "@/lib/pigxel-file/open-tile";
 import {
-  documentFromImage,
+  croppedAnimation,
+  documentFromFrames,
   documentFromSequence,
+  fitted,
   imageBaseName,
   isImageFile,
+  isSupportedFile,
+  pictureFromFile,
   sequenceName,
+  tooLarge,
+  UNSUPPORTED_FILE,
 } from "@/lib/pigxel-file/import-image";
+import type { DecodedAnimation } from "@/lib/image/gif-decode";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
+import { snapshotVersion } from "@/features/versions/actions";
+import { VERSION_EVERY_MS } from "@/features/versions/versions";
+import {
+  showSnackbar,
+  showSuccess,
+  withLoading,
+} from "@/components/ui/snackbar";
 
 type FileStatus = {
   tone: "info" | "error";
@@ -49,9 +74,14 @@ type FileStatus = {
 
 export type TileFile = ReturnType<typeof useTileFile>;
 
-type Sync = "idle" | "saving" | "saved" | "failed";
+type Sync = "idle" | "saving" | "saved" | "retrying" | "failed" | "conflict";
 
 const AUTOSAVE_DELAY = 1500;
+const RETRY_DELAY = 3000;
+const AUTO_RETRIES = 3;
+const SAVE_FAILED = "Failed to save project.";
+const PROJECT_SAVED = "Project saved successfully!";
+const SAVING = "Saving project…";
 
 const isKnownError = (error: unknown): error is Error =>
   error instanceof PigxelFileError ||
@@ -66,8 +96,10 @@ export function useTileFile({
   drive,
   notice,
   onOpen,
+  onDraft,
 }: {
   tile: RefObject<{ document: () => PigxelDocument } | null>;
+  onDraft?: (file: string) => void;
   fileInput: RefObject<HTMLInputElement | null>;
   userId: string;
   initial: Draft;
@@ -76,17 +108,27 @@ export function useTileFile({
   onOpen: (draftId: string) => void;
 }) {
   const [name, setName] = useState(initial.name);
+  const onDraftRef = useRef(onDraft);
+  useLayoutEffect(() => {
+    onDraftRef.current = onDraft;
+  });
   const [location, setLocation] = useState<TileLocation | null>(
     initial.location,
   );
   const [dirty, setDirty] = useState(initial.dirty);
   const [revision, setRevision] = useState(0);
   const latestRevision = useRef(revision);
+  const lastSnapshot = useRef(0);
   const [sync, setSync] = useState<Sync>(
     initial.location && !initial.dirty ? "saved" : "idle",
   );
   const [syncError, setSyncError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
+  const [largePicture, setLargePicture] = useState<{
+    picture: DecodedAnimation;
+    name: string;
+  } | null>(null);
+  const [pause, setPause] = useState<string | null>(null);
   const [status, setStatus] = useState<FileStatus | null>(() =>
     canStoreDrafts(userId)
       ? (notice ?? null)
@@ -97,11 +139,17 @@ export function useTileFile({
   );
 
   useEffect(() => {
+    if (!canStoreDrafts(userId))
+      showSnackbar("Unsaved changes will be lost.", { tone: "warning" });
+  }, [userId]);
+
+  useEffect(() => {
     latestRevision.current = revision;
     const doc = tile.current?.document();
     if (!doc) return;
     const file = serializePigxel(doc);
     writeDraft(userId, { id: initial.id, name, file, location, dirty });
+    onDraftRef.current?.(file);
   }, [tile, userId, initial.id, name, location, dirty, revision]);
 
   const currentImage = () => {
@@ -115,13 +163,26 @@ export function useTileFile({
     current: TileLocation | null,
     image = currentImage(),
     tileName = name,
+    force = false,
   ): Promise<TileLocation> => {
     const contents = serializePigxel(image);
+    if (
+      target === "cloud" &&
+      current?.kind === "cloud" &&
+      Date.now() - lastSnapshot.current > VERSION_EVERY_MS
+    ) {
+      if (await snapshotVersion(current.tile.id).catch(() => false))
+        lastSnapshot.current = Date.now();
+    }
     if (target === "cloud") {
       const tile: CloudTile = await saveCloudTile(
         {
           id: current?.kind === "cloud" ? current.tile.id : undefined,
           name: tileName,
+          version:
+            current?.kind === "cloud" && !force
+              ? current.tile.version
+              : undefined,
         },
         contents,
         image,
@@ -139,45 +200,72 @@ export function useTileFile({
     return { kind: "drive", file };
   };
 
+  const [failures, setFailures] = useState(0);
+
   const saved = (next: TileLocation, savedRevision: number) => {
     setLocation(next);
     setSyncError(null);
+    setFailures(0);
     setSync("saved");
     if (latestRevision.current === savedRevision) setDirty(false);
   };
 
   useEffect(() => {
-    if (!location || !dirty || sync === "saving" || sync === "failed") return;
+    if (
+      !location ||
+      !dirty ||
+      sync === "saving" ||
+      sync === "failed" ||
+      sync === "conflict"
+    )
+      return;
+    if (pause) return;
     if (location.kind === "drive" && !drive.available) return;
-    const timer = setTimeout(async () => {
-      const savedRevision = latestRevision.current;
-      setSync("saving");
-      try {
-        saved(await saveTo(location.kind, location), savedRevision);
-      } catch (error) {
-        setSyncError(
-          isKnownError(error)
-            ? error
-            : new Error(`Couldn’t save to ${LOCATION_LABELS[location.kind]}.`),
-        );
-        setSync("failed");
-      }
-    }, AUTOSAVE_DELAY);
+    const timer = setTimeout(
+      async () => {
+        const savedRevision = latestRevision.current;
+        setSync("saving");
+        try {
+          saved(await saveTo(location.kind, location), savedRevision);
+        } catch (error) {
+          if (error instanceof CloudConflictError) return setSync("conflict");
+          setSyncError(
+            isKnownError(error)
+              ? error
+              : new Error(
+                  `Couldn’t save to ${LOCATION_LABELS[location.kind]}.`,
+                ),
+          );
+          const tries = failures + 1;
+          const needsConnect =
+            error instanceof DriveError && error.needsConnect;
+          setFailures(tries);
+          const gaveUp = tries >= AUTO_RETRIES || needsConnect;
+          if (gaveUp) showSnackbar(SAVE_FAILED);
+          setSync(gaveUp ? "failed" : "retrying");
+        }
+      },
+      sync === "retrying" ? RETRY_DELAY * failures : AUTOSAVE_DELAY,
+    );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, dirty, name, revision, sync, drive.available]);
+  }, [location, dirty, name, revision, sync, drive.available, pause, failures]);
 
   const changed = () => {
     setDirty(true);
     setRevision((r) => r + 1);
   };
 
-  const run = async (action: () => Promise<void>) => {
+  const run = async (
+    action: () => Promise<void>,
+    failure = "Something went wrong. Please try again.",
+  ) => {
     setBusy(true);
     setStatus(null);
     try {
       await action();
     } catch (error) {
+      showSnackbar(failure);
       setStatus({
         tone: "error",
         text: isKnownError(error)
@@ -202,12 +290,33 @@ export function useTileFile({
 
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
-    void run(async () =>
-      isImageFile(file)
-        ? openNew(await documentFromImage(file), imageBaseName(file.name))
-        : onOpen(
-            await draftFromFile(userId, await file.text(), file.name, null),
-          ),
+    if (!isSupportedFile(file))
+      return showSnackbar(UNSUPPORTED_FILE, { tone: "warning" });
+    void run(async () => {
+      if (!isImageFile(file))
+        return onOpen(
+          await draftFromFile(userId, await file.text(), file.name, null),
+        );
+      const picture = await pictureFromFile(file);
+      const pictureName = imageBaseName(file.name);
+      if (tooLarge(picture)) setLargePicture({ picture, name: pictureName });
+      else await openNew(documentFromFrames(picture), pictureName);
+    });
+  };
+
+  const openLargePicture = (
+    area: { x: number; y: number; w: number; h: number } | null,
+  ) => {
+    const large = largePicture;
+    setLargePicture(null);
+    if (!large) return;
+    void run(() =>
+      openNew(
+        documentFromFrames(
+          area ? croppedAnimation(large.picture, area) : fitted(large.picture),
+        ),
+        large.name,
+      ),
     );
   };
 
@@ -242,33 +351,98 @@ export function useTileFile({
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        saved(await saveTo(target, location), savedRevision);
+        saved(
+          await withLoading(SAVING, () => saveTo(target, location)),
+          savedRevision,
+        );
+        showSuccess(PROJECT_SAVED);
       } catch (error) {
-        setSync(location ? "failed" : "idle");
+        setSync(
+          error instanceof CloudConflictError
+            ? "conflict"
+            : location
+              ? "failed"
+              : "idle",
+        );
+        if (error instanceof CloudConflictError) return;
         throw error;
       }
-    });
+    }, SAVE_FAILED);
+
+  const saveToCloudFirst = async () => {
+    let cloud = null as CloudTile | null;
+    await run(async () => {
+      const savedRevision = latestRevision.current;
+      setSync("saving");
+      try {
+        const next = await withLoading(SAVING, () => saveTo("cloud", location));
+        saved(next, savedRevision);
+        showSuccess(PROJECT_SAVED);
+        if (next.kind === "cloud") cloud = next.tile;
+      } catch (error) {
+        setSync(
+          error instanceof CloudConflictError
+            ? "conflict"
+            : location
+              ? "failed"
+              : "idle",
+        );
+        if (error instanceof CloudConflictError) return;
+        throw error;
+      }
+    }, SAVE_FAILED);
+    return cloud;
+  };
 
   const save = () => (location ? saveNow(location.kind) : download());
+
+  const leaving = useRef(false);
+  const unsaved = !!location && (dirty || sync === "saving");
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!leaving.current) event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
 
   const place = location ? LOCATION_LABELS[location.kind] : null;
   const locationStatus: FileStatus | null = !place
     ? null
-    : sync === "failed"
-      ? {
-          tone: "error",
-          text: syncError?.message ?? `Couldn’t save to ${place}.`,
-          retry:
-            syncError instanceof DriveError && syncError.needsConnect
-              ? "Connect Google Drive"
-              : "Try again",
-          connect: syncError instanceof DriveError && syncError.needsConnect,
-        }
-      : sync === "saving"
-        ? { tone: "info", text: `Saving to ${place}…` }
-        : dirty
-          ? { tone: "info", text: `Changes not yet saved to ${place}` }
-          : { tone: "info", text: `All changes saved to ${place}` };
+    : pause
+      ? { tone: "error", text: pause }
+      : sync === "conflict"
+        ? {
+            tone: "error",
+            text: "This tile was changed somewhere else. Choose which version to keep.",
+          }
+        : sync === "failed"
+          ? {
+              tone: "error",
+              text: syncError?.message ?? `Couldn’t save to ${place}.`,
+              retry:
+                syncError instanceof DriveError && syncError.needsConnect
+                  ? "Connect Google Drive"
+                  : "Try again",
+              connect:
+                syncError instanceof DriveError && syncError.needsConnect,
+            }
+          : sync === "retrying"
+            ? {
+                tone: "info",
+                text: `Couldn’t save to ${place}. Trying again…`,
+              }
+            : sync === "saving" && failures > 0
+              ? {
+                  tone: "info",
+                  text: `Couldn’t save to ${place}. Trying again…`,
+                }
+              : sync === "saving"
+                ? { tone: "info", text: `Saving to ${place}…` }
+                : dirty
+                  ? { tone: "info", text: `Changes not yet saved to ${place}` }
+                  : { tone: "info", text: `All changes saved to ${place}` };
 
   return {
     name,
@@ -280,12 +454,49 @@ export function useTileFile({
     location,
     dirty,
     markDirty: changed,
+    conflict: sync === "conflict",
+    keepMine: () =>
+      void run(async () => {
+        if (!location) return;
+        const savedRevision = latestRevision.current;
+        setSync("saving");
+        try {
+          saved(
+            await saveTo(location.kind, location, currentImage(), name, true),
+            savedRevision,
+          );
+        } catch (error) {
+          setSync("failed");
+          throw error;
+        }
+      }),
+    reloadFromCloud: () =>
+      void run(async () => {
+        if (location?.kind !== "cloud") return;
+        const cloud = await readCloudTileVersion(location.tile.id);
+        writeDraft(userId, {
+          id: initial.id,
+          name,
+          file: cloud.file,
+          location: {
+            kind: "cloud",
+            tile: { ...location.tile, version: cloud.version },
+          },
+          dirty: false,
+        });
+        leaving.current = true;
+        window.location.reload();
+      }),
+    setPause,
     busy,
     status:
       sync === "failed" || status?.tone !== "error"
         ? (locationStatus ?? status)
         : status,
     onFileChosen,
+    largePicture: largePicture?.picture ?? null,
+    openLargePicture,
+    cancelLargePicture: () => setLargePicture(null),
     openFromComputer,
     openDocument,
     openFrames,
@@ -293,7 +504,25 @@ export function useTileFile({
     openCloudTile,
     download,
     saveToCloud: () => saveNow("cloud"),
+    saveToCloudFirst,
     saveToDrive: () => saveNow("drive"),
     save,
+    saveBeforeLeaving: async () => {
+      if (!location) return true;
+      const savedRevision = latestRevision.current;
+      setSync("saving");
+      try {
+        saved(
+          await withLoading(SAVING, () => saveTo(location.kind, location)),
+          savedRevision,
+        );
+        showSuccess(PROJECT_SAVED);
+        return true;
+      } catch (error) {
+        setSync(error instanceof CloudConflictError ? "conflict" : "failed");
+        showSnackbar(SAVE_FAILED);
+        return false;
+      }
+    },
   };
 }

@@ -8,9 +8,11 @@ const VIEW = 264;
 
 export function CurveEditor({
   points,
+  light = "#ffffff",
   onChange,
 }: {
   points: CurvePoint[];
+  light?: string;
   onChange: (points: CurvePoint[]) => void;
 }) {
   const svg = useRef<SVGSVGElement>(null);
@@ -82,51 +84,66 @@ export function CurveEditor({
   };
 
   return (
-    <svg
-      ref={svg}
-      viewBox="-4 -4 264 264"
-      role="img"
-      aria-label="Colour curve: click to add a point, drag to move, double-click or right-click a point to remove it"
-      onPointerDown={start}
-      onDoubleClick={remove}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        remove(e);
-      }}
-      className="aspect-square w-full max-w-64 cursor-crosshair touch-none rounded-lg border bg-muted select-none"
-    >
-      {GRID.map((v) => (
-        <g key={v} stroke="currentColor" strokeOpacity={0.12}>
-          <line x1={v} y1={0} x2={v} y2={255} />
-          <line x1={0} y1={v} x2={255} y2={v} />
-        </g>
-      ))}
-      <line
-        x1={0}
-        y1={255}
-        x2={255}
-        y2={0}
-        stroke="currentColor"
-        strokeOpacity={0.2}
-        strokeDasharray="4 4"
+    <div className="grid w-full max-w-72 grid-cols-[0.75rem_1fr] grid-rows-[1fr_0.75rem] gap-1.5">
+      <span
+        aria-hidden="true"
+        className="rounded-full border"
+        style={{ backgroundImage: `linear-gradient(to top, #000, ${light})` }}
       />
-      <polyline
-        points={line}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-      />
-      {points.map(([x, y], i) => (
-        <circle
-          key={i}
-          cx={x}
-          cy={255 - y}
-          r={5}
-          fill="var(--background)"
-          stroke="currentColor"
-          strokeWidth={2}
+      <svg
+        ref={svg}
+        viewBox="-4 -4 264 264"
+        role="img"
+        aria-label="Colour curve: click to add a point, drag to move, double-click or right-click a point to remove it"
+        onPointerDown={start}
+        onDoubleClick={remove}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          remove(e);
+        }}
+        className="aspect-square w-full cursor-crosshair touch-none rounded-xl border bg-background select-none"
+      >
+        {GRID.map((v) => (
+          <g key={v} stroke="var(--border)">
+            <line x1={v} y1={0} x2={v} y2={255} />
+            <line x1={0} y1={v} x2={255} y2={v} />
+          </g>
+        ))}
+        <line
+          x1={0}
+          y1={255}
+          x2={255}
+          y2={0}
+          stroke="var(--muted-foreground)"
+          strokeOpacity={0.35}
+          strokeDasharray="4 4"
         />
-      ))}
-    </svg>
+        <polyline
+          points={line}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {points.map(([x, y], i) => (
+          <circle
+            key={i}
+            cx={x}
+            cy={255 - y}
+            r={6}
+            fill="var(--background)"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          />
+        ))}
+      </svg>
+      <span aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        className="rounded-full border"
+        style={{ backgroundImage: `linear-gradient(to right, #000, ${light})` }}
+      />
+    </div>
   );
 }

@@ -28,6 +28,10 @@ export default function Refunds() {
             renewal, if you ask within {days} days of that payment.
           </li>
           <li>
+            The refund is the full amount you paid, even if you used AI
+            generations or cloud storage in that time.
+          </li>
+          <li>
             After {days} days, payments aren’t refunded, except where the law
             requires it. You can still cancel so the plan doesn’t renew.
           </li>
@@ -63,7 +67,23 @@ export default function Refunds() {
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Contact">
+      <LegalSection title="5. Your legal rights">
+        <p>
+          This policy adds to your rights under consumer law and doesn’t take
+          any away. Consumers in the EU and UK can withdraw from a purchase
+          within 14 days; our {days}-day full refund covers that. Paddle’s{" "}
+          <a
+            href="https://www.paddle.com/legal/checkout-buyer-terms"
+            target="_blank"
+            rel="noreferrer"
+          >
+            buyer terms
+          </a>{" "}
+          also apply to your purchase.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Contact">
         <ContactDetails />
       </LegalSection>
     </LegalPage>

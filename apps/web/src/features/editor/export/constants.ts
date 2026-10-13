@@ -15,6 +15,14 @@ export const EXPORT_FORMATS = [
       "The frame on screen on a solid background. Edges soften slightly; use PNG for game art.",
   },
   {
+    id: "svg",
+    label: "SVG",
+    extension: ".svg",
+    mime: "image/svg+xml",
+    description:
+      "The frame on screen as vector squares, sharp at any size. For web pages, print and design tools.",
+  },
+  {
     id: "gif",
     label: "GIF",
     extension: ".gif",
@@ -135,7 +143,7 @@ export const TIMELAPSE_SHAPES = [
 
 export type TimelapseShape = (typeof TIMELAPSE_SHAPES)[number]["id"];
 
-export const TIMELAPSE_LENGTHS = [5, 10, 15] as const;
+export const TIMELAPSE_LENGTHS = [5, 10, 15, 30, 60] as const;
 
 export type TimelapseLength = (typeof TIMELAPSE_LENGTHS)[number];
 

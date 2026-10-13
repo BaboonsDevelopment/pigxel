@@ -7,18 +7,32 @@ import type { PublicTile } from "@/features/profile/profile";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { HoverOverlay } from "@/features/tiles/components/hover-overlay";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
+import { Highlighted } from "./components/highlighted";
 import { LikeButton } from "./components/like-button";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { formatCount } from "./helpers";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
 
-export function PopularCard({ tile }: { tile: PublicTile }) {
+export function PopularCard({
+  tile,
+  words = [],
+  delay = 0,
+  menu = [],
+}: {
+  tile: PublicTile;
+  words?: string[];
+  delay?: number;
+  menu?: { label: string; onSelect: () => void; destructive?: boolean }[];
+}) {
   const { author } = tile;
   const router = useRouter();
   const href = `/explore/${tile.id}`;
   return (
-    <li className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow hover:shadow-md">
+    <li
+      style={{ animationDelay: `${delay}ms` }}
+      className="group min-w-0 overflow-hidden rounded-2xl border bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-shadow [animation-fill-mode:both] hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300"
+    >
       <Link
         href={href}
         aria-label={`Open ${tile.name}`}
@@ -31,7 +45,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
                 src={tile.thumbnail}
                 alt=""
                 loading="lazy"
-                className="size-full object-contain"
+                className="size-full object-cover"
               />
             ) : (
               <span className="flex size-full items-center justify-center font-mono text-xs text-muted-foreground">
@@ -45,7 +59,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
       <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>
         <div className="flex items-center justify-between gap-2">
           <h3 className="truncate text-xl leading-tight" title={tile.name}>
-            {tile.name}
+            <Highlighted text={tile.name} words={words} />
           </h3>
           <ProjectMenu
             label={`More for ${tile.name}`}
@@ -66,6 +80,7 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
                 label: "View profile",
                 onSelect: () => router.push(`/u/${author.username}`),
               },
+              ...menu,
             ]}
           />
         </div>
@@ -79,7 +94,9 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
               url={author.avatarUrl}
               className="size-3.5 shrink-0 text-[7px]"
             />
-            <span className="truncate">{author.username}</span>
+            <span className="truncate">
+              <Highlighted text={author.username} words={words} />
+            </span>
           </Link>
           <div
             className={cn(
@@ -107,6 +124,23 @@ export function PopularCard({ tile }: { tile: PublicTile }) {
                 <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
               </svg>
               {formatCount(tile.downloads)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span aria-label="Views" className="flex items-center gap-1">
+              <svg
+                aria-hidden="true"
+                viewBox="1 3 14 10"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-2 w-2.5"
+              >
+                <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+                <circle cx="8" cy="8" r="2" />
+              </svg>
+              {formatCount(tile.views ?? 0)}
             </span>
           </div>
         </div>

@@ -13,9 +13,20 @@ export type CloudTileSummary = CloudTile & {
   height: number;
   thumbnail: string | null;
   updatedAt: string;
+  published?: boolean;
+  labels?: string[];
+  pinnedAt?: string | null;
+  openedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 export class CloudError extends Error {}
+
+export class CloudConflictError extends CloudError {
+  constructor() {
+    super("This tile was changed somewhere else.");
+  }
+}
 
 type TileRow = {
   id: string;
@@ -25,6 +36,12 @@ type TileRow = {
   height: number;
   thumbnail: string | null;
   updated_at: string;
+  visibility?: string;
+  review?: string | null;
+  labels?: { label_id: string }[];
+  pinned_at?: string | null;
+  opened_at?: string | null;
+  deleted_at?: string | null;
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -40,6 +57,7 @@ export async function listCloudTiles(): Promise<CloudTileSummary[]> {
     .from("tiles")
     .select("id, user_id, name, width, height, thumbnail, updated_at")
     .eq("user_id", session.user.id)
+    .is("deleted_at", null)
     .order("updated_at", { ascending: false })
     .limit(200);
   if (error) throw new CloudError("Couldn’t load your Pigxel cloud tiles.");
@@ -54,10 +72,19 @@ export function toSummary(row: TileRow): CloudTileSummary {
     height: row.height,
     thumbnail: row.thumbnail,
     updatedAt: row.updated_at,
+    ...(row.visibility && {
+      published: row.visibility === "public" || row.review === "pending",
+    }),
+    ...(row.labels && { labels: row.labels.map((l) => l.label_id) }),
+    ...(row.pinned_at !== undefined && { pinnedAt: row.pinned_at }),
+    ...(row.opened_at !== undefined && { openedAt: row.opened_at }),
+    ...(row.deleted_at !== undefined && { deletedAt: row.deleted_at }),
   };
 }
 
-export async function readCloudTile(id: string): Promise<string> {
+export async function readCloudTileVersion(
+  id: string,
+): Promise<{ file: string; version: string }> {
   const supabase = createClient();
   const row = await findRow(supabase, id);
   const { data, error } = await supabase.storage
@@ -65,8 +92,15 @@ export async function readCloudTile(id: string): Promise<string> {
     .download(filePath(row));
   if (error || !data)
     throw new CloudError("Couldn’t open this tile from Pigxel cloud.");
-  return data.text();
+  return { file: await data.text(), version: row.updated_at };
 }
+
+export async function readCloudTile(id: string): Promise<string> {
+  return (await readCloudTileVersion(id)).file;
+}
+
+export const sameVersion = (a?: string, b?: string) =>
+  !!a && !!b && Date.parse(a) === Date.parse(b);
 
 export async function readPublishedTile(tile: {
   id: string;
@@ -79,8 +113,38 @@ export async function readPublishedTile(tile: {
   return data.text();
 }
 
-export async function saveCloudTile(
-  tile: { id?: string; name: string },
+const ownVersions = new Map<string, Set<number>>();
+const saving = new Map<string, Promise<unknown>>();
+
+const remember = (id: string, version: string) => {
+  const known = ownVersions.get(id) ?? new Set<number>();
+  known.add(Date.parse(version));
+  ownVersions.set(id, known);
+};
+
+export function saveCloudTile(
+  tile: { id?: string; name: string; version?: string },
+  contents: string,
+  image: PigxelDocument,
+  thumbnail: string,
+): Promise<CloudTile> {
+  if (!tile.id) return writeCloudTile(tile, contents, image, thumbnail);
+  const id = tile.id;
+  const next = (saving.get(id) ?? Promise.resolve())
+    .catch(() => {})
+    .then(() => writeCloudTile(tile, contents, image, thumbnail));
+  saving.set(id, next);
+  const forget = () => {
+    if (saving.get(id) === next) saving.delete(id);
+  };
+  // Not finally(): its promise would reject again, unhandled. The caller
+  // gets the error from `next`.
+  void next.then(forget, forget);
+  return next;
+}
+
+async function writeCloudTile(
+  tile: { id?: string; name: string; version?: string },
   contents: string,
   image: PigxelDocument,
   thumbnail: string,
@@ -91,21 +155,25 @@ export async function saveCloudTile(
     width: image.width,
     height: image.height,
     background: image.background,
+    frame_count: image.frames.length,
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };
-  const { data, error } = tile.id
-    ? await supabase
-        .from("tiles")
-        .update(details)
-        .eq("id", tile.id)
-        .select("id, user_id, name")
-        .maybeSingle()
+  if (tile.id) remember(tile.id, details.updated_at);
+  const update = (version?: string) => {
+    const query = supabase.from("tiles").update(details).eq("id", tile.id!);
+    return (version ? query.eq("updated_at", version) : query)
+      .select("id, user_id, name")
+      .maybeSingle();
+  };
+  let { data, error } = tile.id
+    ? await update(tile.version)
     : await supabase
         .from("tiles")
         .insert(details)
         .select("id, user_id, name")
         .single();
+<<<<<<< HEAD
   if (error) {
     const limit = /cloud_tile_limit:(\d+)/.exec(error.message)?.[1];
     throw new CloudError(
@@ -114,6 +182,24 @@ export async function saveCloudTile(
         : "Couldn’t save to Pigxel cloud. Try again.",
     );
   }
+=======
+  if (error) throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
+  if (!data && tile.id && tile.version) {
+    const { data: still } = await supabase
+      .from("tiles")
+      .select("updated_at")
+      .eq("id", tile.id)
+      .is("deleted_at", null)
+      .maybeSingle<{ updated_at: string }>();
+    if (still && ownVersions.get(tile.id)?.has(Date.parse(still.updated_at))) {
+      ({ data, error } = await update(still.updated_at));
+      if (error)
+        throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
+    }
+    if (!data && still) throw new CloudConflictError();
+  }
+  if (data && !tile.id) remember(data.id, details.updated_at);
+>>>>>>> origin/dev
   if (!data)
     throw new CloudError(
       "This tile is no longer in Pigxel cloud. Save it again to keep it.",
@@ -135,23 +221,15 @@ export async function saveCloudTile(
         : "Couldn’t save to Pigxel cloud. Try again.",
     );
   }
-  return { id: data.id, name: data.name };
-}
-
-export async function deleteCloudTile(id: string): Promise<void> {
-  const supabase = createClient();
-  const row = await findRow(supabase, id);
-  await supabase.storage.from(BUCKET).remove([filePath(row)]);
-  const { error } = await supabase.from("tiles").delete().eq("id", id);
-  if (error) throw new CloudError("Couldn’t delete this tile. Try again.");
+  return { id: data.id, name: data.name, version: details.updated_at };
 }
 
 async function findRow(supabase: ReturnType<typeof createClient>, id: string) {
   const { data, error } = await supabase
     .from("tiles")
-    .select("id, user_id")
+    .select("id, user_id, updated_at")
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle<{ id: string; user_id: string; updated_at: string }>();
   if (error) throw new CloudError("Couldn’t reach Pigxel cloud. Try again.");
   if (!data) throw new CloudError("This tile is no longer in Pigxel cloud.");
   return data;

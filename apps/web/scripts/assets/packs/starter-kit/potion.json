@@ -1,0 +1,48 @@
+{
+  "id": "potion",
+  "name": "Health potion",
+  "category": "items",
+  "tags": [
+    "item",
+    "potion",
+    "consumable"
+  ],
+  "colors": {
+    "k": "#181425",
+    "n": "#e4a672",
+    "c": "#b86f50",
+    "C": "#733e39",
+    "w": "#ffffff",
+    "g": "#c0cbdc",
+    "G": "#8b9bb4",
+    "p": "#f6757a",
+    "r": "#e43b44",
+    "d": "#a22633"
+  },
+  "clips": [
+    {
+      "name": "still",
+      "kind": "variant",
+      "frames": [
+        [
+          "................",
+          "......kkkk......",
+          ".....knnnck.....",
+          ".....kcccCk.....",
+          "......kkkk......",
+          "......kwgk......",
+          ".....kwggGk.....",
+          "....kwgggggk....",
+          "...kwppppppdk...",
+          "..kwprrrrrrrdk..",
+          "..kprwrrrrrrdk..",
+          "..krrrrrrrrrdk..",
+          "..krrrrrrrrddk..",
+          "...kdrrrrrddk...",
+          "....kkkkkkkk....",
+          "................"
+        ]
+      ]
+    }
+  ]
+}

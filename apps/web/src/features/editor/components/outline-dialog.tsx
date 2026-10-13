@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import { Radio } from "@pigxel/ui/components/choice";
-import { FormMessage } from "@pigxel/ui/components/field";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { Input } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
-import { NumericInput } from "./numeric-input";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { opaqueHex } from "@/lib/palette/hsv";
 import {
   MAX_OUTLINE,
   outlinedWith,
@@ -14,8 +19,10 @@ import {
   type OutlineShape,
 } from "../pixel-canvas/effects";
 import { rgbaOf } from "../pixel-canvas/paint";
-import { ColorPicker } from "./colors/color-picker";
 import { swatchStyle } from "./colors/helpers";
+import { MiniColorPicker } from "./colors/mini-color-picker";
+import { AllFramesOption } from "./all-frames-option";
+import { SIZE_LABEL, SizeField } from "./size-controls";
 
 type Size = { w: number; h: number };
 
@@ -24,6 +31,7 @@ export type OutlineChoice = {
   place: OutlinePlace;
   shape: OutlineShape;
   width: number;
+  allFrames: boolean;
 };
 
 const PLACES: { value: OutlinePlace; label: string }[] = [
@@ -32,41 +40,81 @@ const PLACES: { value: OutlinePlace; label: string }[] = [
 ];
 
 const SHAPES: { value: OutlineShape; label: string; hint: string }[] = [
-  { value: "round", label: "Round", hint: "thin lines, no corner pixels" },
-  { value: "square", label: "Square", hint: "fills the corners too" },
+  { value: "round", label: "Round", hint: "Thin lines, no corner pixels." },
+  { value: "square", label: "Square", hint: "Fills the corners too." },
 ];
 
-const PREVIEW = { w: 320, h: 180 };
+const PREVIEW = { w: 320, h: 160 };
 
-export default function OutlineDialog({
-  size,
-  pixels,
-  mask,
-  palette,
-  color: initialColor,
-  onApply,
-  onClose,
-}: {
+const option = (on: boolean) =>
+  cn(
+    "h-11 rounded-xl border px-3 text-sm transition-colors",
+    on
+      ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+      : "bg-background hover:bg-pink-base",
+  );
+
+type OutlineProps = {
   size: Size;
   pixels: Uint8ClampedArray;
   mask: Uint8Array | null;
   palette: string[];
+  frameCount: number;
   color: string;
   onApply: (choice: OutlineChoice) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export default function OutlineDialog({
+  onClose,
+  ...props
+}: OutlineProps & { onClose: () => void }) {
+  return (
+    <Dialog
+      onClose={onClose}
+      size="sm"
+      portal
+      className="w-[min(30rem,calc(100vw-2rem))]"
+    >
+      <OutlineForm {...props} />
+    </Dialog>
+  );
+}
+
+function OutlineForm({
+  size,
+  pixels,
+  mask,
+  palette,
+  frameCount,
+  color: initialColor,
+  onApply,
+}: OutlineProps) {
+  const { close } = useDialog();
   const preview = useRef<HTMLCanvasElement>(null);
   const [color, setColor] = useState(initialColor);
+  const [hex, setHex] = useState(() => opaqueHex(initialColor));
+  const [custom, setCustom] = useState(!palette.length);
   const [place, setPlace] = useState<OutlinePlace>("outside");
   const [shape, setShape] = useState<OutlineShape>("round");
-  const [width, setWidth] = useState(1);
-  useEffect(() => dialog.current?.showModal(), []);
+  const [width, setWidth] = useState("1");
+  const [allFrames, setAllFrames] = useState(false);
+  const thickness = Math.min(
+    MAX_OUTLINE,
+    Math.max(1, Math.round(Number(width)) || 1),
+  );
+  const pick = (next: string) => {
+    setColor(next);
+    setHex(opaqueHex(next));
+  };
 
   const result = useMemo(
     () =>
-      outlinedWith(pixels, size, rgbaOf(color), mask, { place, shape, width }),
-    [pixels, size, color, mask, place, shape, width],
+      outlinedWith(pixels, size, rgbaOf(color), mask, {
+        place,
+        shape,
+        width: thickness,
+      }),
+    [pixels, size, color, mask, place, shape, thickness],
   );
   const changed = useMemo(() => {
     let n = 0;
@@ -102,41 +150,18 @@ export default function OutlineDialog({
   }, [result, size, zoom]);
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="outline-title"
-      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!changed && !allFrames) return;
+        onApply({ color, place, shape, width: thickness, allFrames });
+        close();
+      }}
     >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="outline-title">Outline</SectionTitle>
-          <Lead className="mt-1">
-            {mask ? "In the selection" : "On the whole layer"}, in this frame.
-          </Lead>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-
-      <form
-        className="max-h-[80dvh] space-y-5 overflow-y-auto p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!changed) return;
-          onApply({ color, place, shape, width });
-          dialog.current?.close();
-        }}
-      >
-        <div className="flex min-h-24 justify-center overflow-hidden rounded-lg border bg-muted p-3">
+      <ModalHeader title="Outline" />
+      <DialogBody className="grid gap-5 py-5">
+        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-background p-3">
           <div className="self-center bg-checker">
             <canvas
               ref={preview}
@@ -148,100 +173,136 @@ export default function OutlineDialog({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
-          <div className="space-y-4">
-            <fieldset className="space-y-2 text-sm">
-              <legend className="mb-1 font-medium">Place</legend>
+        <div className="grid grid-cols-2 gap-4">
+          <fieldset>
+            <legend className={SIZE_LABEL}>Place</legend>
+            <div role="radiogroup" className="grid grid-cols-2 gap-2">
               {PLACES.map(({ value, label }) => (
-                <label key={value} className="flex items-center gap-2">
-                  <Radio
-                    name="outline-place"
-                    className="mt-0"
-                    checked={place === value}
-                    onChange={() => setPlace(value)}
-                  />
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={place === value}
+                  onClick={() => setPlace(value)}
+                  className={option(place === value)}
+                >
                   {label}
-                </label>
+                </button>
               ))}
-            </fieldset>
-            <fieldset className="space-y-2 text-sm">
-              <legend className="mb-1 font-medium">Shape</legend>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend className={SIZE_LABEL}>Shape</legend>
+            <div role="radiogroup" className="grid grid-cols-2 gap-2">
               {SHAPES.map(({ value, label, hint }) => (
-                <label key={value} className="flex items-start gap-2">
-                  <Radio
-                    name="outline-shape"
-                    checked={shape === value}
-                    onChange={() => setShape(value)}
-                  />
-                  <span>
-                    {label}
-                    <span className="block text-xs text-muted-foreground">
-                      {hint}
-                    </span>
-                  </span>
-                </label>
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={shape === value}
+                  title={hint}
+                  onClick={() => setShape(value)}
+                  className={option(shape === value)}
+                >
+                  {label}
+                </button>
               ))}
-            </fieldset>
-            <label className="flex items-center gap-3 text-sm">
-              <span className="font-medium">Width</span>
-              <NumericInput
-                min={1}
-                max={MAX_OUTLINE}
-                value={width}
-                onValueChange={(next) =>
-                  setWidth(
-                    Math.min(MAX_OUTLINE, Math.max(1, Math.round(next) || 1)),
-                  )
-                }
-                className="h-7 w-14 rounded-md border bg-background px-1 text-center tabular-nums"
-              />
-              <span className="text-muted-foreground">px</span>
-            </label>
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Colour</p>
-            <ColorPicker color={color} onChange={setColor} />
-          </div>
+            </div>
+          </fieldset>
         </div>
+        <p className="-mt-3 text-xs text-muted-foreground">
+          {SHAPES.find((s) => s.value === shape)?.hint}
+        </p>
 
-        {palette.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {palette.map((c) => (
+        <SizeField
+          id="outline-width"
+          label="Width"
+          unit="px"
+          value={width}
+          onChange={setWidth}
+        />
+
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <span className={cn(SIZE_LABEL, "mb-0")}>
+              {custom ? "Custom colour" : "Palette"}
+            </span>
+            {palette.length > 0 && (
               <button
-                key={c}
                 type="button"
-                aria-label={c}
-                title={c}
-                onClick={() => setColor(c)}
-                className={cn(
-                  "size-5 rounded-[2px] ring-1 ring-black/10",
-                  c === color && "ring-2 ring-foreground",
-                )}
-                style={swatchStyle(c)}
-              />
-            ))}
+                aria-expanded={custom}
+                onClick={() => setCustom(!custom)}
+                className="text-xs text-link-accent transition-colors hover:text-lavender-foreground"
+              >
+                {custom ? "Show swatches" : "Custom colour…"}
+              </button>
+            )}
           </div>
-        )}
-
-        <FormMessage tone="muted" className="tabular-nums">
-          {changed
-            ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
-            : "Nothing to outline here."}
-        </FormMessage>
-
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => dialog.current?.close()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!changed}>
-            Outline
-          </Button>
+          {custom ? (
+            <MiniColorPicker color={color} onChange={pick} />
+          ) : (
+            <div className="flex max-h-[6.5rem] snap-y flex-wrap gap-1.5 overflow-y-auto rounded-xl border p-2.5">
+              {palette.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={c}
+                  aria-pressed={c === color}
+                  title={c}
+                  onClick={() => pick(c)}
+                  className={cn(
+                    "size-6 snap-start scroll-mt-2.5 rounded-md ring-1 ring-black/10",
+                    c === color && "ring-2 ring-pink-strong ring-offset-1",
+                  )}
+                  style={swatchStyle(c)}
+                />
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-2">
+            <span
+              className="size-10 shrink-0 rounded-xl ring-1 ring-black/10"
+              style={swatchStyle(color)}
+            />
+            <Input
+              aria-label="Hex colour"
+              value={hex}
+              maxLength={7}
+              onChange={(e) => {
+                const next = e.target.value.trim();
+                setHex(next);
+                if (/^#[0-9a-f]{6}$/i.test(next)) setColor(next.toLowerCase());
+              }}
+              className="h-10 w-full rounded-xl px-3 font-mono uppercase"
+            />
+          </div>
         </div>
-      </form>
-    </dialog>
+
+        <AllFramesOption
+          frameCount={frameCount}
+          checked={allFrames}
+          onChange={setAllFrames}
+        />
+
+        <p
+          className={cn(
+            "rounded-xl px-4 py-3 text-sm tabular-nums",
+            changed ? "bg-success-soft" : "bg-attention-soft",
+          )}
+        >
+          {changed
+            ? `${changed} ${changed === 1 ? "pixel" : "pixels"} will change.`
+            : "Nothing to outline in this frame."}
+        </p>
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!changed && !allFrames}>
+          Outline
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }

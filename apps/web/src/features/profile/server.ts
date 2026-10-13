@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   PROFILE_COLUMNS,
+  PROFILE_PAGE_COLUMNS,
+  ARTS_PAGE,
+  NO_ARTS_QUERY,
+  type ArtsKind,
+  type ArtsQuery,
   avatarUrlOf,
   toArtistProfile,
   type ArtistProfile,
@@ -25,6 +30,9 @@ type TileRow = {
   visibility: Visibility;
   pin_order: number | null;
   updated_at: string;
+  review?: string | null;
+  likes?: { count: number }[];
+  views?: { total: number } | null;
 };
 
 export const getOwnProfile = cache(
@@ -33,7 +41,7 @@ export const getOwnProfile = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("profiles")
-      .select(PROFILE_COLUMNS)
+      .select(PROFILE_PAGE_COLUMNS)
       .eq("id", userId)
       .maybeSingle<ProfileRow>();
     if (error) console.error("Couldn’t load your profile:", error.message);
@@ -62,12 +70,14 @@ type ProfileLookup =
   | { kind: "private" }
   | { kind: "missing" };
 
-export async function findProfile(username: string): Promise<ProfileLookup> {
+export const findProfile = cache(async function findProfile(
+  username: string,
+): Promise<ProfileLookup> {
   if (!isSupabaseConfigured()) return { kind: "missing" };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("profiles")
-    .select(PROFILE_COLUMNS)
+    .select(PROFILE_PAGE_COLUMNS)
     .eq("username", username)
     .maybeSingle<ProfileRow>();
   if (error) throw new Error(`Couldn’t load @${username}: ${error.message}`);
@@ -79,7 +89,7 @@ export async function findProfile(username: string): Promise<ProfileLookup> {
   if (rpcError)
     throw new Error(`Couldn’t load @${username}: ${rpcError.message}`);
   return isPrivate === true ? { kind: "private" } : { kind: "missing" };
-}
+});
 
 export async function listProfileTiles(
   userId: string,
@@ -88,17 +98,18 @@ export async function listProfileTiles(
   const { data, count, error } = await supabase
     .from("tiles")
     .select(
-      "id, name, width, height, thumbnail, visibility, pin_order, updated_at",
+      "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, likes:tile_likes(count), views:tile_views(total)",
       { count: "exact" },
     )
     .eq("user_id", userId)
+    .is("deleted_at", null)
     .order("pin_order", { ascending: true, nullsFirst: false })
     .order("updated_at", { ascending: false })
     .limit(120);
   if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
   return {
     count: count ?? data.length,
-    tiles: (data as TileRow[]).map(toProfileTile),
+    tiles: (data as unknown as TileRow[]).map(toProfileTile),
   };
 }
 
@@ -108,9 +119,12 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
   width: row.width,
   height: row.height,
   thumbnail: row.thumbnail,
-  visibility: row.visibility,
+  visibility: row.review === "pending" ? "public" : row.visibility,
+  inReview: row.review === "pending",
   pinOrder: row.pin_order,
   updatedAt: row.updated_at,
+  ...(row.likes && { likes: row.likes[0]?.count ?? 0 }),
+  ...(row.views !== undefined && { views: Number(row.views?.total ?? 0) }),
 });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -124,54 +138,193 @@ type PublicTileRow = TileRow & {
     | "avatar_kind"
     | "avatar_path"
     | "provider_avatar_url"
-  >;
+  > &
+    Partial<Pick<ProfileRow, "bio">>;
   likes: { count: number }[];
   mine?: { user_id: string }[];
 };
 
+type ArtFilter = {
+  min?: number;
+  max?: number;
+  animated?: boolean;
+  query?: string;
+  order?: "relevance" | "recent" | "az";
+  likedBy?: string;
+  followedBy?: string;
+};
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+const publicTiles = (
+  supabase: Supabase,
+  days: number,
+  filter: ArtFilter,
+  head = false,
+) => {
+  const since = new Date(days ? Date.now() - days * DAY : 0).toISOString();
+  return filter.query
+    ? supabase.rpc(
+        "search_public_tiles",
+        {
+          query: filter.query,
+          liked_since:
+            filter.order === "recent" || filter.order === "az" || filter.likedBy
+              ? null
+              : since,
+        },
+        { count: "exact", head },
+      )
+    : supabase.rpc("popular_tiles", { since }, { count: "exact", head });
+};
+
 const PUBLIC_TILE_COLUMNS =
-  "id, user_id, name, width, height, thumbnail, visibility, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+
+const ART_PAGE_COLUMNS = PUBLIC_TILE_COLUMNS.replace(
+  "provider_avatar_url)",
+  "provider_avatar_url, bio)",
+);
+
+async function followeesOf(supabase: Supabase, userId: string) {
+  const { data, error } = await supabase
+    .from("follows")
+    .select("followee_id")
+    .eq("follower_id", userId);
+  if (error) throw new Error(`Couldn’t load follows: ${error.message}`);
+  return data.map((row) => row.followee_id as string);
+}
 
 export async function listPublicTiles(
   from: number,
   limit: number,
   days: number,
   viewerId: string | null,
-  tag: string | null = null,
+  tags: string[] = [],
+  filter: ArtFilter = {},
 ): Promise<{ tiles: PublicTile[]; count: number }> {
   const supabase = await createClient();
-  const base = supabase
-    .rpc(
-      "popular_tiles",
-      { since: new Date(Date.now() - days * DAY).toISOString() },
-      { count: "exact" },
-    )
-    .select(
-      viewerId
+  const followees = filter.followedBy
+    ? await followeesOf(supabase, filter.followedBy)
+    : null;
+  if (followees && !followees.length) return { tiles: [], count: 0 };
+  const base = publicTiles(supabase, days, filter).select(
+    filter.likedBy
+      ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes!inner(user_id)`
+      : viewerId
         ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
         : PUBLIC_TILE_COLUMNS,
-    );
-  const query = tag ? base.contains("tags", [tag]) : base;
-  const { data, count, error } = await (
-    viewerId ? query.eq("mine.user_id", viewerId) : query
-  ).range(from, from + limit - 1);
+  );
+  let query = tags.length ? base.overlaps("tags", tags) : base;
+  if (filter.max)
+    query = query.lte("width", filter.max).lte("height", filter.max);
+  if (filter.min)
+    query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
+  if (filter.animated) query = query.gt("frame_count", 1);
+  const mine = filter.likedBy ?? viewerId;
+  if (mine) query = query.eq("mine.user_id", mine);
+  if (followees) query = query.in("user_id", followees);
+  if (filter.order === "recent")
+    query = query.order("published_at", { ascending: false }).order("id");
+  if (filter.order === "az") query = query.order("name").order("id");
+  const { data, count, error } = await query.range(from, from + limit - 1);
   if (error) throw new Error(`Couldn’t load public arts: ${error.message}`);
   const rows = data as unknown as PublicTileRow[];
-  const downloads = await downloadCounts(rows.map((row) => row.id));
+  const ids = rows.map((row) => row.id);
+  const [downloads, views] = await Promise.all([
+    downloadCounts(ids),
+    totals("tile_views", ids),
+  ]);
   return {
     count: count ?? rows.length,
     tiles: rows.map((row) => ({
       ...toPublicTile(row),
       downloads: downloads.get(row.id) ?? 0,
+      views: views.get(row.id) ?? 0,
     })),
   };
 }
 
-async function downloadCounts(ids: string[]): Promise<Map<string, number>> {
+export async function listPublicTilesByIds(
+  ids: string[],
+  viewerId: string | null,
+): Promise<PublicTile[]> {
+  if (!ids.length) return [];
+  const supabase = await createClient();
+  const base = supabase
+    .from("tiles")
+    .select(
+      viewerId
+        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
+        : PUBLIC_TILE_COLUMNS,
+    )
+    .in("id", ids)
+    .eq("visibility", "public");
+  const { data, error } = await (viewerId
+    ? base.eq("mine.user_id", viewerId)
+    : base);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  const rows = data as unknown as PublicTileRow[];
+  const [downloads, views] = await Promise.all([
+    downloadCounts(ids),
+    totals("tile_views", ids),
+  ]);
+  const byId = new Map(
+    rows.map((row) => [
+      row.id,
+      {
+        ...toPublicTile(row),
+        downloads: downloads.get(row.id) ?? 0,
+        views: views.get(row.id) ?? 0,
+      },
+    ]),
+  );
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
+export async function countPublicTilesByTag(
+  days: number,
+  tags: readonly string[],
+  filter: ArtFilter = {},
+): Promise<Record<string, number>> {
+  const supabase = await createClient();
+  const followees = filter.followedBy
+    ? await followeesOf(supabase, filter.followedBy)
+    : null;
+  if (followees && !followees.length)
+    return Object.fromEntries(["All", ...tags].map((tag) => [tag, 0]));
+  const counts = await Promise.all(
+    [null, ...tags].map(async (tag) => {
+      let query = publicTiles(supabase, days, filter, true).select(
+        `id, author:profiles!tiles_user_id_profiles_fkey!inner(id)${filter.likedBy ? ", mine:tile_likes!inner(user_id)" : ""}`,
+      );
+      if (followees) query = query.in("user_id", followees);
+      if (filter.likedBy) query = query.eq("mine.user_id", filter.likedBy);
+      if (tag) query = query.contains("tags", [tag]);
+      if (filter.max)
+        query = query.lte("width", filter.max).lte("height", filter.max);
+      if (filter.min)
+        query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
+      if (filter.animated) query = query.gt("frame_count", 1);
+      const { count, error } = await query;
+      if (error)
+        throw new Error(`Couldn’t count public arts: ${error.message}`);
+      return [tag ?? "All", count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(counts);
+}
+
+const downloadCounts = (ids: string[]) => totals("tile_downloads", ids);
+
+async function totals(
+  table: "tile_downloads" | "tile_views",
+  ids: string[],
+): Promise<Map<string, number>> {
   if (!ids.length) return new Map();
   const supabase = await createClient();
   const { data, error } = await supabase
-    .from("tile_downloads")
+    .from(table)
     .select("tile_id, total")
     .in("tile_id", ids);
   if (error) return new Map();
@@ -185,6 +338,7 @@ const toPublicTile = (row: PublicTileRow): PublicTile => ({
     username: row.author.username,
     name: row.author.display_name,
     avatarUrl: avatarUrlOf(row.author),
+    ...(row.author.bio !== undefined && { bio: row.author.bio }),
   },
   likes: row.likes[0]?.count ?? 0,
   liked: Boolean(row.mine?.length),
@@ -202,44 +356,100 @@ export async function getPublicTile(
     .from("tiles")
     .select(
       viewerId
-        ? `${PUBLIC_TILE_COLUMNS}, mine:tile_likes(user_id)`
-        : PUBLIC_TILE_COLUMNS,
+        ? `${ART_PAGE_COLUMNS}, mine:tile_likes(user_id)`
+        : ART_PAGE_COLUMNS,
     )
     .eq("id", id)
-    .eq("visibility", "public");
+    .or(
+      viewerId
+        ? `visibility.eq.public,and(review.eq.pending,user_id.eq.${viewerId})`
+        : "visibility.eq.public",
+    );
   const { data, error } = await (
     viewerId ? query.eq("mine.user_id", viewerId) : query
   ).maybeSingle();
   if (error) throw new Error(`Couldn’t load this art: ${error.message}`);
   if (!data) return null;
   const tile = toPublicTile(data as unknown as PublicTileRow);
-  const [downloads, details] = await Promise.all([
+  const [downloads, details, remixes, views] = await Promise.all([
     downloadCounts([tile.id]),
     supabase
       .from("tiles")
-      .select("tags, description")
+      .select(
+        "tags, description, allow_remix, remix_of_user, original:remix_of_tile(id, name), original_author:remix_of_user(username)",
+      )
       .eq("id", tile.id)
-      .maybeSingle<{ tags: string[]; description: string | null }>(),
+      .maybeSingle<{
+        tags: string[];
+        description: string | null;
+        allow_remix: boolean;
+        remix_of_user: string | null;
+        original: { id: string; name: string } | null;
+        original_author: { username: string } | null;
+      }>(),
+    supabase.rpc("remix_count", { tile: tile.id }),
+    supabase
+      .from("tile_views")
+      .select("total")
+      .eq("tile_id", tile.id)
+      .maybeSingle<{ total: number }>(),
   ]);
   return {
     ...tile,
     downloads: downloads.get(tile.id) ?? 0,
+    remixes: remixes.error ? 0 : Number(remixes.data),
+    views: Number(views.data?.total ?? 0),
     tags: details.data?.tags ?? [],
     description: details.data?.description ?? null,
+    allowRemix: details.data?.allow_remix ?? true,
+    remixOf: details.data?.original_author
+      ? {
+          username: details.data.original_author.username,
+          tile: details.data.original,
+        }
+      : null,
   };
+}
+
+export type AuthorArt = {
+  id: string;
+  name: string;
+  thumbnail: string | null;
+};
+
+export async function listMoreByAuthor(
+  authorId: string,
+  exceptId: string,
+  limit = 6,
+): Promise<AuthorArt[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select("id, name, thumbnail")
+    .eq("user_id", authorId)
+    .eq("visibility", "public")
+    .neq("id", exceptId)
+    .order("published_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`Couldn’t load more arts: ${error.message}`);
+  return data;
 }
 
 export async function getFollowStats(
   profileId: string,
   viewerId: string | null,
-): Promise<{ followers: number; following: boolean }> {
+): Promise<{ followers: number; followed: number; following: boolean }> {
   const supabase = await createClient();
-  const [all, mine] = await Promise.all([
+  const [all, followed, mine] = await Promise.all([
     // Guests may only read followee_id, which is enough to count.
     supabase
       .from("follows")
       .select("followee_id", { count: "exact", head: true })
       .eq("followee_id", profileId),
+    supabase
+      .from("follows")
+      .select("followee_id", { count: "exact", head: true })
+      .eq("follower_id", profileId),
     viewerId
       ? supabase
           .from("follows")
@@ -249,7 +459,175 @@ export async function getFollowStats(
           .maybeSingle()
       : { data: null },
   ]);
-  return { followers: all.count ?? 0, following: Boolean(mine.data) };
+  return {
+    followers: all.count ?? 0,
+    followed: followed.count ?? 0,
+    following: Boolean(mine.data),
+  };
+}
+
+export async function hasBlocked(
+  viewerId: string | null,
+  profileId: string,
+): Promise<boolean> {
+  if (!viewerId || viewerId === profileId) return false;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("blocks")
+    .select("blocked_id")
+    .eq("blocker_id", viewerId)
+    .eq("blocked_id", profileId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+const ART_COLUMNS =
+  "id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, likes:tile_likes(count), views:tile_views(total)";
+
+async function rankedPublished(
+  profileId: string,
+  query: ArtsQuery,
+  from: number,
+): Promise<{ tiles: ProfileTile[]; count: number }> {
+  const supabase = await createClient();
+  const counting = supabase
+    .from("tiles")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", profileId)
+    .eq("visibility", "public")
+    .is("deleted_at", null);
+  const [ranked, total] = await Promise.all([
+    supabase.rpc("profile_arts_ranked", {
+      profile: profileId,
+      sort: query.sort,
+      tag: query.tag,
+      skip: from,
+      take: ARTS_PAGE,
+    }),
+    query.tag ? counting.contains("tags", [query.tag]) : counting,
+  ]);
+  if (ranked.error || total.error)
+    throw new Error("Couldn’t load arts. Try again.");
+  const ids = (ranked.data as { id: string }[]).map((row) => row.id);
+  if (ids.length === 0) return { tiles: [], count: total.count ?? 0 };
+  const { data, error } = await supabase
+    .from("tiles")
+    .select(ART_COLUMNS)
+    .in("id", ids);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  const byId = new Map(
+    (data as unknown as TileRow[]).map((row) => [row.id, toProfileTile(row)]),
+  );
+  return {
+    count: total.count ?? ids.length,
+    tiles: ids.flatMap((id) => {
+      const tile = byId.get(id);
+      return tile ? [{ ...tile, pinOrder: null }] : [];
+    }),
+  };
+}
+
+export async function listProfileTags(profileId: string): Promise<string[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tiles")
+    .select("tags")
+    .eq("user_id", profileId)
+    .eq("visibility", "public")
+    .is("deleted_at", null)
+    .limit(500);
+  if (error) return [];
+  const counts = new Map<string, number>();
+  for (const row of data as { tags: string[] | null }[])
+    for (const tag of row.tags ?? [])
+      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  return [...counts]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 30)
+    .map(([tag]) => tag);
+}
+
+export async function listProfileArts(
+  profileId: string,
+  kind: ArtsKind,
+  from = 0,
+  query: ArtsQuery = NO_ARTS_QUERY,
+): Promise<{ tiles: ProfileTile[]; count: number }> {
+  if (kind === "published" && query.sort !== "newest")
+    return rankedPublished(profileId, query, from);
+  const supabase = await createClient();
+  const to = from + ARTS_PAGE - 1;
+  if (kind === "published" || kind === "drafts") {
+    const all = supabase
+      .from("tiles")
+      .select(ART_COLUMNS, { count: "exact" })
+      .eq("user_id", profileId)
+      .is("deleted_at", null);
+    const base =
+      kind === "published" && query.tag
+        ? all.contains("tags", [query.tag])
+        : all;
+    const { data, count, error } = await (
+      kind === "published"
+        ? base.or("visibility.eq.public,review.eq.pending")
+        : base
+            .eq("visibility", "private")
+            .or("review.is.null,review.neq.pending")
+    )
+      .order("pin_order", { ascending: true, nullsFirst: false })
+      .order("updated_at", { ascending: false })
+      .order("id")
+      .range(from, to);
+    if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+    return {
+      count: count ?? data.length,
+      tiles: (data as unknown as TileRow[]).map(toProfileTile),
+    };
+  }
+  const { data, count, error } = await supabase
+    .from(kind === "liked" ? "tile_likes" : "saved_tiles")
+    .select(`created_at, tile:tiles!inner(${ART_COLUMNS})`, {
+      count: "exact",
+    })
+    .eq("user_id", profileId)
+    .eq("tile.visibility", "public")
+    .order("created_at", { ascending: false })
+    .order("tile_id")
+    .range(from, to);
+  if (error) throw new Error(`Couldn’t load arts: ${error.message}`);
+  return {
+    count: count ?? data.length,
+    tiles: (data as unknown as { tile: TileRow }[]).map((row) => ({
+      ...toProfileTile(row.tile),
+      pinOrder: null,
+    })),
+  };
+}
+
+const SHOWN = 120;
+
+export async function listFollows(
+  profileId: string,
+  side: "followers" | "followed",
+): Promise<{ people: ArtistProfile[]; count: number }> {
+  const supabase = await createClient();
+  const embed =
+    side === "followed"
+      ? "person:profiles!follows_followee_id_fkey"
+      : "person:profiles!follows_follower_id_fkey";
+  const { data, count, error } = await supabase
+    .from("follows")
+    .select(`created_at, ${embed}(${PROFILE_COLUMNS})`, { count: "exact" })
+    .eq(side === "followed" ? "follower_id" : "followee_id", profileId)
+    .order("created_at", { ascending: false })
+    .limit(SHOWN);
+  if (error) throw new Error(`Couldn’t load artists: ${error.message}`);
+  return {
+    count: count ?? data.length,
+    people: (data as unknown as { person: ProfileRow | null }[]).flatMap(
+      (row) => (row.person ? [toArtistProfile(row.person)] : []),
+    ),
+  };
 }
 
 export type ProfileActivity = {

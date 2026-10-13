@@ -10,6 +10,10 @@ import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { authenticate } from "../actions";
 import { HOME_PATH, loginUrl } from "@/lib/auth/routes";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
+import {
+  consented,
+  type Consent,
+} from "@/features/legal/components/consent-checks";
 
 const labels: Record<AuthMode, string> = {
   login: "Log in",
@@ -21,10 +25,13 @@ export function AuthForm({
   mode,
   configured,
   next = HOME_PATH,
+  consent,
 }: {
   mode: AuthMode;
   configured: boolean;
   next?: string;
+  /** For sign-up: the boxes ticked above the form. */
+  consent?: Consent;
 }) {
   const [state, action, pending] = useActionState(
     authenticate.bind(null, mode),
@@ -34,6 +41,8 @@ export function AuthForm({
   return (
     <form action={action} className="space-y-5">
       <input type="hidden" name="next" value={next} />
+      {consent?.age && <input type="hidden" name="age" value="on" />}
+      {consent?.terms && <input type="hidden" name="terms" value="on" />}
       <Field label="Email" htmlFor="email">
         <Input
           id="email"
@@ -88,7 +97,11 @@ export function AuthForm({
       <Button
         size="lg"
         className="h-12 w-full rounded-full"
-        disabled={pending || !configured}
+        disabled={
+          pending ||
+          !configured ||
+          (consent !== undefined && !consented(consent))
+        }
       >
         {pending ? "Please wait…" : labels[mode]}
       </Button>

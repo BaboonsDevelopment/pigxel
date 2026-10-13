@@ -1,4 +1,4 @@
-import { DitherOption, InkOption } from "../shared/options";
+import { DitherOption, FilledOption, InkOption } from "../shared/options";
 import { pointTip } from "../shared/tips";
 import { defineTool } from "../types";
 import { PolygonCanvas } from "./canvas";
@@ -11,8 +11,8 @@ export const polygonTool = defineTool({
   shift: true,
   icon,
   group: "shapes",
-  hint: "Click to place corners · Click the first one, double-click or Enter fills it · Shift snaps to 45° · Esc cancels · Right button uses the secondary colour",
+  hint: "Click to place corners · Click the first one, double-click or Enter completes the polygon · Filled adds a fill · Shift snaps to 45° · Esc cancels · Right button uses the secondary colour",
   tip: pointTip(),
-  options: [InkOption, DitherOption],
+  options: [InkOption, DitherOption, FilledOption],
   canvas: PolygonCanvas,
 });

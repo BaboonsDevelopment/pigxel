@@ -10,6 +10,7 @@ import { toReference } from "../flows/pictures";
 import { ICONS } from "../icons";
 
 type Props = {
+  autoFocus?: boolean;
   draft: string;
   onDraft: (text: string) => void;
   references: string[];
@@ -18,9 +19,11 @@ type Props = {
   onSelectArea: (on: boolean) => void;
   pending: boolean;
   onSend: (text: string) => void;
+  onStop?: () => void;
 };
 
 export function ChatComposer({
+  autoFocus,
   draft,
   onDraft,
   references,
@@ -29,6 +32,7 @@ export function ChatComposer({
   onSelectArea,
   pending,
   onSend,
+  onStop,
 }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -133,6 +137,7 @@ export function ChatComposer({
         <Textarea
           rows={1}
           aria-label="Message"
+          autoFocus={autoFocus}
           placeholder="Ask for a change…"
           value={draft}
           onChange={(e) => onDraft(e.target.value)}
@@ -151,9 +156,21 @@ export function ChatComposer({
           }}
           className="h-11 min-h-11 flex-1 resize-none"
         />
-        <Button size="lg" disabled={!canSend}>
-          Send
-        </Button>
+        {onStop ? (
+          <Button
+            type="button"
+            size="lg"
+            variant="secondary"
+            title="Stop this request. Anything it hasn’t drawn yet won’t be added"
+            onClick={onStop}
+          >
+            Stop
+          </Button>
+        ) : (
+          <Button size="lg" disabled={!canSend}>
+            Send
+          </Button>
+        )}
       </div>
     </form>
   );

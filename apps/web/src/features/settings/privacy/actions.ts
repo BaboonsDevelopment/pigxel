@@ -32,3 +32,27 @@ export async function setProfileVisibility(
         : "Your profile is now public.",
   };
 }
+
+export async function setShowActivity(
+  _state: PrivacyState,
+  formData: FormData,
+): Promise<PrivacyState> {
+  const user = await requireUser();
+  const show = formData.get("showActivity") === "on";
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ show_activity: show })
+      .eq("id", user.id);
+    if (error) return { error: "Couldn’t save. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  refresh();
+  return {
+    message: show
+      ? "Your activity heatmap is visible on your profile."
+      : "Your activity heatmap is hidden from others.",
+  };
+}

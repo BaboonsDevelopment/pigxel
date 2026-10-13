@@ -17,6 +17,9 @@ import {
 } from "../constants";
 import { copyObject, emptyCel, paint } from "../helpers";
 import { toArt } from "./pictures";
+import { showSnackbar } from "@/components/ui/snackbar";
+
+const GENERATE_FAILED = "Couldn’t generate image.";
 
 const layerName = (action: TileAction) =>
   action.name?.trim() ||
@@ -59,6 +62,7 @@ export async function drawOnNewLayer(
     });
   } else {
     chat.setError(result.error);
+    showSnackbar(GENERATE_FAILED);
   }
   chat.setPending(false);
   return result.ok;
@@ -181,6 +185,7 @@ async function drawSet(chat: Chat, items: SetItem[]) {
   }).catch(() => UNREACHABLE);
   if (!result.ok) {
     chat.setError(result.error);
+    showSnackbar(GENERATE_FAILED);
     chat.setPending(false);
     return false;
   }

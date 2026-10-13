@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useRef, type RefObject } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import {
@@ -13,53 +12,65 @@ import { cn } from "@pigxel/ui/lib/utils";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
-import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
 import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "./menu/menu";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
-import type { MenuSections } from "./menu/constants";
+import type { MenuItem, MenuSections } from "./menu/constants";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import { frameActions, layerActions } from "../timeline/actions";
 import type { Playback } from "../timeline/use-playback";
 
 export function EditorHeader({
   hidden,
-  draftId,
   file,
   fileInput,
   drive,
   sprite,
   playback,
   onOpenFrom,
+  recent,
   onConnectDrive,
   onExport,
   onPublish,
+  onPublishArt,
+  onShare,
+  onVersionHistory,
+  renameLocked = false,
+  explorePublished = false,
   onImportSheet,
+  onImportImage,
+  onNewTile,
   onTilemap,
   keyOf,
   menus,
   afterMenus = [],
 }: {
   hidden?: boolean;
-  draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
   drive: DriveStatus;
   sprite: SpriteApi;
   playback: Playback;
   onOpenFrom: (source: OpenSource) => void;
+  recent: MenuItem[];
   onConnectDrive: () => void;
   onExport: () => void;
   onPublish?: () => void;
+  onPublishArt?: () => void;
+  onShare?: () => void;
+  onVersionHistory?: () => void;
+  renameLocked?: boolean;
+  explorePublished?: boolean;
   onImportSheet: () => void;
+  onImportImage: () => void;
+  onNewTile: () => void;
   onTilemap: (convert: boolean) => void;
   keyOf: (id: ActionId) => string | undefined;
   menus: { label: string; sections: MenuSections }[];
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
-  const router = useRouter();
   const framesInput = useRef<HTMLInputElement>(null);
 
   return (
@@ -84,7 +95,7 @@ export function EditorHeader({
           [
             {
               label: "New tile…",
-              onSelect: () => router.push(newTileUrl(draftId)),
+              onSelect: onNewTile,
             },
             {
               label: "Open from your computer…",
@@ -94,6 +105,20 @@ export function EditorHeader({
             {
               label: "Open from Pigxel cloud…",
               onSelect: () => onOpenFrom("cloud"),
+            },
+            {
+              label: "Open recent",
+              submenu: [
+                recent.length
+                  ? recent
+                  : [
+                      {
+                        label: "No recent files",
+                        disabled: true,
+                        onSelect: () => {},
+                      },
+                    ],
+              ],
             },
             {
               label: drive.connected
@@ -107,6 +132,7 @@ export function EditorHeader({
               label: "Import",
               submenu: [
                 [
+                  { label: "Image…", onSelect: onImportImage },
                   {
                     label: "Pictures as frames…",
                     onSelect: () => framesInput.current?.click(),
@@ -142,6 +168,19 @@ export function EditorHeader({
               hidden: !drive.available,
             },
             {
+              label: "Save as copy",
+              onSelect: () =>
+                file.openDocument(
+                  sprite.document(),
+                  `${file.name.slice(0, 93)} (copy)`,
+                ),
+            },
+            {
+              label: "Version history…",
+              onSelect: () => onVersionHistory?.(),
+              hidden: !onVersionHistory,
+            },
+            {
               label: "Download .pigxel",
               shortcut: file.location ? undefined : keyOf("command:save"),
               onSelect: file.download,
@@ -152,6 +191,13 @@ export function EditorHeader({
               label: "Export…",
               shortcut: keyOf("command:export"),
               onSelect: onExport,
+            },
+            {
+              label: explorePublished
+                ? "Edit Explore details…"
+                : "Publish to Explore…",
+              onSelect: () => onPublishArt?.(),
+              disabled: !onPublishArt,
             },
             {
               label: "Publish to Assets…",
@@ -176,6 +222,10 @@ export function EditorHeader({
         <InputGroupInput
           aria-label="File name"
           value={file.name}
+          readOnly={renameLocked}
+          title={
+            renameLocked ? "Only the owner can rename this project" : undefined
+          }
           onChange={(e) => file.rename(e.target.value)}
           maxLength={100}
           className="w-40 px-2"
@@ -239,7 +289,20 @@ export function EditorHeader({
           Google Drive · {drive.email ?? "connected"}
         </p>
       )}
-      <TokensButton className={drive.connected ? undefined : "ml-auto"} />
+      {onShare && (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={onShare}
+          className={drive.connected ? undefined : "ml-auto"}
+        >
+          Share…
+        </Button>
+      )}
+      <TokensButton
+        className={drive.connected || onShare ? undefined : "ml-auto"}
+      />
     </header>
   );
 }

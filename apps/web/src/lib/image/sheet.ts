@@ -150,6 +150,7 @@ export function splitSheet(
 export function posesToFrames(
   poses: (Bitmap | null)[],
   box: Size,
+  fill = false,
 ): (Bitmap | null)[] {
   const present = poses.filter((p): p is Bitmap => !!p);
   if (!present.length) return poses.map(() => null);
@@ -160,8 +161,8 @@ export function posesToFrames(
     paste(strip, p, i * slotW + Math.floor((slotW - p.w) / 2), slotH - p.h),
   );
   const k = Math.min(box.w / slotW, box.h / slotH);
-  const w = Math.max(1, Math.round(slotW * k));
-  const h = Math.max(1, Math.round(slotH * k));
+  const w = fill ? box.w : Math.max(1, Math.round(slotW * k));
+  const h = fill ? box.h : Math.max(1, Math.round(slotH * k));
   const { buf } = imageToSprite(
     strip.rgba,
     strip.w,
@@ -216,5 +217,5 @@ export async function sheetToFrames(
     by === "cells"
       ? sheetCells(sheet, grid, count)
       : splitSheet(sheet, grid, count);
-  return posesToFrames(parts, box);
+  return posesToFrames(parts, box, by === "cells");
 }

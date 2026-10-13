@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { SpriteApi } from "../../pixel-canvas/use-sprite";
 import { frameIndex } from "@/lib/sprite/frames";
+import {
+  fitPreviewBox,
+  PREVIEW_MIN as MIN,
+  readPreviewBox,
+  writePreviewBox,
+} from "./window-state";
 
 const SIZES: { value: number; label: string; hint: string }[] = [
   { value: 0, label: "Fit", hint: "As big as the window allows" },
@@ -10,7 +16,6 @@ const SIZES: { value: number; label: string; hint: string }[] = [
   { value: 2, label: "2×", hint: "Twice the size, smaller if it doesn’t fit" },
 ];
 
-const MIN = { w: 160, h: 120 };
 const MARGIN = 8;
 const HEADER = 32;
 
@@ -18,19 +23,17 @@ const clamp = (v: number, min: number, max: number) =>
   Math.min(Math.max(v, min), Math.max(min, max));
 
 export function PreviewWindow({
+  userId,
   sprite,
   onClose,
 }: {
+  userId: string;
   sprite: SpriteApi;
   onClose: () => void;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [box, setBox] = useState(() => ({
-    x: Math.max(MARGIN, window.innerWidth - 260 - 24),
-    y: 120,
-    w: 260,
-    h: 240,
-  }));
+  const [box, setBox] = useState(() => readPreviewBox(userId));
+  useEffect(() => writePreviewBox(userId, box), [userId, box]);
   const [zoom, setZoom] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [step, setStep] = useState(0);
@@ -69,11 +72,7 @@ export function PreviewWindow({
 
   useEffect(() => {
     const keepInside = () =>
-      setBox((b) => ({
-        ...b,
-        x: clamp(b.x, 0, window.innerWidth - b.w),
-        y: clamp(b.y, 0, window.innerHeight - b.h),
-      }));
+      setBox((b) => fitPreviewBox(b, window.innerWidth, window.innerHeight));
     window.addEventListener("resize", keepInside);
     return () => window.removeEventListener("resize", keepInside);
   }, []);
@@ -89,7 +88,11 @@ export function PreviewWindow({
     el.setPointerCapture(e.pointerId);
     const move = (event: PointerEvent) =>
       setBox(
-        change(event.clientX - start.x, event.clientY - start.y, start.box),
+        fitPreviewBox(
+          change(event.clientX - start.x, event.clientY - start.y, start.box),
+          window.innerWidth,
+          window.innerHeight,
+        ),
       );
     const end = () => {
       el.removeEventListener("pointermove", move);

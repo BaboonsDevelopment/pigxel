@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { cn } from "@pigxel/ui/lib/utils";
@@ -13,6 +14,7 @@ import {
   composeFlips,
   flipTile,
   isSquareTile,
+  movedTile,
   type TileFlip,
 } from "@/lib/tilemap/tilemap";
 import { TileSwatch } from "./tile-swatch";
@@ -29,6 +31,8 @@ export function TilesetPanel({
   onExport: () => void;
 }) {
   const layer = sprite.activeLayer;
+  const [dragged, setDragged] = useState<number | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   if (layer?.kind !== "tilemap")
     return (
@@ -58,6 +62,38 @@ export function TilesetPanel({
   const picked = layer.tiles[sprite.activeTile];
   const turn = (flip: TileFlip) =>
     sprite.setTileFlip(composeFlips(sprite.tileFlip, flip));
+  const manual = sprite.tileMode === "manual";
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const order = movedTile(
+      layer.tiles.map((_, i) => i),
+      from,
+      to,
+    );
+    sprite.setTiles(layer.id, movedTile(layer.tiles, from, to));
+    sprite.setActiveTile(order.indexOf(sprite.activeTile));
+  };
+  const duplicate = () => {
+    if (!picked) return;
+    const at = sprite.activeTile + 1;
+    sprite.setTiles(layer.id, [
+      ...layer.tiles.slice(0, at),
+      new Uint8ClampedArray(picked),
+      ...layer.tiles.slice(at),
+    ]);
+    sprite.setActiveTile(at);
+    setStatus(
+      "Copy added. Draw on the tile on the canvas to change the original; the copy keeps the old look.",
+    );
+  };
+  const removeUnused = () => {
+    const removed = sprite.removeUnusedTiles(layer.id);
+    setStatus(
+      removed
+        ? `Deleted ${removed} unused ${removed === 1 ? "tile" : "tiles"}.`
+        : "Every tile is in use.",
+    );
+  };
 
   return (
     <div className="space-y-2 p-2">
@@ -93,8 +129,24 @@ export function TilesetPanel({
             <button
               key={i}
               type="button"
-              title={`Tile ${i + 1}: click, then click the canvas to place it`}
+              title={`Tile ${i + 1}: click, then click the canvas to place it · drag to reorder`}
               aria-pressed={sprite.activeTile === i}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                setDragged(i);
+              }}
+              onDragOver={(e) => {
+                if (dragged === null) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragged !== null) move(dragged, i);
+                setDragged(null);
+              }}
+              onDragEnd={() => setDragged(null)}
               onClick={() => {
                 sprite.setActiveTile(i);
                 sprite.setTileFlip(NO_FLIP);
@@ -103,6 +155,7 @@ export function TilesetPanel({
               className={cn(
                 "aspect-square overflow-hidden rounded-[3px] ring-1 ring-black/10",
                 sprite.activeTile === i && "ring-2 ring-foreground",
+                dragged === i && "opacity-40",
               )}
             >
               <TileSwatch pixels={pixels} tile={layer.tile} />
@@ -113,6 +166,43 @@ export function TilesetPanel({
         <p className="text-xs text-muted-foreground">
           No tiles yet. Draw on this layer with any tool, and every filled cell
           becomes a tile.
+        </p>
+      )}
+      {layer.tiles.length > 0 && (
+        <div className="flex gap-1.5">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            disabled={!picked || !manual}
+            title={
+              manual
+                ? "Adds a copy of the picked tile next to it"
+                : "In Auto mode unused tiles are removed, so switch to Manual to keep copies"
+            }
+            onClick={duplicate}
+          >
+            Duplicate tile
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            disabled={!manual}
+            title={
+              manual
+                ? "Deletes tiles that aren’t placed in any frame"
+                : "Auto mode already deletes unused tiles"
+            }
+            onClick={removeUnused}
+          >
+            Delete unused
+          </Button>
+        </div>
+      )}
+      {status && (
+        <p role="status" className="text-[11px] text-muted-foreground">
+          {status}
         </p>
       )}
       <label className="flex items-start gap-2 text-xs">
@@ -157,7 +247,7 @@ export function TilesetPanel({
         variant="secondary"
         className="w-full"
         disabled={!layer.tiles.length}
-        title="Saves the tiles as one PNG and the layout as a Tiled map (.tmj) for Godot, Unity and other engines"
+        title="Saves the tiles as one PNG, a Godot TileSet (.tres) and the layout as a Tiled map (.tmj) for Godot, Unity and other engines. Keep the PNG next to the .tres"
         onClick={onExport}
       >
         Export tileset and map
