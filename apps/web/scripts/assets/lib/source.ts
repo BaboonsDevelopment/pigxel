@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { ASSETS_DIR } from "./paths.ts";
 import { PALETTE_PRESETS } from "../../../src/lib/palette/presets.ts";
 import type {
   AssetDef,
   Clip,
-  LegacyCategory,
+  AssetKind,
   PaletteDef,
   SliceDef,
   Tier,
@@ -17,7 +18,7 @@ import { put, sprite } from "./sprite.ts";
  * `packs/<pack>/pack.json` names the pack, its palette and style, and lists
  * its assets in order; `packs/<pack>/<asset>.json` is one asset.
  */
-export const PACKS_DIR = join(import.meta.dirname, "..", "packs");
+export const PACKS_DIR = join(ASSETS_DIR, "packs");
 
 export type Issue = {
   level: "error" | "warning";
@@ -48,6 +49,8 @@ export type PackSource = {
   id: string;
   name: string;
   tier: Tier;
+  block: string | null;
+  premium: string[];
   description: string;
   palette: string[];
   style: PackStyle;
@@ -58,7 +61,7 @@ export type PackSource = {
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const HEX = /^#[0-9a-f]{6}$/;
-const CATEGORIES: LegacyCategory[] = ["characters", "items", "nature", "tiles"];
+const KINDS: AssetKind[] = ["sprite", "tile"];
 export const MAX_SIDE = 256;
 export const MAX_FRAMES = 64;
 export const MAX_COLORS = 32;
@@ -98,15 +101,15 @@ export function parseAsset(
     error("schema", "The file must hold one JSON object.");
     return { def: null, issues };
   }
-  const { id, name, category, tags = [], colors, clips, slices = [] } = json;
+  const { id, name, kind, tags = [], colors, clips, slices = [] } = json;
   if (id !== fileId)
     error("schema", `id must be "${fileId}", the same as the file name.`);
   if (typeof id !== "string" || !ID.test(id) || id.length > 40)
     error("schema", "id must be kebab-case and at most 40 characters.");
   if (typeof name !== "string" || !name.trim() || name.trim().length > 40)
     error("schema", "name must be 1–40 characters.");
-  if (!CATEGORIES.includes(category as LegacyCategory))
-    error("schema", `category must be one of ${CATEGORIES.join(", ")}.`);
+  if (!KINDS.includes(kind as AssetKind))
+    error("schema", `kind must be one of ${KINDS.join(", ")}.`);
   if (!Array.isArray(tags) || tags.some((t) => typeof t !== "string"))
     error("schema", "tags must be a list of strings.");
   if (json.notes !== undefined && typeof json.notes !== "string")
@@ -241,7 +244,7 @@ export function parseAsset(
     def: {
       id: id as string,
       name: (name as string).trim(),
-      category: category as LegacyCategory,
+      kind: kind as AssetKind,
       tags: tags as string[],
       clips: parsed,
       slices: parsedSlices,
@@ -294,6 +297,11 @@ function loadPack(dir: string, dirName: string): PackSource {
     error("pack", `pack.json id must be "${dirName}", the folder's name.`);
   if (json.tier !== "free" && json.tier !== "paid")
     error("pack", `tier must be "free" or "paid".`);
+  if (
+    json.block !== undefined &&
+    (typeof json.block !== "string" || !ID.test(json.block))
+  )
+    error("pack", "block must be the id of a block on the Assets page.");
 
   let palette: string[] = [];
   if (typeof json.palette === "string") {
@@ -343,6 +351,9 @@ function loadPack(dir: string, dirName: string): PackSource {
   for (const file of files)
     if (!listed.includes(file))
       error("pack", `${file}.json isn't listed in pack.json "assets".`);
+  const premium = Array.isArray(json.premium)
+    ? json.premium.map(String).filter((id) => listed.includes(id))
+    : [];
   const assets = listed.flatMap((id) => {
     if (!existsSync(join(dir, `${id}.json`))) {
       error("pack", `pack.json lists "${id}", but ${id}.json is missing.`);
@@ -355,6 +366,8 @@ function loadPack(dir: string, dirName: string): PackSource {
     id: dirName,
     name: typeof json.name === "string" ? json.name : dirName,
     tier: json.tier === "paid" ? "paid" : "free",
+    block: typeof json.block === "string" ? json.block : null,
+    premium,
     description: typeof json.description === "string" ? json.description : "",
     palette,
     style: { outline, maxColors },
@@ -385,4 +398,21 @@ export function loadPacks(dir = PACKS_DIR): PackSource[] {
       seen.set(asset.id, asset.key);
     }
   return packs;
+}
+
+export const isPremium = (
+  pack: Pick<PackSource, "tier" | "premium">,
+  id: string,
+) => pack.tier === "paid" || pack.premium.includes(id);
+
+export function updatePack(
+  id: string,
+  change: (json: Json) => void,
+  dir = PACKS_DIR,
+) {
+  const file = join(dir, id, "pack.json");
+  const json: unknown = JSON.parse(readFileSync(file, "utf8"));
+  if (!isObject(json)) throw new Error(`${id}/pack.json: not an object`);
+  change(json);
+  writeFileSync(file, JSON.stringify(json, null, 2) + "\n");
 }

@@ -1,21 +1,27 @@
 import { TabLinks } from "@/components/ui/tab-links";
-import { ASSET_CATEGORIES } from "../assets";
+import type { AssetBlock } from "../assets";
 
-export const ASSET_TABS = [
-  { value: "all", label: "All" },
-  ...ASSET_CATEGORIES.map((c) => ({ value: c.id, label: c.label })),
-  { value: "palettes", label: "Palettes" },
-] as const;
+export const ALL_TAB = "all";
+export const PALETTES_TAB = "palettes";
 
-export type AssetTab = (typeof ASSET_TABS)[number]["value"];
-
-export function AssetTabs({ active }: { active: AssetTab }) {
+export function AssetTabs({
+  blocks,
+  active,
+}: {
+  blocks: AssetBlock[];
+  active: string;
+}) {
+  const tabs = [
+    { value: ALL_TAB, label: "All" },
+    ...blocks.map((block) => ({ value: block.id, label: block.name })),
+    { value: PALETTES_TAB, label: "Palettes" },
+  ];
   return (
     <TabLinks
       label="Kind of asset"
       variant="segmented"
-      tabs={ASSET_TABS.map((tab) => ({
-        href: tab.value === "all" ? "/assets" : `/assets?type=${tab.value}`,
+      tabs={tabs.map((tab) => ({
+        href: tab.value === ALL_TAB ? "/assets" : `/assets?type=${tab.value}`,
         label: tab.label,
         active: tab.value === active,
       }))}

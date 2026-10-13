@@ -1,26 +1,36 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 
-export type AssetCategory = "characters" | "items" | "nature" | "tiles";
+export type AssetKind = "sprite" | "tile";
 
-export const ASSET_CATEGORIES: { id: AssetCategory; label: string }[] = [
-  { id: "characters", label: "Characters" },
-  { id: "items", label: "Items" },
-  { id: "nature", label: "Nature" },
-  { id: "tiles", label: "Tiles" },
-];
+export type AssetBlock = { id: string; name: string; count: number };
+
+export const ASSET_BLOCK_COLUMNS = "id, name, assets(count)";
+
+export type AssetBlockRow = {
+  id: string;
+  name: string;
+  assets: { count: number }[];
+};
+
+export const toAssetBlock = (row: AssetBlockRow): AssetBlock => ({
+  id: row.id,
+  name: row.name,
+  count: row.assets[0]?.count ?? 0,
+});
 
 export const ASSET_BUCKET = "assets";
 /** Private: premium .pigxel files, readable on paid plans only. */
 export const PREMIUM_ASSET_BUCKET = "premium-assets";
 
 export const ASSET_COLUMNS =
-  "id, name, category, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium";
+  "id, name, category, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium";
 
 export type AssetRow = {
   id: string;
   name: string;
-  category: AssetCategory;
+  category: string;
+  kind: AssetKind;
   width: number;
   height: number;
   frame_count: number;
@@ -35,7 +45,8 @@ export type AssetRow = {
 export type Asset = {
   id: string;
   name: string;
-  category: AssetCategory;
+  category: string;
+  kind: AssetKind;
   width: number;
   height: number;
   frames: number;
@@ -46,10 +57,6 @@ export type Asset = {
   fileUrl: string | null;
   sheetUrl: string;
 };
-
-export function isAssetCategory(value: unknown): value is AssetCategory {
-  return ASSET_CATEGORIES.some((c) => c.id === value);
-}
 
 export function assetFileUrl(path: string) {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -68,6 +75,7 @@ export function toAsset(
     id: row.id,
     name: row.name,
     category: row.category,
+    kind: row.kind,
     width: row.width,
     height: row.height,
     frames: row.frame_count,

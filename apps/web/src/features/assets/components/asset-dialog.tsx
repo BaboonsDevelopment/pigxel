@@ -12,22 +12,18 @@ import { Heading, Text } from "@pigxel/ui/components/typography";
 import { removeAsset } from "../actions";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
-import {
-  ASSET_CATEGORIES,
-  assetBlob,
-  assetFramePng,
-  isLocked,
-  type Asset,
-} from "../assets";
+import { assetBlob, assetFramePng, isLocked, type Asset } from "../assets";
 import { downloadBlob } from "@/lib/utils/download";
 import { AssetImage } from "./asset-image";
 
 export function AssetDialog({
   asset,
+  blockName,
   canRemove,
   onClose,
 }: {
   asset: Asset;
+  blockName: string;
   canRemove: boolean;
   onClose: () => void;
 }) {
@@ -38,16 +34,18 @@ export function AssetDialog({
       portal
       className="backdrop:bg-black/50 backdrop:backdrop-blur-sm"
     >
-      <AssetDetails asset={asset} canRemove={canRemove} />
+      <AssetDetails asset={asset} blockName={blockName} canRemove={canRemove} />
     </Dialog>
   );
 }
 
 function AssetDetails({
   asset,
+  blockName,
   canRemove,
 }: {
   asset: Asset;
+  blockName: string;
   canRemove: boolean;
 }) {
   const { close, titleId } = useDialog();
@@ -56,7 +54,6 @@ function AssetDetails({
     error?: boolean;
   } | null>(null);
   const mod = useModifierLabel();
-  const category = ASSET_CATEGORIES.find((c) => c.id === asset.category);
 
   const copy = () => {
     if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
@@ -100,7 +97,7 @@ function AssetDetails({
       <div className="flex aspect-square items-center justify-center bg-checker p-10">
         <AssetImage
           asset={asset}
-          repeat={asset.category === "tiles"}
+          repeat={asset.kind === "tile"}
           className="max-h-full w-full"
         />
       </div>
@@ -115,7 +112,7 @@ function AssetDetails({
               tone="muted"
               className="mt-0.5 font-mono tabular-nums"
             >
-              {category?.label} · {asset.width} × {asset.height}
+              {blockName} · {asset.width} × {asset.height}
               {asset.frames > 1 && ` · ${asset.frames} frames`}
             </Text>
           </div>

@@ -1,7 +1,7 @@
 {
   "id": "potion",
   "name": "Health potion",
-  "category": "items",
+  "kind": "sprite",
   "tags": [
     "item",
     "potion",

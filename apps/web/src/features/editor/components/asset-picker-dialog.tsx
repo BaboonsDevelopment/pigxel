@@ -15,15 +15,18 @@ import { ModalButton } from "@/components/ui/modal-button";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { AssetImage } from "@/features/assets/components/asset-image";
 import {
-  ASSET_CATEGORIES,
   isLocked,
   type Asset,
+  type AssetBlock,
 } from "@/features/assets/assets";
-import { listAssetsInBrowser } from "@/features/assets/publish";
+import {
+  listAssetBlocksInBrowser,
+  listAssetsInBrowser,
+} from "@/features/assets/publish";
 
 type Listing =
   | { state: "loading" }
-  | { state: "ready"; assets: Asset[] }
+  | { state: "ready"; assets: Asset[]; blocks: AssetBlock[] }
   | { state: "error" };
 
 type PickerProps = {
@@ -49,8 +52,9 @@ function AssetPicker({ onPick }: PickerProps) {
 
   useEffect(() => {
     let stale = false;
-    listAssetsInBrowser().then(
-      (assets) => !stale && setListing({ state: "ready", assets }),
+    Promise.all([listAssetsInBrowser(), listAssetBlocksInBrowser()]).then(
+      ([assets, blocks]) =>
+        !stale && setListing({ state: "ready", assets, blocks }),
       () => !stale && setListing({ state: "error" }),
     );
     return () => {
@@ -110,7 +114,7 @@ function AssetPicker({ onPick }: PickerProps) {
           <p className={status}>No assets yet.</p>
         ) : (
           <div>
-            {ASSET_CATEGORIES.map((category) => {
+            {listing.blocks.map((category) => {
               const assets = listing.assets.filter(
                 (a) => a.category === category.id,
               );
@@ -118,7 +122,7 @@ function AssetPicker({ onPick }: PickerProps) {
               return (
                 <section key={category.id} className="mb-4 last:mb-0">
                   <h3 className="mb-2 text-sm font-semibold">
-                    {category.label}
+                    {category.name}
                   </h3>
                   <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                     {assets.map((asset) => (

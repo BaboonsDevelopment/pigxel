@@ -7,15 +7,18 @@ import {
   type AssetSection,
 } from "@/features/assets/components/asset-library";
 import {
-  ASSET_TABS,
+  ALL_TAB,
   AssetTabs,
-  type AssetTab,
+  PALETTES_TAB,
 } from "@/features/assets/components/asset-tabs";
 import { ImportStarterSet } from "@/features/assets/components/import-starter-set";
 import { PaletteList } from "@/features/assets/components/palette-list";
 import { ScaledPage } from "@/components/layout/scaled-page";
-import { ASSET_CATEGORIES } from "@/features/assets/assets";
-import { countPremiumAssets, listAssets } from "@/features/assets/server";
+import {
+  countPremiumAssets,
+  listAssetBlocks,
+  listAssets,
+} from "@/features/assets/server";
 import { isAdmin, requireUser } from "@/lib/auth/session";
 import { shownFrom } from "@/lib/utils/shown";
 
@@ -32,41 +35,54 @@ export default async function Assets({ searchParams }: Props) {
     searchParams,
     requireUser(),
   ]);
-  const tab: AssetTab =
-    ASSET_TABS.find((t) => t.value === type)?.value ?? "all";
+  const blocks = await listAssetBlocks().catch((error: unknown) => {
+    console.error(error);
+    return null;
+  });
+  const filled = (blocks ?? []).filter((block) => block.count > 0);
+  const tab =
+    type === PALETTES_TAB || filled.some((block) => block.id === type)
+      ? type!
+      : ALL_TAB;
   const admin = isAdmin(user);
   const premiumMissing =
-    admin && tab === "all" && (await countPremiumAssets()) === 0;
+    admin && tab === ALL_TAB && (await countPremiumAssets()) === 0;
 
-  const categories = ASSET_CATEGORIES.filter(
-    (c) => tab === "all" || c.id === tab,
-  );
-  const shown = tab === "all" ? PREVIEW : shownFrom(shownParam, STEP);
+  const shown = tab === ALL_TAB ? PREVIEW : shownFrom(shownParam, STEP);
   const sections: AssetSection[] | null =
-    tab === "palettes"
+    tab === PALETTES_TAB
       ? []
-      : await Promise.all(
-          categories.map(async (category) => {
-            const list = await listAssets(category.id, shown);
-            const more =
-              tab !== "all" && list.total > list.assets.length
-                ? `/assets?type=${category.id}&shown=${shown + STEP}`
-                : undefined;
-            return { category, ...list, more };
-          }),
-        ).catch((error: unknown) => {
-          console.error(error);
-          return null;
-        });
+      : !blocks
+        ? null
+        : await Promise.all(
+            blocks.flatMap((category, index) =>
+              tab === ALL_TAB || category.id === tab
+                ? [
+                    listAssets(category.id, shown).then((list) => ({
+                      category,
+                      index,
+                      ...list,
+                      more:
+                        tab !== ALL_TAB && list.total > list.assets.length
+                          ? `/assets?type=${category.id}&shown=${shown + STEP}`
+                          : undefined,
+                    })),
+                  ]
+                : [],
+            ),
+          ).catch((error: unknown) => {
+            console.error(error);
+            return null;
+          });
   const empty =
-    tab !== "palettes" && !!sections && sections.every((s) => s.total === 0);
+    tab !== PALETTES_TAB && !!sections && sections.every((s) => s.total === 0);
 
   return (
     <ScaledPage>
       <PageHeader
         title="Assets"
         description="Sprites, seamless tiles and palettes to start a tile from or drop into yours."
-        actions={<AssetTabs active={tab} />}
+        actions={<AssetTabs blocks={filled} active={tab} />}
       />
       {premiumMissing && sections && !empty && (
         <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-dashed p-4">
@@ -84,18 +100,18 @@ export default async function Assets({ searchParams }: Props) {
       ) : empty ? (
         <EmptyState
           className="mt-12"
-          title={tab === "all" ? "No assets yet" : "Nothing here yet"}
+          title={tab === ALL_TAB ? "No assets yet" : "Nothing here yet"}
           description={
             admin
               ? "Publish a tile from the editor (File › Publish to Assets…), or start with the starter set."
               : "The Pigxel team is drawing them. Check back soon."
           }
-          action={admin && tab === "all" ? <ImportStarterSet /> : undefined}
+          action={admin && tab === ALL_TAB ? <ImportStarterSet /> : undefined}
         />
       ) : (
         <AssetLibrary sections={sections} canManage={admin} />
       )}
-      {(tab === "all" || tab === "palettes") && <PaletteList />}
+      {(tab === ALL_TAB || tab === PALETTES_TAB) && <PaletteList />}
     </ScaledPage>
   );
 }

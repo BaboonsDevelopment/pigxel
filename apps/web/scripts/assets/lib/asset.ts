@@ -2,8 +2,7 @@ import type { Sprite } from "./sprite.ts";
 
 export type Tier = "free" | "paid";
 
-/** The category the current `assets` table needs until packs and tags exist. */
-export type LegacyCategory = "characters" | "items" | "nature" | "tiles";
+export type AssetKind = "sprite" | "tile";
 
 /** A named run of frames: an animation, or a set of variants of one thing. */
 export type Clip = {
@@ -27,7 +26,7 @@ export type SliceDef = {
 export type AssetDef = {
   id: string;
   name: string;
-  category: LegacyCategory;
+  kind: AssetKind;
   tags: string[];
   clips: Clip[];
   slices?: SliceDef[];

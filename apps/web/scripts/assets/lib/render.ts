@@ -81,7 +81,7 @@ export function assetPreview(asset: AssetDef, scale = 8) {
   const rows = asset.clips.map((clip) =>
     clip.frames.map((f) => checker(scaled(f, scale), cell)),
   );
-  if (asset.category === "tiles")
+  if (asset.kind === "tile")
     rows.push(
       asset.clips
         .flatMap((clip) => clip.frames)

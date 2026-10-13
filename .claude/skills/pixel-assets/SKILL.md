@@ -11,7 +11,7 @@ Assets are drawn by hand as JSON pixel grids in `apps/web/scripts/assets/packs/<
 | --- | --- |
 | `pnpm assets:render --only <id>` | Writes `scripts/assets/out/render/<pack>/<id>.png` (frames ×8 on a checkerboard, tiles also 3×3) and prints the path |
 | `pnpm assets:check [--only <id>]` | Schema, palette and art checks, review state, and reviewers' notes |
-| `pnpm assets:review` | Review page at http://localhost:4870 — the user approves or rejects |
+| `pnpm dev` → `/internal/assets` | Review page (dev only, needs `ASSETS_REVIEW_KEY`): the user approves, rejects or asks for fixes per asset, renames blocks (packs), marks blocks or single assets premium, publishes approved assets and deletes ones already in production |
 | `pnpm assets:build` | Builds approved, error-free assets into `scripts/assets/out/` |
 | `pnpm assets:import [--prune] [--dry-run]` | Uploads the build to the hosted Supabase |
 
@@ -25,7 +25,7 @@ Assets are drawn by hand as JSON pixel grids in `apps/web/scripts/assets/packs/<
 6. Run `pnpm assets:check --only <id>`: no errors, and every warning either fixed or deliberate (say why in `"notes"`).
 7. When a batch is done, render the contact sheet (`pnpm assets:render --pack <pack>`), Read `out/render/contact.png` and check the set looks like one game.
 
-Never write to `review.json` — approval is the user's. Never run `assets:import` without the user asking; it writes to the hosted project. Acting on review: `pnpm assets:check` prints each rejected asset's note; redraw from it, and the asset returns to review on its own.
+Never write to `review.json` — approval is the user's. Never run `assets:import` without the user asking; it writes to the hosted project. Every request becomes its own pack folder. A pack either becomes a new block on the Assets page (block id = pack id, block name = `name` in `pack.json`) or adds to an existing block (`"block": "<block id>"` in `pack.json`, e.g. `items`). Set `block` when the user names an existing block; otherwise leave it out, and the user can change it on the review page. Block name, target and premium (`tier: "paid"` for the whole pack, `premium: [ids]` for single assets) are the review page's to change unless asked. Rejecting an asset on the review page deletes its JSON; deleting one from production deletes it everywhere. Acting on review: `pnpm assets:check` prints each asset's state and note. Redraw every `[fix]` asset from its note, and it returns to review on its own.
 
 ## File format
 
@@ -33,7 +33,7 @@ Never write to `review.json` — approval is the user's. Never run `assets:impor
 {
   "id": "slime",
   "name": "Slime",
-  "category": "characters",
+  "kind": "sprite",
   "tags": ["character", "enemy", "animated"],
   "colors": { "k": "#181425", "d": "#265c42", "g": "#3e8948", "l": "#63c74d", "w": "#ffffff" },
   "clips": [
@@ -43,7 +43,7 @@ Never write to `review.json` — approval is the user's. Never run `assets:impor
 }
 ```
 
-- `id` is kebab-case, the file name, and unique across all packs. `category` is one of `characters`, `items`, `nature`, `tiles`.
+- `id` is kebab-case, the file name, and unique across all packs. `kind` is `sprite`, or `tile` for a seamless tile (tile checks and the 3×3 render apply).
 - Each frame is a list of equal-length row strings; `.` is clear, every other character is a key in `colors`. All frames of an asset have the same size.
 - `colors` values are lowercase `#rrggbb` from the pack's palette (`pack.json` → `palette`; `endesga-32` is in `apps/web/src/lib/palette/presets.ts`). Pick mnemonic keys: `k` outline, `d`/`m`/`l` dark/mid/light, `w` highlight.
 - `kind: "animation"` loops its frames (`ms` per frame, `direction` `forward` or `pingpong`); `kind: "variant"` is a set of alternatives (open/closed chest, full/empty heart). An asset can have several clips (`idle`, `walk`).
