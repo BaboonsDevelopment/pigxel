@@ -47,7 +47,7 @@ export function PopularTemplates() {
             key={template.name}
             className="group relative flex min-h-0 flex-col overflow-hidden rounded-xl bg-card shadow-[0_1px_2px_rgb(59_42_51/0.06)]"
           >
-            <span className="relative block aspect-[16/10] overflow-hidden lg:aspect-auto lg:min-h-0 lg:flex-1">
+            <span className="relative block aspect-[16/10] overflow-hidden xl:aspect-auto xl:min-h-0 xl:flex-1">
               <Image
                 src={template.image}
                 alt={template.alt}

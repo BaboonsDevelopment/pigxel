@@ -22,6 +22,7 @@ import {
 import mascot from "../../../../../public/art/pigxel-maskot-searching.png";
 import { PublishButton } from "./components/publish-button";
 import { FeedSwitch } from "./components/feed-switch";
+import { CategoryMenu } from "./components/category-menu";
 import { OptionMenu } from "./components/option-menu";
 import { SortMenu } from "./components/sort-menu";
 
@@ -178,74 +179,83 @@ export function ExploreHeader({
           <PublishButton guest={guest} />
         </div>
       </div>
-      <div className="mt-6 flex flex-wrap items-center gap-x-7 gap-y-3">
-        <div
-          role="group"
-          aria-label="Category"
-          className="flex flex-wrap gap-3"
-        >
-          {CATEGORIES.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => toggle(name)}
-              aria-pressed={
-                name === CATEGORIES[0] ? !tags.length : tags.includes(name)
-              }
-              className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-5 text-xs transition-[background-color,border-color,transform] duration-200 ease-out hover:bg-muted active:scale-95 aria-pressed:border-transparent aria-pressed:bg-pastel-pink motion-reduce:transition-none"
-            >
-              {name}
-              {tagCounts && (
-                <span className="text-muted-foreground tabular-nums">
-                  {tagCounts[name] ?? 0}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3">
-          <SortMenu
-            sort={sort}
-            onChange={onSortChange}
-            size={size}
-            onSizeChange={onSizeChange}
-            animated={animated}
-            onAnimatedChange={onAnimatedChange}
-          />
+      <div className="@container mt-6">
+        <div className="flex flex-col gap-3 @min-[920px]:flex-row @min-[920px]:items-center @min-[920px]:gap-7">
           <div
-            aria-hidden={sort !== SORTS[0].value}
-            inert={sort !== SORTS[0].value}
-            className={`grid overflow-x-clip transition-[grid-template-columns,opacity,margin] duration-300 ease-out motion-reduce:transition-none ${sort === SORTS[0].value ? "grid-cols-[1fr]" : "-ml-3 grid-cols-[0fr] opacity-0"}`}
+            role="group"
+            aria-label="Category"
+            className="hidden min-w-0 gap-2 @min-[640px]:flex"
           >
-            <div className="min-w-0 whitespace-nowrap">
-              <OptionMenu
-                label="Period"
-                options={PERIODS}
-                value={period}
-                onChange={onPeriodChange}
-              />
-            </div>
+            {CATEGORIES.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => toggle(name)}
+                aria-pressed={
+                  name === CATEGORIES[0] ? !tags.length : tags.includes(name)
+                }
+                className="flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-4 text-xs whitespace-nowrap transition-[background-color,border-color,transform] duration-200 ease-out hover:bg-muted active:scale-95 aria-pressed:border-transparent aria-pressed:bg-pastel-pink motion-reduce:transition-none"
+              >
+                {name}
+                {tagCounts && (
+                  <span className="text-muted-foreground tabular-nums">
+                    {tagCounts[name] ?? 0}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
-          <button
-            type="button"
-            onClick={onClear}
-            aria-hidden={!filtered}
-            tabIndex={filtered ? undefined : -1}
-            className={`flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs text-muted-foreground transition-[opacity,transform,background-color,color] duration-200 ease-out hover:bg-muted hover:text-foreground active:scale-95 motion-reduce:transition-none ${filtered ? "" : "pointer-events-none -translate-x-1 opacity-0"}`}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              className="size-3"
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <CategoryMenu
+              categories={CATEGORIES}
+              selected={tags}
+              counts={tagCounts}
+              onToggle={toggle}
+              className="@min-[640px]:hidden"
+            />
+            <SortMenu
+              sort={sort}
+              onChange={onSortChange}
+              size={size}
+              onSizeChange={onSizeChange}
+              animated={animated}
+              onAnimatedChange={onAnimatedChange}
+            />
+            <div
+              aria-hidden={sort !== SORTS[0].value}
+              inert={sort !== SORTS[0].value}
+              className={`grid overflow-x-clip transition-[grid-template-columns,opacity,margin] duration-300 ease-out motion-reduce:transition-none ${sort === SORTS[0].value ? "grid-cols-[1fr]" : "-ml-3 grid-cols-[0fr] opacity-0"}`}
             >
-              <path d="m4 4 8 8M12 4l-8 8" />
-            </svg>
-            Clear
-          </button>
+              <div className="min-w-0 whitespace-nowrap">
+                <OptionMenu
+                  label="Period"
+                  options={PERIODS}
+                  value={period}
+                  onChange={onPeriodChange}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClear}
+              aria-hidden={!filtered}
+              tabIndex={filtered ? undefined : -1}
+              className={`flex h-9 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-xs text-muted-foreground transition-[opacity,transform,background-color,color] duration-200 ease-out hover:bg-muted hover:text-foreground active:scale-95 motion-reduce:transition-none ${filtered ? "" : "pointer-events-none -translate-x-1 opacity-0"}`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                className="size-3"
+              >
+                <path d="m4 4 8 8M12 4l-8 8" />
+              </svg>
+              Clear
+            </button>
+          </div>
         </div>
       </div>
     </header>

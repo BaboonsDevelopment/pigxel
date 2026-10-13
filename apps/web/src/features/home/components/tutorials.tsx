@@ -31,11 +31,11 @@ export function Tutorials() {
           View all <span aria-hidden="true">→</span>
         </Link>
       </div>
-      <ul className="relative z-10 mt-3 flex min-h-0 flex-1 flex-col gap-2 sm:mr-40 lg:ml-4">
+      <ul className="relative z-10 mt-3 flex min-h-0 flex-1 flex-col gap-2 sm:mr-40 xl:ml-4">
         {TUTORIALS.map((tutorial) => (
           <li
             key={tutorial.slug}
-            className="flex h-16 lg:h-auto lg:max-h-16 lg:min-h-10 lg:flex-1"
+            className="flex h-16 xl:h-auto xl:max-h-16 xl:min-h-10 xl:flex-1"
           >
             <Link
               href={`/tutorials/${tutorial.slug}`}

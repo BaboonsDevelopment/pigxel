@@ -1,16 +1,13 @@
 import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
-import { StatsHover } from "@/features/tiles/components/projects-view/components/stats-hover";
 import { PROFILE_TABS, tabHref, type ProfileTabId } from "../tabs";
 
 export function ProfileTabs({
-  profileId,
   username,
   active,
   isOwner,
   withCollections,
 }: {
-  profileId: string;
   username: string;
   active: ProfileTabId;
   isOwner: boolean;
@@ -42,9 +39,6 @@ export function ProfileTabs({
           {tab.label}
         </Link>
       ))}
-      <span className="ml-auto">
-        <StatsHover tile={null} profileId={profileId} />
-      </span>
     </nav>
   );
 }

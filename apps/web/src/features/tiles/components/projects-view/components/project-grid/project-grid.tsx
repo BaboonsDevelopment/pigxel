@@ -56,7 +56,7 @@ import { useProjectActions } from "./use-project-actions";
 const PRELOAD = "1500px";
 
 export const GRID =
-  "grid grid-cols-2 gap-x-[33px] gap-y-[28px] sm:grid-cols-3 lg:grid-cols-5";
+  "grid grid-cols-2 gap-x-[33px] gap-y-[28px] sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 
 const compareProjects = (a: Project, b: Project, sort: ProjectSort) =>
   sort === "az"

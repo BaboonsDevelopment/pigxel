@@ -30,7 +30,6 @@ import {
   type ProfileTile,
 } from "@/features/profile/profile";
 import { ArtsToolbar } from "@/features/profile/components/arts-toolbar";
-import { ActivityHeatmap } from "@/features/profile/components/activity-heatmap";
 import { readTab, tabHref, type ProfileTabId } from "@/features/profile/tabs";
 import { usernameError, usernameIn } from "@/features/profile/validation";
 
@@ -193,12 +192,10 @@ export default async function ArtistProfilePage({
         follows={follows}
         blocked={blocked}
         tabHref={(id) => tabHref(profile.username, id)}
+        activity={activity}
       />
 
-      {activity && <ActivityHeatmap activity={activity} />}
-
       <ProfileTabs
-        profileId={profile.id}
         username={profile.username}
         active={tab.id}
         isOwner={isOwner}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { TileEditor } from "@/features/editor/tile-editor";
+import { WideScreenOnly } from "@/features/editor/components/wide-screen-only";
 import { isAdmin, requireUser } from "@/lib/auth/session";
 import { getDriveStatus } from "@/lib/google-drive/server";
 
@@ -22,14 +23,16 @@ export default async function EditTile({
     getDriveStatus(user.id),
   ]);
   return (
-    <TileEditor
-      userId={user.id}
-      tileId={id}
-      drive={drive}
-      driveError={driveResult === "error"}
-      guide={guide}
-      start={start}
-      canPublish={isAdmin(user)}
-    />
+    <WideScreenOnly>
+      <TileEditor
+        userId={user.id}
+        tileId={id}
+        drive={drive}
+        driveError={driveResult === "error"}
+        guide={guide}
+        start={start}
+        canPublish={isAdmin(user)}
+      />
+    </WideScreenOnly>
   );
 }

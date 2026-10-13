@@ -43,7 +43,7 @@ export function Menu({
           variant: "ghost",
           size: "sm",
           className:
-            "cursor-pointer list-none gap-1 px-3 text-sm text-foreground [&::-webkit-details-marker]:hidden",
+            "cursor-pointer list-none gap-1 px-2 text-sm text-foreground xl:px-3 [&::-webkit-details-marker]:hidden",
         })}
       >
         {label}
