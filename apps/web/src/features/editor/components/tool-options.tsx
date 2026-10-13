@@ -49,7 +49,10 @@ export function ToolOptions({
 
 function brushesStatus(status?: string | null) {
   return status ? (
-    <span role="status" className="text-xs text-muted-foreground">
+    <span
+      role="status"
+      className="sr-only text-xs text-muted-foreground xl:not-sr-only"
+    >
       {status}
     </span>
   ) : null;

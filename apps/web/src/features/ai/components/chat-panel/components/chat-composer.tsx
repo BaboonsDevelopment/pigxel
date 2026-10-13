@@ -154,7 +154,7 @@ export function ChatComposer({
             e.preventDefault();
             void attach(files);
           }}
-          className="h-11 min-h-11 flex-1 resize-none"
+          className="h-11 min-h-11 min-w-0 flex-1 resize-none py-2.5 text-sm"
         />
         {onStop ? (
           <Button
@@ -163,11 +163,12 @@ export function ChatComposer({
             variant="secondary"
             title="Stop this request. Anything it hasn’t drawn yet won’t be added"
             onClick={onStop}
+            className="shrink-0 px-4"
           >
             Stop
           </Button>
         ) : (
-          <Button size="lg" disabled={!canSend}>
+          <Button size="lg" disabled={!canSend} className="shrink-0 px-4">
             Send
           </Button>
         )}

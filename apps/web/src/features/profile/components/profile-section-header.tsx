@@ -14,10 +14,14 @@ export function ProfileSectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex items-center gap-3">
+    <div className="mb-5 flex flex-wrap items-center gap-3">
       <h2
         id={id}
-        className={cn(madimiOne.className, PROFILE_HEADING, "text-[32px]")}
+        className={cn(
+          madimiOne.className,
+          PROFILE_HEADING,
+          "text-2xl sm:text-[32px]",
+        )}
       >
         {title}
       </h2>

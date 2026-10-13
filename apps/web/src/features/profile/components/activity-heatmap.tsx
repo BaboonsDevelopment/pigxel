@@ -63,7 +63,9 @@ export function ActivityHeatmap({
   return (
     <section
       aria-label="Activity"
-      className={cardVariants({ className: "mt-8 w-fit max-w-full min-w-0" })}
+      className={cardVariants({
+        className: "w-fit max-w-full min-w-0 shadow-lg",
+      })}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
         <Heading>Daily activity</Heading>

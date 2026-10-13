@@ -22,9 +22,9 @@ export function HomeView({
   cloudTiles: CloudTileSummary[];
 }) {
   return (
-    <div className="relative lg:h-full lg:[container-type:size]">
+    <div className="relative xl:h-full xl:[container-type:size]">
       <PixelBackdrop />
-      <Page className="relative flex max-w-[88rem] flex-col pb-6 lg:h-[726px] lg:w-[1290px] lg:max-w-none lg:[zoom:max(0.8,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,726px))))]">
+      <Page className="relative flex max-w-[88rem] flex-col pb-6 xl:h-[726px] xl:w-[1290px] xl:max-w-none xl:[zoom:max(0.8,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,726px))))]">
         <section aria-labelledby="start-heading" className="shrink-0">
           <Heading as="h1" id="start-heading" className="mb-3">
             Start creating
@@ -52,7 +52,7 @@ export function HomeView({
           />
         </section>
 
-        <div className="mt-6 grid grid-cols-1 gap-5 lg:min-h-56 lg:flex-1 lg:grid-cols-2">
+        <div className="mt-6 grid grid-cols-1 gap-5 xl:min-h-56 xl:flex-1 xl:grid-cols-2">
           <PopularTemplates />
           <Tutorials />
         </div>

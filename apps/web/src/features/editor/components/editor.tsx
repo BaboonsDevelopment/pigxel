@@ -65,8 +65,6 @@ import { usePlayback } from "../timeline/use-playback";
 import { TilesetPanel } from "./tileset/tileset-panel";
 import { PreviewWindow } from "./preview/preview-window";
 import { SecondView } from "./second-view";
-import { ZoomControl } from "./zoom-control";
-import { PointerPosition } from "./pointer-position";
 import { saveExport } from "../export/save";
 import { tilemapFiles } from "../export/tilemap";
 import { loadAssetFrame, type Asset } from "@/features/assets/assets";
@@ -307,10 +305,6 @@ export function Editor({
       .catch(() => {});
   }, [router]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
-  const [pointerPosition, setPointerPosition] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [creatingTile, setCreatingTile] = useState(false);
@@ -409,7 +403,7 @@ export function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
-  const { scale, zoomIn, zoomOut, zoomReset, zoomSet, zoomFit } = useZoom({
+  const { scale, zoomIn, zoomOut, zoomReset, zoomFit } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
     initial: kept?.scale,
@@ -1778,25 +1772,9 @@ export function Editor({
                 )}
               >
                 <div className="m-auto">
-                  <PixelCanvas
-                    ref={canvas}
-                    scale={scale}
-                    {...canvasProps}
-                    onPointerPosition={setPointerPosition}
-                  />
+                  <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
                 </div>
               </main>
-              <div className="absolute top-2 right-2 z-10">
-                <ZoomControl
-                  scale={scale}
-                  onChange={zoomSet}
-                  onFit={zoomFit}
-                  onZoomIn={zoomIn}
-                  onZoomOut={zoomOut}
-                  onReset={zoomReset}
-                />
-                <PointerPosition point={pointerPosition} />
-              </div>
             </div>
             {splitView && (
               <SecondView
