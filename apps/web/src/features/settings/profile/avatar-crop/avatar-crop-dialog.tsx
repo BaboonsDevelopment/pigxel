@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import {
   centeredCrop,
   clampCrop,
@@ -125,11 +121,11 @@ export function AvatarCropDialog({
 
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader
-        title="Crop your picture"
-        description="Drag to move it, scroll or use the slider to zoom."
-      />
-      <DialogBody className="grid justify-items-center gap-4">
+      <ModalHeader title="Crop Your Picture" />
+      <DialogBody className="grid justify-items-center gap-5 py-5">
+        <p className="-mb-1 w-full text-sm text-muted-foreground">
+          Drag to move it, scroll or use the slider to zoom.
+        </p>
         <div
           ref={box}
           onPointerDown={drag}
@@ -161,7 +157,7 @@ export function AvatarCropDialog({
           />
         </div>
         <label className="flex w-full items-center gap-3 text-sm">
-          <span className="text-muted-foreground">Zoom</span>
+          <span className="w-14 font-semibold">Zoom</span>
           <input
             type="range"
             min={1}
@@ -174,22 +170,18 @@ export function AvatarCropDialog({
               size &&
               setCrop(zoomAround(crop, Number(e.target.value), size.w, size.h))
             }
-            className="min-w-0 flex-1 accent-primary"
+            className="min-w-0 flex-1 accent-pink-strong"
           />
         </label>
         {error && <FormMessage tone="error">{error}</FormMessage>}
       </DialogBody>
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onClose}>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={onClose}>
           Cancel
-        </Button>
-        <Button
-          type="button"
-          disabled={!crop || saving}
-          onClick={() => void save()}
-        >
+        </ModalButton>
+        <ModalButton disabled={!crop || saving} onClick={() => void save()}>
           {saving ? "Saving…" : "Save"}
-        </Button>
+        </ModalButton>
       </DialogFooter>
     </Dialog>
   );

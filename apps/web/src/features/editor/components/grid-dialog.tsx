@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { Input } from "@pigxel/ui/components/input";
+import { ModalButton } from "@/components/ui/modal-button";
+import { ModalHeader } from "@/components/ui/modal-header";
 import {
   DEFAULT_GRID_LOOK,
   MAX_GRID,
@@ -11,7 +12,7 @@ import {
   type CanvasGrid,
   type GridLook,
 } from "../pixel-canvas/view";
-import { NumberField } from "./number-field";
+import { SIZE_LABEL, SizeField } from "./size-controls";
 
 export default function GridDialog({
   grid: initialGrid,
@@ -27,6 +28,7 @@ export default function GridDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const [grid, setGrid] = useState(initialGrid ?? squareGrid(16));
   const [look, setLook] = useState(initialLook);
+  const [hex, setHex] = useState(initialLook.color);
   const kept = useRef(true);
   useEffect(() => dialog.current?.showModal(), []);
   const valid =
@@ -40,6 +42,14 @@ export default function GridDialog({
     if ([next.w, next.h].every((n) => n >= 1 && n <= MAX_GRID))
       onChange(next, nextLook);
   };
+  const recolor = (color: string) => {
+    setHex(color);
+    show(grid, { ...look, color });
+  };
+  const cancel = () => {
+    kept.current = false;
+    dialog.current?.close();
+  };
 
   return (
     <dialog
@@ -52,10 +62,9 @@ export default function GridDialog({
         kept.current = false;
       }}
       aria-labelledby="grid-title"
-      className="m-auto mr-4 w-[min(22rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-transparent"
+      className="m-auto w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-transparent"
     >
       <form
-        className="space-y-5 p-5"
         onSubmit={(e) => {
           e.preventDefault();
           if (!valid) return;
@@ -63,92 +72,118 @@ export default function GridDialog({
           dialog.current?.close();
         }}
       >
-        <div>
-          <SectionTitle id="grid-title">Grid</SectionTitle>
-          <Lead className="mt-1">Changes show on the canvas right away.</Lead>
-        </div>
+        <ModalHeader title="Grid" titleId="grid-title" onClose={cancel} />
 
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField
-            id="grid-width"
-            label="Width, px"
-            value={grid.w}
-            onChange={(w) => show({ ...grid, w })}
-          />
-          <NumberField
-            id="grid-height"
-            label="Height, px"
-            value={grid.h}
-            onChange={(h) => show({ ...grid, h })}
-          />
-          <NumberField
-            id="grid-x"
-            label="Shift right, px"
-            value={grid.x}
-            onChange={(x) => show({ ...grid, x })}
-          />
-          <NumberField
-            id="grid-y"
-            label="Shift down, px"
-            value={grid.y}
-            onChange={(y) => show({ ...grid, y })}
-          />
-        </div>
-
-        <div className="flex items-center gap-3 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="color"
-              aria-label="Grid colour"
-              value={look.color}
-              onChange={(e) => show(grid, { ...look, color: e.target.value })}
-              className="h-7 w-9 cursor-pointer rounded border bg-background"
+        <div className="grid gap-5 p-5">
+          <div className="grid grid-cols-2 gap-4">
+            <SizeField
+              id="grid-width"
+              label="Width"
+              unit="px"
+              value={String(grid.w)}
+              onChange={(text) => show({ ...grid, w: Number(text) })}
             />
-            Colour
+            <SizeField
+              id="grid-height"
+              label="Height"
+              unit="px"
+              value={String(grid.h)}
+              onChange={(text) => show({ ...grid, h: Number(text) })}
+            />
+            <SizeField
+              id="grid-x"
+              label="Shift right"
+              unit="px"
+              min={null}
+              value={String(grid.x)}
+              onChange={(text) => show({ ...grid, x: Number(text) })}
+            />
+            <SizeField
+              id="grid-y"
+              label="Shift down"
+              unit="px"
+              min={null}
+              value={String(grid.y)}
+              onChange={(text) => show({ ...grid, y: Number(text) })}
+            />
+          </div>
+
+          <div>
+            <span className={SIZE_LABEL}>Colour</span>
+            <div className="flex items-center gap-2">
+              <label
+                title="Pick a colour"
+                className="relative size-10 shrink-0 cursor-pointer overflow-hidden rounded-xl ring-1 ring-black/10"
+              >
+                <span
+                  className="absolute inset-0"
+                  style={{ backgroundColor: look.color }}
+                />
+                <input
+                  type="color"
+                  aria-label="Grid colour"
+                  value={look.color}
+                  onChange={(e) => recolor(e.target.value)}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                />
+              </label>
+              <Input
+                aria-label="Hex colour"
+                value={hex}
+                maxLength={7}
+                onChange={(e) => {
+                  const next = e.target.value.trim();
+                  setHex(next);
+                  if (/^#[0-9a-f]{6}$/i.test(next))
+                    show(grid, { ...look, color: next.toLowerCase() });
+                }}
+                className="h-10 w-full rounded-xl px-3 font-mono uppercase"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-3 text-sm">
+            <span className="w-16 font-semibold">Opacity</span>
+            <input
+              type="range"
+              aria-label="Grid opacity"
+              min={10}
+              max={100}
+              value={look.opacity}
+              onChange={(e) =>
+                show(grid, { ...look, opacity: Number(e.target.value) })
+              }
+              className="min-w-0 flex-1 accent-pink-strong"
+            />
+            <span className="w-10 text-right tabular-nums">
+              {look.opacity}%
+            </span>
           </label>
-          <input
-            type="range"
-            aria-label="Grid opacity"
-            min={10}
-            max={100}
-            value={look.opacity}
-            onChange={(e) =>
-              show(grid, { ...look, opacity: Number(e.target.value) })
-            }
-            className="min-w-0 flex-1 accent-primary"
-          />
-          <span className="w-10 text-right tabular-nums">{look.opacity}%</span>
+
+          {!valid && (
+            <FormMessage tone="error">
+              Width and height must be between 1 and {MAX_GRID} px.
+            </FormMessage>
+          )}
         </div>
 
-        {!valid && (
-          <FormMessage tone="error">
-            Width and height must be between 1 and {MAX_GRID} px.
-          </FormMessage>
-        )}
-
-        <div className="flex justify-between gap-2 border-t pt-4">
-          <Button
+        <div className="flex items-center gap-2 border-t bg-pink-base px-5 py-4">
+          <button
             type="button"
-            variant="ghost"
-            onClick={() => show(squareGrid(16), DEFAULT_GRID_LOOK)}
+            onClick={() => {
+              setHex(DEFAULT_GRID_LOOK.color);
+              show(squareGrid(16), DEFAULT_GRID_LOOK);
+            }}
+            className="mr-auto text-xs text-link-accent transition-colors hover:text-lavender-foreground"
           >
             Reset
-          </Button>
-          <span className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                kept.current = false;
-                dialog.current?.close();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!valid}>
-              Done
-            </Button>
-          </span>
+          </button>
+          <ModalButton variant="secondary" onClick={cancel}>
+            Cancel
+          </ModalButton>
+          <ModalButton type="submit" disabled={!valid}>
+            Done
+          </ModalButton>
         </div>
       </form>
     </dialog>

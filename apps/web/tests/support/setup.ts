@@ -27,6 +27,7 @@ vi.mock("next/font/google", () => {
     Geist: font,
     Geist_Pixel: font,
     Inter: font,
+    Madimi_One: font,
     Manrope: font,
     Pixelify_Sans: font,
     Poppins: font,

@@ -24,7 +24,7 @@ export default function OpenTileDialog({
   if (source === "cloud")
     return (
       <FilesDialog
-        title="Open from Pigxel cloud"
+        title="Open from Pigxel Cloud"
         empty="No tiles in Pigxel cloud yet. Tiles you save there appear here."
         load={async () =>
           (await listCloudTiles()).map((tile) => ({

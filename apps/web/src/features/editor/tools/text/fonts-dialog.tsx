@@ -2,13 +2,10 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Button, IconButton } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { IconButton } from "@pigxel/ui/components/button";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { NumericInput } from "../../components/numeric-input";
@@ -121,15 +118,8 @@ export function FontsDialog({
 
   return (
     <Dialog onClose={onClose} size="md" portal>
-      <DialogHeader
-        title={pending ? "Add a font" : "Your fonts"}
-        description={
-          pending
-            ? "Set the size the font was drawn at, so every pixel lands on the grid. The preview shows it at 1×."
-            : "Upload a pixel font to write with it on any tile. Fonts stay with your account."
-        }
-      />
-      <DialogBody className="grid gap-4">
+      <ModalHeader title={pending ? "Add a Font" : "Your Fonts"} />
+      <DialogBody className="grid gap-5 py-5">
         {pending ? (
           <>
             <Field label="Name" htmlFor="font-name">
@@ -140,6 +130,7 @@ export function FontsDialog({
                 onChange={(e) =>
                   setPending({ ...pending, name: e.target.value })
                 }
+                className="h-12 rounded-xl px-4 text-base"
               />
             </Field>
             <Field
@@ -159,27 +150,28 @@ export function FontsDialog({
                     px: Math.min(64, Math.max(4, Math.round(px))),
                   })
                 }
-                className="w-24"
+                className="h-12 w-28 rounded-xl px-4 text-base"
               />
             </Field>
             <FontPreview font={pending} />
           </>
         ) : fonts.isPending ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
             Loading…
           </p>
         ) : fonts.isError ? (
           <FormMessage tone="error">{fonts.error.message}</FormMessage>
         ) : fonts.data.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No fonts yet.
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
+            No fonts yet. Upload a pixel font to write with it on any tile.
+            Fonts stay with your account.
           </p>
         ) : (
-          <ul className="-mx-2 grid gap-0.5">
+          <ul className="grid max-h-96 gap-1 overflow-y-auto rounded-xl border bg-background p-2">
             {fonts.data.map((font) => (
               <li
                 key={font.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-secondary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/60"
               >
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {font.name}
@@ -210,32 +202,27 @@ export function FontsDialog({
           }}
         />
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={MODAL_FOOTER}>
         {pending ? (
           <>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setPending(null)}
-            >
+            <ModalButton variant="secondary" onClick={() => setPending(null)}>
               Cancel
-            </Button>
-            <Button
-              type="button"
+            </ModalButton>
+            <ModalButton
               disabled={!pending.name.trim()}
               onClick={() => save(pending)}
             >
               Add font
-            </Button>
+            </ModalButton>
           </>
         ) : (
           <>
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <ModalButton variant="secondary" onClick={onClose}>
               Close
-            </Button>
-            <Button type="button" onClick={() => input.current?.click()}>
+            </ModalButton>
+            <ModalButton onClick={() => input.current?.click()}>
               Upload font…
-            </Button>
+            </ModalButton>
           </>
         )}
       </DialogFooter>
@@ -276,7 +263,7 @@ function FontPreview({ font }: { font: Pending }) {
   }, [font.id, font.family, font.px]);
 
   return (
-    <div className="grid min-h-24 place-items-center overflow-auto rounded-lg border bg-white p-3">
+    <div className="grid min-h-24 place-items-center overflow-auto rounded-xl border bg-white p-3">
       {empty && (
         <p className="text-sm text-muted-foreground">
           This font has none of these letters.

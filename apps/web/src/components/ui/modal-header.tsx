@@ -10,11 +10,19 @@ export const MODAL_FOOTER = "bg-pink-base py-4";
 export function ModalHeader({
   title,
   className,
+  titleId: ownTitleId,
+  onClose,
+  closable = true,
 }: {
   title: string;
   className?: string;
+  titleId?: string;
+  onClose?: () => void;
+  closable?: boolean;
 }) {
-  const { close, titleId } = useDialog();
+  const dialog = useDialog();
+  const close = onClose ?? dialog.close;
+  const titleId = ownTitleId ?? dialog.titleId;
   return (
     <div
       className={cn(
@@ -26,28 +34,30 @@ export function ModalHeader({
         id={titleId}
         className={cn(
           madimiOne.className,
-          "text-2xl leading-[30px] text-undo-surface",
+          "min-w-0 text-2xl leading-[30px] break-words text-undo-surface",
         )}
       >
         {title}
       </h2>
-      <IconButton
-        label="Close"
-        onClick={close}
-        className="size-9 rounded-lg bg-background text-muted-foreground hover:text-foreground"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          strokeLinecap="round"
-          className="size-5"
+      {closable && (
+        <IconButton
+          label="Close"
+          onClick={close}
+          className="size-9 rounded-lg bg-background text-muted-foreground hover:text-foreground"
         >
-          <path d="m3 3 10 10M13 3 3 13" />
-        </svg>
-      </IconButton>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+            strokeLinecap="round"
+            className="size-5"
+          >
+            <path d="m3 3 10 10M13 3 3 13" />
+          </svg>
+        </IconButton>
+      )}
     </div>
   );
 }

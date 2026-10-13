@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useState, type DragEvent } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { toolById, type ToolId } from "../tools";
 import { dropInOrder, moveInOrder, orderedToolGroups } from "../tool-order";
 
@@ -27,8 +33,6 @@ export default function CustomizeToolsDialog({
   onChange: (tool: string, shown: boolean) => void;
   onClose: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => dialog.current?.showModal(), []);
   const groups = orderedToolGroups(groupOrder, toolOrder);
   const [dragged, setDragged] = useState<Dragged | null>(null);
   const [target, setTarget] = useState<{ id: string; after: boolean } | null>(
@@ -93,38 +97,28 @@ export default function CustomizeToolsDialog({
   };
   const dropClass = (id: string) =>
     target?.id === id &&
-    (target.after ? "border-b-2 border-primary" : "border-t-2 border-primary");
+    (target.after
+      ? "border-b-2 border-b-pink-strong"
+      : "border-t-2 border-t-pink-strong");
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="customize-tools-title"
-      className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
-    >
-      <div className="border-b p-5">
-        <SectionTitle id="customize-tools-title">Customize tools</SectionTitle>
-        <Lead className="mt-1">
-          Pick the tools to show. Hidden tools still work from their keys. Use
-          the drag handles or arrows to reorder groups and tools within each
-          group.
-        </Lead>
-      </div>
-      <div className="grid max-h-[60dvh] grid-cols-1 gap-5 overflow-y-auto p-5 sm:grid-cols-2">
+    <Dialog onClose={onClose} size="lg" portal>
+      <ModalHeader title="Customize Tools" />
+      <DialogBody className="grid grid-cols-1 gap-4 py-5 sm:grid-cols-2">
         {groups.map((group, groupIndex) => (
           <fieldset
             key={group.id}
             onDragOver={(e) => dragOver(e, { kind: "group", id: group.id })}
             onDrop={(e) => drop(e, { kind: "group", id: group.id })}
             className={cn(
-              "rounded-md",
+              "rounded-xl border p-3",
               dragged?.kind === "group" &&
                 dragged.id === group.id &&
                 "opacity-40",
               dropClass(group.id),
             )}
           >
-            <legend className="mb-2 w-full text-sm font-medium">
+            <legend className="float-left mb-2 w-full text-sm font-semibold">
               <span className="flex items-center gap-2">
                 <DragHandle
                   label={`${group.label} group`}
@@ -151,7 +145,7 @@ export default function CustomizeToolsDialog({
                 />
               </span>
             </legend>
-            <div className="space-y-1.5">
+            <div className="clear-left space-y-1.5">
               {group.tools.map((id, toolIndex) => {
                 const tool = toolById(id);
                 return (
@@ -212,21 +206,24 @@ export default function CustomizeToolsDialog({
             </div>
           </fieldset>
         ))}
-      </div>
-      <div className="flex justify-between border-t p-4">
-        <Button
+      </DialogBody>
+      <DialogFooter className={cn(MODAL_FOOTER, "items-center")}>
+        <button
           type="button"
-          variant="ghost"
           onClick={() => onOrderChange([], [])}
+          className="mr-auto text-xs text-link-accent transition-colors hover:text-lavender-foreground"
         >
           Reset order
-        </Button>
-        <Button type="button" onClick={() => dialog.current?.close()}>
-          Done
-        </Button>
-      </div>
-    </dialog>
+        </button>
+        <DoneButton />
+      </DialogFooter>
+    </Dialog>
   );
+}
+
+function DoneButton() {
+  const { close } = useDialog();
+  return <ModalButton onClick={close}>Done</ModalButton>;
 }
 
 function DragHandle({
@@ -246,7 +243,7 @@ function DragHandle({
       title={`Drag ${label} to reorder`}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className="size-6 shrink-0 cursor-grab rounded text-muted-foreground hover:bg-muted active:cursor-grabbing"
+      className="size-6 shrink-0 cursor-grab rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing"
     >
       ⠿
     </button>
@@ -272,7 +269,7 @@ function OrderButtons({
         title="Move earlier"
         disabled={first}
         onClick={() => onMove(-1)}
-        className="size-6 rounded hover:bg-muted disabled:opacity-30"
+        className="size-6 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
       >
         ↑
       </button>
@@ -282,7 +279,7 @@ function OrderButtons({
         title="Move later"
         disabled={last}
         onClick={() => onMove(1)}
-        className="size-6 rounded hover:bg-muted disabled:opacity-30"
+        className="size-6 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
       >
         ↓
       </button>

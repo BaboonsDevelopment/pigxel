@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
 import { Checkbox } from "@pigxel/ui/components/choice";
-import { FormMessage, Label } from "@pigxel/ui/components/field";
-import { Input } from "@pigxel/ui/components/input";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { NumericInput } from "./numeric-input";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
 import type { DecodedAnimation } from "@/lib/image/gif-decode";
 import {
   cutSheet,
@@ -29,23 +34,36 @@ const FIELDS: { key: keyof SheetGrid; label: string; min: number }[] = [
   { key: "gapY", label: "Gap Y", min: 0 },
 ];
 
-export default function ImportSheetDialog({
-  name,
-  picture,
-  scale,
-  onImport,
-  onClose,
-}: {
+const FIELD_LABEL = "mb-1.5 block text-sm font-semibold";
+
+const NUMBER_FIELD =
+  "h-12 w-full rounded-xl border border-input bg-background px-4 pr-11 text-base tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+
+const UNIT =
+  "pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm text-muted-foreground";
+
+type SheetProps = {
   name: string;
   picture: Picture;
   scale: number;
   onImport: (frames: DecodedAnimation) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export default function ImportSheetDialog({
+  onClose,
+  ...props
+}: SheetProps & { onClose: () => void }) {
+  return (
+    <Dialog onClose={onClose} size="md" portal>
+      <SheetForm {...props} />
+    </Dialog>
+  );
+}
+
+function SheetForm({ name, picture, scale, onImport }: SheetProps) {
+  const { close } = useDialog();
   const preview = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState(() => guessSheetGrid(picture));
-  useEffect(() => dialog.current?.showModal(), []);
 
   const cells = sheetCells(grid, picture.w, picture.h);
   const cut = useMemo(() => cutSheet(picture, grid), [picture, grid]);
@@ -83,44 +101,23 @@ export default function ImportSheetDialog({
     setGrid((g) => ({ ...g, [key]: value }));
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="sheet-dialog-title"
-      className="m-auto w-[min(36rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (problem) return;
+        onImport(cut);
+        close();
+      }}
     >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="sheet-dialog-title">
-            Import sprite sheet
-          </SectionTitle>
-          <Lead className="mt-1">
-            {name} · {picture.w} × {picture.h} px
-            {scale > 1 && ` (saved at ${scale}×, read at its own size)`}
-          </Lead>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
+      <ModalHeader title="Import Sprite Sheet" />
+      <DialogBody className="grid gap-5 py-5">
+        <p className="-mb-1 truncate text-sm text-muted-foreground tabular-nums">
+          {name} · {picture.w} × {picture.h} px
+          {scale > 1 && ` (saved at ${scale}×, read at its own size)`}
+        </p>
 
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (problem) return;
-          onImport(cut);
-          dialog.current?.close();
-        }}
-      >
-        <div className="flex justify-center overflow-hidden rounded-lg border bg-muted p-3">
+        <div className="flex justify-center overflow-hidden rounded-xl border bg-background p-3">
           <div
             className="relative bg-checker"
             style={{ width: picture.w * zoom, height: picture.h * zoom }}
@@ -135,7 +132,7 @@ export default function ImportSheetDialog({
             {cells.map((cell, i) => (
               <span
                 key={`${cell.x},${cell.y}`}
-                className="pointer-events-none absolute border border-blue-500/80 text-[10px] leading-none text-blue-600"
+                className="pointer-events-none absolute border border-pink-strong/80 text-[10px] leading-none text-pink-strong"
                 style={{
                   left: cell.x * zoom,
                   top: cell.y * zoom,
@@ -144,7 +141,9 @@ export default function ImportSheetDialog({
                 }}
               >
                 {cell.w * zoom >= 18 && (
-                  <span className="bg-background/80 px-0.5">{i + 1}</span>
+                  <span className="rounded-br bg-background/85 px-0.5">
+                    {i + 1}
+                  </span>
                 )}
               </span>
             ))}
@@ -153,49 +152,45 @@ export default function ImportSheetDialog({
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
           {FIELDS.map(({ key, label, min }) => (
-            <div key={key} className="space-y-1">
-              <Label htmlFor={`sheet-${key}`} className="block text-xs">
-                {label}
-              </Label>
-              <NumericInput
-                as={Input}
-                id={`sheet-${key}`}
-                inputSize="sm"
-                min={min}
-                value={grid[key] as number}
-                onValueChange={(next) =>
-                  set(key, Math.max(min, Math.round(next) || min))
-                }
-                className="tabular-nums"
-              />
-            </div>
+            <label key={key} className="block">
+              <span className={FIELD_LABEL}>{label}</span>
+              <span className="relative block">
+                <NumericInput
+                  min={min}
+                  value={grid[key] as number}
+                  onValueChange={(next) =>
+                    set(key, Math.max(min, Math.round(next) || min))
+                  }
+                  className={NUMBER_FIELD}
+                />
+                <span className={UNIT}>px</span>
+              </span>
+            </label>
           ))}
-          <div className="space-y-1">
-            <Label htmlFor="sheet-duration" className="block text-xs">
-              Frame duration, ms
-            </Label>
-            <NumericInput
-              as={Input}
-              id="sheet-duration"
-              inputSize="sm"
-              min={MIN_FRAME_DURATION}
-              max={MAX_FRAME_DURATION}
-              value={grid.duration}
-              onValueChange={(next) =>
-                set(
-                  "duration",
-                  Math.max(
-                    MIN_FRAME_DURATION,
-                    Math.min(
-                      MAX_FRAME_DURATION,
-                      Math.round(next) || MIN_FRAME_DURATION,
+          <label className="block">
+            <span className={FIELD_LABEL}>Frame duration</span>
+            <span className="relative block">
+              <NumericInput
+                min={MIN_FRAME_DURATION}
+                max={MAX_FRAME_DURATION}
+                value={grid.duration}
+                onValueChange={(next) =>
+                  set(
+                    "duration",
+                    Math.max(
+                      MIN_FRAME_DURATION,
+                      Math.min(
+                        MAX_FRAME_DURATION,
+                        Math.round(next) || MIN_FRAME_DURATION,
+                      ),
                     ),
-                  ),
-                )
-              }
-              className="tabular-nums"
-            />
-          </div>
+                  )
+                }
+                className={NUMBER_FIELD}
+              />
+              <span className={UNIT}>ms</span>
+            </span>
+          </label>
         </div>
 
         <label className="flex items-center gap-2 text-sm">
@@ -206,27 +201,24 @@ export default function ImportSheetDialog({
           Skip empty frames
         </label>
 
-        <FormMessage
-          tone={problem ? "error" : "muted"}
-          className="tabular-nums"
+        <p
+          className={cn(
+            "rounded-xl px-4 py-3 text-sm tabular-nums",
+            problem ? "bg-attention-soft" : "bg-success-soft",
+          )}
         >
           {problem ??
             `${cut.frames.length} ${cut.frames.length === 1 ? "frame" : "frames"} of ${grid.frameW} × ${grid.frameH} px`}
-        </FormMessage>
-
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => dialog.current?.close()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!!problem}>
-            Import as new tile
-          </Button>
-        </div>
-      </form>
-    </dialog>
+        </p>
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!!problem}>
+          Import as new tile
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }

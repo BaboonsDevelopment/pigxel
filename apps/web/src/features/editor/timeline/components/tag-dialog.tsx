@@ -5,11 +5,21 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  DialogHeader,
   useDialog,
 } from "@pigxel/ui/components/dialog";
+import { FormMessage } from "@pigxel/ui/components/field";
+import { Input } from "@pigxel/ui/components/input";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import type { FrameTag, TagDirection } from "@/lib/sprite/tags";
-import { EditorSelect } from "../../components/editor-select";
+import { SIZE_LABEL, SizeField } from "../../components/size-controls";
+
+const DIRECTIONS: { value: TagDirection; label: string }[] = [
+  { value: "forward", label: "Forward" },
+  { value: "reverse", label: "Reverse" },
+  { value: "pingpong", label: "Ping-pong" },
+];
 
 export function TagDialog({
   tag,
@@ -32,6 +42,7 @@ export function TagDialog({
   const [from, setFrom] = useState(String((tag?.from ?? initialFrame) + 1));
   const [to, setTo] = useState(String((tag?.to ?? initialFrame) + 1));
   const [color, setColor] = useState(tag?.color ?? "#3b82f6");
+  const [hex, setHex] = useState(tag?.color ?? "#3b82f6");
   const [direction, setDirection] = useState<TagDirection>(
     tag?.direction ?? "forward",
   );
@@ -60,11 +71,11 @@ export function TagDialog({
     repeatNumber <= 1000;
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader title={tag ? "Edit frame tag" : "New frame tag"} />
-      <DialogBody>
+      <ModalHeader title={tag ? "Edit Frame Tag" : "New Frame Tag"} />
+      <DialogBody className="py-5">
         <form
           id="frame-tag-form"
-          className="space-y-4 text-sm"
+          className="grid gap-5"
           onSubmit={(e) => {
             e.preventDefault();
             if (!valid) return;
@@ -80,80 +91,114 @@ export function TagDialog({
             (e.currentTarget.closest("dialog") as HTMLDialogElement).close();
           }}
         >
-          <label className="block">
-            <span className="mb-1 block">Name</span>
-            <input
-              autoFocus
-              required
-              maxLength={100}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2"
-            />
-          </label>
-          {duplicate && (
-            <p className="text-destructive">Tag names must be unique.</p>
-          )}
-          <div className="flex gap-3">
-            <label className="min-w-0 flex-1">
-              <span className="mb-1 block">From frame</span>
-              <input
-                type="number"
-                min={1}
-                max={frameCount}
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="h-9 w-full rounded-md border bg-background px-2"
+          <div>
+            <label className="block">
+              <span className={SIZE_LABEL}>Name</span>
+              <Input
+                autoFocus
+                required
+                maxLength={100}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-12 rounded-xl px-4 text-base"
               />
             </label>
-            <label className="min-w-0 flex-1">
-              <span className="mb-1 block">To frame</span>
-              <input
-                type="number"
-                min={1}
-                max={frameCount}
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="h-9 w-full rounded-md border bg-background px-2"
-              />
-            </label>
+            {duplicate && (
+              <FormMessage tone="error" className="mt-2">
+                Tag names must be unique.
+              </FormMessage>
+            )}
           </div>
-          <label className="flex items-center gap-3">
-            <span>Color</span>
-            <input
-              type="color"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="h-8 w-12 cursor-pointer"
+          <div className="grid grid-cols-2 gap-4">
+            <SizeField
+              id="tag-from"
+              label="From frame"
+              unit=""
+              value={from}
+              onChange={setFrom}
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block">Direction</span>
-            <EditorSelect
-              value={direction}
-              onChange={(value) => setDirection(value as TagDirection)}
-              className="h-9 w-full rounded-md border bg-background px-2"
-              options={[
-                { value: "forward", label: "Forward" },
-                { value: "reverse", label: "Reverse" },
-                { value: "pingpong", label: "Ping-pong" },
-              ]}
+            <SizeField
+              id="tag-to"
+              label="To frame"
+              unit=""
+              value={to}
+              onChange={setTo}
             />
-          </label>
-          <label className="block">
-            <span className="mb-1 block">Repeats (0 = infinite)</span>
-            <input
-              type="number"
+          </div>
+          <div>
+            <span className={SIZE_LABEL}>Colour</span>
+            <div className="flex items-center gap-2">
+              <label
+                title="Pick a colour"
+                className="relative size-10 shrink-0 cursor-pointer overflow-hidden rounded-xl ring-1 ring-black/10"
+              >
+                <span
+                  className="absolute inset-0"
+                  style={{ backgroundColor: color }}
+                />
+                <input
+                  type="color"
+                  aria-label="Tag colour"
+                  value={color}
+                  onChange={(e) => {
+                    setColor(e.target.value);
+                    setHex(e.target.value);
+                  }}
+                  className="absolute inset-0 cursor-pointer opacity-0"
+                />
+              </label>
+              <Input
+                aria-label="Hex colour"
+                value={hex}
+                maxLength={7}
+                onChange={(e) => {
+                  const next = e.target.value.trim();
+                  setHex(next);
+                  if (/^#[0-9a-f]{6}$/i.test(next))
+                    setColor(next.toLowerCase());
+                }}
+                className="h-10 w-full rounded-xl px-3 font-mono uppercase"
+              />
+            </div>
+          </div>
+          <fieldset>
+            <legend className={SIZE_LABEL}>Direction</legend>
+            <div role="radiogroup" className="grid grid-cols-3 gap-2">
+              {DIRECTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={direction === value}
+                  onClick={() => setDirection(value)}
+                  className={cn(
+                    "h-11 rounded-xl border px-3 text-sm transition-colors",
+                    direction === value
+                      ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+                      : "bg-background hover:bg-pink-base",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <div>
+            <SizeField
+              id="tag-repeat"
+              label="Repeats"
+              unit="times"
               min={0}
-              max={1000}
               value={repeat}
-              onChange={(e) => setRepeat(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2"
+              onChange={setRepeat}
             />
-          </label>
+            <p className="mt-2 text-xs text-muted-foreground">
+              0 plays it on a loop forever.
+            </p>
+          </div>
         </form>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={cn(MODAL_FOOTER, "items-center")}>
         <TagDialogButtons
           canSave={valid}
           canDelete={!!tag}
@@ -178,31 +223,22 @@ function TagDialogButtons({
 }) {
   const { close } = useDialog();
   return (
-    <div className="flex w-full gap-2">
+    <>
       {canDelete && (
         <button
           type="button"
           onClick={onDelete}
-          className="mr-auto rounded-md border px-3 py-1.5 text-sm text-destructive"
+          className="mr-auto text-xs text-destructive transition-colors hover:underline"
         >
-          Delete
+          Delete tag
         </button>
       )}
-      <button
-        type="button"
-        onClick={close}
-        className="rounded-md border px-3 py-1.5 text-sm"
-      >
+      <ModalButton variant="secondary" onClick={close}>
         Cancel
-      </button>
-      <button
-        type="submit"
-        form="frame-tag-form"
-        disabled={!canSave}
-        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-40"
-      >
+      </ModalButton>
+      <ModalButton type="submit" form="frame-tag-form" disabled={!canSave}>
         Save
-      </button>
-    </div>
+      </ModalButton>
+    </>
   );
 }

@@ -129,7 +129,7 @@ function ScaleForm({
     >
       <ModalHeader title="Sprite Size" />
       <DialogBody className="grid gap-6 py-6">
-        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-pink-base p-3">
+        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-background p-3">
           {scaled && (
             <div className="self-center bg-checker">
               <canvas

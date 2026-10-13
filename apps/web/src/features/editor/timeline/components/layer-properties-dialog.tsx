@@ -5,9 +5,13 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  DialogHeader,
   useDialog,
 } from "@pigxel/ui/components/dialog";
+import { Checkbox } from "@pigxel/ui/components/choice";
+import { Input } from "@pigxel/ui/components/input";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { SIZE_LABEL } from "../../components/size-controls";
 import { BLEND_MODES, MAX_OPACITY } from "@/lib/layers/constants";
 import type { Layer } from "@/lib/layers/types";
 import type { LayerPatch } from "../../pixel-canvas/use-sprite";
@@ -38,11 +42,11 @@ export function LayerPropertiesDialog({
   const [above, setAbove] = useState(!!layer.above);
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader title="Layer properties" />
-      <DialogBody>
+      <ModalHeader title="Layer Properties" />
+      <DialogBody className="py-5">
         <form
           id="layer-properties"
-          className="space-y-4"
+          className="grid gap-5"
           onSubmit={(e) => {
             e.preventDefault();
             const trimmed = name.trim();
@@ -57,59 +61,59 @@ export function LayerPropertiesDialog({
             (e.currentTarget.closest("dialog") as HTMLDialogElement).close();
           }}
         >
-          <label className="block text-sm">
-            <span className="mb-1 block">Name</span>
-            <input
+          <label className="block">
+            <span className={SIZE_LABEL}>Name</span>
+            <Input
               autoFocus
               required
               maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2"
+              className="h-12 rounded-xl px-4 text-base"
             />
           </label>
           {layer.kind !== "background" && (
             <>
-              <label className="block text-sm">
-                <span className="mb-1 block">
-                  Opacity: {Math.round((opacity / MAX_OPACITY) * 100)}%
-                </span>
+              <label className="flex items-center gap-3 text-sm">
+                <span className="w-16 font-semibold">Opacity</span>
                 <input
                   type="range"
                   min={0}
                   max={MAX_OPACITY}
                   value={opacity}
                   onChange={(e) => setOpacity(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  className="min-w-0 flex-1 accent-pink-strong"
                 />
+                <span className="w-10 text-right tabular-nums">
+                  {Math.round((opacity / MAX_OPACITY) * 100)}%
+                </span>
               </label>
-              <label className="block text-sm">
-                <span className="mb-1 block">Blend mode</span>
+              <div>
+                <span className={SIZE_LABEL}>Blend mode</span>
                 <EditorSelect
                   value={blend}
                   onChange={(value) => setBlend(value as Layer["blend"])}
-                  className="h-9 w-full rounded-md border bg-background px-2"
+                  ariaLabel="Blend mode"
+                  className="h-12 w-full rounded-xl px-4 text-base"
                   options={BLEND_MODES.map((mode) => ({
                     value: mode.id,
                     label: mode.label,
                   }))}
                 />
-              </label>
+              </div>
             </>
           )}
           {layer.kind === "reference" && (
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={above}
                 onChange={(e) => setAbove(e.target.checked)}
-                className="accent-primary"
               />
               Show above the art
             </label>
           )}
           <fieldset>
-            <legend className="mb-2 text-sm">Timeline label</legend>
+            <legend className={SIZE_LABEL}>Timeline label</legend>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -117,7 +121,7 @@ export function LayerPropertiesDialog({
                 aria-label="No color"
                 aria-pressed={!labelColor}
                 onClick={() => setLabelColor(undefined)}
-                className="size-7 rounded-full border text-sm aria-pressed:ring-2 aria-pressed:ring-primary"
+                className="size-8 rounded-full border text-sm text-muted-foreground aria-pressed:ring-2 aria-pressed:ring-pink-strong aria-pressed:ring-offset-2"
               >
                 ×
               </button>
@@ -130,14 +134,14 @@ export function LayerPropertiesDialog({
                   aria-pressed={labelColor === color}
                   onClick={() => setLabelColor(color)}
                   style={{ backgroundColor: color }}
-                  className="size-7 rounded-full border aria-pressed:ring-2 aria-pressed:ring-primary aria-pressed:ring-offset-2"
+                  className="size-8 rounded-full ring-1 ring-black/10 aria-pressed:ring-2 aria-pressed:ring-pink-strong aria-pressed:ring-offset-2"
                 />
               ))}
             </div>
           </fieldset>
         </form>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={MODAL_FOOTER}>
         <SaveButton />
       </DialogFooter>
     </Dialog>
@@ -147,21 +151,13 @@ export function LayerPropertiesDialog({
 function SaveButton() {
   const { close } = useDialog();
   return (
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={close}
-        className="rounded-md border px-3 py-1.5 text-sm"
-      >
+    <>
+      <ModalButton variant="secondary" onClick={close}>
         Cancel
-      </button>
-      <button
-        type="submit"
-        form="layer-properties"
-        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-      >
+      </ModalButton>
+      <ModalButton type="submit" form="layer-properties">
         Save
-      </button>
-    </div>
+      </ModalButton>
+    </>
   );
 }

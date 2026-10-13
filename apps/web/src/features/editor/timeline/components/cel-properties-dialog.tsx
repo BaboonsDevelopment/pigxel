@@ -5,13 +5,14 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  DialogHeader,
   useDialog,
 } from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+
+const SLIDER = "flex items-center gap-3 text-sm";
 
 export function CelPropertiesDialog({
-  layerName,
-  frameNumber,
   opacity: initialOpacity,
   zIndex: initialZIndex,
   zCount,
@@ -30,11 +31,11 @@ export function CelPropertiesDialog({
   const [zIndex, setZIndex] = useState(initialZIndex);
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader title="Cel properties" />
-      <DialogBody>
+      <ModalHeader title="Cel Properties" />
+      <DialogBody className="py-5">
         <form
           id="cel-properties"
-          className="space-y-4"
+          className="grid gap-5"
           onSubmit={(event) => {
             event.preventDefault();
             onSave(opacity, zIndex);
@@ -43,44 +44,45 @@ export function CelPropertiesDialog({
             ).close();
           }}
         >
-          <p className="text-sm text-muted-foreground">
-            {layerName} · Frame {frameNumber}
-          </p>
-          <label className="block text-sm">
-            <span className="mb-1 block">
-              Opacity: {Math.round((opacity / 255) * 100)}%
-            </span>
+          <label className={SLIDER}>
+            <span className="w-16 font-semibold">Opacity</span>
             <input
               type="range"
               min={0}
               max={255}
               value={opacity}
               onChange={(event) => setOpacity(Number(event.target.value))}
-              className="w-full accent-primary"
+              className="min-w-0 flex-1 accent-pink-strong"
             />
+            <span className="w-10 text-right tabular-nums">
+              {Math.round((opacity / 255) * 100)}%
+            </span>
           </label>
           {zCount > 1 && (
-            <label className="block text-sm">
-              <span className="mb-1 block">
-                Order in this frame: {zIndex + 1} of {zCount}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={zCount - 1}
-                value={zIndex}
-                onChange={(event) => setZIndex(Number(event.target.value))}
-                className="w-full accent-primary"
-              />
-              <span className="flex justify-between text-xs text-muted-foreground">
+            <div>
+              <label className={SLIDER}>
+                <span className="w-16 font-semibold">Order</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={zCount - 1}
+                  value={zIndex}
+                  onChange={(event) => setZIndex(Number(event.target.value))}
+                  className="min-w-0 flex-1 accent-pink-strong"
+                />
+                <span className="w-10 text-right tabular-nums">
+                  {zIndex + 1}/{zCount}
+                </span>
+              </label>
+              <span className="mt-1 flex justify-between pr-13 pl-19 text-xs text-muted-foreground">
                 <span>Back</span>
                 <span>Front</span>
               </span>
-            </label>
+            </div>
           )}
         </form>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={MODAL_FOOTER}>
         <Actions />
       </DialogFooter>
     </Dialog>
@@ -90,21 +92,13 @@ export function CelPropertiesDialog({
 function Actions() {
   const { close } = useDialog();
   return (
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={close}
-        className="rounded-md border px-3 py-1.5 text-sm"
-      >
+    <>
+      <ModalButton variant="secondary" onClick={close}>
         Cancel
-      </button>
-      <button
-        type="submit"
-        form="cel-properties"
-        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-      >
+      </ModalButton>
+      <ModalButton type="submit" form="cel-properties">
         Save
-      </button>
-    </div>
+      </ModalButton>
+    </>
   );
 }

@@ -4,9 +4,11 @@ import { IconButton } from "@pigxel/ui/components/button";
 import {
   Dialog,
   DialogBody,
-  DialogHeader,
+  DialogFooter,
   useDialog,
 } from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { Input } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { Slice } from "@/lib/slices/slices";
@@ -26,13 +28,10 @@ export function SlicesDialog({
 }) {
   return (
     <Dialog onClose={onClose} size="md" portal>
-      <DialogHeader
-        title="Slices"
-        description="Click a slice to pick it on the canvas. Type in its name to rename it."
-      />
-      <DialogBody>
+      <ModalHeader title="Slices" />
+      <DialogBody className="py-5">
         {slices.length ? (
-          <ul className="-mx-2 grid gap-0.5">
+          <ul className="grid max-h-96 gap-1 overflow-y-auto rounded-xl border bg-background p-2">
             {slices.map((slice) => (
               <SliceRow
                 key={slice.id}
@@ -51,12 +50,24 @@ export function SlicesDialog({
             ))}
           </ul>
         ) : (
-          <p className="py-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
             No slices left.
           </p>
         )}
       </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <CloseButton />
+      </DialogFooter>
     </Dialog>
+  );
+}
+
+function CloseButton() {
+  const { close } = useDialog();
+  return (
+    <ModalButton variant="secondary" onClick={close}>
+      Close
+    </ModalButton>
   );
 }
 
@@ -90,12 +101,12 @@ function SliceRow({
       }}
       className={cn(
         "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5",
-        picked ? "bg-secondary" : "hover:bg-secondary",
+        picked ? "bg-pastel-pink-soft" : "hover:bg-muted/60",
       )}
     >
       <Input
         key={slice.name}
-        inputSize="sm"
+        inputSize="md"
         defaultValue={slice.name}
         aria-label={`Name of ${slice.name}`}
         onBlur={(e) => rename(e.target.value)}
@@ -108,7 +119,7 @@ function SliceRow({
             e.currentTarget.blur();
           }
         }}
-        className="min-w-0 flex-1"
+        className="min-w-0 flex-1 rounded-xl px-3"
       />
       <button
         type="button"

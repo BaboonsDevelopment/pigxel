@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NumericInput } from "./numeric-input";
-import { Button } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
-import { FormMessage } from "@pigxel/ui/components/field";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import {
   CONVOLUTIONS,
   CURVE_CHANNELS,
@@ -31,10 +36,24 @@ const CHANNEL_LABELS = {
 };
 
 const CHANNEL_TONES = {
-  rgb: "",
-  red: "text-red-600",
-  green: "text-green-600",
-  blue: "text-blue-600",
+  rgb: "text-pink-strong",
+  red: "text-[#d9626b]",
+  green: "text-[#4f9e72]",
+  blue: "text-[#5a7fd6]",
+};
+
+const CHANNEL_DOTS = {
+  rgb: "conic-gradient(#ee8a91 0 33.3%, #7cc69c 0 66.6%, #8aa8ec 0)",
+  red: "#ee8a91",
+  green: "#7cc69c",
+  blue: "#8aa8ec",
+};
+
+const CHANNEL_LIGHTS = {
+  rgb: "#ffffff",
+  red: "#ee8a91",
+  green: "#7cc69c",
+  blue: "#8aa8ec",
 };
 
 const SLIDERS = {
@@ -58,8 +77,8 @@ const TITLES = {
   hueSaturation: "Hue / Saturation",
   brightnessContrast: "Brightness / Contrast",
   despeckle: "Despeckle",
-  curve: "Colour curve",
-  convolution: "Convolution matrix",
+  curve: "Colour Curve",
+  convolution: "Convolution Matrix",
 };
 
 const HINTS = {
@@ -82,17 +101,7 @@ const initialValues = (kind: AdjustKind) =>
 
 const PREVIEW = { w: 320, h: 180 };
 
-export default function AdjustColorsDialog({
-  kind,
-  size,
-  pixels,
-  mask,
-  frameCount,
-  colorMode,
-  palette,
-  onApply,
-  onClose,
-}: {
+type AdjustProps = {
   kind: AdjustKind;
   size: Size;
   pixels: Uint8ClampedArray;
@@ -101,9 +110,30 @@ export default function AdjustColorsDialog({
   colorMode: ColorMode;
   palette: string[];
   onApply: (settings: AdjustSettings, allFrames: boolean) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export default function AdjustColorsDialog({
+  onClose,
+  ...props
+}: AdjustProps & { onClose: () => void }) {
+  return (
+    <Dialog onClose={onClose} size="md" portal>
+      <AdjustForm {...props} />
+    </Dialog>
+  );
+}
+
+function AdjustForm({
+  kind,
+  size,
+  pixels,
+  mask,
+  frameCount,
+  colorMode,
+  palette,
+  onApply,
+}: AdjustProps) {
+  const { close } = useDialog();
   const preview = useRef<HTMLCanvasElement>(null);
   const [values, setValues] = useState(() => initialValues(kind));
   const [curve, setCurve] = useState(STRAIGHT_CURVE);
@@ -111,7 +141,6 @@ export default function AdjustColorsDialog({
   const [channel, setChannel] = useState<CurveChannel | "rgb">("rgb");
   const [matrix, setMatrix] = useState(FIRST.matrix);
   const [allFrames, setAllFrames] = useState(false);
-  useEffect(() => dialog.current?.showModal(), []);
 
   const result = useMemo(() => {
     const out = adjustedColors(kind, pixels, mask, size, {
@@ -173,44 +202,18 @@ export default function AdjustColorsDialog({
   }, [result, size, zoom]);
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="adjust-colors-title"
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!applicable) return;
+        onApply({ values, curve, channels, matrix }, allFrames);
+        close();
+      }}
     >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="adjust-colors-title">{TITLES[kind]}</SectionTitle>
-          <Lead className="mt-1">
-            {mask ? "In the selection" : "On the whole layer"},{" "}
-            {allFrames ? "in every frame" : "in this frame"}.
-            {colorMode === "indexed" &&
-              " Colours stay in the palette: each one goes to its nearest palette colour."}
-          </Lead>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!applicable) return;
-          onApply({ values, curve, channels, matrix }, allFrames);
-          dialog.current?.close();
-        }}
-      >
-        <div className="flex min-h-24 justify-center overflow-hidden rounded-lg border bg-muted p-3">
+      <ModalHeader title={TITLES[kind]} />
+      <DialogBody className="grid gap-5 py-5">
+        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-background p-3">
           <div className="self-center bg-checker">
             <canvas
               ref={preview}
@@ -227,7 +230,7 @@ export default function AdjustColorsDialog({
             <div
               role="group"
               aria-label="Channel"
-              className="flex gap-1 rounded-lg border p-0.5"
+              className="grid w-full grid-cols-4 gap-2"
             >
               {(["rgb", ...CURVE_CHANNELS] as const).map((option) => (
                 <button
@@ -235,15 +238,33 @@ export default function AdjustColorsDialog({
                   type="button"
                   aria-pressed={channel === option}
                   onClick={() => setChannel(option)}
-                  className="h-7 rounded-md px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground"
+                  className={cn(
+                    "h-11 rounded-xl border text-sm transition-colors",
+                    channel === option
+                      ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+                      : "bg-background hover:bg-pink-base",
+                  )}
                 >
-                  {CHANNEL_LABELS[option]}
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="size-3.5 rounded-full ring-1 ring-black/10"
+                      style={{ background: CHANNEL_DOTS[option] }}
+                    />
+                    {CHANNEL_LABELS[option]}
+                  </span>
                 </button>
               ))}
             </div>
-            <div className={cn("w-full max-w-64", CHANNEL_TONES[channel])}>
+            <div
+              className={cn(
+                "flex w-full justify-center rounded-xl border p-4",
+                CHANNEL_TONES[channel],
+              )}
+            >
               <CurveEditor
                 key={channel}
+                light={CHANNEL_LIGHTS[channel]}
                 points={channel === "rgb" ? curve : channels[channel]}
                 onChange={(points) =>
                   channel === "rgb"
@@ -266,83 +287,80 @@ export default function AdjustColorsDialog({
           />
         )}
 
-        <div className="space-y-3">
-          {SLIDERS[kind].map(({ key, label, min, max, initial }) => {
-            const value = values[key] ?? initial;
-            const set = (next: number) =>
-              setValues((v) => ({
-                ...v,
-                [key]: Math.min(
-                  max,
-                  Math.max(min, Math.round(next) || initial),
-                ),
-              }));
-            return (
-              <label key={key} className="flex items-center gap-3 text-sm">
-                <span className="w-20 font-medium">{label}</span>
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  value={value}
-                  onChange={(e) => set(Number(e.target.value))}
-                  onDoubleClick={() => set(initial)}
-                  className="min-w-0 flex-1 accent-primary"
-                />
-                <NumericInput
-                  min={min}
-                  max={max}
-                  value={value}
-                  onValueChange={set}
-                  className="h-7 w-14 rounded-md border bg-background px-1 text-center tabular-nums"
-                />
-              </label>
-            );
-          })}
-        </div>
+        {SLIDERS[kind].length > 0 && (
+          <div className="grid gap-3">
+            {SLIDERS[kind].map(({ key, label, min, max, initial }) => {
+              const value = values[key] ?? initial;
+              const set = (next: number) =>
+                setValues((v) => ({
+                  ...v,
+                  [key]: Math.min(
+                    max,
+                    Math.max(min, Math.round(next) || initial),
+                  ),
+                }));
+              return (
+                <label key={key} className="flex items-center gap-3 text-sm">
+                  <span className="w-24 font-semibold">{label}</span>
+                  <input
+                    type="range"
+                    min={min}
+                    max={max}
+                    value={value}
+                    onChange={(e) => set(Number(e.target.value))}
+                    onDoubleClick={() => set(initial)}
+                    className="min-w-0 flex-1 accent-pink-strong"
+                  />
+                  <NumericInput
+                    min={min}
+                    max={max}
+                    value={value}
+                    onValueChange={set}
+                    className="h-10 w-16 rounded-xl border border-input bg-background px-2 text-center tabular-nums outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
+                  />
+                </label>
+              );
+            })}
+          </div>
+        )}
 
-        <FormMessage tone="muted" className="tabular-nums">
+        <p className="text-xs text-muted-foreground tabular-nums">
           {HINTS[kind]}{" "}
           {changed
             ? `${changed} ${changed === 1 ? "pixel changes" : "pixels change"}.`
             : untouched
               ? "Nothing changes yet."
-              : "Nothing changes in this frame."}
-        </FormMessage>
+              : mask
+                ? "Nothing changes: the selection has no pixels on this layer. Deselect to adjust the whole layer."
+                : "Nothing changes in this frame."}
+        </p>
         <AllFramesOption
           frameCount={frameCount}
           checked={allFrames}
           onChange={setAllFrames}
         />
-
-        <div className="flex justify-between gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={untouched}
-            onClick={() => {
-              setValues(initialValues(kind));
-              setCurve(STRAIGHT_CURVE);
-              setChannels(STRAIGHT_CHANNELS);
-              setMatrix(FIRST.matrix);
-            }}
-          >
-            Reset
-          </Button>
-          <span className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => dialog.current?.close()}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={!applicable}>
-              Apply
-            </Button>
-          </span>
-        </div>
-      </form>
-    </dialog>
+      </DialogBody>
+      <DialogFooter className={cn(MODAL_FOOTER, "items-center")}>
+        <button
+          type="button"
+          disabled={untouched}
+          onClick={() => {
+            setValues(initialValues(kind));
+            setCurve(STRAIGHT_CURVE);
+            setChannels(STRAIGHT_CHANNELS);
+            setMatrix(FIRST.matrix);
+          }}
+          className="mr-auto text-xs text-link-accent transition-colors hover:text-lavender-foreground disabled:opacity-50"
+        >
+          Reset
+        </button>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!applicable}>
+          Apply
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }

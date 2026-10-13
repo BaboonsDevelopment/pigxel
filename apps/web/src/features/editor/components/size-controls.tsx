@@ -11,6 +11,7 @@ export function SizeField({
   label,
   value,
   unit,
+  min = 1,
   disabled,
   onChange,
 }: {
@@ -18,6 +19,7 @@ export function SizeField({
   label: string;
   value: string;
   unit: string;
+  min?: number | null;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -31,7 +33,7 @@ export function SizeField({
           id={id}
           type="number"
           inputMode="numeric"
-          min={1}
+          min={min ?? undefined}
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
