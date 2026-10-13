@@ -37,6 +37,11 @@ export default function Tutorials() {
                 <Badge tone="overlay" className="absolute top-3 left-3">
                   {tutorial.level} · {tutorial.minutes} min
                 </Badge>
+                {tutorial.premium && (
+                  <Badge tone="primary" className="absolute top-3 right-3">
+                    Premium
+                  </Badge>
+                )}
               </span>
               <span className="flex flex-1 flex-col p-4">
                 <Heading as="span">{tutorial.title}</Heading>

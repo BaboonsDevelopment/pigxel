@@ -11,7 +11,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ASSET_BUCKET,
   ASSET_COLUMNS,
-  toAsset,
+  PREMIUM_ASSET_BUCKET,
+  toAssets,
   type Asset,
   type AssetCategory,
   type AssetRow,
@@ -21,14 +22,15 @@ export const ASSET_NAME_MAX = 40;
 const ASSET_MAX_FRAMES = 64;
 
 export async function listAssetsInBrowser(): Promise<Asset[]> {
-  const { data, error } = await createClient()
+  const supabase = createClient();
+  const { data, error } = await supabase
     .from("assets")
     .select(ASSET_COLUMNS)
     .order("sort")
     .order("name")
     .returns<AssetRow[]>();
   if (error || !data) throw new Error("Couldn’t load the assets.");
-  return data.map(toAsset);
+  return toAssets(supabase, data);
 }
 
 export async function assetExists(id: string): Promise<boolean> {
@@ -99,12 +101,15 @@ export async function publishAsset({
   category,
   document: doc,
   sort,
+  premium = false,
 }: {
   id: string;
   name: string;
   category: AssetCategory;
   document: PigxelDocument;
   sort?: number;
+  /** Paid plans only: the .pigxel file goes to the private bucket. */
+  premium?: boolean;
 }): Promise<void> {
   if (doc.frames.length > ASSET_MAX_FRAMES)
     throw new Error(`An asset can have at most ${ASSET_MAX_FRAMES} frames.`);
@@ -121,13 +126,16 @@ export async function publishAsset({
 
   const { data: before } = await supabase
     .from("assets")
-    .select("file_path, sheet_path")
+    .select("file_path, sheet_path, premium")
     .eq("id", id)
-    .maybeSingle<Pick<AssetRow, "file_path" | "sheet_path">>();
+    .maybeSingle<Pick<AssetRow, "file_path" | "sheet_path" | "premium">>();
   const storage = supabase.storage.from(ASSET_BUCKET);
+  const fileStorage = supabase.storage.from(
+    premium ? PREMIUM_ASSET_BUCKET : ASSET_BUCKET,
+  );
   const options = { cacheControl: "31536000", upsert: true };
   const uploads = await Promise.all([
-    storage.upload(filePath, new Blob([file], { type: PIGXEL_MIME_TYPE }), {
+    fileStorage.upload(filePath, new Blob([file], { type: PIGXEL_MIME_TYPE }), {
       ...options,
       contentType: PIGXEL_MIME_TYPE,
     }),
@@ -147,13 +155,17 @@ export async function publishAsset({
     colors: colorsOf(sheet.pixels, 32),
     file_path: filePath,
     sheet_path: sheetPath,
+    premium,
     ...(sort !== undefined && { sort }),
     updated_at: new Date().toISOString(),
   });
   if (error) throw new Error("Couldn’t save the asset.");
 
-  const replaced = [before?.file_path, before?.sheet_path].filter(
-    (path): path is string => !!path && path !== filePath && path !== sheetPath,
-  );
-  if (replaced.length) await storage.remove(replaced);
+  if (before?.sheet_path && before.sheet_path !== sheetPath)
+    await storage.remove([before.sheet_path]);
+  const movedBucket = !!before && before.premium !== premium;
+  if (before?.file_path && (movedBucket || before.file_path !== filePath))
+    await supabase.storage
+      .from(before.premium ? PREMIUM_ASSET_BUCKET : ASSET_BUCKET)
+      .remove([before.file_path]);
 }

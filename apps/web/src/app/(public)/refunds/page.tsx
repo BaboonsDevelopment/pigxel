@@ -40,14 +40,11 @@ export default function Refunds() {
 
       <LegalSection title="2. How to ask">
         <p>
-          Our orders are processed by Paddle.com, our Merchant of Record, who
-          handles refunds. Reply to your Paddle receipt email or find your order
-          at{" "}
-          <a href="https://paddle.net" target="_blank" rel="noreferrer">
-            paddle.net
-          </a>
-          , or email us at <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>{" "}
-          and we’ll arrange it with Paddle.
+          Our orders are processed by Creem, our Merchant of Record, who handles
+          refunds. Email us at{" "}
+          <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a> with the email
+          address you paid with, or reply to your Creem receipt, and we’ll
+          arrange the refund with Creem.
         </p>
         <p>
           Refunds go back to the payment method you used, usually within 5–10
@@ -74,15 +71,8 @@ export default function Refunds() {
         <p>
           This policy adds to your rights under consumer law and doesn’t take
           any away. Consumers in the EU and UK can withdraw from a purchase
-          within 14 days; our {days}-day full refund covers that. Paddle’s{" "}
-          <a
-            href="https://www.paddle.com/legal/checkout-buyer-terms"
-            target="_blank"
-            rel="noreferrer"
-          >
-            buyer terms
-          </a>{" "}
-          also apply to your purchase.
+          within 14 days; our {days}-day full refund covers that. Creem, our
+          Merchant of Record, also applies the terms of sale shown at checkout.
         </p>
       </LegalSection>
 

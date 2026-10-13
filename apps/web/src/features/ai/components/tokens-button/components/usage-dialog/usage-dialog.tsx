@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Dialog, DialogHeader } from "@pigxel/ui/components/dialog";
 import { Text } from "@pigxel/ui/components/typography";
 import { getAiBalance, listAiUsage } from "../../../../actions";
 import { groupActions, tokens, type UsageAction } from "./helpers";
 
 type Usage = {
-  balance: { limit: number; left: number };
+  balance: { limit: number; left: number; resetsAt: string | null };
   actions: UsageAction[];
 };
 
@@ -74,8 +75,36 @@ export function UsageDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Balance({ limit, left }: { limit: number; left: number }) {
+function Balance({
+  limit,
+  left,
+  resetsAt,
+}: {
+  limit: number;
+  left: number;
+  resetsAt: string | null;
+}) {
+  const resets =
+    resetsAt &&
+    new Date(resetsAt).toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    });
   const share = limit ? left / limit : 0;
+  if (limit === 0)
+    return (
+      <div className="px-5 pt-2 pb-5">
+        <p className="font-semibold">The AI helper is for paid plans</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Starter, Pro and Advanced come with AI tokens every month, from 1 000
+          to 7 000.{" "}
+          <Link href="/pricing" className="underline underline-offset-2">
+            See plans
+          </Link>
+        </p>
+      </div>
+    );
   return (
     <div className="px-5 pt-2 pb-5">
       <p className="flex items-baseline gap-2">
@@ -99,9 +128,23 @@ function Balance({ limit, left }: { limit: number; left: number }) {
           style={{ width: `${Math.max(0, Math.min(1, share)) * 100}%` }}
         />
       </div>
+      {resets && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Your tokens refill on {resets}.
+        </p>
+      )}
       {left <= 0 && (
         <p className="mt-2 text-xs text-destructive">
           You’ve used all your tokens, so the assistant can’t draw for now.
+          {!resets && (
+            <>
+              {" "}
+              <Link href="/pricing" className="underline underline-offset-2">
+                See plans
+              </Link>{" "}
+              for monthly tokens.
+            </>
+          )}
         </p>
       )}
     </div>

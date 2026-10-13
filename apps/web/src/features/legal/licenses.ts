@@ -44,11 +44,6 @@ export const LIBRARIES: { name: string; license: string; by: string }[] = [
     by: "Supabase, Inc.",
   },
   { name: "@tanstack/react-query", license: "MIT", by: "Tanner Linsley" },
-  {
-    name: "@paddle/paddle-js, @paddle/paddle-node-sdk",
-    license: "Apache-2.0",
-    by: "Paddle.com Market Ltd",
-  },
   { name: "TensorFlow.js", license: "Apache-2.0", by: "Google LLC" },
   {
     name: "NSFWJS and its MobileNetV2 model",

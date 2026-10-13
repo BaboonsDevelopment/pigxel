@@ -3,6 +3,7 @@ import { Page } from "@pigxel/ui/components/page";
 import { PageTitle } from "@pigxel/ui/components/typography";
 import { NewTileForm } from "@/features/tiles/components/new-tile-form";
 import { findAsset } from "@/features/assets/server";
+import { isLocked } from "@/features/assets/assets";
 import { requireUser } from "@/lib/auth/session";
 import { listFolders } from "@/features/tiles/server";
 import { getDriveStatus } from "@/lib/google-drive/server";
@@ -53,7 +54,7 @@ export default async function NewTile({
         userId={user.id}
         drive={drive}
         driveError={params.drive === "error"}
-        asset={asset}
+        asset={asset && !isLocked(asset) ? asset : null}
         paletteId={params.palette}
         customPalette={
           colors?.length

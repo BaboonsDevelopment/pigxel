@@ -5,6 +5,9 @@ type AiErrorCode =
   | "unavailable"
   | "denied"
   | "no_credits"
+  | "paid_only"
+  | "blocked"
+  | "moderation"
   | "failed";
 
 export class AiError extends Error {
@@ -24,6 +27,11 @@ const USER_MESSAGES: Record<AiErrorCode, string> = {
   denied:
     "The AI refused the API key. Check the key and the account’s access and billing.",
   no_credits: "You’ve used all your AI tokens.",
+  paid_only:
+    "The AI helper comes with the Starter, Pro and Advanced plans. See them on the Pricing page.",
+  blocked:
+    "This request goes against our content rules, so the AI won’t draw it. Try describing something else.",
+  moderation: "The AI is unavailable right now. Try again in a minute.",
   failed: "Something went wrong with the AI. Try again.",
 };
 

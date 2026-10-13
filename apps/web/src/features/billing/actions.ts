@@ -3,22 +3,21 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
-import { paddleApi, storeSubscription } from "./paddle-api";
-import { getCurrentPlan, setPendingPrice } from "./server";
+import { authUrl } from "@/lib/auth/config";
+import { creemApi, storeSubscription } from "./creem";
+import { getCurrentPlan, setPendingProduct } from "./server";
 import {
   canChangePlan,
-  formatMoney,
   planChange,
+  planOfProduct,
   type CurrentPlan,
   type PlanChange,
 } from "./subscription";
 
 const SUBSCRIPTION_PATH = "/settings/subscription";
 
-export type PortalTarget = "overview" | "payment" | "cancel";
-
 export type PlanPreview =
-  | { change: Exclude<PlanChange, "same">; priceId: string; charge?: string }
+  | { change: Exclude<PlanChange, "same">; productId: string }
   | { error: string };
 
 type PaidPlan = Exclude<CurrentPlan, { name: "Free" }>;
@@ -37,68 +36,64 @@ const failed = (what: string, error: unknown, detail = "") => {
   };
 };
 
-export async function openBillingPortal(target: PortalTarget) {
+/** Sends the person to Creem's checkout for a plan, or to plan changes if they already pay. */
+export async function startCheckout(productId: string) {
+  const user = await requireUser();
+  if (!planOfProduct(productId)) redirect("/pricing");
+  const plan = await getCurrentPlan(user.id);
+  if (plan.name !== "Free")
+    redirect(`${SUBSCRIPTION_PATH}?plan=${encodeURIComponent(productId)}`);
+  let url: string | undefined;
+  try {
+    url = await creemApi.createCheckout({
+      productId,
+      userId: user.id,
+      email: user.email,
+      successUrl: authUrl("/welcome"),
+    });
+  } catch (error) {
+    console.error("Couldn’t start a Creem checkout:", error);
+  }
+  redirect(url ?? "/pricing?checkout=error");
+}
+
+export async function openBillingPortal() {
   const plan = await paidPlan();
   let url: string | undefined;
   try {
-    const { urls } = await paddleApi().customerPortalSessions.create(
-      plan.customerId,
-      [plan.subscriptionId],
-    );
-    const links = urls.subscriptions.find((s) => s.id === plan.subscriptionId);
-    url =
-      target === "payment"
-        ? links?.updateSubscriptionPaymentMethod
-        : target === "cancel"
-          ? links?.cancelSubscription
-          : undefined;
-    url ??= urls.general.overview;
+    url = await creemApi.portalLink(plan.customerId);
   } catch (error) {
-    console.error("Couldn’t open the Paddle customer portal:", error);
+    console.error("Couldn’t open the Creem customer portal:", error);
   }
   redirect(url ?? `${SUBSCRIPTION_PATH}?billing=error`);
 }
 
-export async function previewPlanChange(priceId: string): Promise<PlanPreview> {
+export async function previewPlanChange(
+  productId: string,
+): Promise<PlanPreview> {
   const plan = await paidPlan();
-  const change = planChange(plan.priceId, priceId);
+  const change = planChange(plan.productId, productId);
   if (!change || change === "same" || !canChangePlan(plan))
     return { error: "This plan can’t be changed right now." };
-  if (change === "downgrade") return { change, priceId };
-  try {
-    const preview = await paddleApi().subscriptions.previewUpdate(
-      plan.subscriptionId,
-      {
-        items: [{ priceId, quantity: 1 }],
-        prorationBillingMode: "prorated_immediately",
-      },
-    );
-    const totals = preview.immediateTransaction?.details.totals;
-    return {
-      change,
-      priceId,
-      charge: totals && formatMoney(totals.grandTotal, totals.currencyCode),
-    };
-  } catch (error) {
-    return failed("work out the price of the new plan", error);
-  }
+  return { change, productId };
 }
 
 export async function changePlan(
-  priceId: string,
+  productId: string,
 ): Promise<{ error?: string } | void> {
   const plan = await paidPlan();
-  const change = planChange(plan.priceId, priceId);
+  const change = planChange(plan.productId, productId);
   if (!change || !canChangePlan(plan))
     return { error: "This plan can’t be changed right now." };
   if (change === "upgrade") {
     try {
       await storeSubscription(
-        await paddleApi().subscriptions.update(plan.subscriptionId, {
-          items: [{ priceId, quantity: 1 }],
-          prorationBillingMode: "prorated_immediately",
-          onPaymentFailure: "prevent_change",
-        }),
+        await creemApi.switchProduct(
+          plan.subscriptionId,
+          productId,
+          "proration-charge-immediately",
+        ),
+        plan.userId,
       );
     } catch (error) {
       return failed(
@@ -108,8 +103,8 @@ export async function changePlan(
       );
     }
   }
-  const pending = change === "downgrade" ? priceId : null;
-  const error = await setPendingPrice(
+  const pending = change === "downgrade" ? productId : null;
+  const error = await setPendingProduct(
     plan.subscriptionId,
     plan.userId,
     pending,
@@ -118,19 +113,34 @@ export async function changePlan(
   revalidatePath("/", "layout");
 }
 
+export async function cancelPlan(): Promise<{ error?: string } | void> {
+  const plan = await paidPlan();
+  if (!plan.cancelsAt)
+    try {
+      await storeSubscription(
+        await creemApi.cancelAtPeriodEnd(plan.subscriptionId),
+        plan.userId,
+      );
+    } catch (error) {
+      return failed("cancel your plan", error);
+    }
+  const error = await setPendingProduct(plan.subscriptionId, plan.userId, null);
+  if (error) return failed("cancel your plan", error.message);
+  revalidatePath("/", "layout");
+}
+
 export async function keepPlan(): Promise<{ error?: string } | void> {
   const plan = await paidPlan();
   if (plan.cancelsAt)
     try {
       await storeSubscription(
-        await paddleApi().subscriptions.update(plan.subscriptionId, {
-          scheduledChange: null,
-        }),
+        await creemApi.resume(plan.subscriptionId),
+        plan.userId,
       );
     } catch (error) {
       return failed("keep your plan", error);
     }
-  const error = await setPendingPrice(plan.subscriptionId, plan.userId, null);
+  const error = await setPendingProduct(plan.subscriptionId, plan.userId, null);
   if (error) return failed("keep your plan", error.message);
   revalidatePath("/", "layout");
 }

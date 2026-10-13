@@ -3,7 +3,7 @@ import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { createFrame } from "@/lib/sprite/frames";
 import type { AssetCategory } from "./assets";
 
-type StarterAsset = {
+export type StarterAsset = {
   id: string;
   name: string;
   category: AssetCategory;
@@ -12,7 +12,7 @@ type StarterAsset = {
   duration?: number;
 };
 
-const art = (text: string) =>
+export const art = (text: string) =>
   text
     .trim()
     .split("\n")

@@ -23,8 +23,6 @@
     "assets:import": "node --env-file-if-exists=.env.local scripts/assets/import.ts"
   },
   "dependencies": {
-    "@paddle/paddle-js": "1.6.5",
-    "@paddle/paddle-node-sdk": "^3.3.0",
     "@pigxel/ui": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.80.0",

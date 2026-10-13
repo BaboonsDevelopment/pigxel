@@ -10,6 +10,7 @@ import {
 } from "./constants";
 import { creditBalance, creditsOf } from "./credits";
 import { AiError, toUserMessage } from "./errors";
+import { moderate } from "./moderation";
 import {
   buildAnimationPrompt,
   buildComposePrompt,
@@ -54,10 +55,19 @@ const MAX_GRID_TEXT = 100_000;
 
 const validSize = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
 
-async function attempt<T>(label: string, run: () => Promise<T>) {
+/** Runs an AI step after checking the balance and screening what the person typed. */
+async function attempt<T>(
+  label: string,
+  typed: string[],
+  run: () => Promise<T>,
+) {
   try {
-    if ((await creditBalance()).left <= 0)
+    const balance = await creditBalance();
+    if (balance.limit === 0)
+      throw new AiError("paid_only", "The AI helper is for paid plans.");
+    if (balance.left <= 0)
       throw new AiError("no_credits", "No AI tokens left.");
+    await moderate(typed, (await requireUser()).id);
     return { ok: true, value: await run() } as const;
   } catch (e) {
     console.error(`[ai] ${label} failed:`, e);
@@ -69,7 +79,9 @@ export async function sendMessage(
   messages: ChatMessage[],
 ): Promise<AiResult<ChatMessage>> {
   await requireUser();
-  return attempt("sendMessage", async () => {
+  const typed =
+    [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+  return attempt("sendMessage", [typed], async () => {
     const ai = getAiProvider();
     const recent = messages.slice(-MAX_HISTORY);
     const route = await ai.route(recent);
@@ -111,7 +123,7 @@ export async function generateImage(
   ) {
     return { ok: false, error: "That area cannot be used for a picture." };
   }
-  return attempt("generateImage", async () => {
+  return attempt("generateImage", [subject], async () => {
     const { mimeType, base64 } = await getAiProvider().generate(
       buildImagePrompt(subject, width, height, pictures.length > 0),
       closestAspectRatio(width, height),
@@ -130,7 +142,7 @@ export async function editTile(
   if (!request.trim() || !grid || grid.length > MAX_GRID_TEXT) {
     return { ok: false, error: "That area is too big to edit this way." };
   }
-  return attempt("editTile", () =>
+  return attempt("editTile", [request], () =>
     getAiProvider().edit(
       buildEditSystemPrompt(),
       buildEditUserMessage(grid, request),
@@ -149,7 +161,7 @@ export async function redrawArea(
   if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
     return { ok: false, error: "That area cannot be redrawn." };
   }
-  return attempt("redrawArea", async () => {
+  return attempt("redrawArea", [request], async () => {
     const { mimeType, base64 } = await getAiProvider().redraw(
       buildRedrawPrompt(request, width, height),
       { mimeType: "image/png", base64: png },
@@ -171,7 +183,7 @@ export async function suggestComposition(
   if (!subject.trim() || !png || !validSize(width) || !validSize(height)) {
     return { ok: false, error: "The tile could not be analysed." };
   }
-  return attempt("suggestComposition", async () => {
+  return attempt("suggestComposition", [subject], async () => {
     const rect = await getAiProvider().compose(
       buildComposePrompt(subject, width, height),
       { mimeType: "image/png", base64: png },
@@ -207,7 +219,7 @@ export async function planEdit(args: {
     rects.every((r) => [r.x, r.y, r.w, r.h].every(Number.isInteger));
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
-  return attempt("planEdit", async () => {
+  return attempt("planEdit", [request], async () => {
     const reply = await getAiProvider().plan(
       buildPlanPrompt({
         request,
@@ -277,7 +289,7 @@ export async function planPlacement(args: {
     args.objects.every((r) => [r.x, r.y, r.w, r.h].every(Number.isInteger));
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
-  return attempt("planPlacement", async () => {
+  return attempt("planPlacement", [args.subject, args.where], async () => {
     const reply = await getAiProvider().place(
       buildPlacementPrompt({
         ...args,
@@ -344,7 +356,7 @@ export async function planAnimation(args: {
     objects.every((r) => [r.x, r.y, r.w, r.h].every(Number.isInteger));
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
-  return attempt("planAnimation", async () => {
+  return attempt("planAnimation", [request], async () => {
     const reply = await getAiProvider().animate(
       buildAnimationPrompt({
         request,
@@ -375,7 +387,7 @@ export async function reviewEdit(args: {
   const after = PNG_DATA_URL.exec(args.after)?.[1];
   if (!args.request?.trim() || !before || !after)
     return { ok: false, error: "The edit could not be checked." };
-  return attempt("reviewEdit", () =>
+  return attempt("reviewEdit", [args.request], () =>
     getAiProvider().reviewEdit(
       buildEditReviewPrompt(
         args.request.slice(0, 1000),
@@ -401,7 +413,7 @@ export async function generateSet(args: {
     validSize(args.cellW) &&
     validSize(args.cellH);
   if (!valid) return { ok: false, error: "Those things cannot be drawn." };
-  return attempt("generateSet", async () => {
+  return attempt("generateSet", subjects, async () => {
     const layout = sheetLayout(subjects.length, args.cellW, args.cellH);
     const { mimeType, base64 } = await getAiProvider().generate(
       buildSetPrompt({
@@ -436,7 +448,7 @@ export async function redrawFrames(args: {
     validSize(args.cellW) &&
     validSize(args.cellH);
   if (!valid) return { ok: false, error: "Those frames cannot be redrawn." };
-  return attempt("redrawFrames", async () => {
+  return attempt("redrawFrames", [args.instruction], async () => {
     const layout = sheetLayout(args.count, args.cellW, args.cellH);
     const { mimeType, base64 } = await getAiProvider().redraw(
       buildSheetRedrawPrompt({
@@ -473,7 +485,7 @@ export async function animateSheet(args: {
     validSize(args.cellW) &&
     validSize(args.cellH);
   if (!valid) return { ok: false, error: "That animation cannot be drawn." };
-  return attempt("animateSheet", async () => {
+  return attempt("animateSheet", [args.subject, ...args.poses], async () => {
     const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const { mimeType, base64 } = await getAiProvider().redraw(
       buildSheetAnimatePrompt({
@@ -512,7 +524,7 @@ export async function generateSheet(args: {
     reference !== undefined;
   if (!valid) return { ok: false, error: "That animation cannot be drawn." };
 
-  return attempt("generateSheet", async () => {
+  return attempt("generateSheet", [args.subject, ...args.poses], async () => {
     const ai = getAiProvider();
     const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const prompt = buildSheetPrompt({
@@ -554,8 +566,9 @@ export async function listAiUsage(): Promise<UsageRow[]> {
 export async function getAiBalance(): Promise<{
   limit: number;
   left: number;
+  resetsAt: string | null;
 }> {
   await requireUser();
-  const { limit, left } = await creditBalance();
-  return { limit, left: Math.floor(left) };
+  const { limit, left, resetsAt } = await creditBalance();
+  return { limit, left: Math.floor(left), resetsAt };
 }

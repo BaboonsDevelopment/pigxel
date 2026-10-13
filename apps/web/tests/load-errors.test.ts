@@ -32,7 +32,10 @@ vi.mock("@/features/feedback/server", () => ({
   listFeedback: mocks.listFeedback,
   countFeedback: mocks.countFeedback,
 }));
-vi.mock("@/features/assets/server", () => ({ listAssets: mocks.listAssets }));
+vi.mock("@/features/assets/server", () => ({
+  listAssets: mocks.listAssets,
+  countPremiumAssets: async () => 0,
+}));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
   countPublicTilesByTag: async () => ({}),

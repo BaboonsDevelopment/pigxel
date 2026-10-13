@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/ui/brand";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
-import { LEGAL_LINKS } from "@/features/legal/legal";
+import { LEGAL, LEGAL_LINKS } from "@/features/legal/legal";
 import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
 import { ART, STRIP } from "../art";
 import { ArtWall } from "./art-wall";
@@ -96,7 +96,7 @@ const FAQ = [
   {
     question: "Is Pigxel free?",
     answer:
-      "Yes. Every drawing tool, layers, frames and export are free, with a few AI generations to try it out. Paid plans add more AI and more room in Pigxel cloud.",
+      "Yes. Every drawing tool, layers, frames and export are free, with 5 arts in Pigxel cloud and unlimited saving to Google Drive. Paid plans add the AI helper, more room in Pigxel cloud, and premium assets and tutorials.",
   },
   {
     question: "Do I need to install anything?",
@@ -400,6 +400,10 @@ export function Landing() {
             <Link href="/pricing">Pricing</Link>
             <Link href="/login?mode=signup">Sign up</Link>
             <Link href="/login">Log in</Link>
+          </nav>
+          <nav aria-label="Support" className={styles.footerColumn}>
+            <h3>Support</h3>
+            <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>
           </nav>
           <nav aria-label="Policies" className={styles.footerColumn}>
             <h3>Legal</h3>

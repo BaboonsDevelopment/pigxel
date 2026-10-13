@@ -18,7 +18,7 @@ export function GuideCoach({
 }: {
   tutorial: Tutorial;
   sprite: SpriteApi;
-  editor: Omit<GuideState, "painted" | "framesDiffer">;
+  editor: Omit<GuideState, "painted" | "look" | "framesDiffer">;
   onExit: () => void;
 }) {
   const state: GuideState = { ...editor, ...pixelState(sprite) };
@@ -190,10 +190,14 @@ export function GuideCoach({
 
 function pixelState(
   sprite: SpriteApi,
-): Pick<GuideState, "painted" | "framesDiffer"> {
+): Pick<GuideState, "painted" | "look" | "framesDiffer"> {
   const shown = sprite.composite(["reference"]);
   let painted = 0;
   for (let i = 3; i < shown.length; i += 4) if (shown[i]) painted++;
+  // FNV-1a over the pixels: changes with any recolour, not just new pixels.
+  let look = 0x811c9dc5;
+  for (let i = 0; i < shown.length; i++)
+    look = Math.imul(look ^ shown[i]!, 0x01000193);
   const [first, ...rest] = sprite.frames;
   const firstPixels = first && sprite.composite(["reference"], first.id);
   const framesDiffer =
@@ -202,7 +206,7 @@ function pixelState(
       const pixels = sprite.composite(["reference"], frame.id);
       return pixels.some((value, i) => value !== firstPixels[i]);
     });
-  return { painted, framesDiffer };
+  return { painted, look: look >>> 0, framesDiffer };
 }
 
 function Spotlight({ selector }: { selector: string }) {

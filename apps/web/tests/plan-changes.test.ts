@@ -7,29 +7,31 @@ const mocks = vi.hoisted(() => ({
   setPending: vi.fn(),
   due: vi.fn(),
   store: vi.fn(),
-  update: vi.fn(),
-  previewUpdate: vi.fn(),
+  checkout: vi.fn(),
   portal: vi.fn(),
+  switchProduct: vi.fn(),
+  cancel: vi.fn(),
+  resume: vi.fn(),
   revalidate: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/session", () => ({
-  requireUser: async () => ({ id: "user-1" }),
+  requireUser: async () => ({ id: "user-1", email: "artist@example.com" }),
 }));
 vi.mock("@/features/billing/server", () => ({
   getCurrentPlan: mocks.plan,
-  setPendingPrice: mocks.setPending,
+  setPendingProduct: mocks.setPending,
   dueDowngrades: mocks.due,
 }));
-vi.mock("@/features/billing/paddle-api", () => ({
-  paddleApi: () => ({
-    subscriptions: {
-      update: mocks.update,
-      previewUpdate: mocks.previewUpdate,
-    },
-    customerPortalSessions: { create: mocks.portal },
-  }),
+vi.mock("@/features/billing/creem", () => ({
+  creemApi: {
+    createCheckout: mocks.checkout,
+    portalLink: mocks.portal,
+    switchProduct: mocks.switchProduct,
+    cancelAtPeriodEnd: mocks.cancel,
+    resume: mocks.resume,
+  },
   storeSubscription: mocks.store,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
@@ -40,12 +42,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 import {
+  cancelPlan,
   changePlan,
   keepPlan,
   openBillingPortal,
   previewPlanChange,
+  startCheckout,
 } from "@/features/billing/actions";
-import { GET } from "@/app/api/paddle/downgrades/route";
+import { GET } from "@/app/api/billing/downgrades/route";
 
 const [starter, pro] = TIERS;
 
@@ -55,8 +59,8 @@ const paid = (
   name: "Pro",
   cycle: "month",
   subscriptionId: "sub_1",
-  customerId: "ctm_1",
-  priceId: pro!.priceId.month,
+  customerId: "cust_1",
+  productId: pro!.productId.month,
   status: "active",
   renewsAt: "2026-11-01T12:00:00Z",
   cancelsAt: null,
@@ -66,112 +70,153 @@ const paid = (
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubEnv("APP_URL", "https://www.pigxel.studio");
   mocks.plan.mockResolvedValue(paid());
   mocks.setPending.mockResolvedValue(null);
-  mocks.update.mockResolvedValue({ id: "sub_1" });
+  mocks.switchProduct.mockResolvedValue({ id: "sub_1" });
+  mocks.cancel.mockResolvedValue({ id: "sub_1" });
+  mocks.resume.mockResolvedValue({ id: "sub_1" });
+});
+
+describe("checkout", () => {
+  it("sends Free accounts to Creem with their account attached", async () => {
+    mocks.plan.mockResolvedValue({ name: "Free" });
+    mocks.checkout.mockResolvedValue("https://checkout.creem.io/ch_1");
+    await expect(startCheckout(pro!.productId.year)).rejects.toThrow(
+      "REDIRECT:https://checkout.creem.io/ch_1",
+    );
+    expect(mocks.checkout).toHaveBeenCalledWith({
+      productId: pro!.productId.year,
+      userId: "user-1",
+      email: "artist@example.com",
+      successUrl: "https://www.pigxel.studio/welcome",
+    });
+  });
+
+  it("offers a plan change to subscribers instead of a second subscription", async () => {
+    await expect(startCheckout(starter!.productId.month)).rejects.toThrow(
+      `REDIRECT:/settings/subscription?plan=${starter!.productId.month}`,
+    );
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("ignores unknown products and reports Creem failures", async () => {
+    await expect(startCheckout("prod_unknown")).rejects.toThrow(
+      "REDIRECT:/pricing",
+    );
+    mocks.plan.mockResolvedValue({ name: "Free" });
+    mocks.checkout.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(startCheckout(pro!.productId.month)).rejects.toThrow(
+      "REDIRECT:/pricing?checkout=error",
+    );
+  });
 });
 
 describe("changing plans", () => {
   it("upgrades right away with a prorated charge", async () => {
-    await changePlan(pro!.priceId.year);
-    expect(mocks.update).toHaveBeenCalledWith("sub_1", {
-      items: [{ priceId: pro!.priceId.year, quantity: 1 }],
-      prorationBillingMode: "prorated_immediately",
-      onPaymentFailure: "prevent_change",
-    });
-    expect(mocks.store).toHaveBeenCalledWith({ id: "sub_1" });
+    await changePlan(pro!.productId.year);
+    expect(mocks.switchProduct).toHaveBeenCalledWith(
+      "sub_1",
+      pro!.productId.year,
+      "proration-charge-immediately",
+    );
+    expect(mocks.store).toHaveBeenCalledWith({ id: "sub_1" }, "user-1");
     expect(mocks.setPending).toHaveBeenCalledWith("sub_1", "user-1", null);
   });
 
-  it("keeps a downgrade for renewal without touching Paddle", async () => {
-    await changePlan(starter!.priceId.month);
-    expect(mocks.update).not.toHaveBeenCalled();
+  it("keeps a downgrade for renewal without touching Creem", async () => {
+    await changePlan(starter!.productId.month);
+    expect(mocks.switchProduct).not.toHaveBeenCalled();
     expect(mocks.setPending).toHaveBeenCalledWith(
       "sub_1",
       "user-1",
-      starter!.priceId.month,
+      starter!.productId.month,
     );
   });
 
   it("leaves the plan alone when an upgrade payment fails", async () => {
-    mocks.update.mockRejectedValue(new Error("declined"));
+    mocks.switchProduct.mockRejectedValue(new Error("declined"));
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const result = await changePlan(pro!.priceId.year);
+    const result = await changePlan(pro!.productId.year);
     expect(result?.error).toMatch(/weren’t charged/);
     expect(mocks.setPending).not.toHaveBeenCalled();
   });
 
-  it("refuses changes on unknown prices, past-due or ending plans", async () => {
-    expect(await changePlan("pri_unknown")).toHaveProperty("error");
+  it("refuses changes on unknown products, past-due or ending plans", async () => {
+    expect(await changePlan("prod_unknown")).toHaveProperty("error");
     mocks.plan.mockResolvedValue(paid({ status: "past_due" }));
-    expect(await changePlan(pro!.priceId.year)).toHaveProperty("error");
+    expect(await changePlan(pro!.productId.year)).toHaveProperty("error");
     mocks.plan.mockResolvedValue(paid({ cancelsAt: "2026-11-01T12:00:00Z" }));
-    expect(await changePlan(starter!.priceId.month)).toHaveProperty("error");
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(await changePlan(starter!.productId.month)).toHaveProperty("error");
+    expect(mocks.switchProduct).not.toHaveBeenCalled();
     expect(mocks.setPending).not.toHaveBeenCalled();
   });
 
   it("sends Free accounts back to the subscription page", async () => {
     mocks.plan.mockResolvedValue({ name: "Free" });
-    await expect(changePlan(pro!.priceId.year)).rejects.toThrow(
+    await expect(changePlan(pro!.productId.year)).rejects.toThrow(
       "REDIRECT:/settings/subscription",
     );
   });
 
-  it("previews what an upgrade costs today", async () => {
-    mocks.previewUpdate.mockResolvedValue({
-      immediateTransaction: {
-        details: { totals: { grandTotal: "4250", currencyCode: "EUR" } },
-      },
-    });
-    expect(await previewPlanChange(pro!.priceId.year)).toEqual({
+  it("previews whether a change is an upgrade or a downgrade", async () => {
+    expect(await previewPlanChange(pro!.productId.year)).toEqual({
       change: "upgrade",
-      priceId: pro!.priceId.year,
-      charge: "€42.50",
+      productId: pro!.productId.year,
     });
-    expect(await previewPlanChange(starter!.priceId.year)).toEqual({
+    expect(await previewPlanChange(starter!.productId.year)).toEqual({
       change: "downgrade",
-      priceId: starter!.priceId.year,
+      productId: starter!.productId.year,
     });
+    expect(await previewPlanChange(pro!.productId.month)).toHaveProperty(
+      "error",
+    );
+  });
+});
+
+describe("cancelling and keeping a plan", () => {
+  it("cancels at the end of the period and drops a pending downgrade", async () => {
+    await cancelPlan();
+    expect(mocks.cancel).toHaveBeenCalledWith("sub_1");
+    expect(mocks.store).toHaveBeenCalledWith({ id: "sub_1" }, "user-1");
+    expect(mocks.setPending).toHaveBeenCalledWith("sub_1", "user-1", null);
   });
 
-  it("keeps the plan by undoing a cancellation and a pending downgrade", async () => {
+  it("doesn't cancel twice", async () => {
+    mocks.plan.mockResolvedValue(paid({ cancelsAt: "2026-11-01T12:00:00Z" }));
+    await cancelPlan();
+    expect(mocks.cancel).not.toHaveBeenCalled();
+  });
+
+  it("keeps the plan by resuming it and undoing a pending downgrade", async () => {
     mocks.plan.mockResolvedValue(paid({ cancelsAt: "2026-11-01T12:00:00Z" }));
     await keepPlan();
-    expect(mocks.update).toHaveBeenCalledWith("sub_1", {
-      scheduledChange: null,
-    });
+    expect(mocks.resume).toHaveBeenCalledWith("sub_1");
     expect(mocks.setPending).toHaveBeenCalledWith("sub_1", "user-1", null);
+  });
+
+  it("reports a failed cancellation", async () => {
+    mocks.cancel.mockRejectedValue(new Error("down"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await cancelPlan()).toHaveProperty("error");
+    expect(mocks.setPending).not.toHaveBeenCalled();
   });
 });
 
 describe("billing portal", () => {
-  it("opens the page for the chosen task", async () => {
-    mocks.portal.mockResolvedValue({
-      urls: {
-        general: { overview: "https://portal/overview" },
-        subscriptions: [
-          {
-            id: "sub_1",
-            cancelSubscription: "https://portal/cancel",
-            updateSubscriptionPaymentMethod: "https://portal/card",
-          },
-        ],
-      },
-    });
-    await expect(openBillingPortal("payment")).rejects.toThrow(
-      "REDIRECT:https://portal/card",
+  it("opens the customer's Creem portal", async () => {
+    mocks.portal.mockResolvedValue("https://creem.io/portal/cust_1");
+    await expect(openBillingPortal()).rejects.toThrow(
+      "REDIRECT:https://creem.io/portal/cust_1",
     );
-    expect(mocks.portal).toHaveBeenCalledWith("ctm_1", ["sub_1"]);
-    await expect(openBillingPortal("overview")).rejects.toThrow(
-      "REDIRECT:https://portal/overview",
-    );
+    expect(mocks.portal).toHaveBeenCalledWith("cust_1");
   });
 
-  it("comes back with an error when Paddle fails", async () => {
+  it("comes back with an error when Creem fails", async () => {
     mocks.portal.mockRejectedValue(new Error("down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(openBillingPortal("cancel")).rejects.toThrow(
+    await expect(openBillingPortal()).rejects.toThrow(
       "REDIRECT:/settings/subscription?billing=error",
     );
   });
@@ -180,10 +225,18 @@ describe("billing portal", () => {
 describe("downgrade job", () => {
   const call = (authorization?: string) =>
     GET(
-      new Request("http://localhost/api/paddle/downgrades", {
+      new Request("http://localhost/api/billing/downgrades", {
         headers: authorization ? { authorization } : {},
       }),
     );
+
+  const due = [
+    {
+      id: "sub_1",
+      userId: "user-1",
+      pendingProductId: starter!.productId.month,
+    },
+  ];
 
   beforeEach(() => vi.stubEnv("CRON_SECRET", "cron-secret"));
 
@@ -193,25 +246,23 @@ describe("downgrade job", () => {
     expect(mocks.due).not.toHaveBeenCalled();
   });
 
-  it("switches due subscriptions without billing them", async () => {
-    mocks.due.mockResolvedValue([
-      { id: "sub_1", pendingPriceId: starter!.priceId.month },
-    ]);
+  it("switches due subscriptions without prorating them", async () => {
+    mocks.due.mockResolvedValue(due);
     const response = await call("Bearer cron-secret");
     expect(await response.json()).toEqual({ applied: 1, failed: 0 });
-    expect(mocks.update).toHaveBeenCalledWith("sub_1", {
-      items: [{ priceId: starter!.priceId.month, quantity: 1 }],
-      prorationBillingMode: "do_not_bill",
-    });
+    expect(mocks.switchProduct).toHaveBeenCalledWith(
+      "sub_1",
+      starter!.productId.month,
+      "proration-none",
+    );
+    expect(mocks.store).toHaveBeenCalledWith({ id: "sub_1" }, "user-1");
     const cutoff = mocks.due.mock.calls[0]![0] as Date;
     expect(cutoff.getTime()).toBeGreaterThan(Date.now());
   });
 
   it("reports failures so the scheduler retries", async () => {
-    mocks.due.mockResolvedValue([
-      { id: "sub_1", pendingPriceId: starter!.priceId.month },
-    ]);
-    mocks.update.mockRejectedValue(new Error("down"));
+    mocks.due.mockResolvedValue(due);
+    mocks.switchProduct.mockRejectedValue(new Error("down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     const response = await call("Bearer cron-secret");
     expect(response.status).toBe(500);

@@ -16,6 +16,7 @@ import {
   ASSET_CATEGORIES,
   assetBlob,
   assetFramePng,
+  isLocked,
   type Asset,
 } from "../assets";
 import { downloadBlob } from "@/lib/utils/download";
@@ -140,38 +141,64 @@ function AssetDetails({
           </ul>
         )}
 
-        <div className="flex flex-col gap-2">
-          <Link
-            href={`/tiles/new?asset=${encodeURIComponent(asset.id)}`}
-            className={buttonVariants()}
-          >
-            New tile from it
-          </Link>
-          <Button type="button" variant="secondary" onClick={copy}>
-            Copy
-          </Button>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void download(asset.sheetUrl, `${asset.id}.png`)}
+        {isLocked(asset) ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <p className="font-semibold">Premium asset</p>
+            <Text size="sm" tone="muted" className="mt-1">
+              Starter, Pro and Advanced plans unlock every premium asset and
+              tutorial: start tiles from them, drop them into yours and download
+              them.
+            </Text>
+            <Link
+              href="/pricing"
+              className={buttonVariants({ className: "mt-3 w-full" })}
             >
-              {asset.frames > 1 ? "PNG sheet" : "PNG"}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void download(asset.fileUrl, `${asset.id}.pigxel`)}
-            >
-              .pigxel
-            </Button>
+              See plans
+            </Link>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <Link
+              href={`/tiles/new?asset=${encodeURIComponent(asset.id)}`}
+              className={buttonVariants()}
+            >
+              New tile from it
+            </Link>
+            <Button type="button" variant="secondary" onClick={copy}>
+              Copy
+            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void download(asset.sheetUrl, `${asset.id}.png`)}
+              >
+                {asset.frames > 1 ? "PNG sheet" : "PNG"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  asset.fileUrl &&
+                  void download(asset.fileUrl, `${asset.id}.pigxel`)
+                }
+              >
+                .pigxel
+              </Button>
+            </div>
+          </div>
+        )}
 
-        <Text role="status" size="xs" tone={status?.error ? "error" : "muted"}>
-          {status?.text ??
-            "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on."}
-        </Text>
+        {!isLocked(asset) && (
+          <Text
+            role="status"
+            size="xs"
+            tone={status?.error ? "error" : "muted"}
+          >
+            {status?.text ??
+              "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on."}
+          </Text>
+        )}
 
         {canRemove && (
           <Button

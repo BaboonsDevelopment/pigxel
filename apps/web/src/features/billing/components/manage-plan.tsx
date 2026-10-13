@@ -7,28 +7,32 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { Notice } from "@pigxel/ui/components/notice";
 import { SectionTitle, Text } from "@pigxel/ui/components/typography";
 import {
+  cancelPlan,
   changePlan,
   keepPlan,
   openBillingPortal,
   previewPlanChange,
   type PlanPreview,
-  type PortalTarget,
 } from "../actions";
 import { TIERS, type BillingCycle } from "../pricing";
-import { canChangePlan, planOfPrice, type CurrentPlan } from "../subscription";
+import {
+  canChangePlan,
+  planOfProduct,
+  type CurrentPlan,
+} from "../subscription";
 
 type PaidPlan = Exclude<CurrentPlan, { name: "Free" }>;
 
 const billed = (cycle: BillingCycle) =>
   cycle === "month" ? "billed monthly" : "billed yearly";
 
-const labelOf = (priceId: string) => {
-  const plan = planOfPrice(priceId);
+const labelOf = (productId: string) => {
+  const plan = planOfProduct(productId);
   return plan ? `${plan.name}, ${billed(plan.cycle)}` : "";
 };
 
 const OPTIONS = TIERS.flatMap((tier) =>
-  (["month", "year"] as const).map((cycle) => tier.priceId[cycle]),
+  (["month", "year"] as const).map((cycle) => tier.productId[cycle]),
 );
 
 export function ManagePlan({
@@ -44,6 +48,7 @@ export function ManagePlan({
   const [pending, startTransition] = useTransition();
   const [preview, setPreview] = useState<PlanPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const until = periodEnd ?? "the end of this billing period";
 
   const run = (action: () => Promise<{ error?: string } | void>) =>
@@ -51,18 +56,21 @@ export function ManagePlan({
       setError(null);
       const result = await action();
       if (result?.error) setError(result.error);
-      else setPreview(null);
+      else {
+        setPreview(null);
+        setCancelling(false);
+      }
     });
 
-  const choose = (priceId: string) =>
+  const choose = (productId: string) =>
     startTransition(async () => {
       setError(null);
       setPreview(null);
-      setPreview(await previewPlanChange(priceId));
+      setPreview(await previewPlanChange(productId));
     });
 
   useEffect(() => {
-    if (initial && initial !== plan.priceId && canChangePlan(plan))
+    if (initial && initial !== plan.productId && canChangePlan(plan))
       choose(initial);
     // Only for the plan the page was opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,12 +108,12 @@ export function ManagePlan({
           </Text>
           <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
             <legend className="sr-only">New plan</legend>
-            {OPTIONS.filter((id) => id !== plan.priceId).map((id) => (
+            {OPTIONS.filter((id) => id !== plan.productId).map((id) => (
               <ChoiceCard key={id} className="p-3">
                 <Radio
                   name="new-plan"
                   disabled={pending}
-                  checked={chosen?.priceId === id}
+                  checked={chosen?.productId === id}
                   onChange={() => choose(id)}
                 />
                 <ChoiceText title={labelOf(id)} />
@@ -116,19 +124,15 @@ export function ManagePlan({
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
               <Text className="max-w-prose">
                 {chosen.change === "upgrade"
-                  ? `You’ll switch to ${labelOf(chosen.priceId)} now${
-                      chosen.charge
-                        ? ` and pay ${chosen.charge} today for the rest of this period.`
-                        : "."
-                    }`
-                  : `You’ll keep ${plan.name} until ${until}, then switch to ${labelOf(chosen.priceId)}. Nothing is charged now.`}
+                  ? `You’ll switch to ${labelOf(chosen.productId)} now and pay the prorated difference for the rest of this period today.`
+                  : `You’ll keep ${plan.name} until ${until}, then switch to ${labelOf(chosen.productId)}. Nothing is charged now.`}
               </Text>
               <Button
                 disabled={pending}
-                onClick={() => run(() => changePlan(chosen.priceId))}
+                onClick={() => run(() => changePlan(chosen.productId))}
               >
                 {chosen.change === "upgrade"
-                  ? `Upgrade${chosen.charge ? ` and pay ${chosen.charge}` : ""}`
+                  ? "Upgrade now"
                   : "Switch at renewal"}
               </Button>
             </div>
@@ -141,36 +145,51 @@ export function ManagePlan({
       <section aria-labelledby="billing-heading">
         <SectionTitle id="billing-heading">Billing</SectionTitle>
         <Text tone="muted" className="mt-1">
-          Paddle, our payment provider, keeps your card and invoices.
+          Creem, our payment provider, keeps your card and invoices.
         </Text>
         <div className="mt-4 flex flex-wrap gap-2">
-          <PortalButton target="payment">Update payment method</PortalButton>
-          <PortalButton target="overview">Invoices and receipts</PortalButton>
+          <form action={openBillingPortal}>
+            <Button type="submit" variant="secondary">
+              Payment method and invoices
+            </Button>
+          </form>
           {plan.cancelsAt ? (
             <Button disabled={pending} onClick={() => run(keepPlan)}>
               Keep my plan
             </Button>
           ) : (
-            <PortalButton target="cancel">Cancel plan</PortalButton>
+            !cancelling && (
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setCancelling(true)}
+              >
+                Cancel plan
+              </Button>
+            )
           )}
         </div>
+        {cancelling && !plan.cancelsAt && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+            <Text className="max-w-prose">
+              Your plan stays active until {until}, then you move to Free. You
+              won’t be charged again.
+            </Text>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                disabled={pending}
+                onClick={() => setCancelling(false)}
+              >
+                Keep {plan.name}
+              </Button>
+              <Button disabled={pending} onClick={() => run(cancelPlan)}>
+                Cancel plan
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
     </div>
-  );
-}
-
-function PortalButton({
-  target,
-  children,
-}: {
-  target: PortalTarget;
-  children: string;
-}) {
-  return (
-    <form action={openBillingPortal.bind(null, target)}>
-      <Button type="submit" variant="secondary">
-        {children}
-      </Button>
-    </form>
   );
 }

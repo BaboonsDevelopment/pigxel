@@ -14,7 +14,11 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { ModalButton } from "@/components/ui/modal-button";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { AssetImage } from "@/features/assets/components/asset-image";
-import { ASSET_CATEGORIES, type Asset } from "@/features/assets/assets";
+import {
+  ASSET_CATEGORIES,
+  isLocked,
+  type Asset,
+} from "@/features/assets/assets";
 import { listAssetsInBrowser } from "@/features/assets/publish";
 
 type Listing =
@@ -55,6 +59,12 @@ function AssetPicker({ onPick }: PickerProps) {
   }, []);
 
   const pick = async (asset: Asset) => {
+    if (isLocked(asset)) {
+      setProblem(
+        `“${asset.name}” is a premium asset. Starter, Pro and Advanced plans unlock it.`,
+      );
+      return;
+    }
     setPicking(asset.id);
     setProblem(null);
     const error = await onPick(asset);
@@ -76,7 +86,20 @@ function AssetPicker({ onPick }: PickerProps) {
           It lands in the middle of the layer you’re drawing on, ready to move.
           Animations bring their first frame.
         </p>
-        {problem && <FormMessage tone="error">{problem}</FormMessage>}
+        {problem && (
+          <FormMessage tone="error">
+            {problem}{" "}
+            {problem.includes("premium") && (
+              <Link
+                href="/pricing"
+                target="_blank"
+                className={textLinkClassName}
+              >
+                See plans
+              </Link>
+            )}
+          </FormMessage>
+        )}
         {listing.state === "loading" ? (
           <p className={status}>Loading…</p>
         ) : listing.state === "error" ? (
@@ -108,8 +131,18 @@ function AssetPicker({ onPick }: PickerProps) {
                           onClick={() => void pick(asset)}
                           className="flex w-full flex-col items-center gap-1 rounded-xl p-1.5 text-xs transition-colors hover:bg-muted/60 focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
                         >
-                          <span className="flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
-                            <AssetImage asset={asset} className="w-full" />
+                          <span className="relative flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
+                            <AssetImage
+                              asset={asset}
+                              className={
+                                isLocked(asset) ? "w-full opacity-50" : "w-full"
+                              }
+                            />
+                            {asset.premium && (
+                              <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+                                Premium
+                              </span>
+                            )}
                           </span>
                           <span className="w-full truncate text-center">
                             {asset.name}

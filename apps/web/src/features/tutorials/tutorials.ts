@@ -2,13 +2,17 @@ import type { StaticImageData } from "next/image";
 import type { ToolId } from "@/features/editor/constants";
 import buildTileset from "../../../public/art/tutorials/build-tileset.png";
 import firstAnimation from "../../../public/art/tutorials/first-animation.png";
+import idleAnimation from "../../../public/art/tutorials/idle-animation.png";
 import pixelArtBasics from "../../../public/art/tutorials/pixel-art-basics.png";
+import shadingHighlights from "../../../public/art/tutorials/shading-highlights.png";
 
 export type GuideState = {
   tool: ToolId;
   color: string;
   frames: number;
   painted: number;
+  /** A fingerprint of the visible pixels: changes with any edit. */
+  look: number;
   framesDiffer: boolean;
   onion: number;
   grid: number;
@@ -32,6 +36,8 @@ export type Tutorial = {
   summary: string;
   minutes: number;
   level: "Beginner" | "Intermediate";
+  /** Paid plans only; its practice asset is a premium one. */
+  premium?: boolean;
   image: StaticImageData;
   youtubeId?: string;
   practice: {
@@ -252,6 +258,152 @@ export const TUTORIALS: Tutorial[] = [
       {
         title: "Export the sheet",
         body: "Export a PNG at 1× for a game engine: every 16 × 16 cell is one tile.",
+        keys: ["Mod+E"],
+        target: menu("File"),
+        done: (now) => now.exporting,
+      },
+    ],
+  },
+  {
+    slug: "shading-highlights",
+    title: "Shading and highlights",
+    summary:
+      "Give a flat knight volume: choose a light source, build darker and lighter shades, and place shadows, highlights and a crisp rim light.",
+    minutes: 20,
+    level: "Intermediate",
+    premium: true,
+    image: shadingHighlights,
+    practice: {
+      name: "Shaded knight",
+      width: 16,
+      height: 16,
+      asset: "knight",
+      frames: 1,
+    },
+    steps: [
+      {
+        title: "Choose a light source",
+        body: "Decide where the light comes from before you touch a pixel. Top-left is the classic choice: surfaces facing it get lighter, the ones facing away get darker.",
+        target: CANVAS,
+      },
+      {
+        title: "Pick up the base colour",
+        body: "Choose the Pipette and click the knight’s blue tabard. Every shade you add starts from this colour.",
+        keys: ["I"],
+        target: tool("Pipette"),
+        done: (now, from) => now.tool === "pipette" && now.color !== from.color,
+      },
+      {
+        title: "Choose a darker shade",
+        body: "In the palette, pick a darker blue that leans a little towards purple. Shifting the hue as well as the brightness keeps shadows rich instead of muddy.",
+        target: PALETTE,
+        done: (now, from) => now.color !== from.color,
+      },
+      {
+        title: "Paint the shadows",
+        body: "With the Pen, paint the sides facing away from the light: the right edge of the tabard and helmet, and under the arms. Keep shadows in small clusters, not single pixels.",
+        keys: ["B"],
+        target: CANVAS,
+        done: (now, from) => now.tool === "pen" && now.look !== from.look,
+      },
+      {
+        title: "Add highlights",
+        body: "Pick a lighter, slightly warmer colour and touch the edges facing the light: the top-left of the helmet and the shoulders. Use highlights sparingly; they’re what catches the eye.",
+        target: PALETTE,
+        done: (now, from) => now.color !== from.color && now.look !== from.look,
+      },
+      {
+        title: "Avoid pillow shading",
+        body: "Shading every edge the same way, dark outside and light in the middle, makes a puffy “pillow”. Check that each shadow sits on the side away from your light.",
+        target: CANVAS,
+      },
+      {
+        title: "Check it at real size",
+        body: "Zoom out until the knight is tiny. Shading that’s too subtle disappears at 1×; if it does, push the shadows a step darker.",
+        keys: ["−", "+"],
+        target: CANVAS,
+      },
+      {
+        title: "Export it",
+        body: "Open File › Export… and save a PNG scaled up 8× to share your shaded knight.",
+        keys: ["Mod+E"],
+        target: menu("File"),
+        done: (now) => now.exporting,
+      },
+    ],
+  },
+  {
+    slug: "idle-animation",
+    title: "Animate an idle loop",
+    summary:
+      "Make a knight breathe: key poses, a one-pixel bob, secondary motion on the plume, timing that feels alive, and a seamless loop.",
+    minutes: 24,
+    level: "Intermediate",
+    premium: true,
+    image: idleAnimation,
+    practice: {
+      name: "Idle knight",
+      width: 16,
+      height: 16,
+      asset: "knight",
+      frames: 1,
+    },
+    steps: [
+      {
+        title: "Study the rest pose",
+        body: "An idle loop is a character doing almost nothing, convincingly. Frame 1 is the knight at rest; every other frame is a small change from it.",
+        target: TIMELINE,
+      },
+      {
+        title: "Duplicate the frame",
+        body: "Copy frame 1 into frame 2, so you only redraw what moves.",
+        keys: ["Alt+N"],
+        target: DUPLICATE_FRAME,
+        done: (now) => now.frames >= 2,
+      },
+      {
+        title: "Turn on onion skin",
+        body: "View › Onion skin shows frame 1 faintly under frame 2, so you can see exactly how far things move.",
+        keys: ["F3"],
+        target: menu("View"),
+        done: (now) => now.onion > 0,
+      },
+      {
+        title: "Bob the body down",
+        body: "On frame 2, select the head and body (not the feet) and nudge them one pixel down, then press Enter. One pixel is plenty at this size.",
+        keys: ["M", "↓", "Enter"],
+        target: CANVAS,
+        done: (now) => now.framesDiffer,
+      },
+      {
+        title: "Let the plume follow",
+        body: "Secondary motion sells it: on frame 2, shift the red plume one pixel back so it trails behind the helmet.",
+        keys: ["B"],
+        target: CANVAS,
+        done: (now, from) => now.look !== from.look,
+      },
+      {
+        title: "Add an in-between",
+        body: "Duplicate again and make a halfway frame: body down, plume still catching up. Three or four frames make a smooth breath.",
+        keys: ["Alt+N"],
+        target: DUPLICATE_FRAME,
+        done: (now) => now.frames >= 3,
+      },
+      {
+        title: "Play the loop",
+        body: "Press Play and watch it a few times. If the loop jumps when it wraps around, the last frame and frame 1 are too different.",
+        keys: [",", "."],
+        target: 'button[title="Play"], button[title="Pause"]',
+        done: (now) => now.playing,
+      },
+      {
+        title: "Tune the timing",
+        body: "Idles feel natural when they’re slow. Hold the rest pose longer than the others, around 400 ms, and keep the in-betweens short.",
+        target: '[data-guide="frame-duration"]',
+      },
+      {
+        title: "Export a GIF",
+        body: "Open File › Export… and choose GIF, or Sprite sheet for a game engine.",
         keys: ["Mod+E"],
         target: menu("File"),
         done: (now) => now.exporting,
