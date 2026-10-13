@@ -2,12 +2,7 @@
   "id": "grass",
   "name": "Grass",
   "category": "tiles",
-  "tags": [
-    "tile",
-    "ground",
-    "grass",
-    "seamless"
-  ],
+  "tags": ["tile", "ground", "grass", "seamless"],
   "colors": {
     "d": "#265c42",
     "g": "#3e8948",

@@ -5,8 +5,7 @@ import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 
-/** Admins publish a set of assets drawn in code: free, or premium for paid plans. */
-export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
+export function ImportStarterSet() {
   const router = useRouter();
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -14,16 +13,9 @@ export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
   const importAll = async () => {
     setError(null);
     try {
-      const [
-        { STARTER_ASSETS, starterDocument },
-        { PREMIUM_ASSETS },
-        { publishAsset },
-      ] = await Promise.all([
-        import("../starter"),
-        import("../premium"),
-        import("../publish"),
-      ]);
-      const set = premium ? PREMIUM_ASSETS : STARTER_ASSETS;
+      const [{ STARTER_ASSETS, starterDocument }, { publishAsset }] =
+        await Promise.all([import("../starter"), import("../publish")]);
+      const set = STARTER_ASSETS;
       for (const [i, asset] of set.entries()) {
         setProgress(`Importing ${i + 1} of ${set.length}…`);
         await publishAsset({
@@ -31,8 +23,7 @@ export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
           name: asset.name,
           category: asset.category,
           document: starterDocument(asset),
-          sort: premium ? 100 + i : i,
-          premium,
+          sort: i,
         });
       }
       setProgress(null);
@@ -53,8 +44,7 @@ export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
         disabled={progress !== null}
         onClick={() => void importAll()}
       >
-        {progress ??
-          (premium ? "Import the premium set" : "Import the starter set")}
+        {progress ?? "Import the starter set"}
       </Button>
       {error && <FormMessage tone="error">{error}</FormMessage>}
     </div>

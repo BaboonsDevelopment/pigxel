@@ -1,0 +1,41 @@
+{
+  "id": "tower-shield",
+  "name": "Tower shield",
+  "category": "items",
+  "tags": ["item", "armor", "equipment"],
+  "colors": {
+    "k": "#181425",
+    "w": "#fee761",
+    "y": "#feae34",
+    "o": "#d77643",
+    "c": "#2ce8f5",
+    "b": "#0099db",
+    "n": "#124e89"
+  },
+  "clips": [
+    {
+      "name": "still",
+      "kind": "variant",
+      "frames": [
+        [
+          "................",
+          "...kkkkkkkkkk...",
+          "..kwyyyyyyyyok..",
+          "..kycbbbybbnok..",
+          "..kycbbbybbnok..",
+          "..kybbbbybbnok..",
+          "..kyyyyyyyyyok..",
+          "..kycbbbybbnok..",
+          "..kybbbbybbnok..",
+          "...kybbbybnok...",
+          "...kybbbybnok...",
+          "....kybbynok....",
+          ".....kyyook.....",
+          "......kook......",
+          ".......kk.......",
+          "................"
+        ]
+      ]
+    }
+  ]
+}

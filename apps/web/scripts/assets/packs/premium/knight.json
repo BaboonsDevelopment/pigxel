@@ -1,0 +1,65 @@
+{
+  "id": "knight",
+  "name": "Knight",
+  "category": "characters",
+  "tags": ["character", "hero", "animated"],
+  "colors": {
+    "k": "#181425",
+    "w": "#ffffff",
+    "l": "#c0cbdc",
+    "s": "#8b9bb4",
+    "m": "#5a6988",
+    "v": "#262b44",
+    "r": "#e43b44",
+    "R": "#a22633",
+    "b": "#0099db",
+    "n": "#124e89",
+    "y": "#feae34"
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "kind": "animation",
+      "ms": 400,
+      "frames": [
+        [
+          "................",
+          ".......kk.......",
+          "......krrk......",
+          ".....kkrRkk.....",
+          "....kwllllsk....",
+          "....klssssmk....",
+          "....kvvvvvvk....",
+          "....klssssmk....",
+          ".....kmmmmk.....",
+          "...klbbybbnmk...",
+          "..klkbyyybnkmk..",
+          "..kskbbybbnkmk..",
+          "...kkbbbbbnkk...",
+          "....kmkkkkmk....",
+          "...kvvk..kvvk...",
+          "................"
+        ],
+        [
+          "................",
+          "................",
+          ".......kk.......",
+          "......krrk......",
+          ".....kkrRkk.....",
+          "....kwllllsk....",
+          "....klssssmk....",
+          "....kvvvvvvk....",
+          "....klssssmk....",
+          ".....kmmmmk.....",
+          "...klbbybbnmk...",
+          "..klkbyyybnkmk..",
+          "..kskbbybbnkmk..",
+          "...kkbbbbbnkk...",
+          "...kvvk..kvvk...",
+          "................"
+        ]
+      ]
+    }
+  ],
+  "notes": "Idle breath: the body bobs 1px down on frame 2 while the boots stay on the ground line."
+}

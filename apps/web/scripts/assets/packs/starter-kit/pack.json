@@ -8,13 +8,6 @@
     "outline": "#181425",
     "maxColors": 16
   },
-  "palettes": [
-    "pico-8",
-    "sweetie-16",
-    "endesga-32"
-  ],
-  "assets": [
-    "potion",
-    "grass"
-  ]
+  "palettes": ["pico-8", "sweetie-16", "endesga-32"],
+  "assets": ["potion", "grass"]
 }

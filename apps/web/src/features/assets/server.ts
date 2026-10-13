@@ -44,13 +44,3 @@ export async function findAsset(
     return null;
   }
 }
-
-/** How many premium assets exist, so admins can import the premium set. */
-export async function countPremiumAssets(): Promise<number> {
-  const supabase = await createClient();
-  const { count } = await supabase
-    .from("assets")
-    .select("id", { count: "exact", head: true })
-    .eq("premium", true);
-  return count ?? 0;
-}

@@ -1,32 +1,45 @@
 import { describe, expect, it } from "vitest";
-import { PREMIUM_ASSETS } from "@/features/assets/premium";
+import { isLocked } from "@/features/assets/assets";
 import { STARTER_ASSETS } from "@/features/assets/starter";
-import { isAssetCategory, isLocked } from "@/features/assets/assets";
 import { TUTORIALS } from "@/features/tutorials/tutorials";
+import { hasErrors, issuesOf } from "../scripts/assets/lib/checks";
+import { loadPacks } from "../scripts/assets/lib/source";
+import {
+  ASSET_BUCKET,
+  fileBucket,
+  isPremium,
+  PREMIUM_ASSET_BUCKET,
+} from "../scripts/assets/lib/upload";
 
-describe("premium asset set", () => {
-  it("draws every frame as a full 16 × 16 grid in its own colours", () => {
-    for (const asset of PREMIUM_ASSETS) {
-      expect(isAssetCategory(asset.category)).toBe(true);
-      for (const frame of asset.frames) {
-        expect(frame, asset.id).toHaveLength(16);
-        for (const row of frame) {
-          expect(row, `${asset.id}: ${row}`).toHaveLength(16);
-          for (const pixel of row)
-            if (pixel !== ".")
-              expect(asset.colors[pixel], `${asset.id}: ${pixel}`).toMatch(
-                /^#[0-9a-f]{6}$/,
-              );
-        }
-      }
-    }
+const packs = loadPacks();
+const premium = packs.find((pack) => pack.id === "premium")!;
+
+describe("premium pack", () => {
+  it("is a paid pack whose assets all pass the checks", () => {
+    expect(premium.tier).toBe("paid");
+    expect(premium.issues).toEqual([]);
+    expect(premium.assets.length).toBeGreaterThan(0);
+    for (const source of premium.assets)
+      expect(hasErrors(issuesOf(source, premium)), source.key).toBe(false);
   });
 
-  it("doesn't reuse a free asset's id", () => {
-    const free = new Set(STARTER_ASSETS.map((asset) => asset.id));
-    const ids = PREMIUM_ASSETS.map((asset) => asset.id);
-    expect(ids.filter((id) => free.has(id))).toEqual([]);
-    expect(new Set(ids).size).toBe(ids.length);
+  it("doesn't reuse an id from the starter set or another pack", () => {
+    const elsewhere = new Set([
+      ...STARTER_ASSETS.map((asset) => asset.id),
+      ...packs
+        .filter((pack) => pack.id !== "premium")
+        .flatMap((pack) => pack.assets.map((asset) => asset.id)),
+    ]);
+    expect(
+      premium.assets.map((a) => a.id).filter((id) => elsewhere.has(id)),
+    ).toEqual([]);
+  });
+
+  it("uploads paid files to the private bucket and free ones to the public one", () => {
+    expect(isPremium("paid")).toBe(true);
+    expect(isPremium("free")).toBe(false);
+    expect(fileBucket(true)).toBe(PREMIUM_ASSET_BUCKET);
+    expect(fileBucket(false)).toBe(ASSET_BUCKET);
   });
 
   it("locks premium assets the viewer can't open", () => {
@@ -37,11 +50,11 @@ describe("premium asset set", () => {
 });
 
 describe("premium tutorials", () => {
-  it("has some, and each practises on a premium asset that exists", () => {
-    const premium = TUTORIALS.filter((tutorial) => tutorial.premium);
-    expect(premium.length).toBeGreaterThan(0);
-    const ids = new Set(PREMIUM_ASSETS.map((asset) => asset.id));
-    for (const tutorial of premium)
+  it("practise on assets from the premium pack", () => {
+    const tutorials = TUTORIALS.filter((tutorial) => tutorial.premium);
+    expect(tutorials.length).toBeGreaterThan(0);
+    const ids = new Set(premium.assets.map((asset) => asset.id));
+    for (const tutorial of tutorials)
       if (tutorial.practice.asset)
         expect(ids.has(tutorial.practice.asset), tutorial.slug).toBe(true);
   });

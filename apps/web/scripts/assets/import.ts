@@ -14,9 +14,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
-import type { LegacyCategory } from "./lib/asset.ts";
+import type { LegacyCategory, Tier } from "./lib/asset.ts";
+import { ASSET_BUCKET, fileBucket, isPremium } from "./lib/upload.ts";
 
-const BUCKET = "assets";
 const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
 const CACHE_SECONDS = "31536000";
 
@@ -24,6 +24,7 @@ type ManifestAsset = {
   id: string;
   name: string;
   category: LegacyCategory;
+  tier: Tier;
   sort: number;
   width: number;
   height: number;
@@ -46,6 +47,7 @@ type Row = {
   file_path: string;
   sheet_path: string;
   sort: number;
+  premium: boolean;
 };
 
 const { values } = parseArgs({
@@ -72,12 +74,12 @@ const assets = manifest.packs.flatMap((pack) => pack.assets);
 const supabase = createClient(url, key, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-const storage = supabase.storage.from(BUCKET);
+const storage = supabase.storage.from(ASSET_BUCKET);
 
 const { data: existing, error: listError } = await supabase
   .from("assets")
   .select(
-    "id, name, category, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort",
+    "id, name, category, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
   )
   .returns<Row[]>();
 if (listError) throw new Error(`Couldn’t read assets: ${listError.message}`);
@@ -103,6 +105,7 @@ for (const asset of assets) {
     file_path: `${asset.id}/${hashOf(file)}.pigxel`,
     sheet_path: `${asset.id}/${hashOf(sheet)}.png`,
     sort: asset.sort,
+    premium: isPremium(asset.tier),
   };
   const old = before.get(asset.id);
   if (old && JSON.stringify(old) === JSON.stringify(row)) {
@@ -116,7 +119,7 @@ for (const asset of assets) {
 
   const options = { cacheControl: CACHE_SECONDS, upsert: true };
   const uploads = await Promise.all([
-    storage.upload(row.file_path, file, {
+    supabase.storage.from(fileBucket(row.premium)).upload(row.file_path, file, {
       ...options,
       contentType: PIGXEL_MIME_TYPE,
     }),
@@ -134,11 +137,17 @@ for (const asset of assets) {
     .upsert({ ...row, updated_at: new Date().toISOString() });
   if (error) throw new Error(`${asset.id}: couldn’t save: ${error.message}`);
 
-  const replaced = [old?.file_path, old?.sheet_path].filter(
-    (path): path is string =>
-      !!path && path !== row.file_path && path !== row.sheet_path,
-  );
-  if (replaced.length) await storage.remove(replaced);
+  if (old?.sheet_path && old.sheet_path !== row.sheet_path)
+    await storage.remove([old.sheet_path]);
+  // A file that moved bucket (free ⇄ paid) goes from the old one even if
+  // its name is the same.
+  if (
+    old?.file_path &&
+    (old.file_path !== row.file_path || old.premium !== row.premium)
+  )
+    await supabase.storage
+      .from(fileBucket(old.premium))
+      .remove([old.file_path]);
 }
 
 if (values.prune) {
@@ -160,6 +169,8 @@ if (values.prune) {
       ...(files ?? []).map((f) => `${row.id}/${f.name}`),
     ];
     await storage.remove([...new Set(paths)]);
+    if (row.premium)
+      await supabase.storage.from(fileBucket(true)).remove([row.file_path]);
   }
 }
 

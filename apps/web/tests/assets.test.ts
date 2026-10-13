@@ -13,7 +13,7 @@ import {
   starterDocument,
   starterPixels,
 } from "@/features/assets/starter";
-import { PREMIUM_ASSETS } from "@/features/assets/premium";
+import { loadPacks } from "../scripts/assets/lib/source";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
   flattenDocument,
@@ -223,7 +223,10 @@ describe("tutorials", () => {
   it("have unique slugs and practice tiles that exist", () => {
     const slugs = TUTORIALS.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
-    const ids = [...STARTER_ASSETS, ...PREMIUM_ASSETS].map((a) => a.id);
+    const ids = [
+      ...STARTER_ASSETS.map((a) => a.id),
+      ...loadPacks().flatMap((pack) => pack.assets.map((a) => a.id)),
+    ];
     for (const { practice } of TUTORIALS)
       if (practice.asset) expect(ids).toContain(practice.asset);
   });

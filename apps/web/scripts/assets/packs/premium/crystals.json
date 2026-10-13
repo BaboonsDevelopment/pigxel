@@ -1,0 +1,42 @@
+{
+  "id": "crystals",
+  "name": "Crystals",
+  "category": "nature",
+  "tags": ["nature", "gem", "cave"],
+  "colors": {
+    "k": "#181425",
+    "w": "#ffffff",
+    "l": "#f6757a",
+    "m": "#b55088",
+    "c": "#68386c",
+    "G": "#8b9bb4",
+    "g": "#5a6988",
+    "d": "#3a4466"
+  },
+  "clips": [
+    {
+      "name": "still",
+      "kind": "variant",
+      "frames": [
+        [
+          "................",
+          "................",
+          ".......k........",
+          "......kwk.......",
+          "......kwck......",
+          ".....kwlmck.....",
+          ".....klmmck.....",
+          "....kwlmmcck.k..",
+          "....kllmmcckkwk.",
+          "..k.klmmmccklck.",
+          ".kwkklmmmccklck.",
+          ".klkkmmmcccklck.",
+          ".kckkmmmccckmck.",
+          ".kGgggggggddddk.",
+          "..kkkkkkkkkkkk..",
+          "................"
+        ]
+      ]
+    }
+  ]
+}

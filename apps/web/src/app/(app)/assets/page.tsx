@@ -15,7 +15,7 @@ import { ImportStarterSet } from "@/features/assets/components/import-starter-se
 import { PaletteList } from "@/features/assets/components/palette-list";
 import { ScaledPage } from "@/components/layout/scaled-page";
 import { ASSET_CATEGORIES } from "@/features/assets/assets";
-import { countPremiumAssets, listAssets } from "@/features/assets/server";
+import { listAssets } from "@/features/assets/server";
 import { isAdmin, requireUser } from "@/lib/auth/session";
 import { shownFrom } from "@/lib/utils/shown";
 
@@ -35,8 +35,6 @@ export default async function Assets({ searchParams }: Props) {
   const tab: AssetTab =
     ASSET_TABS.find((t) => t.value === type)?.value ?? "all";
   const admin = isAdmin(user);
-  const premiumMissing =
-    admin && tab === "all" && (await countPremiumAssets()) === 0;
 
   const categories = ASSET_CATEGORIES.filter(
     (c) => tab === "all" || c.id === tab,
@@ -68,15 +66,6 @@ export default async function Assets({ searchParams }: Props) {
         description="Sprites, seamless tiles and palettes to start a tile from or drop into yours."
         actions={<AssetTabs active={tab} />}
       />
-      {premiumMissing && sections && !empty && (
-        <div className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-dashed p-4">
-          <span className="text-sm text-muted-foreground">
-            Admin: no premium assets yet. Publish the premium set (knight,
-            wizard, torch, shield, crystals, lava) for paid plans.
-          </span>
-          <ImportStarterSet premium />
-        </div>
-      )}
       {!sections ? (
         <Notice tone="error" className="mt-8">
           Couldn’t load assets. Refresh the page to try again.

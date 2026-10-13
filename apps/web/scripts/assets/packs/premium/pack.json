@@ -1,0 +1,13 @@
+{
+  "id": "premium",
+  "name": "Premium adventure pack",
+  "tier": "paid",
+  "description": "A knight, a wizard, gear, cave crystals and lava for paid plans, drawn in Endesga 32.",
+  "palette": "endesga-32",
+  "style": {
+    "outline": "#181425",
+    "maxColors": 16
+  },
+  "palettes": [],
+  "assets": ["knight", "wizard", "torch", "tower-shield", "crystals", "lava"]
+}

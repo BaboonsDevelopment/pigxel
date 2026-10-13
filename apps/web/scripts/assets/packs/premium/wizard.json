@@ -1,0 +1,47 @@
+{
+  "id": "wizard",
+  "name": "Wizard",
+  "category": "characters",
+  "tags": ["character", "mage", "npc"],
+  "colors": {
+    "k": "#181425",
+    "n": "#124e89",
+    "b": "#0099db",
+    "c": "#2ce8f5",
+    "y": "#feae34",
+    "f": "#e4a672",
+    "w": "#ffffff",
+    "l": "#c0cbdc",
+    "g": "#8b9bb4",
+    "q": "#b55088",
+    "p": "#68386c",
+    "d": "#3e2731",
+    "o": "#b86f50"
+  },
+  "clips": [
+    {
+      "name": "still",
+      "kind": "variant",
+      "frames": [
+        [
+          "................",
+          "......kk....kk..",
+          ".....kck...kwck.",
+          ".....kbnk..kcck.",
+          "....kcbnk...kk..",
+          "....kbybnk..kok.",
+          "...kcbbbnk..kok.",
+          "..kcbbbbbnnkkok.",
+          ".kkkkkkkkkkkkok.",
+          "...kfkffkfk.kok.",
+          "...kwwllgk.kfok.",
+          "..kqpwlgppdkkok.",
+          "..kqpplpppdkkok.",
+          "..kqppppppdkkok.",
+          "..kkkkkkkkkkkkk.",
+          "................"
+        ]
+      ]
+    }
+  ]
+}

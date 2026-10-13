@@ -1,0 +1,79 @@
+{
+  "id": "torch",
+  "name": "Torch",
+  "category": "items",
+  "tags": ["item", "light", "fire", "animated"],
+  "colors": {
+    "k": "#181425",
+    "r": "#e43b44",
+    "o": "#f77622",
+    "y": "#feae34",
+    "e": "#fee761",
+    "l": "#b86f50",
+    "d": "#733e39"
+  },
+  "clips": [
+    {
+      "name": "burn",
+      "kind": "animation",
+      "ms": 120,
+      "frames": [
+        [
+          "................",
+          ".......kk.......",
+          "......kork......",
+          ".....kroyrk.....",
+          "....kryeeyrk....",
+          "....kroeeork....",
+          ".....kryyrk.....",
+          "....kkkkkkkk....",
+          "....kllllddk....",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kkkk......",
+          "................"
+        ],
+        [
+          "................",
+          "........kk......",
+          ".......kork.....",
+          ".....kroyyrk....",
+          "....kryeeyrk....",
+          "....kroeeork....",
+          ".....kryyrk.....",
+          "....kkkkkkkk....",
+          "....kllllddk....",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kkkk......",
+          "................"
+        ],
+        [
+          "................",
+          "......kk........",
+          ".....kork.......",
+          ".....kroyrk.....",
+          "....kryeeyrk....",
+          "....kroeeork....",
+          ".....kryyrk.....",
+          "....kkkkkkkk....",
+          "....kllllddk....",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kldk......",
+          "......kkkk......",
+          "................"
+        ]
+      ]
+    }
+  ],
+  "notes": "The flame tip sways left and right; the body of the flame and the handle stay put."
+}

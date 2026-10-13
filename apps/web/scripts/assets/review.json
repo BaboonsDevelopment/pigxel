@@ -1,0 +1,50 @@
+{
+  "premium/crystals": {
+    "status": "approved",
+    "note": "",
+    "hash": "2ab730b626cccc6c",
+    "at": "2026-10-13T13:03:38.708Z"
+  },
+  "premium/knight": {
+    "status": "approved",
+    "note": "",
+    "hash": "89b2c61b2bc9b839",
+    "at": "2026-10-13T13:03:37.422Z"
+  },
+  "premium/lava": {
+    "status": "approved",
+    "note": "",
+    "hash": "e41d66348d086bb3",
+    "at": "2026-10-13T13:03:39.570Z"
+  },
+  "premium/torch": {
+    "status": "approved",
+    "note": "",
+    "hash": "e4ea06f7a59753f7",
+    "at": "2026-10-13T13:03:38.054Z"
+  },
+  "premium/tower-shield": {
+    "status": "approved",
+    "note": "",
+    "hash": "e454932a71907116",
+    "at": "2026-10-13T13:03:40.113Z"
+  },
+  "premium/wizard": {
+    "status": "approved",
+    "note": "",
+    "hash": "af852ee36a70e103",
+    "at": "2026-10-13T13:03:40.617Z"
+  },
+  "starter-kit/grass": {
+    "status": "approved",
+    "note": "",
+    "hash": "aa78e7a02b9eab3f",
+    "at": "2026-10-13T13:03:41.230Z"
+  },
+  "starter-kit/potion": {
+    "status": "approved",
+    "note": "",
+    "hash": "35a21b5dab44238b",
+    "at": "2026-10-13T13:03:41.663Z"
+  }
+}

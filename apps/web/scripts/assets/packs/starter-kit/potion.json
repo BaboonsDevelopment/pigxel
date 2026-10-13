@@ -2,11 +2,7 @@
   "id": "potion",
   "name": "Health potion",
   "category": "items",
-  "tags": [
-    "item",
-    "potion",
-    "consumable"
-  ],
+  "tags": ["item", "potion", "consumable"],
   "colors": {
     "k": "#181425",
     "n": "#e4a672",

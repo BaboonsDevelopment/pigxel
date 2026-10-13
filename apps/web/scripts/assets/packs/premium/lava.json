@@ -1,0 +1,58 @@
+{
+  "id": "lava",
+  "name": "Lava",
+  "category": "tiles",
+  "tags": ["tile", "hazard", "animated"],
+  "colors": {
+    "r": "#e43b44",
+    "d": "#a22633",
+    "o": "#f77622",
+    "y": "#feae34",
+    "e": "#fee761"
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "kind": "animation",
+      "ms": 350,
+      "frames": [
+        [
+          "rrrrorrrrrrdrrrr",
+          "rroyyorrrrrrrrrr",
+          "rrooorrrddrrrorr",
+          "rrrrrrrdrrrroyor",
+          "rrdrrrrrrrrrooor",
+          "rrrrrrorrrrrrrrr",
+          "rrrrroyorrrdrrrr",
+          "drrrrooorrrrrrrd",
+          "rrrrrrrrrrrrrrrr",
+          "rrrrrrrrrorrrrrr",
+          "rrdrrrrroyeorrrr",
+          "rrrrrrrrooorrdrr",
+          "rrrorrrrrrrrrrrr",
+          "rroyorrrdrrrrrrr",
+          "rrooorrrrrrrrorr",
+          "rrrrrrrrrrrdrrrr"
+        ],
+        [
+          "rrrrrrrrrrrdrrrr",
+          "rrrorrrrrrrrrrrr",
+          "rroyorrrddrrrrrr",
+          "rrooorrdrrrrrorr",
+          "rrdrrrrrrrrroyor",
+          "rrrrrrrrrrrrooor",
+          "rrrrrrorrrrdrrrr",
+          "drrrroyorrrrrrrd",
+          "rrrrrooorrrrrrrr",
+          "rrrrrrrrrrrrrrrr",
+          "rrdrrrrrrorrrrrr",
+          "rrrrrrrroyeorrrr",
+          "rrrrrrrrooorrdrr",
+          "rrrorrrrrrrrrrrr",
+          "rroyorrrdrrrrrrr",
+          "rrooorrrrrrrrorr"
+        ]
+      ]
+    }
+  ]
+}

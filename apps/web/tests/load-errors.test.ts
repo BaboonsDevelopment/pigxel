@@ -34,7 +34,6 @@ vi.mock("@/features/feedback/server", () => ({
 }));
 vi.mock("@/features/assets/server", () => ({
   listAssets: mocks.listAssets,
-  countPremiumAssets: async () => 0,
 }));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
