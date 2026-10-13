@@ -71,15 +71,8 @@ export default function Refunds() {
         <p>
           This policy adds to your rights under consumer law and doesn’t take
           any away. Consumers in the EU and UK can withdraw from a purchase
-          within 14 days; our {days}-day full refund covers that. Paddle’s{" "}
-          <a
-            href="https://www.paddle.com/legal/checkout-buyer-terms"
-            target="_blank"
-            rel="noreferrer"
-          >
-            buyer terms
-          </a>{" "}
-          also apply to your purchase.
+          within 14 days; our {days}-day full refund covers that. Creem, our
+          Merchant of Record, also applies the terms of sale shown at checkout.
         </p>
       </LegalSection>
 

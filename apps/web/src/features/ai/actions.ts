@@ -485,7 +485,7 @@ export async function animateSheet(args: {
     validSize(args.cellW) &&
     validSize(args.cellH);
   if (!valid) return { ok: false, error: "That animation cannot be drawn." };
-  return attempt("animateSheet", async () => {
+  return attempt("animateSheet", [args.subject, ...args.poses], async () => {
     const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const { mimeType, base64 } = await getAiProvider().redraw(
       buildSheetAnimatePrompt({

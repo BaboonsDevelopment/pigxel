@@ -88,6 +88,14 @@ export const creemApi = {
     );
   },
 
+  /** Ends the subscription now, e.g. before the account is deleted. */
+  cancelNow(subscriptionId: string) {
+    return call<CreemSubscription>(
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,
+      { mode: "immediate" },
+    );
+  },
+
   /** Undoes a scheduled cancellation. */
   resume(subscriptionId: string) {
     return call<CreemSubscription>(

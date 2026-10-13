@@ -3,14 +3,9 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { Brand } from "@/components/ui/brand";
 import { PublicHeader } from "@/components/layout/public-header/public-header";
-<<<<<<< HEAD
 import { LEGAL, LEGAL_LINKS } from "@/features/legal/legal";
-import { ART, STRIP, type Art } from "../art";
-=======
-import { LEGAL_LINKS } from "@/features/legal/legal";
 import { CookieSettingsButton } from "@/features/legal/components/cookie-banner";
 import { ART, STRIP } from "../art";
->>>>>>> origin/dev
 import { ArtWall } from "./art-wall";
 import { FeatureTour } from "./feature-tour/feature-tour";
 import { WorldsZoom } from "./worlds-zoom/worlds-zoom";

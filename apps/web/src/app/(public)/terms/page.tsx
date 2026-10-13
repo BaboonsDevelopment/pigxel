@@ -15,74 +15,30 @@ export default function Terms() {
       title="Terms of Service"
       intro={
         <p>
-<<<<<<< HEAD
-          These terms describe the rules for using Pigxel, including the pixel
-          art editor, the AI helper, public profiles, and related services.
-=======
           These terms are an agreement between you and {LEGAL.legalName} (“we”,
           “us”), who runs {LEGAL.operator}, a pixel art editor with an AI helper
           at this website (the “Service”). By creating an account or using the
           Service, you agree to them and to our{" "}
           <Link href="/privacy">Privacy Policy</Link>. If you don’t agree,
           please don’t use Pigxel.
->>>>>>> origin/dev
         </p>
       }
     >
-      <LegalSection title="Using Pigxel">
+      <LegalSection title="1. Your account">
         <p>
-<<<<<<< HEAD
-          You may use Pigxel to draw and animate pixel art, organize your tiles
-          and assets, export your work, publish it on your profile, and get help
-          from the AI helper. You are responsible for the information you add
-          and for keeping your account credentials secure.
-        </p>
-        <p>
-          You must not use Pigxel to upload unlawful content, violate someone
-          else’s rights, abuse the service, interfere with security, or attempt
-          to access accounts or data that are not yours.
-=======
           You need an account to save and share your work. You must be at least{" "}
           {LEGAL.minAge} years old, and give accurate details when you sign up.
           You are responsible for what happens under your account; keep your
           password safe and tell us if you think someone else is using it.
->>>>>>> origin/dev
         </p>
       </LegalSection>
 
-      <LegalSection title="Accounts and Content">
+      <LegalSection title="2. Your art">
         <p>
-          You retain ownership of the art you create. By adding content to
-          Pigxel, you give us permission to host, process, display, and share it
-          as needed to provide the service and honor the visibility settings you
-          choose.
+          What you make in Pigxel is yours. We don’t claim ownership of your
+          tiles, drawings or animations.
         </p>
         <p>
-<<<<<<< HEAD
-          If you publish a tile on your profile, other people can view it.
-          Please review what you publish before sharing.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="AI Helper">
-        <p>
-          Pigxel includes an AI helper that generates and edits pixel art from
-          your text requests. It uses machine learning models run by third-party
-          providers (Google Gemini). Artwork the AI helper produces is
-          AI-generated; results can be unexpected or inaccurate, and you decide
-          what to keep and are responsible for how you use it.
-        </p>
-        <p>
-          Every request is screened by an automated moderation service before it
-          reaches the model, and requests that break these rules are blocked.
-          The models also apply their own safety filters.
-        </p>
-        <p>You must not use the AI helper to create:</p>
-        <ul>
-          <li>
-            sexual or sexually suggestive content, or any content involving
-            minors in a sexual or harmful way;
-=======
           To run the Service we need permission to store, copy, process and show
           your content: for example to save it to Pigxel cloud, make thumbnails
           and versions, send it to our AI providers when you ask the AI helper
@@ -131,13 +87,35 @@ export default function Terms() {
 
       <LegalSection title="5. The AI helper">
         <p>
-          The AI helper can draw, edit and animate with you. Its results come
-          from machine learning models run by third parties, can be unexpected
-          or wrong, and may look like existing work. You decide what to keep and
-          are responsible for how you use it. Don’t ask it for anything that
-          breaks these terms or the law. AI features have usage limits that
-          depend on your plan.
+          The AI helper generates and edits pixel art from your text requests.
+          It is part of the paid plans and uses machine learning models run by
+          third parties (Google Gemini). Artwork it produces is AI-generated:
+          its results can be unexpected or wrong, and may look like existing
+          work. You decide what to keep and are responsible for how you use it.
+          Each plan includes a monthly number of AI tokens.
         </p>
+        <p>
+          Every request is screened by an automated moderation service before it
+          reaches the model, and requests that break these rules are blocked.
+          The models also apply their own safety filters.
+        </p>
+        <p>You must not use the AI helper to create:</p>
+        <ul>
+          <li>
+            sexual or sexually suggestive content, or any content involving
+            minors in a sexual or harmful way;
+          </li>
+          <li>
+            depictions of real, identifiable people, deepfakes, or face swaps;
+          </li>
+          <li>
+            content that copies trademarks, logos, or copyrighted characters you
+            don’t have rights to;
+          </li>
+          <li>hateful, harassing, violent, extremist, or self-harm content;</li>
+          <li>anything illegal, or meant to deceive or defraud others.</li>
+        </ul>
+        <p>We may limit or suspend AI access for accounts that misuse it.</p>
       </LegalSection>
 
       <LegalSection title="6. What you mustn’t do">
@@ -155,30 +133,21 @@ export default function Terms() {
             Fake engagement: buy, trade or automate likes, follows, views,
             downloads or comments, use several accounts to boost your own art,
             or post spam.
->>>>>>> origin/dev
           </li>
           <li>
-            depictions of real, identifiable people, deepfakes, or face swaps;
+            Try to break, overload or get around the security or limits of the
+            Service, or access other people’s accounts or data.
           </li>
           <li>
-            content that copies trademarks, logos, or copyrighted characters you
-            don’t have rights to;
+            Scrape the Service, resell it, or use it to build a competing
+            product.
           </li>
-          <li>hateful, harassing, violent, extremist, or self-harm content;</li>
-          <li>anything illegal, or meant to deceive or defraud others.</li>
+          <li>Pretend to be someone else, including in your username.</li>
         </ul>
       </LegalSection>
 
       <LegalSection title="7. Moderation and reports">
         <p>
-<<<<<<< HEAD
-          We may remove such content and limit or suspend AI access for accounts
-          that misuse the AI helper.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="Subscriptions">
-=======
           Published art is checked automatically for sexual content before it
           appears; flagged art isn’t published and you’re told. Anyone can
           report art, comments or profiles, and a person reviews reports. We may
@@ -195,28 +164,14 @@ export default function Terms() {
       </LegalSection>
 
       <LegalSection title="8. Plans and payments">
->>>>>>> origin/dev
         <p>
-          Pigxel offers a free plan and paid plans. Prices, billing periods, and
-          what each plan includes are shown on the{" "}
-          <Link href="/pricing">Pricing</Link> page and at checkout.
+          Pigxel has a free plan and paid subscription plans, shown on the{" "}
+          <Link href="/pricing">Pricing</Link> page. Our order process is
+          conducted by our online reseller Creem (creem.io). Creem is the
+          Merchant of Record for all our orders and handles payments, taxes,
+          invoices and refunds.
         </p>
         <p>
-<<<<<<< HEAD
-          Our order process is conducted by our online reseller Creem
-          (creem.io). Creem is the Merchant of Record for all our orders and
-          handles payments, taxes, invoices, and refunds.
-        </p>
-        <p>
-          Paid subscriptions renew automatically unless canceled. You can cancel
-          anytime in Settings › Subscription; canceling stops future renewals
-          and your plan stays active until the end of the period you paid for.
-          Refunds are covered by our <Link href="/refunds">Refund Policy</Link>.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="Third-Party Services">
-=======
           Subscriptions renew automatically each billing period until you
           cancel. You can cancel anytime in Settings › Subscription; your plan
           then stays until the end of the period you paid for. The price shown
@@ -234,49 +189,13 @@ export default function Terms() {
       </LegalSection>
 
       <LegalSection title="9. Other services">
->>>>>>> origin/dev
         <p>
-          Pigxel may rely on third-party services for authentication, payments,
-          AI generation, analytics, hosting, and data storage, such as Google
-          sign-in and Google Drive. Those services may process information
-          according to their own terms and policies.
+          You can sign in with Google or Apple and save to Google Drive. Your
+          use of those services is covered by their own terms. We only reach the
+          files Pigxel creates or you open with it.
         </p>
       </LegalSection>
 
-<<<<<<< HEAD
-      <LegalSection title="Service Changes">
-        <p>
-          We may update, suspend, or discontinue parts of Pigxel as the product
-          evolves. We may also update these terms when needed. Continued use of
-          Pigxel after changes means you accept the updated terms.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="Ending Your Account">
-        <p>
-          You can stop using Pigxel anytime and ask us to delete your account by
-          emailing {LEGAL.email}. We may suspend or close accounts that break
-          these terms. Download anything you want to keep first: deleted work
-          can’t be recovered.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="Disclaimers and Liability">
-        <p>
-          Pigxel is provided on an as-is and as-available basis. We work to keep
-          the service reliable, but we do not guarantee uninterrupted access or
-          that AI results will meet your expectations.
-        </p>
-        <p>
-          To the maximum extent permitted by law, Pigxel is not liable for
-          indirect, incidental, special, consequential, or punitive damages
-          arising from your use of the service. Nothing in these terms limits
-          rights you have as a consumer that the law doesn’t let us limit.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="Contact">
-=======
       <LegalSection title="10. Changes and availability">
         <p>
           We keep improving Pigxel, so features can change, and the Service can
@@ -323,7 +242,6 @@ export default function Terms() {
       </LegalSection>
 
       <LegalSection title="14. Contact">
->>>>>>> origin/dev
         <ContactDetails />
       </LegalSection>
     </LegalPage>

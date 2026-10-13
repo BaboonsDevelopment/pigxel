@@ -79,49 +79,6 @@ function AssetPicker({ onPick }: PickerProps) {
   );
 
   return (
-<<<<<<< HEAD
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialog.current) dialog.current.close();
-      }}
-      aria-labelledby="asset-picker-title"
-      className="m-auto max-h-[min(40rem,calc(100dvh-2rem))] w-[min(36rem,calc(100vw-2rem))] flex-col rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40 open:flex"
-    >
-      <div className="flex items-center justify-between gap-4 px-5 pt-4">
-        <SectionTitle id="asset-picker-title">Insert asset</SectionTitle>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-      <p className="px-5 pt-1 text-sm text-muted-foreground">
-        It lands in the middle of the layer you’re drawing on, ready to move.
-        Animations bring their first frame.
-      </p>
-      {problem && (
-        <FormMessage tone="error" className="px-5 pt-2">
-          {problem}{" "}
-          {problem.includes("premium") && (
-            <Link
-              href="/pricing"
-              target="_blank"
-              className="underline underline-offset-2"
-            >
-              See plans
-            </Link>
-          )}
-        </FormMessage>
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
-=======
     <>
       <ModalHeader title="Insert Asset" />
       <DialogBody className="grid gap-4 py-5">
@@ -129,8 +86,20 @@ function AssetPicker({ onPick }: PickerProps) {
           It lands in the middle of the layer you’re drawing on, ready to move.
           Animations bring their first frame.
         </p>
-        {problem && <FormMessage tone="error">{problem}</FormMessage>}
->>>>>>> origin/dev
+        {problem && (
+          <FormMessage tone="error">
+            {problem}{" "}
+            {problem.includes("premium") && (
+              <Link
+                href="/pricing"
+                target="_blank"
+                className={textLinkClassName}
+              >
+                See plans
+              </Link>
+            )}
+          </FormMessage>
+        )}
         {listing.state === "loading" ? (
           <p className={status}>Loading…</p>
         ) : listing.state === "error" ? (
@@ -140,52 +109,6 @@ function AssetPicker({ onPick }: PickerProps) {
         ) : listing.assets.length === 0 ? (
           <p className={status}>No assets yet.</p>
         ) : (
-<<<<<<< HEAD
-          ASSET_CATEGORIES.map((category) => {
-            const assets = listing.assets.filter(
-              (a) => a.category === category.id,
-            );
-            if (!assets.length) return null;
-            return (
-              <section key={category.id} className="mb-4">
-                <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  {category.label}
-                </h3>
-                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                  {assets.map((asset) => (
-                    <li key={asset.id}>
-                      <button
-                        type="button"
-                        title={asset.name}
-                        disabled={picking !== null}
-                        aria-busy={picking === asset.id}
-                        onClick={() => void pick(asset)}
-                        className="flex w-full flex-col items-center gap-1 rounded-lg p-1.5 text-xs hover:bg-muted focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
-                      >
-                        <span className="relative flex aspect-square w-full items-center justify-center rounded-md bg-checker p-2">
-                          <AssetImage
-                            asset={asset}
-                            className={
-                              isLocked(asset) ? "w-full opacity-50" : "w-full"
-                            }
-                          />
-                          {asset.premium && (
-                            <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
-                              Premium
-                            </span>
-                          )}
-                        </span>
-                        <span className="w-full truncate text-center">
-                          {asset.name}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })
-=======
           <div>
             {ASSET_CATEGORIES.map((category) => {
               const assets = listing.assets.filter(
@@ -208,8 +131,18 @@ function AssetPicker({ onPick }: PickerProps) {
                           onClick={() => void pick(asset)}
                           className="flex w-full flex-col items-center gap-1 rounded-xl p-1.5 text-xs transition-colors hover:bg-muted/60 focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
                         >
-                          <span className="flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
-                            <AssetImage asset={asset} className="w-full" />
+                          <span className="relative flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
+                            <AssetImage
+                              asset={asset}
+                              className={
+                                isLocked(asset) ? "w-full opacity-50" : "w-full"
+                              }
+                            />
+                            {asset.premium && (
+                              <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+                                Premium
+                              </span>
+                            )}
                           </span>
                           <span className="w-full truncate text-center">
                             {asset.name}
@@ -222,7 +155,6 @@ function AssetPicker({ onPick }: PickerProps) {
               );
             })}
           </div>
->>>>>>> origin/dev
         )}
       </DialogBody>
       <DialogFooter className={`${MODAL_FOOTER} items-center`}>

@@ -268,7 +268,7 @@ export default function Privacy() {
       <LegalSection title="7. Who we share it with">
         <p>
           We use these service providers to run Pigxel. They process data on our
-          behalf and under our instructions, except Paddle, which acts as an
+          behalf and under our instructions, except Creem, which acts as an
           independent controller for payments:
         </p>
         <ul>
@@ -276,13 +276,6 @@ export default function Privacy() {
             <strong>Supabase Inc.</strong> (USA): accounts, sign-in, database
             and file storage.
           </li>
-<<<<<<< HEAD
-          <li>
-            Creem: payments, as Merchant of Record, and screening of AI prompts.
-          </li>
-          <li>Google and Apple: when you choose to sign in with them.</li>
-=======
->>>>>>> origin/dev
           <li>
             <strong>{LEGAL.hosting}</strong>: hosts the website and runs its
             servers, keeping short-lived request logs.
@@ -298,8 +291,9 @@ export default function Privacy() {
             choose it.
           </li>
           <li>
-            <strong>Paddle.com Market Ltd</strong> (UK): payments, tax and
-            invoices, as Merchant of Record.
+            <strong>Armitage Labs OÜ (Creem)</strong> (Estonia): payments, tax
+            and invoices, as Merchant of Record; and screening of the text of AI
+            requests, as our processor.
           </li>
           <li>
             <strong>YouTube</strong> (Google): tutorial videos. Nothing is sent
@@ -331,32 +325,12 @@ export default function Privacy() {
 
       <LegalSection title="9. Security">
         <p>
-<<<<<<< HEAD
-          We retain account, profile, saved artwork and associated chat records
-          while needed to provide your account and the features you use. We keep
-          a Drive connection token while the connection remains active;
-          disconnecting it removes the saved connection record. Revoking Google
-          authorization does not automatically remove information already saved
-          to your Pigxel profile or cloud storage.
-        </p>
-        <p>
-          To request deletion of your Pigxel account, Google-derived account
-          information, cloud artwork or chat history, contact us using the
-          details below and identify the account and data concerned. We may need
-          to verify account ownership before carrying out your request. We
-          delete data no longer needed for the service unless retention is
-          required for legal obligations, billing records, security or resolving
-          disputes. Backup copies may remain until they are replaced or expire
-          under the provider’s backup lifecycle. Data held independently by
-          Google or Creem is subject to their retention policies.
-=======
           Pigxel uses HTTPS for all communication. Authentication checks and
           database access rules restrict private records to authorized accounts;
           Drive refresh tokens are restricted to server-side access. These
           controls reduce unauthorized access, but no online service can
           guarantee complete security. If a breach puts your rights at risk,
           we’ll tell you and the authorities as the law requires.
->>>>>>> origin/dev
         </p>
       </LegalSection>
 
@@ -383,7 +357,7 @@ export default function Privacy() {
             <strong>Drive connection:</strong> until you disconnect Drive.
           </li>
           <li>
-            <strong>Billing records:</strong> kept by Paddle, and by us as long
+            <strong>Billing records:</strong> kept by Creem, and by us as long
             as tax and accounting law requires.
           </li>
           <li>

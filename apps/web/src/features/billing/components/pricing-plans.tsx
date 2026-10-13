@@ -125,36 +125,12 @@ export function PricingPlans({
                   features={tier.features}
                   highlighted={tier.highlighted}
                   price={
-<<<<<<< HEAD
                     <Price
                       amount={quote(tier.price[cycle]).formattedTotal}
                       period={`/ ${cycle}`}
                       comparison={comparison}
-                      note={
-                        cycle === "year"
-                          ? "Billed once per year"
-                          : "Billed monthly"
-                      }
+                      note={`Renews ${cycle === "year" ? "yearly" : "monthly"} until you cancel · Plus any tax`}
                     />
-=======
-                    quote ? (
-                      <Price
-                        amount={quote.formattedTotal}
-                        period={`/ ${cycle}`}
-                        comparison={comparison}
-                        note={`Renews ${cycle === "year" ? "yearly" : "monthly"} until you cancel · ${country ? "Tax included" : "Plus any tax"}`}
-                      />
-                    ) : failed ? (
-                      <Text as="span" tone="muted">
-                        Price unavailable
-                      </Text>
-                    ) : (
-                      <Skeleton
-                        aria-label="Loading price"
-                        className="h-10 w-32"
-                      />
-                    )
->>>>>>> origin/dev
                   }
                   action={
                     currentProductId === productId ? (

@@ -94,11 +94,11 @@ const THIRD_PARTY: Item[] = [
     lasts: "Set by YouTube",
   },
   {
-    name: "Paddle (paddle.com)",
+    name: "Creem (creem.io)",
     kind: "Cookies and storage",
     purpose:
-      "Shows prices and runs checkout on the Pricing page, including fraud prevention; see Paddle’s cookie policy.",
-    lasts: "Set by Paddle",
+      "Runs checkout and the billing portal on Creem’s own site, including fraud prevention, once you choose a plan; see Creem’s privacy policy.",
+    lasts: "Set by Creem",
   },
 ];
 

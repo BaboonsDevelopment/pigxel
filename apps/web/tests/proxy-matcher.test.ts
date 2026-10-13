@@ -13,7 +13,7 @@ describe("proxy matcher", () => {
     "/home",
     "/tiles/edit?id=t1",
     "/u/artist",
-    "/api/paddle/webhook",
+    "/api/creem/webhook",
   ])("runs on %s", (url) => expect(runsOn(url)).toBe(true));
 
   it.each([

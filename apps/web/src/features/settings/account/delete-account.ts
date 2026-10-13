@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { paddleApi } from "@/features/billing/paddle-api";
+import { creemApi } from "@/features/billing/creem";
 import {
   deleteDriveConnection,
   isDriveAvailable,
@@ -43,9 +43,7 @@ export async function deleteAccount(
     return { error: "We couldn’t check your subscription. Please try again." };
   try {
     for (const subscription of subscriptions ?? [])
-      await paddleApi().subscriptions.cancel(subscription.id, {
-        effectiveFrom: "immediately",
-      });
+      await creemApi.cancelNow(subscription.id);
   } catch (error) {
     console.error("Couldn’t cancel the subscription before deletion:", error);
     return {

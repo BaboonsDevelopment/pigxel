@@ -173,7 +173,6 @@ async function writeCloudTile(
         .insert(details)
         .select("id, user_id, name")
         .single();
-<<<<<<< HEAD
   if (error) {
     const limit = /cloud_tile_limit:(\d+)/.exec(error.message)?.[1];
     throw new CloudError(
@@ -182,8 +181,6 @@ async function writeCloudTile(
         : "Couldn’t save to Pigxel cloud. Try again.",
     );
   }
-=======
-  if (error) throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
   if (!data && tile.id && tile.version) {
     const { data: still } = await supabase
       .from("tiles")
@@ -199,7 +196,6 @@ async function writeCloudTile(
     if (!data && still) throw new CloudConflictError();
   }
   if (data && !tile.id) remember(data.id, details.updated_at);
->>>>>>> origin/dev
   if (!data)
     throw new CloudError(
       "This tile is no longer in Pigxel cloud. Save it again to keep it.",

@@ -51,14 +51,10 @@ export function LegalSection({
 export function ContactDetails() {
   return (
     <p>
-<<<<<<< HEAD
-      Questions about this policy? Contact us at{" "}
-=======
       {LEGAL.operator} is run by {LEGAL.legalName}
       {LEGAL.registrationNumber &&
         `, registration number ${LEGAL.registrationNumber}`}
       , {LEGAL.address}. Email:{" "}
->>>>>>> origin/dev
       <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
     </p>
   );

@@ -70,7 +70,7 @@ export default async function AccountDeletion({
         </p>
         <p>
           We keep only what the law requires, such as billing records held by
-          Paddle and for tax. Backup copies are overwritten on our providers’
+          Creem and for tax. Backup copies are overwritten on our providers’
           schedule. Files in your Google Drive and drafts in your browser stay
           under your control; delete them there.
         </p>
