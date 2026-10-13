@@ -1,10 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import { Checkbox, Radio } from "@pigxel/ui/components/choice";
-import { FormMessage } from "@pigxel/ui/components/field";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { Checkbox } from "@pigxel/ui/components/choice";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { opaqueHex } from "@/lib/palette/hsv";
 import {
   MAX_REDUCE,
@@ -15,7 +21,7 @@ import {
   reducedPalette,
   type ReduceDither,
 } from "@/lib/palette/reduce";
-import { NumberField } from "./number-field";
+import { SIZE_LABEL, SizeField } from "./size-controls";
 
 type Size = { w: number; h: number };
 
@@ -25,41 +31,60 @@ export type ReduceChoice = {
   replacePalette: boolean;
 };
 
-const PREVIEW = { w: 320, h: 180 };
+const PREVIEW = { w: 320, h: 160 };
 
-export default function ReduceColorsDialog({
-  size,
-  frames,
-  picture,
-  palette,
-  onApply,
-  onClose,
-}: {
+const option = (on: boolean) =>
+  cn(
+    "h-11 rounded-xl border px-3 text-sm transition-colors",
+    on
+      ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+      : "bg-background hover:bg-pink-base",
+  );
+
+type ReduceProps = {
   size: Size;
   frames: Uint8ClampedArray[];
   picture: Uint8ClampedArray;
   palette: string[];
   onApply: (choice: ReduceChoice) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export default function ReduceColorsDialog({
+  onClose,
+  ...props
+}: ReduceProps & { onClose: () => void }) {
+  return (
+    <Dialog
+      onClose={onClose}
+      size="sm"
+      portal
+      className="w-[min(30rem,calc(100vw-2rem))]"
+    >
+      <ReduceForm {...props} />
+    </Dialog>
+  );
+}
+
+function ReduceForm({ size, frames, picture, palette, onApply }: ReduceProps) {
+  const { close } = useDialog();
   const preview = useRef<HTMLCanvasElement>(null);
   const [target, setTarget] = useState<"count" | "palette">("count");
-  const [count, setCount] = useState(16);
+  const [count, setCount] = useState("16");
   const [dither, setDither] = useState<ReduceDither>("none");
   const [replacePalette, setReplacePalette] = useState(true);
-  useEffect(() => dialog.current?.showModal(), []);
 
+  const wanted = Number(count);
   const before = useMemo(() => countColors(frames), [frames]);
-  const valid = count >= MIN_REDUCE && count <= MAX_REDUCE;
+  const valid =
+    Number.isInteger(wanted) && wanted >= MIN_REDUCE && wanted <= MAX_REDUCE;
   const colors = useMemo(
     () =>
       target === "palette"
         ? [...new Set(palette.map(opaqueHex))]
         : valid
-          ? reducedPalette(frames, count)
+          ? reducedPalette(frames, wanted)
           : [],
-    [target, palette, frames, count, valid],
+    [target, palette, frames, wanted, valid],
   );
   const problem =
     target === "count" && !valid
@@ -97,45 +122,22 @@ export default function ReduceColorsDialog({
   }, [reduced, size, zoom]);
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="reduce-colors-title"
-      className="m-auto w-[min(34rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (problem) return;
+        onApply({
+          palette: colors,
+          dither,
+          replacePalette: target === "count" && replacePalette,
+        });
+        close();
+      }}
     >
-      <div className="flex items-start justify-between gap-4 border-b p-5">
-        <div>
-          <SectionTitle id="reduce-colors-title">Reduce colours</SectionTitle>
-          <Lead className="mt-1">
-            Every layer and frame gets only the colours you choose.
-          </Lead>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (problem) return;
-          onApply({
-            palette: colors,
-            dither,
-            replacePalette: target === "count" && replacePalette,
-          });
-          dialog.current?.close();
-        }}
-      >
-        <div className="flex min-h-24 justify-center overflow-hidden rounded-lg border bg-muted p-3">
+      <ModalHeader title="Reduce Colours" />
+      <DialogBody className="grid gap-5 py-5">
+        <div className="flex min-h-24 justify-center overflow-hidden rounded-xl border bg-background p-3">
           {reduced && (
             <div className="self-center bg-checker">
               <canvas
@@ -149,84 +151,85 @@ export default function ReduceColorsDialog({
           )}
         </div>
 
-        <fieldset className="space-y-3">
-          <legend className="mb-1 text-sm font-medium">Reduce to</legend>
-          <label className="flex items-center gap-3 text-sm">
-            <Radio
-              name="reduce-target"
-              className="mt-0"
-              checked={target === "count"}
-              onChange={() => setTarget("count")}
+        <fieldset>
+          <legend className={SIZE_LABEL}>Reduce to</legend>
+          <div role="radiogroup" className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={target === "count"}
+              onClick={() => setTarget("count")}
+              className={option(target === "count")}
+            >
+              Number of colours
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={target === "palette"}
+              onClick={() => setTarget("palette")}
+              className={option(target === "palette")}
+            >
+              Tile palette ({palette.length})
+            </button>
+          </div>
+        </fieldset>
+
+        {target === "count" && (
+          <div className="grid gap-3">
+            <SizeField
+              id="reduce-count"
+              label="Colours"
+              unit="colours"
+              value={count}
+              onChange={setCount}
             />
-            <span className="w-24">
-              <NumberField
-                id="reduce-count"
-                label="Colours"
-                value={count}
-                disabled={target !== "count"}
-                onChange={setCount}
-              />
-            </span>
-          </label>
-          {target === "count" && (
-            <label className="flex items-center gap-2 pl-7 text-sm">
+            <label className="flex items-center gap-2 text-sm">
               <Checkbox
                 checked={replacePalette}
                 onChange={(e) => setReplacePalette(e.target.checked)}
               />
               Make these colours the palette
             </label>
-          )}
-          <label className="flex items-center gap-3 text-sm">
-            <Radio
-              name="reduce-target"
-              className="mt-0"
-              checked={target === "palette"}
-              onChange={() => setTarget("palette")}
-            />
-            The tile’s palette ({palette.length}{" "}
-            {palette.length === 1 ? "colour" : "colours"})
-          </label>
-        </fieldset>
+          </div>
+        )}
 
-        <fieldset className="space-y-2">
-          <legend className="mb-1 text-sm font-medium">Dithering</legend>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
+        <fieldset>
+          <legend className={SIZE_LABEL}>Dithering</legend>
+          <div role="radiogroup" className="flex flex-wrap gap-2">
             {REDUCE_DITHERS.map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-2 text-sm">
-                <Radio
-                  name="reduce-dither"
-                  className="mt-0"
-                  checked={dither === value}
-                  onChange={() => setDither(value)}
-                />
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={dither === value}
+                onClick={() => setDither(value)}
+                className={option(dither === value)}
+              >
                 {label}
-              </label>
+              </button>
             ))}
           </div>
         </fieldset>
 
-        <FormMessage
-          tone={problem ? "error" : "muted"}
-          className="tabular-nums"
+        <p
+          className={cn(
+            "rounded-xl px-4 py-3 text-sm tabular-nums",
+            problem ? "bg-attention-soft" : "bg-success-soft",
+          )}
         >
           {problem ??
             `${before} ${before === 1 ? "colour" : "colours"} → ${colors.length}, in every layer and frame.`}
-        </FormMessage>
-
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => dialog.current?.close()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!!problem}>
-            Reduce
-          </Button>
-        </div>
-      </form>
-    </dialog>
+        </p>
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!!problem}>
+          Reduce
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }

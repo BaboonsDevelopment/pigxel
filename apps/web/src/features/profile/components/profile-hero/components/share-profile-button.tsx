@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LINK_COPIED, showSnackbar } from "@/components/ui/snackbar";
 import { BANNER_BUTTON } from "../constants";
 
 export function ShareProfileButton({
@@ -20,6 +21,7 @@ export function ShareProfileButton({
       else {
         await navigator.clipboard.writeText(url);
         setCopied(true);
+        showSnackbar(LINK_COPIED, { tone: "action" });
         setTimeout(() => setCopied(false), 1500);
       }
     } catch {}

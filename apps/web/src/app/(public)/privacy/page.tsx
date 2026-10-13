@@ -81,7 +81,7 @@ export default function Privacy() {
             an AI operation; saved chat history and AI usage records.
           </li>
           <li>
-            <strong>Payments:</strong> handled by Paddle. We receive your plan,
+            <strong>Payments:</strong> handled by Creem. We receive your plan,
             its status and billing country, never your card details.
           </li>
           <li>
@@ -246,6 +246,11 @@ export default function Privacy() {
           submitting personal information or confidential material you do not
           want processed by that service.
         </p>
+        <p>
+          Before any AI request runs, the text you typed is screened by Creem’s
+          moderation service, together with your account ID, to block requests
+          that break our content rules. Images are not sent for this check.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. Automated checks of published art">
@@ -263,7 +268,7 @@ export default function Privacy() {
       <LegalSection title="7. Who we share it with">
         <p>
           We use these service providers to run Pigxel. They process data on our
-          behalf and under our instructions, except Paddle, which acts as an
+          behalf and under our instructions, except Creem, which acts as an
           independent controller for payments:
         </p>
         <ul>
@@ -286,8 +291,9 @@ export default function Privacy() {
             choose it.
           </li>
           <li>
-            <strong>Paddle.com Market Ltd</strong> (UK): payments, tax and
-            invoices, as Merchant of Record.
+            <strong>Armitage Labs OÜ (Creem)</strong> (Estonia): payments, tax
+            and invoices, as Merchant of Record; and screening of the text of AI
+            requests, as our processor.
           </li>
           <li>
             <strong>YouTube</strong> (Google): tutorial videos. Nothing is sent
@@ -351,7 +357,7 @@ export default function Privacy() {
             <strong>Drive connection:</strong> until you disconnect Drive.
           </li>
           <li>
-            <strong>Billing records:</strong> kept by Paddle, and by us as long
+            <strong>Billing records:</strong> kept by Creem, and by us as long
             as tax and accounting law requires.
           </li>
           <li>

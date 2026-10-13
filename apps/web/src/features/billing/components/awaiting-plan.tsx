@@ -7,7 +7,7 @@ import { Text } from "@pigxel/ui/components/typography";
 const CHECK_EVERY = 2000;
 const GIVE_UP_AFTER = 30_000;
 
-/** Refreshes the page until Paddle's webhook has stored the new plan. */
+/** Refreshes the page until Creem's webhook has stored the new plan. */
 export function AwaitingPlan() {
   const router = useRouter();
   const [waiting, setWaiting] = useState(true);
@@ -28,7 +28,7 @@ export function AwaitingPlan() {
     <Text size="md" tone="muted" className="mt-4" role="status">
       {waiting
         ? "Finishing your subscription. This usually takes a few seconds…"
-        : "Paddle hasn’t confirmed your payment yet. If you were charged, your plan will appear in Settings → Subscription within a few minutes, and Paddle emails your receipt."}
+        : "Creem hasn’t confirmed your payment yet. If you were charged, your plan will appear in Settings → Subscription within a few minutes, and Creem emails your receipt."}
     </Text>
   );
 }

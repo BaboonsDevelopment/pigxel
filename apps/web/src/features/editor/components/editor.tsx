@@ -108,6 +108,10 @@ import { openTabAfter, readTabs } from "@/lib/pigxel-file/tabs";
 import { draftThumbnail, thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { showSnackbar } from "@/components/ui/snackbar";
+import { confirmClearCanvas } from "./clear-canvas-dialog";
+import { ImportImageDialog } from "./import-image-dialog";
+import { NewProjectDialog } from "./new-project-dialog";
 import { useProjectAccess } from "@/features/sharing/queries";
 import { useEditLock } from "@/features/sharing/use-edit-lock";
 import { loadArtDetails } from "@/features/explore/actions";
@@ -117,6 +121,8 @@ import {
   documentFromFrames,
   imageBaseName,
   isImageFile,
+  isSupportedFile,
+  UNSUPPORTED_FILE,
   pictureForTile,
   readPicture,
   sequenceOrder,
@@ -138,6 +144,8 @@ import {
 import {
   isStartKind,
   START_PANELS,
+  STORAGE_FULL_SHARE,
+  NO_EDIT_WARN_GAP,
   type Command,
   type EditorProps,
   type OpenSource,
@@ -286,12 +294,26 @@ export function Editor({
     if (openedTile) void markTileOpened(openedTile);
     else writeMark(userId, "opened", draft.id, true);
   }, [userId, draft.id, openedTile]);
+  useEffect(() => {
+    void navigator.storage
+      ?.estimate()
+      .then(({ usage = 0, quota = 0 }) => {
+        if (quota && usage / quota >= STORAGE_FULL_SHARE)
+          showSnackbar("Your storage is almost full.", {
+            tone: "warning",
+            action: { label: "Manage", onClick: () => router.push("/tiles") },
+          });
+      })
+      .catch(() => {});
+  }, [router]);
   const [opening, setOpening] = useState<OpenSource | null>(null);
   const [pointerPosition, setPointerPosition] = useState<{
     x: number;
     y: number;
   } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [creatingTile, setCreatingTile] = useState(false);
   const sheetInput = useRef<HTMLInputElement>(null);
   const [sheet, setSheet] = useState<{
     name: string;
@@ -324,9 +346,13 @@ export function Editor({
   const [publishing, setPublishing] = useState(false);
   const [publishingArt, setPublishingArt] = useState<PublishTile | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [sharing, setSharing] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [sharing, setSharing] = useState<{
+    id: string;
+    name: string;
+    thumbnail: string;
+    width: number;
+    height: number;
+  } | null>(null);
   const [explore, setExplore] = useState<{
     tileId: string;
     published: boolean;
@@ -451,7 +477,27 @@ export function Editor({
     [setPause, removed, heldBy],
   );
 
-  const sprite = useSprite(image, file.markDirty, kept?.sprite, removed);
+  const viewer = !!cloudTileId && access === "viewer";
+  const warnedAt = useRef(0);
+  const warnViewOnly = () => {
+    if (Date.now() - warnedAt.current < NO_EDIT_WARN_GAP) return;
+    warnedAt.current = Date.now();
+    showSnackbar("You don’t have permission to edit this project.", {
+      tone: "account",
+    });
+  };
+  const sprite = useSprite(
+    image,
+    file.markDirty,
+    kept?.sprite,
+    removed || viewer,
+    warnViewOnly,
+  );
+  const sharePreview = () => ({
+    thumbnail: thumbnailDataUrl(sprite.document()),
+    width: sprite.size.w,
+    height: sprite.size.h,
+  });
   useEffect(() => {
     if (historyReady.current) return;
     let live = true;
@@ -742,14 +788,12 @@ export function Editor({
     );
     if (area && (area.w < sprite.size.w || area.h < sprite.size.h))
       return cropTo(area);
-    await choiceDialog({
-      title: "Nothing to trim",
-      message: area
-        ? "The drawing already reaches every edge of the tile."
-        : "Nothing is drawn on the tile yet.",
-      choices: [],
-      cancelLabel: "OK",
-    });
+    showSnackbar(
+      area
+        ? "Nothing to trim: the drawing already reaches every edge."
+        : "Nothing to trim: the tile is empty.",
+      { tone: "warning" },
+    );
   };
 
   const keyOf = (id: ActionId) => keysLabel(keymap, id, mod);
@@ -783,6 +827,12 @@ export function Editor({
         label: "Delete",
         shortcut: keyOf("command:clearLayer"),
         onSelect: commands.clearLayer,
+      },
+      {
+        label: "Clear canvas…",
+        onSelect: async () => {
+          if (await confirmClearCanvas()) sprite.clearCanvas();
+        },
       },
     ],
     [{ label: "Insert asset…", onSelect: () => setInserting(true) }],
@@ -1297,8 +1347,8 @@ export function Editor({
     const all = [...e.dataTransfer.files];
     if (all.length > 1 && all.every(isImageFile)) {
       const open = await choiceDialog({
-        title: `Open ${all.length} pictures as frames?`,
-        message: `They become the frames of a new tile, in the order their names count up (${sequenceOrder(
+        title: "Open as Animation",
+        message: `${all.length} pictures become the frames of a new tile, in the order their names count up (${sequenceOrder(
           all,
         )
           .slice(0, 3)
@@ -1314,9 +1364,11 @@ export function Editor({
     const dropped = all[0];
     if (!dropped) return;
     const at = canvas.current?.tilePointAt(e.clientX, e.clientY) ?? null;
+    if (!isSupportedFile(dropped))
+      return showSnackbar(UNSUPPORTED_FILE, { tone: "warning" });
     if (!isImageFile(dropped)) {
       const open = await choiceDialog({
-        title: "Open this tile?",
+        title: "Open Tile",
         message: `“${dropped.name}” opens in the editor in place of this tile, which stays saved in My projects.`,
         choices: [{ value: "open", label: "Open" }],
       });
@@ -1324,10 +1376,10 @@ export function Editor({
       return;
     }
     const choice = await choiceDialog({
-      title: `Add “${dropped.name}”?`,
+      title: "Add Picture",
       message: sprite.canPaint
-        ? "Put the picture on this tile where you dropped it, to move into place, or open it as a new tile (this one stays saved in My projects)."
-        : "The active layer is hidden or locked, so the picture can only open as a new tile.",
+        ? `Put “${dropped.name}” on this tile where you dropped it, or open it as a new tile. This one stays saved in My projects.`
+        : `The active layer is hidden or locked, so “${dropped.name}” can only open as a new tile.`,
       choices: [
         { value: "new", label: "Open as new tile", variant: "secondary" },
         ...(sprite.canPaint
@@ -1336,9 +1388,15 @@ export function Editor({
       ],
     });
     if (choice === "new") return file.onFileChosen(dropped);
-    if (choice !== "place") return;
+    if (choice === "place") await placePicture(dropped, at);
+  };
+
+  const placePicture = async (
+    picked: File,
+    at: { x: number; y: number } | null,
+  ) => {
     try {
-      const { rgba, w, h } = await pictureForTile(dropped, sprite.size);
+      const { rgba, w, h } = await pictureForTile(picked, sprite.size);
       const centre = at ?? { x: sprite.size.w / 2, y: sprite.size.h / 2 };
       const placed = selection.paste({
         x: Math.round(centre.x - w / 2),
@@ -1350,12 +1408,7 @@ export function Editor({
       });
       if (placed) setTool("move");
     } catch {
-      await choiceDialog({
-        title: "Couldn’t read the picture",
-        message: `“${dropped.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
-        choices: [],
-        cancelLabel: "OK",
-      });
+      showSnackbar(`Couldn’t read “${picked.name}”. Try a PNG or GIF.`);
     }
   };
 
@@ -1555,7 +1608,6 @@ export function Editor({
       )}
       <EditorHeader
         hidden={canvasOnly}
-        draftId={draft.id}
         file={file}
         fileInput={fileInput}
         drive={drive}
@@ -1622,7 +1674,11 @@ export function Editor({
           owner && (cloudTile || !file.location)
             ? async () => {
                 if (cloudTile)
-                  return setSharing({ id: cloudTile.id, name: file.name });
+                  return setSharing({
+                    id: cloudTile.id,
+                    name: file.name,
+                    ...sharePreview(),
+                  });
                 const confirmed = await confirmDialog({
                   title: "Save to Pigxel cloud first?",
                   message: `Only cloud projects can be shared, so “${file.name}” will be saved to Pigxel cloud first.`,
@@ -1630,11 +1686,18 @@ export function Editor({
                 });
                 if (!confirmed) return;
                 const target = await file.saveToCloudFirst();
-                if (target) setSharing({ id: target.id, name: file.name });
+                if (target)
+                  setSharing({
+                    id: target.id,
+                    name: file.name,
+                    ...sharePreview(),
+                  });
               }
             : undefined
         }
         onImportSheet={() => sheetInput.current?.click()}
+        onImportImage={() => setImporting(true)}
+        onNewTile={() => setCreatingTile(true)}
         onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
         menus={[
@@ -1683,6 +1746,8 @@ export function Editor({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TileTabs
             hidden={canvasOnly}
+            onSave={file.saveBeforeLeaving}
+            onNew={() => setCreatingTile(true)}
             userId={userId}
             current={{
               id: draft.id,
@@ -1812,15 +1877,28 @@ export function Editor({
             const native = nativeSheet(await readPicture(chosen));
             setSheet({ name: imageBaseName(chosen.name), ...native });
           } catch {
-            await choiceDialog({
-              title: "Couldn’t read the picture",
-              message: `“${chosen.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
-              choices: [],
-              cancelLabel: "OK",
-            });
+            showSnackbar(`Couldn’t read “${chosen.name}”. Try a PNG or GIF.`);
           }
         }}
       />
+      {creatingTile && (
+        <NewProjectDialog
+          userId={userId}
+          from={draft.id}
+          drive={drive}
+          onClose={() => setCreatingTile(false)}
+        />
+      )}
+      {importing && (
+        <ImportImageDialog
+          onImport={(picked) =>
+            sprite.canPaint
+              ? void placePicture(picked, null)
+              : file.onFileChosen(picked)
+          }
+          onClose={() => setImporting(false)}
+        />
+      )}
       {sheet && (
         <ImportSheetDialog
           name={sheet.name}
@@ -2057,7 +2135,6 @@ export function Editor({
       {resizing && (
         <CanvasSizeDialog
           size={sprite.size}
-          picture={sprite.composite(["reference"])}
           onApply={(next, offset) => {
             selection.deselect();
             sprite.resize(next, offset);

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
+import { CheckboxField } from "@pigxel/ui/components/choice";
 import { SectionTitle } from "@pigxel/ui/components/typography";
 import {
   ASSET_CATEGORIES,
@@ -39,6 +40,7 @@ export default function PublishAssetDialog({
   const dialog = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(initialName.slice(0, ASSET_NAME_MAX));
   const [category, setCategory] = useState<AssetCategory>("items");
+  const [premium, setPremium] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "editing" });
   const id = assetIdFor(name);
 
@@ -60,6 +62,7 @@ export default function PublishAssetDialog({
         name: name.trim(),
         category,
         document: document(),
+        premium,
       });
       setStatus({ state: "done", id });
     } catch (e) {
@@ -85,7 +88,8 @@ export default function PublishAssetDialog({
       {status.state === "done" ? (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
-            “{name.trim()}” is on the Assets page for everyone.
+            “{name.trim()}” is on the Assets page
+            {premium ? ", for paid plans." : " for everyone."}
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <Link
@@ -142,6 +146,11 @@ export default function PublishAssetDialog({
               }))}
             />
           </Field>
+          <CheckboxField
+            label="Premium: only paid plans can use it"
+            checked={premium}
+            onChange={(e) => setPremium(e.target.checked)}
+          />
           {status.state === "replace" && (
             <FormMessage>
               An asset with the id “{status.id}” is there already. Publishing

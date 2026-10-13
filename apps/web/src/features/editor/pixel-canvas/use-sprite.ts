@@ -130,11 +130,16 @@ export function useSprite(
   onChange: () => void,
   kept?: KeptSprite,
   viewOnly = false,
+  onViewOnly?: () => void,
 ) {
   const viewing = useRef(viewOnly);
   useEffect(() => {
     viewing.current = viewOnly;
   }, [viewOnly]);
+  const blocked = useRef(onViewOnly);
+  useEffect(() => {
+    blocked.current = onViewOnly;
+  });
   const [background, setBackground] = useState(initial.background);
   const [size, setSize] = useState<Size>({
     w: initial.width,
@@ -407,6 +412,7 @@ export function useSprite(
   ) => {
     if (viewing.current) {
       restore(past.current.present, false);
+      blocked.current?.();
       return;
     }
     const mode = next.colorMode ?? colorMode;
@@ -591,6 +597,23 @@ export function useSprite(
         );
     }
     if (next.size) writeCels(layerId, next);
+  };
+
+  const clearCanvas = () => {
+    if (viewing.current) return blocked.current?.();
+    const ids = layerTree
+      .allLayers(tree)
+      .filter(
+        (layer) =>
+          layer.kind === "normal" && !layerTree.isLocked(tree, layer.id),
+      )
+      .map((layer) => layer.id);
+    for (const id of ids)
+      putCels(
+        id,
+        frames.map((frame) => [frame.id, null] as const),
+      );
+    finish();
   };
 
   const clearCel = () => {
@@ -1653,6 +1676,7 @@ export function useSprite(
       return true;
     },
     clearCel,
+    clearCanvas,
     resize,
     rescale,
     transformAll,

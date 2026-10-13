@@ -1,12 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
+import { useEffect, useState } from "react";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { SectionTitle } from "@pigxel/ui/components/typography";
+import { textLinkClassName } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { AssetImage } from "@/features/assets/components/asset-image";
-import { ASSET_CATEGORIES, type Asset } from "@/features/assets/assets";
+import {
+  ASSET_CATEGORIES,
+  isLocked,
+  type Asset,
+} from "@/features/assets/assets";
 import { listAssetsInBrowser } from "@/features/assets/publish";
 
 type Listing =
@@ -14,20 +26,28 @@ type Listing =
   | { state: "ready"; assets: Asset[] }
   | { state: "error" };
 
-export default function AssetPickerDialog({
-  onPick,
-  onClose,
-}: {
+type PickerProps = {
   onPick: (asset: Asset) => Promise<string | null>;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
+};
+
+export default function AssetPickerDialog({
+  onClose,
+  ...props
+}: PickerProps & { onClose: () => void }) {
+  return (
+    <Dialog onClose={onClose} size="lg" portal>
+      <AssetPicker {...props} />
+    </Dialog>
+  );
+}
+
+function AssetPicker({ onPick }: PickerProps) {
+  const { close } = useDialog();
   const [listing, setListing] = useState<Listing>({ state: "loading" });
   const [picking, setPicking] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    dialog.current?.showModal();
     let stale = false;
     listAssetsInBrowser().then(
       (assets) => !stale && setListing({ state: "ready", assets }),
@@ -39,102 +59,115 @@ export default function AssetPickerDialog({
   }, []);
 
   const pick = async (asset: Asset) => {
+    if (isLocked(asset)) {
+      setProblem(
+        `“${asset.name}” is a premium asset. Starter, Pro and Advanced plans unlock it.`,
+      );
+      return;
+    }
     setPicking(asset.id);
     setProblem(null);
     const error = await onPick(asset);
     setPicking(null);
     if (error) setProblem(error);
-    else dialog.current?.close();
+    else close();
   };
 
+  const status = cn(
+    "rounded-xl border bg-background px-4 py-6 text-center text-sm",
+    listing.state === "error" ? "text-destructive" : "text-muted-foreground",
+  );
+
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialog.current) dialog.current.close();
-      }}
-      aria-labelledby="asset-picker-title"
-      className="m-auto max-h-[min(40rem,calc(100dvh-2rem))] w-[min(36rem,calc(100vw-2rem))] flex-col rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40 open:flex"
-    >
-      <div className="flex items-center justify-between gap-4 px-5 pt-4">
-        <SectionTitle id="asset-picker-title">Insert asset</SectionTitle>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Close"
-          onClick={() => dialog.current?.close()}
-          className="text-lg leading-none"
-        >
-          ×
-        </Button>
-      </div>
-      <p className="px-5 pt-1 text-sm text-muted-foreground">
-        It lands in the middle of the layer you’re drawing on, ready to move.
-        Animations bring their first frame.
-      </p>
-      {problem && (
-        <FormMessage tone="error" className="px-5 pt-2">
-          {problem}
-        </FormMessage>
-      )}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+    <>
+      <ModalHeader title="Insert Asset" />
+      <DialogBody className="grid gap-4 py-5">
+        <p className="-mb-1 text-sm text-muted-foreground">
+          It lands in the middle of the layer you’re drawing on, ready to move.
+          Animations bring their first frame.
+        </p>
+        {problem && (
+          <FormMessage tone="error">
+            {problem}{" "}
+            {problem.includes("premium") && (
+              <Link
+                href="/pricing"
+                target="_blank"
+                className={textLinkClassName}
+              >
+                See plans
+              </Link>
+            )}
+          </FormMessage>
+        )}
         {listing.state === "loading" ? (
-          <p className="py-6 text-sm text-muted-foreground">Loading…</p>
+          <p className={status}>Loading…</p>
         ) : listing.state === "error" ? (
-          <p className="py-6 text-sm text-destructive">
+          <p className={status}>
             Couldn’t load the assets. Close this and try again.
           </p>
         ) : listing.assets.length === 0 ? (
-          <p className="py-6 text-sm text-muted-foreground">No assets yet.</p>
+          <p className={status}>No assets yet.</p>
         ) : (
-          ASSET_CATEGORIES.map((category) => {
-            const assets = listing.assets.filter(
-              (a) => a.category === category.id,
-            );
-            if (!assets.length) return null;
-            return (
-              <section key={category.id} className="mb-4">
-                <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                  {category.label}
-                </h3>
-                <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                  {assets.map((asset) => (
-                    <li key={asset.id}>
-                      <button
-                        type="button"
-                        title={asset.name}
-                        disabled={picking !== null}
-                        aria-busy={picking === asset.id}
-                        onClick={() => void pick(asset)}
-                        className="flex w-full flex-col items-center gap-1 rounded-lg p-1.5 text-xs hover:bg-muted focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
-                      >
-                        <span className="flex aspect-square w-full items-center justify-center rounded-md bg-checker p-2">
-                          <AssetImage asset={asset} className="w-full" />
-                        </span>
-                        <span className="w-full truncate text-center">
-                          {asset.name}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })
+          <div>
+            {ASSET_CATEGORIES.map((category) => {
+              const assets = listing.assets.filter(
+                (a) => a.category === category.id,
+              );
+              if (!assets.length) return null;
+              return (
+                <section key={category.id} className="mb-4 last:mb-0">
+                  <h3 className="mb-2 text-sm font-semibold">
+                    {category.label}
+                  </h3>
+                  <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {assets.map((asset) => (
+                      <li key={asset.id}>
+                        <button
+                          type="button"
+                          title={asset.name}
+                          disabled={picking !== null}
+                          aria-busy={picking === asset.id}
+                          onClick={() => void pick(asset)}
+                          className="flex w-full flex-col items-center gap-1 rounded-xl p-1.5 text-xs transition-colors hover:bg-muted/60 focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
+                        >
+                          <span className="relative flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
+                            <AssetImage
+                              asset={asset}
+                              className={
+                                isLocked(asset) ? "w-full opacity-50" : "w-full"
+                              }
+                            />
+                            {asset.premium && (
+                              <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+                                Premium
+                              </span>
+                            )}
+                          </span>
+                          <span className="w-full truncate text-center">
+                            {asset.name}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
         )}
-      </div>
-      <p className="border-t px-5 py-3 text-xs text-muted-foreground">
-        Palettes are in the colour panel’s Load… menu.{" "}
-        <Link
-          href="/assets"
-          target="_blank"
-          className="underline underline-offset-2"
-        >
-          Browse all assets
-        </Link>
-      </p>
-    </dialog>
+      </DialogBody>
+      <DialogFooter className={`${MODAL_FOOTER} items-center`}>
+        <p className="mr-auto text-xs text-muted-foreground">
+          Palettes are in the colour panel’s Load… menu.{" "}
+          <Link href="/assets" target="_blank" className={textLinkClassName}>
+            Browse all assets
+          </Link>
+        </p>
+        <ModalButton variant="secondary" onClick={close}>
+          Close
+        </ModalButton>
+      </DialogFooter>
+    </>
   );
 }

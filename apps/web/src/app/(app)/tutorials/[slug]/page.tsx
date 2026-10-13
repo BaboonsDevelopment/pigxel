@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { buttonVariants } from "@pigxel/ui/components/button";
+import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
 import {
   Heading,
@@ -13,6 +15,7 @@ import { StartGuideButton } from "@/features/tutorials/components/start-guide-bu
 import { TutorialVideo } from "@/features/tutorials/components/tutorial-video";
 import { findAsset } from "@/features/assets/server";
 import { requireUser } from "@/lib/auth/session";
+import { hasPremiumAccess } from "@/features/billing/server";
 import { findTutorial } from "@/features/tutorials/tutorials";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +31,10 @@ export default async function TutorialPage({ params }: Props) {
   const tutorial = findTutorial((await params).slug);
   if (!tutorial) notFound();
   const { practice } = tutorial;
-  const [user, asset] = await Promise.all([
-    requireUser(),
-    practice.asset ? findAsset(practice.asset) : null,
-  ]);
+  const user = await requireUser();
+  const locked = !!tutorial.premium && !(await hasPremiumAccess(user));
+  const asset =
+    practice.asset && !locked ? await findAsset(practice.asset) : null;
 
   return (
     <ScaledPage>
@@ -44,6 +47,11 @@ export default async function TutorialPage({ params }: Props) {
       <Text size="xs" tone="muted" className="mt-1 font-mono">
         {tutorial.level} · {tutorial.minutes} min · {tutorial.steps.length}{" "}
         steps
+        {tutorial.premium && (
+          <Badge tone="primary" className="ml-2 align-middle">
+            Premium
+          </Badge>
+        )}
       </Text>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -63,11 +71,27 @@ export default async function TutorialPage({ params }: Props) {
             tool, and steps tick off by themselves as you do them.
           </Text>
           <div className="mt-4">
-            <StartGuideButton
-              userId={user.id}
-              slug={tutorial.slug}
-              asset={asset}
-            />
+            {locked ? (
+              <div className="rounded-lg bg-white/70 p-4">
+                <p className="font-semibold">A premium tutorial</p>
+                <Text size="sm" tone="muted" className="mt-1">
+                  Starter, Pro and Advanced plans unlock every premium tutorial
+                  and asset, including the practice sprite for this one.
+                </Text>
+                <Link
+                  href="/pricing"
+                  className={buttonVariants({ className: "mt-3 w-full" })}
+                >
+                  See plans
+                </Link>
+              </div>
+            ) : (
+              <StartGuideButton
+                userId={user.id}
+                slug={tutorial.slug}
+                asset={asset}
+              />
+            )}
           </div>
           <ol className="mt-5 space-y-2.5">
             {tutorial.steps.map((step, i) => (

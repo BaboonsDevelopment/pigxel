@@ -18,6 +18,7 @@ import {
   stopSharing,
 } from "./actions";
 import type { LinkAccess, ProjectSharing, ShareRole } from "./sharing";
+import { showSuccess } from "@/components/ui/snackbar";
 
 export const sharingKey = (tileId: string) => ["sharing", tileId] as const;
 
@@ -63,6 +64,7 @@ export function useProjectSharing(tileId: string) {
     mutationFn: ({ username, role }: { username: string; role: ShareRole }) =>
       ensure(inviteToProject(tileId, username, role)),
     onMutate: () => setError(null),
+    onSuccess: () => showSuccess("Invitation sent!"),
     onError: fail,
     onSettled: settle,
   });

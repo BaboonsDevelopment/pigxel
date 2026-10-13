@@ -14,6 +14,7 @@ vi.mock("next/font/google", () => ({
   Pixelify_Sans: () => ({ className: "" }),
   Manrope: () => ({ className: "" }),
   Inter: () => ({ className: "" }),
+  Madimi_One: () => ({ className: "" }),
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
@@ -31,7 +32,10 @@ vi.mock("@/features/feedback/server", () => ({
   listFeedback: mocks.listFeedback,
   countFeedback: mocks.countFeedback,
 }));
-vi.mock("@/features/assets/server", () => ({ listAssets: mocks.listAssets }));
+vi.mock("@/features/assets/server", () => ({
+  listAssets: mocks.listAssets,
+  countPremiumAssets: async () => 0,
+}));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
   countPublicTilesByTag: async () => ({}),

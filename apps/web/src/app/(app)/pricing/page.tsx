@@ -1,28 +1,23 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { Page } from "@pigxel/ui/components/page";
 import { PageTransition } from "@/components/layout/page-transition";
 import { PricingPlans } from "@/features/billing/components/pricing-plans";
 import { getUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
 import { LEGAL } from "@/features/legal/legal";
-import {
-  countryFromHeaders,
-  paddleClientConfig,
-} from "@/features/billing/paddle";
 import { Heading, Text } from "@pigxel/ui/components/typography";
 
 export const metadata: Metadata = {
   title: "Pricing · Pigxel",
   description:
-    "Pigxel is free to use. Paid plans add more AI generations and cloud storage.",
+    "Pigxel is free to use. Paid plans add the AI helper, more cloud storage, and premium assets and tutorials.",
 };
 
 const FACTS: { text: string; href?: string }[] = [
   { text: "Cancel anytime" },
   { text: `Refunds within ${LEGAL.refundDays} days`, href: "/refunds" },
-  { text: "Paddle handles payments and VAT" },
+  { text: "Creem handles payments and VAT" },
   { text: "Your art stays yours" },
 ];
 
@@ -31,24 +26,24 @@ const POLICIES = [
   { href: "/privacy", label: "Privacy" },
 ];
 
-export default async function Pricing() {
-  const country = countryFromHeaders(await headers());
-  const { environment, token } = paddleClientConfig();
+export default async function Pricing({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
+  const { checkout } = await searchParams;
   const user = await getUser();
-  const customer = user && { id: user.id, email: user.email };
   const plan = user ? await getCurrentPlan(user.id) : null;
-  const currentPriceId =
-    plan && plan.name !== "Free" ? plan.priceId : undefined;
+  const currentProductId =
+    plan && plan.name !== "Free" ? plan.productId : undefined;
 
   return (
     <PageTransition>
       <Page className="flex min-h-full max-w-6xl flex-col pt-6 pb-5 md:pt-6 lg:[@media(max-height:820px)]:pt-3 lg:[@media(max-height:740px)]:pb-3">
         <PricingPlans
-          environment={environment}
-          token={token}
-          country={country}
-          customer={customer ?? undefined}
-          currentPriceId={currentPriceId}
+          signedIn={!!user}
+          currentProductId={currentProductId}
+          checkoutFailed={checkout === "error"}
           heading={
             <div>
               <Heading
@@ -62,8 +57,8 @@ export default async function Pricing() {
                 tone="muted"
                 className="mt-2 lg:[@media(max-height:740px)]:hidden"
               >
-                Every drawing tool is free. Paid plans add more AI and more room
-                for your art.
+                Every drawing tool is free. Paid plans add the AI helper and
+                more room for your art.
               </Text>
             </div>
           }

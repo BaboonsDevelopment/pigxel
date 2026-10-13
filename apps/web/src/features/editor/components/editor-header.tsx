@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useRef, type RefObject } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import {
@@ -13,7 +12,6 @@ import { cn } from "@pigxel/ui/lib/utils";
 import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
-import { newTileUrl } from "@/lib/pigxel-file/open-tile";
 import type { OpenSource } from "../constants";
 import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
@@ -26,7 +24,6 @@ import type { Playback } from "../timeline/use-playback";
 
 export function EditorHeader({
   hidden,
-  draftId,
   file,
   fileInput,
   drive,
@@ -43,13 +40,14 @@ export function EditorHeader({
   renameLocked = false,
   explorePublished = false,
   onImportSheet,
+  onImportImage,
+  onNewTile,
   onTilemap,
   keyOf,
   menus,
   afterMenus = [],
 }: {
   hidden?: boolean;
-  draftId: string;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
   drive: DriveStatus;
@@ -66,12 +64,13 @@ export function EditorHeader({
   renameLocked?: boolean;
   explorePublished?: boolean;
   onImportSheet: () => void;
+  onImportImage: () => void;
+  onNewTile: () => void;
   onTilemap: (convert: boolean) => void;
   keyOf: (id: ActionId) => string | undefined;
   menus: { label: string; sections: MenuSections }[];
   afterMenus?: { label: string; sections: MenuSections }[];
 }) {
-  const router = useRouter();
   const framesInput = useRef<HTMLInputElement>(null);
 
   return (
@@ -96,7 +95,7 @@ export function EditorHeader({
           [
             {
               label: "New tile…",
-              onSelect: () => router.push(newTileUrl(draftId)),
+              onSelect: onNewTile,
             },
             {
               label: "Open from your computer…",
@@ -133,6 +132,7 @@ export function EditorHeader({
               label: "Import",
               submenu: [
                 [
+                  { label: "Image…", onSelect: onImportImage },
                   {
                     label: "Pictures as frames…",
                     onSelect: () => framesInput.current?.click(),

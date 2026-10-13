@@ -2,7 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import {
   ASSET_COLUMNS,
-  toAsset,
+  toAssets,
   type Asset,
   type AssetCategory,
   type AssetRow,
@@ -22,7 +22,10 @@ export async function listAssets(
     .limit(limit)
     .returns<AssetRow[]>();
   if (error) throw new Error(`Couldn’t load assets: ${error.message}`);
-  return { assets: data.map(toAsset), total: count ?? data.length };
+  return {
+    assets: await toAssets(supabase, data),
+    total: count ?? data.length,
+  };
 }
 
 export async function findAsset(
@@ -36,8 +39,18 @@ export async function findAsset(
       .select(ASSET_COLUMNS)
       .eq("id", id)
       .maybeSingle<AssetRow>();
-    return data ? toAsset(data) : null;
+    return data ? ((await toAssets(supabase, [data]))[0] ?? null) : null;
   } catch {
     return null;
   }
+}
+
+/** How many premium assets exist, so admins can import the premium set. */
+export async function countPremiumAssets(): Promise<number> {
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("assets")
+    .select("id", { count: "exact", head: true })
+    .eq("premium", true);
+  return count ?? 0;
 }

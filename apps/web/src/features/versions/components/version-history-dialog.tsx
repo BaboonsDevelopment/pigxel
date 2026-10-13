@@ -2,19 +2,16 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { editedAgo } from "@/features/tiles/components/projects-view/helpers";
 import { loadVersions, restoreVersion } from "../actions";
 import type { TileVersion } from "../versions";
+import { showSuccess, withLoading } from "@/components/ui/snackbar";
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-US", {
@@ -52,40 +49,44 @@ export function VersionHistoryDialog({
     if (!confirmed) return;
     setError(null);
     setRestoring(version.id);
-    const result = await restoreVersion(tileId, version.id);
+    const result = await withLoading("Restoring version…", () =>
+      restoreVersion(tileId, version.id),
+    );
     if (result.error) {
       setError(result.error);
       setRestoring(null);
       return;
     }
+    showSuccess("Version restored!");
     onRestored();
   };
 
   return (
     <Dialog onClose={onClose} size="md" portal>
-      <DialogHeader
-        title="Version history"
-        description="Pigxel cloud keeps a version of this tile every 10 minutes while it’s being edited, up to the last 50."
-      />
-      <DialogBody>
+      <ModalHeader title="Version History" />
+      <DialogBody className="grid gap-4 py-5">
+        <p className="-mb-1 text-sm text-muted-foreground">
+          Pigxel cloud keeps a version of this tile every 10 minutes while it’s
+          being edited, up to the last 50.
+        </p>
         {versions.isPending ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
             Loading…
           </p>
         ) : versions.isError ? (
           <FormMessage tone="error">{versions.error.message}</FormMessage>
         ) : versions.data.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
             No earlier versions yet. Keep editing and they’ll show up here.
           </p>
         ) : (
-          <ul className="-mx-2 grid gap-0.5">
+          <ul className="grid max-h-96 gap-1 overflow-y-auto rounded-xl border bg-background p-2">
             {versions.data.map((version) => (
               <li
                 key={version.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-secondary"
+                className="flex items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/60"
               >
-                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-checker">
+                <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-checker">
                   {version.thumbnail && (
                     <PixelImage
                       src={version.thumbnail}
@@ -104,29 +105,24 @@ export function VersionHistoryDialog({
                     × {version.height} px
                   </span>
                 </span>
-                <Button
-                  type="button"
-                  size="sm"
+                <ModalButton
                   variant="secondary"
                   disabled={restoring !== null}
                   onClick={() => void restore(version)}
+                  className="h-9 rounded-lg px-4 text-sm"
                 >
                   {restoring === version.id ? "Restoring…" : "Restore"}
-                </Button>
+                </ModalButton>
               </li>
             ))}
           </ul>
         )}
-        {error && (
-          <FormMessage tone="error" className="mt-3">
-            {error}
-          </FormMessage>
-        )}
+        {error && <FormMessage tone="error">{error}</FormMessage>}
       </DialogBody>
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onClose}>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={onClose}>
           Close
-        </Button>
+        </ModalButton>
       </DialogFooter>
     </Dialog>
   );

@@ -1,17 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { createLabel, deleteLabel, setTileLabels } from "../../../actions";
 import { LABEL_COLORS, LABEL_NAME_MAX, type Label } from "../../../labels";
 
@@ -102,13 +98,14 @@ export function LabelsDialog({
 
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader
-        title="Labels"
-        description={`Only you see labels. Use them to sort “${tile.name}” and find it with Filters.`}
-      />
-      <DialogBody className="grid gap-4">
+      <ModalHeader title="Labels" />
+      <DialogBody className="grid gap-5 py-5">
+        <p className="-mb-1 text-sm text-muted-foreground">
+          Only you see labels. Use them to sort “{tile.name}” and find it with
+          Filters.
+        </p>
         {labels.length > 0 ? (
-          <ul className="grid gap-0.5">
+          <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-xl border bg-pink-base p-2">
             {labels.map((label) => (
               <li key={label.id} className="group flex items-center gap-1">
                 <button
@@ -116,14 +113,14 @@ export function LabelsDialog({
                   role="checkbox"
                   aria-checked={chosen.has(label.id)}
                   onClick={() => toggle(label.id)}
-                  className="flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2 text-left text-sm transition-colors hover:bg-secondary"
+                  className="flex h-10 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors hover:bg-background"
                 >
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "flex size-4 shrink-0 items-center justify-center rounded-sm border",
+                      "flex size-5 shrink-0 items-center justify-center rounded-md border bg-background",
                       chosen.has(label.id) &&
-                        "border-primary bg-primary text-primary-foreground",
+                        "border-pink-strong bg-pink-strong text-white",
                     )}
                   >
                     {chosen.has(label.id) && (
@@ -141,7 +138,7 @@ export function LabelsDialog({
                   </span>
                   <span
                     aria-hidden="true"
-                    className="size-2.5 shrink-0 rounded-full"
+                    className="size-3 shrink-0 rounded-full"
                     style={{ background: label.color }}
                   />
                   <span className="truncate">{label.name}</span>
@@ -150,7 +147,7 @@ export function LabelsDialog({
                   type="button"
                   aria-label={`Delete the ${label.name} label`}
                   onClick={() => void remove(label)}
-                  className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-secondary hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+                  className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition hover:bg-background hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
                 >
                   <svg
                     aria-hidden="true"
@@ -169,7 +166,7 @@ export function LabelsDialog({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="rounded-xl border bg-pink-base px-4 py-5 text-center text-sm text-muted-foreground">
             No labels yet. Make one below, like “Client work” or “Ideas”.
           </p>
         )}
@@ -178,9 +175,9 @@ export function LabelsDialog({
             e.preventDefault();
             if (!busy) void add();
           }}
-          className="grid gap-2 border-t pt-4"
+          className="grid gap-2"
         >
-          <span className="text-xs font-medium">New label</span>
+          <span className="text-sm font-semibold">New label</span>
           <div className="flex gap-2">
             <Input
               aria-label="Label name"
@@ -188,19 +185,20 @@ export function LabelsDialog({
               maxLength={LABEL_NAME_MAX}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="h-12 rounded-xl px-4 text-base"
             />
-            <Button
+            <ModalButton
               type="submit"
               variant="secondary"
               disabled={busy || !name.trim()}
             >
               Add
-            </Button>
+            </ModalButton>
           </div>
           <div
             role="radiogroup"
             aria-label="Label color"
-            className="flex gap-1.5"
+            className="mt-1 flex gap-2"
           >
             {LABEL_COLORS.map((swatch) => (
               <button
@@ -211,8 +209,8 @@ export function LabelsDialog({
                 aria-label={swatch}
                 onClick={() => setColor(swatch)}
                 className={cn(
-                  "size-6 cursor-pointer rounded-full border border-black/5 transition-transform hover:scale-110",
-                  color === swatch && "ring-2 ring-primary ring-offset-2",
+                  "size-7 cursor-pointer rounded-full ring-1 ring-black/10 transition-transform hover:scale-110",
+                  color === swatch && "ring-2 ring-pink-strong ring-offset-2",
                 )}
                 style={{ background: swatch }}
               />
@@ -221,13 +219,13 @@ export function LabelsDialog({
         </form>
         {error && <FormMessage tone="error">{error}</FormMessage>}
       </DialogBody>
-      <DialogFooter>
-        <Button type="button" variant="secondary" onClick={onClose}>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={onClose}>
           Cancel
-        </Button>
-        <Button type="button" disabled={busy} onClick={() => void save()}>
+        </ModalButton>
+        <ModalButton disabled={busy} onClick={() => void save()}>
           {busy ? "Saving…" : "Save"}
-        </Button>
+        </ModalButton>
       </DialogFooter>
     </Dialog>
   );

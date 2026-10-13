@@ -49,14 +49,21 @@ import {
   fitted,
   imageBaseName,
   isImageFile,
+  isSupportedFile,
   pictureFromFile,
   sequenceName,
   tooLarge,
+  UNSUPPORTED_FILE,
 } from "@/lib/pigxel-file/import-image";
 import type { DecodedAnimation } from "@/lib/image/gif-decode";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { snapshotVersion } from "@/features/versions/actions";
 import { VERSION_EVERY_MS } from "@/features/versions/versions";
+import {
+  showSnackbar,
+  showSuccess,
+  withLoading,
+} from "@/components/ui/snackbar";
 
 type FileStatus = {
   tone: "info" | "error";
@@ -72,6 +79,9 @@ type Sync = "idle" | "saving" | "saved" | "retrying" | "failed" | "conflict";
 const AUTOSAVE_DELAY = 1500;
 const RETRY_DELAY = 3000;
 const AUTO_RETRIES = 3;
+const SAVE_FAILED = "Failed to save project.";
+const PROJECT_SAVED = "Project saved successfully!";
+const SAVING = "Saving project…";
 
 const isKnownError = (error: unknown): error is Error =>
   error instanceof PigxelFileError ||
@@ -127,6 +137,11 @@ export function useTileFile({
           text: "This browser won’t keep your tile between pages. Save it to keep it.",
         },
   );
+
+  useEffect(() => {
+    if (!canStoreDrafts(userId))
+      showSnackbar("Unsaved changes will be lost.", { tone: "warning" });
+  }, [userId]);
 
   useEffect(() => {
     latestRevision.current = revision;
@@ -225,9 +240,9 @@ export function useTileFile({
           const needsConnect =
             error instanceof DriveError && error.needsConnect;
           setFailures(tries);
-          setSync(
-            tries >= AUTO_RETRIES || needsConnect ? "failed" : "retrying",
-          );
+          const gaveUp = tries >= AUTO_RETRIES || needsConnect;
+          if (gaveUp) showSnackbar(SAVE_FAILED);
+          setSync(gaveUp ? "failed" : "retrying");
         }
       },
       sync === "retrying" ? RETRY_DELAY * failures : AUTOSAVE_DELAY,
@@ -241,12 +256,16 @@ export function useTileFile({
     setRevision((r) => r + 1);
   };
 
-  const run = async (action: () => Promise<void>) => {
+  const run = async (
+    action: () => Promise<void>,
+    failure = "Something went wrong. Please try again.",
+  ) => {
     setBusy(true);
     setStatus(null);
     try {
       await action();
     } catch (error) {
+      showSnackbar(failure);
       setStatus({
         tone: "error",
         text: isKnownError(error)
@@ -271,6 +290,8 @@ export function useTileFile({
 
   const onFileChosen = (file: File | undefined) => {
     if (!file) return;
+    if (!isSupportedFile(file))
+      return showSnackbar(UNSUPPORTED_FILE, { tone: "warning" });
     void run(async () => {
       if (!isImageFile(file))
         return onOpen(
@@ -330,7 +351,11 @@ export function useTileFile({
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        saved(await saveTo(target, location), savedRevision);
+        saved(
+          await withLoading(SAVING, () => saveTo(target, location)),
+          savedRevision,
+        );
+        showSuccess(PROJECT_SAVED);
       } catch (error) {
         setSync(
           error instanceof CloudConflictError
@@ -342,7 +367,7 @@ export function useTileFile({
         if (error instanceof CloudConflictError) return;
         throw error;
       }
-    });
+    }, SAVE_FAILED);
 
   const saveToCloudFirst = async () => {
     let cloud = null as CloudTile | null;
@@ -350,8 +375,9 @@ export function useTileFile({
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        const next = await saveTo("cloud", location);
+        const next = await withLoading(SAVING, () => saveTo("cloud", location));
         saved(next, savedRevision);
+        showSuccess(PROJECT_SAVED);
         if (next.kind === "cloud") cloud = next.tile;
       } catch (error) {
         setSync(
@@ -364,7 +390,7 @@ export function useTileFile({
         if (error instanceof CloudConflictError) return;
         throw error;
       }
-    });
+    }, SAVE_FAILED);
     return cloud;
   };
 
@@ -481,5 +507,22 @@ export function useTileFile({
     saveToCloudFirst,
     saveToDrive: () => saveNow("drive"),
     save,
+    saveBeforeLeaving: async () => {
+      if (!location) return true;
+      const savedRevision = latestRevision.current;
+      setSync("saving");
+      try {
+        saved(
+          await withLoading(SAVING, () => saveTo(location.kind, location)),
+          savedRevision,
+        );
+        showSuccess(PROJECT_SAVED);
+        return true;
+      } catch (error) {
+        setSync(error instanceof CloudConflictError ? "conflict" : "failed");
+        showSnackbar(SAVE_FAILED);
+        return false;
+      }
+    },
   };
 }

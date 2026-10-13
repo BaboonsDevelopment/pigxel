@@ -5,9 +5,11 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  DialogHeader,
   useDialog,
 } from "@pigxel/ui/components/dialog";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
+import { SizeField } from "../../components/size-controls";
 
 export function LinkCelsDialog({
   frameCount,
@@ -36,14 +38,11 @@ export function LinkCelsDialog({
     sourceIndex + 1 <= end;
   return (
     <Dialog onClose={onClose} size="sm" portal>
-      <DialogHeader
-        title="Link cels"
-        description={`The cel in frame ${sourceIndex + 1} will replace the cels in this range. Future edits to any linked cel will appear in all of them.`}
-      />
-      <DialogBody>
+      <ModalHeader title="Link Cels" className="bg-attention-soft" />
+      <DialogBody className="py-5">
         <form
           id="link-cels-form"
-          className="flex gap-3 text-sm"
+          className="grid gap-5"
           onSubmit={(event) => {
             event.preventDefault();
             if (!valid) return;
@@ -53,31 +52,29 @@ export function LinkCelsDialog({
             ).close();
           }}
         >
-          <label className="min-w-0 flex-1">
-            <span className="mb-1 block">From frame</span>
-            <input
-              type="number"
-              min={1}
-              max={frameCount}
+          <div className="grid grid-cols-2 gap-4">
+            <SizeField
+              id="link-from"
+              label="From frame"
+              unit=""
               value={from}
-              onChange={(event) => setFrom(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2"
+              onChange={setFrom}
             />
-          </label>
-          <label className="min-w-0 flex-1">
-            <span className="mb-1 block">To frame</span>
-            <input
-              type="number"
-              min={1}
-              max={frameCount}
+            <SizeField
+              id="link-to"
+              label="To frame"
+              unit=""
               value={to}
-              onChange={(event) => setTo(event.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2"
+              onChange={setTo}
             />
-          </label>
+          </div>
+          <p className="rounded-xl bg-attention-soft px-4 py-3 text-sm">
+            The cel in frame {sourceIndex + 1} will replace the cels in this
+            range. Future edits to any linked cel will appear in all of them.
+          </p>
         </form>
       </DialogBody>
-      <DialogFooter>
+      <DialogFooter className={MODAL_FOOTER}>
         <LinkButtons valid={valid} />
       </DialogFooter>
     </Dialog>
@@ -87,22 +84,13 @@ export function LinkCelsDialog({
 function LinkButtons({ valid }: { valid: boolean }) {
   const { close } = useDialog();
   return (
-    <div className="flex gap-2">
-      <button
-        type="button"
-        onClick={close}
-        className="rounded-md border px-3 py-1.5 text-sm"
-      >
+    <>
+      <ModalButton variant="secondary" onClick={close}>
         Cancel
-      </button>
-      <button
-        type="submit"
-        form="link-cels-form"
-        disabled={!valid}
-        className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-40"
-      >
+      </ModalButton>
+      <ModalButton type="submit" form="link-cels-form" disabled={!valid}>
         Link cels
-      </button>
-    </div>
+      </ModalButton>
+    </>
   );
 }

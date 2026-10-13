@@ -87,13 +87,35 @@ export default function Terms() {
 
       <LegalSection title="5. The AI helper">
         <p>
-          The AI helper can draw, edit and animate with you. Its results come
-          from machine learning models run by third parties, can be unexpected
-          or wrong, and may look like existing work. You decide what to keep and
-          are responsible for how you use it. Don’t ask it for anything that
-          breaks these terms or the law. AI features have usage limits that
-          depend on your plan.
+          The AI helper generates and edits pixel art from your text requests.
+          It is part of the paid plans and uses machine learning models run by
+          third parties (Google Gemini). Artwork it produces is AI-generated:
+          its results can be unexpected or wrong, and may look like existing
+          work. You decide what to keep and are responsible for how you use it.
+          Each plan includes a monthly number of AI tokens.
         </p>
+        <p>
+          Every request is screened by an automated moderation service before it
+          reaches the model, and requests that break these rules are blocked.
+          The models also apply their own safety filters.
+        </p>
+        <p>You must not use the AI helper to create:</p>
+        <ul>
+          <li>
+            sexual or sexually suggestive content, or any content involving
+            minors in a sexual or harmful way;
+          </li>
+          <li>
+            depictions of real, identifiable people, deepfakes, or face swaps;
+          </li>
+          <li>
+            content that copies trademarks, logos, or copyrighted characters you
+            don’t have rights to;
+          </li>
+          <li>hateful, harassing, violent, extremist, or self-harm content;</li>
+          <li>anything illegal, or meant to deceive or defraud others.</li>
+        </ul>
+        <p>We may limit or suspend AI access for accounts that misuse it.</p>
       </LegalSection>
 
       <LegalSection title="6. What you mustn’t do">
@@ -145,9 +167,9 @@ export default function Terms() {
         <p>
           Pigxel has a free plan and paid subscription plans, shown on the{" "}
           <Link href="/pricing">Pricing</Link> page. Our order process is
-          conducted by our online reseller Paddle.com. Paddle.com is the
-          Merchant of Record for all our orders. Paddle provides all customer
-          service inquiries and handles returns.
+          conducted by our online reseller Creem (creem.io). Creem is the
+          Merchant of Record for all our orders and handles payments, taxes,
+          invoices and refunds.
         </p>
         <p>
           Subscriptions renew automatically each billing period until you

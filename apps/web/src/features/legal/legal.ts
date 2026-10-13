@@ -6,12 +6,12 @@ export const LEGAL = {
   /** РНОКПП of the ФОП; shown once set. */
   registrationNumber: null as string | null,
   address: "Romanchuka 12, Lviv, Ukraine",
-  email: "valerii.inshyn@gmail.com",
+  email: "support@pigxel.studio",
   jurisdiction: "Ukraine",
   hosting: "Vercel Inc. (USA)",
   minAge: 16,
   refundDays: 14,
-  updated: "2026-10-10",
+  updated: "2026-10-13",
   draft: false,
 } as const;
 
@@ -20,7 +20,7 @@ export const LEGAL_VERSION = LEGAL.updated;
 
 /** What changed in this version, for people asked to accept it again. */
 export const LEGAL_CHANGES =
-  "They now explain sharing and remixing, the Assets license, moderation and appeals, how long we keep data and your rights, and Pigxel is now for people 16 and older.";
+  "They now explain sharing and remixing, the Assets license, moderation and appeals, how long we keep data and your rights, and Pigxel is now for people 16 and older. Payments now go through Creem, and the AI helper’s rules and moderation are spelled out.";
 
 /** Set while someone who ticked the boxes signs up with Google or Apple. */
 export const ACCEPT_COOKIE = "pigxel-accept";

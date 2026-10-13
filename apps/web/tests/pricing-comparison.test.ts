@@ -5,7 +5,7 @@ import {
 } from "@/features/billing/pricing-comparison";
 
 function quote(total: string, currencyCode = "USD"): PriceQuote {
-  return { total, currencyCode, formattedTotal: "Paddle-formatted price" };
+  return { total, currencyCode, formattedTotal: "formatted price" };
 }
 
 describe("annual price comparisons", () => {

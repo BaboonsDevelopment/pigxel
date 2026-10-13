@@ -27,7 +27,7 @@ export default async function Welcome() {
         </Heading>
         {paid ? (
           <Text size="md" tone="muted" className="mt-4">
-            Your plan is active, and Paddle is emailing your receipt.
+            Your plan is active, and Creem is emailing your receipt.
           </Text>
         ) : user ? (
           <AwaitingPlan />

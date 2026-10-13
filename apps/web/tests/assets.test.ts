@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   assetFileUrl,
+  isLocked,
   keepFrames,
   toAsset,
+  toAssets,
   type AssetRow,
 } from "@/features/assets/assets";
 import { assetIdFor, sheetPixels } from "@/features/assets/publish";
@@ -11,6 +13,7 @@ import {
   starterDocument,
   starterPixels,
 } from "@/features/assets/starter";
+import { PREMIUM_ASSETS } from "@/features/assets/premium";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
   flattenDocument,
@@ -82,6 +85,7 @@ describe("assets from the database", () => {
     file_path: "coin/1a2b.pigxel",
     sheet_path: "coin/3c4d.png",
     sort: 0,
+    premium: false,
   };
 
   it("read their files from the public bucket", () => {
@@ -91,6 +95,65 @@ describe("assets from the database", () => {
       /\/storage\/v1\/object\/public\/assets\/coin\/3c4d\.png$/,
     );
     expect(asset.frames).toBe(4);
+  });
+
+  const signer = (
+    items: { path: string; signedUrl: string; error: string | null }[],
+  ) => {
+    const createSignedUrls = vi.fn(async () => ({ data: items, error: null }));
+    const from = vi.fn(() => ({ createSignedUrls }));
+    return {
+      client: { storage: { from } } as unknown as Parameters<
+        typeof toAssets
+      >[0],
+      from,
+      createSignedUrls,
+    };
+  };
+
+  it("give paid plans short-lived links to premium files", async () => {
+    const knight = {
+      ...row,
+      id: "knight",
+      file_path: "knight/9f.pigxel",
+      premium: true,
+    };
+    const { client, from } = signer([
+      {
+        path: "knight/9f.pigxel",
+        signedUrl: "https://signed/knight",
+        error: null,
+      },
+    ]);
+    const [free, premium] = await toAssets(client, [row, knight]);
+    expect(from).toHaveBeenCalledWith("premium-assets");
+    expect(free!.fileUrl).toBe(assetFileUrl("coin/1a2b.pigxel"));
+    expect(premium).toMatchObject({
+      premium: true,
+      fileUrl: "https://signed/knight",
+    });
+    expect(isLocked(premium!)).toBe(false);
+  });
+
+  it("lock premium files the session can't read", async () => {
+    const knight = {
+      ...row,
+      id: "knight",
+      file_path: "knight/9f.pigxel",
+      premium: true,
+    };
+    const { client } = signer([
+      { path: "knight/9f.pigxel", signedUrl: "", error: "Object not found" },
+    ]);
+    const [premium] = await toAssets(client, [knight]);
+    expect(premium!.fileUrl).toBeNull();
+    expect(isLocked(premium!)).toBe(true);
+  });
+
+  it("don't ask storage when nothing is premium", async () => {
+    const { client, from } = signer([]);
+    await toAssets(client, [row]);
+    expect(from).not.toHaveBeenCalled();
   });
 
   it("can start a tile from their first frames only", () => {
@@ -147,6 +210,7 @@ describe("tutorials", () => {
     color: "#000000",
     frames: 1,
     painted: 0,
+    look: 0,
     framesDiffer: false,
     onion: 0,
     grid: 0,
@@ -159,9 +223,9 @@ describe("tutorials", () => {
   it("have unique slugs and practice tiles that exist", () => {
     const slugs = TUTORIALS.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
+    const ids = [...STARTER_ASSETS, ...PREMIUM_ASSETS].map((a) => a.id);
     for (const { practice } of TUTORIALS)
-      if (practice.asset)
-        expect(STARTER_ASSETS.map((a) => a.id)).toContain(practice.asset);
+      if (practice.asset) expect(ids).toContain(practice.asset);
   });
 
   it("steps that wait for a change aren't done when nothing changed", () => {
@@ -178,6 +242,16 @@ describe("tutorials", () => {
     expect(
       squash.done!({ ...state, frames: 2, framesDiffer: true }, state),
     ).toBe(true);
+  });
+
+  it("the shading guide notices recolours, not just new pixels", () => {
+    const shading = findTutorial("shading-highlights")!;
+    const shadows = shading.steps.find((s) => s.title === "Paint the shadows")!;
+    expect(shadows.done!(state, state)).toBe(false);
+    expect(shadows.done!({ ...state, look: 42 }, state)).toBe(true);
+    expect(shadows.done!({ ...state, tool: "eraser", look: 42 }, state)).toBe(
+      false,
+    );
   });
 
   it("the tileset guide waits for an asset to be inserted", () => {

@@ -20,6 +20,11 @@ import {
   useCloudTileActions,
 } from "../../../../tile-actions";
 import { ProjectCard } from "../../../project-card/project-card";
+import { draftThumbnail } from "@/lib/pigxel-file/thumbnail";
+import {
+  confirmDeleteProject,
+  DELETE_FOR_GOOD,
+} from "../../../delete-project-dialog";
 import { TileThumbnail } from "../../../tile-thumbnail";
 import { TRASH_DAYS } from "../../../../constants";
 import {
@@ -40,6 +45,7 @@ import { LabelsDialog } from "../labels-dialog";
 import { MoveDialog } from "../move-dialog";
 import { NewProjectCard } from "../new-project-card";
 import { RenameDialog } from "../rename-dialog";
+import { DuplicateDialog } from "../duplicate-dialog";
 import { SectionHeader } from "../section-header";
 import { LabelBadge, PinBadge, PublishedBadge } from "./badges";
 import { useLocalProjects } from "./use-local-projects";
@@ -127,6 +133,7 @@ function Grid({
   const [publishing, setPublishing] = useState<CloudTileSummary | null>(null);
   const [labelling, setLabelling] = useState<CloudTileSummary | null>(null);
   const [renaming, setRenaming] = useState<Project | null>(null);
+  const [duplicating, setDuplicating] = useState<Project | null>(null);
   const [downloading, setDownloading] = useState<Project | null>(null);
   const [sharing, setSharing] = useState<CloudTileSummary | null>(null);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -205,8 +212,16 @@ function Grid({
   };
   const deleteChosen = async () => {
     const local = chosen.length - chosenTiles.length;
-    const confirmed = await confirmDialog({
-      title: `Delete ${chosen.length === 1 ? "1 project" : `${chosen.length} projects`}?`,
+    const first = chosen[0];
+    const confirmed = await confirmDeleteProject({
+      title: chosen.length === 1 ? "Delete Project" : "Delete Projects",
+      name:
+        chosen.length === 1 ? (first?.name ?? "") : `${chosen.length} projects`,
+      thumbnail: !first
+        ? null
+        : first.kind === "cloud"
+          ? first.tile.thumbnail
+          : draftThumbnail(first.draft),
       message: [
         chosenTiles.length > 0 &&
           `${chosenTiles.length} from Pigxel cloud will move to Trash for ${TRASH_DAYS} days.`,
@@ -215,26 +230,28 @@ function Grid({
       ]
         .filter(Boolean)
         .join(" "),
-      confirmLabel: "Delete",
     });
     if (!confirmed) return;
     await actions.deleteMany(chosen).then(stopSelecting, () => {});
   };
 
   const forget = async (tile: CloudTileSummary) => {
-    const confirmed = await confirmDialog({
-      title: "Delete forever?",
-      message: `“${tile.name}” will be gone for good. This can’t be undone.`,
-      confirmLabel: "Delete forever",
+    const confirmed = await confirmDeleteProject({
+      name: tile.name,
+      thumbnail: tile.thumbnail,
+      size: tile,
+      message: DELETE_FOR_GOOD,
     });
     if (confirmed) actions.deleteForever([tile]);
   };
   const emptyTrash = async () => {
-    const confirmed = await confirmDialog({
-      title: "Empty Trash?",
-      message:
-        "Every project in Trash will be gone for good. This can’t be undone.",
+    const confirmed = await confirmDeleteProject({
+      title: "Empty Trash",
       confirmLabel: "Empty Trash",
+      name: "Trash",
+      detail: total === 1 ? "1 project" : `${total} projects`,
+      message:
+        "Are you sure you want to delete every project in Trash? This action cannot be undone.",
     });
     if (confirmed) actions.deleteForever(list.tiles, true);
   };
@@ -271,7 +288,7 @@ function Grid({
       onSelect: () => actions.togglePin(project, pinOf(project) === null),
     },
     { label: "Rename…", onSelect: () => setRenaming(project) },
-    { label: "Duplicate", onSelect: () => actions.duplicate(project) },
+    { label: "Duplicate…", onSelect: () => setDuplicating(project) },
     { label: "Download…", onSelect: () => setDownloading(project) },
   ];
   const archiveItem = (project: Project) => ({
@@ -547,6 +564,18 @@ function Grid({
           name={renaming.name}
           onRename={(name) => actions.rename(renaming, name)}
           onClose={() => setRenaming(null)}
+        />
+      )}
+      {duplicating && (
+        <DuplicateDialog
+          name={duplicating.name}
+          folders={folders}
+          folderId={folderId ?? null}
+          withFolder={duplicating.kind === "cloud"}
+          onDuplicate={(name, target) =>
+            actions.duplicate(duplicating, name, target)
+          }
+          onClose={() => setDuplicating(null)}
         />
       )}
       {selecting && (
