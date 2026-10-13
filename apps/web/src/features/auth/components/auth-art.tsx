@@ -3,14 +3,24 @@ import type { CSSProperties } from "react";
 import { WALL_COLUMNS } from "@/features/landing/art";
 import styles from "./auth-page.module.css";
 
-const SPEEDS = [70, 88, 62, 80, 74, 94, 66, 84, 78];
+const SPEEDS = [70, 88, 62, 80, 74, 94, 66, 84, 78, 90, 72];
 
-const COLUMNS = [...WALL_COLUMNS, ...WALL_COLUMNS.slice(0, 3).reverse()];
+// One column per speed, however many columns the landing wall has; repeats
+// run in reverse so neighbours don't look alike. Each column loops through
+// its cards twice, so one loop outlasts the panel's diagonal on big screens.
+const COLUMNS = SPEEDS.map((_, index) => {
+  const column = WALL_COLUMNS[index % WALL_COLUMNS.length] ?? [];
+  const cards = index < WALL_COLUMNS.length ? column : [...column].reverse();
+  return [...cards, ...cards];
+});
 
 export function AuthArt() {
   return (
     <div className={styles.art} aria-hidden="true">
-      <div className={styles.artPlane}>
+      <div
+        className={styles.artPlane}
+        style={{ "--columns": COLUMNS.length } as CSSProperties}
+      >
         {COLUMNS.map((column, index) => (
           <div
             key={index}

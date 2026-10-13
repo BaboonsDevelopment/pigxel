@@ -96,9 +96,12 @@
   top: 50%;
   left: 50%;
   display: grid;
-  grid-template-columns: repeat(9, 150px);
+  grid-template-columns: repeat(var(--columns), 150px);
   gap: 16px;
-  transform: translate(-50%, -50%) rotate(-28deg);
+  /* Columns drift by half their height, so only their first half is always
+     filled: centre the panel on it, a quarter of the way down. */
+  transform: translate(-50%, -25%) rotate(-28deg);
+  transform-origin: 50% 25%;
 }
 
 .artColumn {

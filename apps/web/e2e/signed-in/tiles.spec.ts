@@ -13,9 +13,9 @@ test("creates a tile in Pigxel cloud and opens it in the editor", async ({
   await expect(page.getByRole("textbox", { name: "File name" })).toHaveValue(
     name,
   );
-  await expect(page.getByRole("status")).toHaveText(
-    "All changes saved to Pigxel cloud",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Pigxel cloud" }),
+  ).toHaveText("All changes saved to Pigxel cloud");
   await expect(
     page.getByRole("button", { name: "Pen (Draw tools)" }),
   ).toHaveAttribute("aria-pressed", "true");
