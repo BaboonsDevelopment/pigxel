@@ -788,14 +788,12 @@ export function Editor({
     );
     if (area && (area.w < sprite.size.w || area.h < sprite.size.h))
       return cropTo(area);
-    await choiceDialog({
-      title: "Nothing to trim",
-      message: area
-        ? "The drawing already reaches every edge of the tile."
-        : "Nothing is drawn on the tile yet.",
-      choices: [],
-      cancelLabel: "OK",
-    });
+    showSnackbar(
+      area
+        ? "Nothing to trim: the drawing already reaches every edge."
+        : "Nothing to trim: the tile is empty.",
+      { tone: "warning" },
+    );
   };
 
   const keyOf = (id: ActionId) => keysLabel(keymap, id, mod);
@@ -1349,8 +1347,8 @@ export function Editor({
     const all = [...e.dataTransfer.files];
     if (all.length > 1 && all.every(isImageFile)) {
       const open = await choiceDialog({
-        title: `Open ${all.length} pictures as frames?`,
-        message: `They become the frames of a new tile, in the order their names count up (${sequenceOrder(
+        title: "Open as Animation",
+        message: `${all.length} pictures become the frames of a new tile, in the order their names count up (${sequenceOrder(
           all,
         )
           .slice(0, 3)
@@ -1370,7 +1368,7 @@ export function Editor({
       return showSnackbar(UNSUPPORTED_FILE, { tone: "warning" });
     if (!isImageFile(dropped)) {
       const open = await choiceDialog({
-        title: "Open this tile?",
+        title: "Open Tile",
         message: `“${dropped.name}” opens in the editor in place of this tile, which stays saved in My projects.`,
         choices: [{ value: "open", label: "Open" }],
       });
@@ -1378,10 +1376,10 @@ export function Editor({
       return;
     }
     const choice = await choiceDialog({
-      title: `Add “${dropped.name}”?`,
+      title: "Add Picture",
       message: sprite.canPaint
-        ? "Put the picture on this tile where you dropped it, to move into place, or open it as a new tile (this one stays saved in My projects)."
-        : "The active layer is hidden or locked, so the picture can only open as a new tile.",
+        ? `Put “${dropped.name}” on this tile where you dropped it, or open it as a new tile. This one stays saved in My projects.`
+        : `The active layer is hidden or locked, so “${dropped.name}” can only open as a new tile.`,
       choices: [
         { value: "new", label: "Open as new tile", variant: "secondary" },
         ...(sprite.canPaint
@@ -1410,12 +1408,7 @@ export function Editor({
       });
       if (placed) setTool("move");
     } catch {
-      await choiceDialog({
-        title: "Couldn’t read the picture",
-        message: `“${picked.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
-        choices: [],
-        cancelLabel: "OK",
-      });
+      showSnackbar(`Couldn’t read “${picked.name}”. Try a PNG or GIF.`);
     }
   };
 
@@ -1884,12 +1877,7 @@ export function Editor({
             const native = nativeSheet(await readPicture(chosen));
             setSheet({ name: imageBaseName(chosen.name), ...native });
           } catch {
-            await choiceDialog({
-              title: "Couldn’t read the picture",
-              message: `“${chosen.name}” isn’t a picture this browser can open. Try a PNG or GIF.`,
-              choices: [],
-              cancelLabel: "OK",
-            });
+            showSnackbar(`Couldn’t read “${chosen.name}”. Try a PNG or GIF.`);
           }
         }}
       />

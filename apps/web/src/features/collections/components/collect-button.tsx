@@ -12,8 +12,10 @@ import {
 import type { MyCollection } from "../collections";
 import { COLLECTION_NAME_MAX } from "../constants";
 import { showSuccess } from "@/components/ui/snackbar";
+import { modalButton } from "@/components/ui/modal-button";
+import { madimiOne } from "@/lib/fonts/madimi";
 
-const PANEL_WIDTH = 256;
+const PANEL_WIDTH = 288;
 const GUTTER = 8;
 
 export function CollectButton({
@@ -173,21 +175,26 @@ export function CollectButton({
             style={{ top: place.top, left: place.left, width: PANEL_WIDTH }}
             role="dialog"
             aria-label="Add to collection"
-            className="fixed z-50 rounded-lg border bg-popover p-1 text-xs shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
+            className="fixed z-50 overflow-hidden rounded-2xl border bg-popover text-sm shadow-lg animate-in fade-in slide-in-from-top-1 duration-150"
           >
-            <p className="px-2.5 pt-1.5 pb-1 text-[10px] text-muted-foreground">
-              Add to collection
+            <p
+              className={cn(
+                madimiOne.className,
+                "bg-pink-base px-4 py-3 text-lg text-undo-surface",
+              )}
+            >
+              Add to Collection
             </p>
             {collections === null ? (
               !error && (
-                <p className="px-2.5 py-2 text-muted-foreground">Loading…</p>
+                <p className="px-4 py-3 text-muted-foreground">Loading…</p>
               )
             ) : collections.length === 0 ? (
-              <p className="px-2.5 py-2 text-muted-foreground">
+              <p className="px-4 py-3 text-muted-foreground">
                 No collections yet. Make one for arts that go together.
               </p>
             ) : (
-              <ul className="max-h-56 overflow-y-auto">
+              <ul className="grid max-h-56 gap-0.5 overflow-y-auto p-2">
                 {collections.map((collection) => (
                   <li key={collection.id}>
                     <button
@@ -195,18 +202,18 @@ export function CollectButton({
                       role="checkbox"
                       aria-checked={chosen.has(collection.id)}
                       onClick={() => toggle(collection)}
-                      className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors hover:bg-secondary"
+                      className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60"
                     >
                       <span
                         aria-hidden="true"
                         className={cn(
-                          "flex size-3.5 shrink-0 items-center justify-center rounded-sm border",
+                          "flex size-5 shrink-0 items-center justify-center rounded-md border bg-background",
                           chosen.has(collection.id) &&
-                            "border-primary bg-primary text-primary-foreground",
+                            "border-pink-strong bg-pink-strong text-white",
                         )}
                       >
                         {chosen.has(collection.id) && (
-                          <svg viewBox="0 0 12 12" className="size-2.5">
+                          <svg viewBox="0 0 12 12" className="size-3">
                             <path
                               d="m2.5 6.2 2.3 2.3 4.7-5"
                               fill="none"
@@ -221,7 +228,7 @@ export function CollectButton({
                       <span className="min-w-0 flex-1 truncate font-medium">
                         {collection.name}
                       </span>
-                      <span className="text-[10px] text-muted-foreground tabular-nums">
+                      <span className="text-xs text-muted-foreground tabular-nums">
                         {collection.count +
                           (chosen.has(collection.id) === collection.has
                             ? 0
@@ -234,13 +241,13 @@ export function CollectButton({
                 ))}
               </ul>
             )}
-            {error && <p className="px-2.5 py-1.5 text-destructive">{error}</p>}
-            <div className="mt-1 border-t pt-1">
+            {error && <p className="px-4 py-2 text-destructive">{error}</p>}
+            <div className="border-t p-2">
               {name === null ? (
                 <button
                   type="button"
                   onClick={() => setName("")}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-primary transition-colors hover:bg-secondary"
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left font-medium text-pink-strong transition-colors hover:bg-muted/60"
                 >
                   <span aria-hidden="true">+</span> New collection
                 </button>
@@ -250,7 +257,7 @@ export function CollectButton({
                     e.preventDefault();
                     void create();
                   }}
-                  className="flex gap-1 p-1"
+                  className="flex gap-2"
                 >
                   <input
                     autoFocus
@@ -259,23 +266,26 @@ export function CollectButton({
                     maxLength={COLLECTION_NAME_MAX}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="h-7 min-w-0 flex-1 rounded-md border bg-background px-2 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
                   />
                   <button
                     type="submit"
                     disabled={!name.trim() || creating}
-                    className="h-7 cursor-pointer rounded-md bg-primary px-2.5 text-primary-foreground transition-opacity disabled:cursor-default disabled:opacity-50"
+                    className={modalButton(
+                      "primary",
+                      "h-10 rounded-xl px-4 text-sm",
+                    )}
                   >
                     {creating ? "…" : "Create"}
                   </button>
                 </form>
               )}
             </div>
-            <div className="flex justify-end gap-1 border-t px-1 pt-1.5 pb-0.5">
+            <div className="flex justify-end gap-2 border-t bg-pink-base px-3 py-3">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="h-7 cursor-pointer rounded-md px-2.5 transition-colors hover:bg-secondary"
+                className={modalButton("secondary", "h-10 px-4 text-sm")}
               >
                 Cancel
               </button>
@@ -283,7 +293,7 @@ export function CollectButton({
                 type="button"
                 disabled={!changed.length || saving}
                 onClick={() => void save()}
-                className="h-7 cursor-pointer rounded-md bg-primary px-3 text-primary-foreground transition-opacity disabled:cursor-default disabled:opacity-50"
+                className={modalButton("primary", "h-10 px-4 text-sm")}
               >
                 {saving ? "Saving…" : "Save"}
               </button>

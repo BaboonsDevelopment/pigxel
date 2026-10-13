@@ -1,19 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogFooter,
-  DialogHeader,
-} from "@pigxel/ui/components/dialog";
+import { Dialog, DialogBody, DialogFooter } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { Input, Textarea } from "@pigxel/ui/components/input";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { updateCollection } from "../actions";
 import type { Collection } from "../collections";
 import { COLLECTION_DESCRIPTION_MAX, COLLECTION_NAME_MAX } from "../constants";
 import { showSuccess } from "@/components/ui/snackbar";
+
+const LABEL = "mb-2 block text-sm font-semibold";
 
 export function CollectionDialog({
   collection,
@@ -40,67 +39,62 @@ export function CollectionDialog({
   };
 
   return (
-    <Dialog onClose={onClose} size="md" portal>
+    <Dialog onClose={onClose} size="sm" portal>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void save();
         }}
+        className="flex min-h-0 flex-col"
       >
-        <DialogHeader
-          title="Edit collection"
-          description="Everyone who opens the collection sees its name and description."
-        />
-        <DialogBody className="grid gap-4">
+        <ModalHeader title="Edit Collection" />
+        <DialogBody className="grid gap-5 py-5">
+          <p className="-mb-1 text-sm text-muted-foreground">
+            Everyone who opens the collection sees its name and description.
+          </p>
           <label className="block">
-            <span className="mb-1.5 block text-xs font-medium">Name</span>
+            <span className={LABEL}>Name</span>
             <Input
               value={name}
               maxLength={COLLECTION_NAME_MAX}
               required
               onChange={(e) => setName(e.target.value)}
+              className="h-12 rounded-xl px-4 text-base"
             />
           </label>
           <label className="block">
-            <span className="mb-1.5 flex justify-between text-xs font-medium">
+            <span className={cn(LABEL, "flex justify-between")}>
               Description
               <span className="font-normal text-muted-foreground tabular-nums">
                 {description.length}/{COLLECTION_DESCRIPTION_MAX}
               </span>
             </span>
             <Textarea
-              rows={4}
+              rows={3}
               maxLength={COLLECTION_DESCRIPTION_MAX}
               placeholder="What ties these arts together?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              className="rounded-xl px-4 py-3"
             />
           </label>
           {error && <FormMessage tone="error">{error}</FormMessage>}
         </DialogBody>
-        <DialogFooter className="items-center justify-between">
-          <Button
+        <DialogFooter className={cn(MODAL_FOOTER, "items-center")}>
+          <button
             type="button"
-            variant="ghost"
             disabled={saving}
             onClick={onDelete}
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            className="mr-auto text-xs text-destructive transition-colors hover:underline disabled:opacity-50"
           >
             Delete collection
-          </Button>
-          <span className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={saving}
-              onClick={onClose}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving || !name.trim()}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </span>
+          </button>
+          <ModalButton variant="secondary" disabled={saving} onClick={onClose}>
+            Cancel
+          </ModalButton>
+          <ModalButton type="submit" disabled={saving || !name.trim()}>
+            {saving ? "Saving…" : "Save"}
+          </ModalButton>
         </DialogFooter>
       </form>
     </Dialog>

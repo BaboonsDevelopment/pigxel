@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
-import { Radio } from "@pigxel/ui/components/choice";
-import { Lead, SectionTitle } from "@pigxel/ui/components/typography";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { FormMessage } from "@pigxel/ui/components/field";
+import { cn } from "@pigxel/ui/lib/utils";
+import { ModalButton } from "@/components/ui/modal-button";
+import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { MAX_MODIFY, type ModifyShape } from "../pixel-canvas/selection";
-import { NumberField } from "./number-field";
+import { SIZE_LABEL, SizeField } from "./size-controls";
 
 export type ModifyKind = "expand" | "contract" | "border" | "stroke";
 
@@ -14,12 +21,12 @@ const TEXT: Record<
   { title: string; lead: string; action: string }
 > = {
   expand: {
-    title: "Expand selection",
+    title: "Expand Selection",
     lead: "Grow the selection outward. Expand by 1, then fill it on a layer underneath, and what was selected gets an outline.",
     action: "Expand",
   },
   contract: {
-    title: "Contract selection",
+    title: "Contract Selection",
     lead: "Shrink the selection inward, away from its edge and the tile’s.",
     action: "Contract",
   },
@@ -29,98 +36,108 @@ const TEXT: Record<
     action: "Select border",
   },
   stroke: {
-    title: "Stroke selection",
+    title: "Stroke Selection",
     lead: "Draw a line of the primary colour along the inside of the selection’s edge.",
     action: "Stroke",
   },
 };
 
-export default function ModifySelectionDialog({
-  kind,
-  onApply,
-  onClose,
-}: {
+const SHAPES: { value: ModifyShape; label: string; hint: string }[] = [
+  {
+    value: "round",
+    label: "Round",
+    hint: "Measures straight across: thin, clean pixel-art lines.",
+  },
+  {
+    value: "square",
+    label: "Square",
+    hint: "Counts diagonals too: fuller lines and corners.",
+  },
+];
+
+type ModifyProps = {
   kind: ModifyKind;
   onApply: (by: number, shape: ModifyShape) => void;
-  onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [by, setBy] = useState(1);
+};
+
+export default function ModifySelectionDialog({
+  onClose,
+  ...props
+}: ModifyProps & { onClose: () => void }) {
+  return (
+    <Dialog onClose={onClose} size="sm" portal>
+      <ModifyForm {...props} />
+    </Dialog>
+  );
+}
+
+function ModifyForm({ kind, onApply }: ModifyProps) {
+  const { close } = useDialog();
+  const [by, setBy] = useState("1");
   const [shape, setShape] = useState<ModifyShape>("round");
-  useEffect(() => dialog.current?.showModal(), []);
   const text = TEXT[kind];
-  const valid = by >= 1 && by <= MAX_MODIFY;
+  const amount = Number(by);
+  const valid = Number.isInteger(amount) && amount >= 1 && amount <= MAX_MODIFY;
 
   return (
-    <dialog
-      ref={dialog}
-      onClose={onClose}
-      aria-labelledby="modify-selection-title"
-      className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40"
+    <form
+      className="flex min-h-0 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) return;
+        onApply(amount, shape);
+        close();
+      }}
     >
-      <form
-        className="space-y-5 p-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!valid) return;
-          onApply(by, shape);
-          dialog.current?.close();
-        }}
-      >
-        <div>
-          <SectionTitle id="modify-selection-title">{text.title}</SectionTitle>
-          <Lead className="mt-1">{text.lead}</Lead>
-        </div>
-        <div className="w-32">
-          <NumberField
-            id="modify-by"
-            label={`${kind === "stroke" ? "Width" : "By"}, px (1–${MAX_MODIFY})`}
-            value={by}
-            onChange={(n) => setBy(n)}
-          />
-        </div>
-        <fieldset className="space-y-2 text-sm">
-          <legend className="mb-1 font-medium">Shape</legend>
-          <label className="flex items-start gap-2">
-            <Radio
-              name="modify-shape"
-              checked={shape === "round"}
-              onChange={() => setShape("round")}
-            />
-            <span>
-              Round
-              <span className="block text-muted-foreground">
-                Measures straight across: thin, clean pixel-art lines.
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2">
-            <Radio
-              name="modify-shape"
-              checked={shape === "square"}
-              onChange={() => setShape("square")}
-            />
-            <span>
-              Square
-              <span className="block text-muted-foreground">
-                Counts diagonals too: fuller lines and corners.
-              </span>
-            </span>
-          </label>
+      <ModalHeader title={text.title} />
+      <DialogBody className="grid gap-5 py-5">
+        <p className="-mb-1 text-sm text-muted-foreground">{text.lead}</p>
+        <SizeField
+          id="modify-by"
+          label={kind === "stroke" ? "Width" : "By"}
+          unit="px"
+          value={by}
+          onChange={setBy}
+        />
+        <fieldset>
+          <legend className={SIZE_LABEL}>Shape</legend>
+          <div role="radiogroup" className="grid grid-cols-2 gap-2">
+            {SHAPES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={shape === value}
+                onClick={() => setShape(value)}
+                className={cn(
+                  "h-11 rounded-xl border px-3 text-sm transition-colors",
+                  shape === value
+                    ? "border-primary-soft bg-pastel-pink-soft font-semibold"
+                    : "bg-background hover:bg-pink-base",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {SHAPES.find((s) => s.value === shape)?.hint}
+          </p>
         </fieldset>
-        <div className="flex justify-end gap-2 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => dialog.current?.close()}
-          >
-            Cancel
-          </Button>
-          <Button type="submit" disabled={!valid}>
-            {text.action}
-          </Button>
-        </div>
-      </form>
-    </dialog>
+        {!valid && (
+          <FormMessage tone="error">
+            Use a whole number from 1 to {MAX_MODIFY} pixels.
+          </FormMessage>
+        )}
+      </DialogBody>
+      <DialogFooter className={MODAL_FOOTER}>
+        <ModalButton variant="secondary" onClick={close}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="submit" disabled={!valid}>
+          {text.action}
+        </ModalButton>
+      </DialogFooter>
+    </form>
   );
 }
