@@ -82,7 +82,7 @@ export function checkAsset(asset: AssetDef, pack: PackSource): Issue[] {
   const warn = (rule: string, message: string) =>
     issues.push({ level: "warning", rule, message });
   const frames = asset.clips.flatMap((clip) => clip.frames);
-  const tile = asset.category === "tiles";
+  const tile = asset.kind === "tile";
 
   const used = new Set<string>();
   for (const s of frames)

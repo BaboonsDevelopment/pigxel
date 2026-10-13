@@ -9,12 +9,16 @@ import {
 } from "@/lib/pigxel-file/format";
 import { createClient } from "@/lib/supabase/client";
 import {
+  ASSET_BLOCK_COLUMNS,
   ASSET_BUCKET,
   ASSET_COLUMNS,
   PREMIUM_ASSET_BUCKET,
+  toAssetBlock,
   toAssets,
   type Asset,
-  type AssetCategory,
+  type AssetBlock,
+  type AssetBlockRow,
+  type AssetKind,
   type AssetRow,
 } from "./assets";
 
@@ -31,6 +35,17 @@ export async function listAssetsInBrowser(): Promise<Asset[]> {
     .returns<AssetRow[]>();
   if (error || !data) throw new Error("Couldn’t load the assets.");
   return toAssets(supabase, data);
+}
+
+export async function listAssetBlocksInBrowser(): Promise<AssetBlock[]> {
+  const { data, error } = await createClient()
+    .from("asset_blocks")
+    .select(ASSET_BLOCK_COLUMNS)
+    .order("sort")
+    .order("name")
+    .returns<AssetBlockRow[]>();
+  if (error || !data) throw new Error("Couldn’t load the asset blocks.");
+  return data.map(toAssetBlock);
 }
 
 export async function assetExists(id: string): Promise<boolean> {
@@ -99,13 +114,15 @@ export async function publishAsset({
   id,
   name,
   category,
+  kind,
   document: doc,
   sort,
   premium = false,
 }: {
   id: string;
   name: string;
-  category: AssetCategory;
+  category: string;
+  kind: AssetKind;
   document: PigxelDocument;
   sort?: number;
   /** Paid plans only: the .pigxel file goes to the private bucket. */
@@ -148,6 +165,7 @@ export async function publishAsset({
     id,
     name,
     category,
+    kind,
     width: doc.width,
     height: doc.height,
     frame_count: doc.frames.length,

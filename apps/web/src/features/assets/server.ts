@@ -1,16 +1,19 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import {
+  ASSET_BLOCK_COLUMNS,
   ASSET_COLUMNS,
+  toAssetBlock,
   toAssets,
   type Asset,
-  type AssetCategory,
+  type AssetBlock,
+  type AssetBlockRow,
   type AssetRow,
 } from "./assets";
 
 /** Throws when the catalog can't be loaded. */
 export async function listAssets(
-  category: AssetCategory | null,
+  category: string | null,
   limit: number,
 ): Promise<{ assets: Asset[]; total: number }> {
   const supabase = await createClient();
@@ -26,6 +29,18 @@ export async function listAssets(
     assets: await toAssets(supabase, data),
     total: count ?? data.length,
   };
+}
+
+export async function listAssetBlocks(): Promise<AssetBlock[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("asset_blocks")
+    .select(ASSET_BLOCK_COLUMNS)
+    .order("sort")
+    .order("name")
+    .returns<AssetBlockRow[]>();
+  if (error) throw new Error(`Couldn’t load asset blocks: ${error.message}`);
+  return data.map(toAssetBlock);
 }
 
 export async function findAsset(

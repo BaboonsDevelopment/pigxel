@@ -8,15 +8,12 @@ import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { SectionTitle } from "@pigxel/ui/components/typography";
-import {
-  ASSET_CATEGORIES,
-  isAssetCategory,
-  type AssetCategory,
-} from "@/features/assets/assets";
+import type { AssetBlock } from "@/features/assets/assets";
 import {
   ASSET_NAME_MAX,
   assetIdFor,
   assetExists,
+  listAssetBlocksInBrowser,
   publishAsset,
 } from "@/features/assets/publish";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
@@ -39,17 +36,36 @@ export default function PublishAssetDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(initialName.slice(0, ASSET_NAME_MAX));
-  const [category, setCategory] = useState<AssetCategory>("items");
+  const [blocks, setBlocks] = useState<AssetBlock[] | null>(null);
+  const [category, setCategory] = useState("");
+  const [tile, setTile] = useState(false);
   const [premium, setPremium] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "editing" });
   const id = assetIdFor(name);
 
   useEffect(() => {
     dialog.current?.showModal();
+    let stale = false;
+    listAssetBlocksInBrowser().then(
+      (list) => {
+        if (stale) return;
+        setBlocks(list);
+        setCategory((list.find((b) => b.id === "items") ?? list[0])?.id ?? "");
+      },
+      () =>
+        !stale &&
+        setStatus({
+          state: "error",
+          message: "Couldn’t load the blocks. Close this and try again.",
+        }),
+    );
+    return () => {
+      stale = true;
+    };
   }, []);
 
   const publish = async () => {
-    if (!id) return;
+    if (!id || !category) return;
     setStatus({ state: "publishing" });
     try {
       const replacing = status.state === "replace" && status.id === id;
@@ -61,6 +77,7 @@ export default function PublishAssetDialog({
         id,
         name: name.trim(),
         category,
+        kind: tile ? "tile" : "sprite",
         document: document(),
         premium,
       });
@@ -132,20 +149,23 @@ export default function PublishAssetDialog({
               }}
             />
           </Field>
-          <Field label="Kind" htmlFor="asset-category">
+          <Field label="Block" htmlFor="asset-category">
             <EditorSelect
               id="asset-category"
               value={category}
-              onChange={(value) => {
-                if (isAssetCategory(value)) setCategory(value);
-              }}
+              onChange={setCategory}
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
-              options={ASSET_CATEGORIES.map((c) => ({
-                value: c.id,
-                label: c.label,
+              options={(blocks ?? []).map((b) => ({
+                value: b.id,
+                label: b.name,
               }))}
             />
           </Field>
+          <CheckboxField
+            label="Seamless tile: repeats edge to edge"
+            checked={tile}
+            onChange={(e) => setTile(e.target.checked)}
+          />
           <CheckboxField
             label="Premium: only paid plans can use it"
             checked={premium}
@@ -168,7 +188,9 @@ export default function PublishAssetDialog({
             >
               Cancel
             </Button>
-            <Button disabled={!id || status.state === "publishing"}>
+            <Button
+              disabled={!id || !category || status.state === "publishing"}
+            >
               {status.state === "publishing"
                 ? "Publishing…"
                 : status.state === "replace"
