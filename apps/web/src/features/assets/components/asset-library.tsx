@@ -9,7 +9,7 @@ import {
   Text,
 } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { Asset, AssetCategory } from "../assets";
+import { isLocked, type Asset, type AssetCategory } from "../assets";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
 
@@ -117,6 +117,15 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
               : "w-3/5 group-hover:-translate-y-1 group-hover:-rotate-3",
           )}
         />
+        {asset.premium && (
+          <Badge
+            tone="primary"
+            className="absolute top-2 left-2"
+            title={isLocked(asset) ? "Included in paid plans" : undefined}
+          >
+            Premium
+          </Badge>
+        )}
         {asset.frames > 1 && (
           <Badge tone="overlay" className="absolute top-2 right-2">
             Animated

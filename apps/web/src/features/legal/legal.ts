@@ -1,10 +1,8 @@
 export const LEGAL = {
   operator: "Pigxel",
-  address: "Romanchuka 12, Lviv, Ukraine",
-  email: "valerii.inshyn@gmail.com",
-  jurisdiction: "Ukraine",
+  email: "support@pigxel.studio",
   refundDays: 14,
-  updated: "2026-10-03",
+  updated: "2026-10-13",
   draft: false,
 } as const;
 

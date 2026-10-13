@@ -49,7 +49,7 @@ export function LegalSection({
 export function ContactDetails() {
   return (
     <p>
-      {LEGAL.operator}, {LEGAL.address}. Email:{" "}
+      Questions about this policy? Contact us at{" "}
       <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
     </p>
   );

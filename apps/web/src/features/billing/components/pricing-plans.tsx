@@ -1,18 +1,15 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import {
-  initializePaddle,
-  type Environments,
-  type Paddle,
-} from "@paddle/paddle-js";
+import { useFormStatus } from "react-dom";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import { Notice } from "@pigxel/ui/components/notice";
-import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
-import { FREE_PLAN, TIERS, type BillingCycle, type Tier } from "../pricing";
+import { CURRENCY, FREE_PLAN, TIERS, type BillingCycle } from "../pricing";
 import { loginUrl } from "@/lib/auth/routes";
+import { startCheckout } from "../actions";
+import { formatMoney } from "../subscription";
 import { annualComparison, type PriceQuote } from "../pricing-comparison";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Heading, Text } from "@pigxel/ui/components/typography";
@@ -22,87 +19,28 @@ const CYCLES: { id: BillingCycle; label: string }[] = [
   { id: "year", label: "Yearly" },
 ];
 
-type Prices = Partial<Record<string, PriceQuote>>;
+const quote = (cents: number): PriceQuote => ({
+  formattedTotal: formatMoney(String(cents), CURRENCY),
+  total: String(cents),
+  currencyCode: CURRENCY,
+});
 
 type Props = {
-  environment: Environments;
-  token: string;
-  country?: string;
-  customer?: { id: string; email?: string };
-  /** The subscriber's current price; they change plans instead of buying another. */
-  currentPriceId?: string;
+  signedIn?: boolean;
+  /** The subscriber's current product; they change plans instead of buying another. */
+  currentProductId?: string;
+  /** Creem couldn't start a checkout last time. */
+  checkoutFailed?: boolean;
   heading: ReactNode;
 };
 
 export function PricingPlans({
-  environment,
-  token,
-  country,
-  customer,
-  currentPriceId,
+  signedIn,
+  currentProductId,
+  checkoutFailed,
   heading,
 }: Props) {
   const [cycle, setCycle] = useState<BillingCycle>("month");
-  const [paddle, setPaddle] = useState<Paddle>();
-  const [prices, setPrices] = useState<Prices>({});
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    initializePaddle({ environment, token })
-      .then(async (instance) => {
-        if (!instance) throw new Error("Paddle.js didn't load.");
-        if (!active) return;
-        setPaddle(instance);
-        const previews = await Promise.all(
-          CYCLES.map(({ id }) =>
-            instance.PricePreview({
-              items: TIERS.map((tier) => ({
-                priceId: tier.priceId[id],
-                quantity: 1,
-              })),
-              ...(country && { address: { countryCode: country } }),
-            }),
-          ),
-        );
-        if (!active) return;
-        setPrices(
-          Object.fromEntries(
-            previews.flatMap((preview) =>
-              preview.data.details.lineItems.map((item) => [
-                item.price.id,
-                {
-                  formattedTotal: item.formattedTotals.total,
-                  total: item.totals.total,
-                  currencyCode: preview.data.currencyCode,
-                },
-              ]),
-            ),
-          ),
-        );
-      })
-      .catch((error: unknown) => {
-        console.error("Couldn't load prices from Paddle", error);
-        if (active) setFailed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [environment, token, country]);
-
-  function subscribe(tier: Tier) {
-    if (!customer) return;
-    paddle?.Checkout.open({
-      items: [{ priceId: tier.priceId[cycle], quantity: 1 }],
-      ...(customer.email && { customer: { email: customer.email } }),
-      customData: { userId: customer.id },
-      settings: {
-        displayMode: "overlay",
-        variant: "one-page",
-        successUrl: `${window.location.origin}/welcome`,
-      },
-    });
-  }
 
   return (
     <div className="flex flex-1 flex-col">
@@ -134,14 +72,15 @@ export function PricingPlans({
           <Text size="xs" tone="muted" className="md:text-right">
             {cycle === "year"
               ? "One yearly payment. Compare it with 12 months of monthly billing."
-              : "Billed monthly. Choose yearly to see your annual savings."}
+              : "Billed monthly. Choose yearly to see your annual savings."}{" "}
+            Prices in USD, plus tax where it applies.
           </Text>
         </div>
       </div>
 
-      {failed && (
+      {checkoutFailed && (
         <Notice tone="error" className="mx-auto mt-6 max-w-xl text-center">
-          Couldn’t load prices. Refresh the page to try again.
+          Couldn’t open the checkout. Please try again in a moment.
         </Notice>
       )}
 
@@ -174,12 +113,12 @@ export function PricingPlans({
             />
           </li>
           {TIERS.map((tier) => {
-            const quote = prices[tier.priceId[cycle]];
+            const productId = tier.productId[cycle];
             const comparison =
               cycle === "year"
                 ? annualComparison(
-                    prices[tier.priceId.month],
-                    prices[tier.priceId.year],
+                    quote(tier.price.month),
+                    quote(tier.price.year),
                   )
                 : undefined;
             return (
@@ -190,30 +129,19 @@ export function PricingPlans({
                   features={tier.features}
                   highlighted={tier.highlighted}
                   price={
-                    quote ? (
-                      <Price
-                        amount={quote.formattedTotal}
-                        period={`/ ${cycle}`}
-                        comparison={comparison}
-                        note={
-                          cycle === "year"
-                            ? "Billed once per year"
-                            : "Billed monthly"
-                        }
-                      />
-                    ) : failed ? (
-                      <Text as="span" tone="muted">
-                        Price unavailable
-                      </Text>
-                    ) : (
-                      <Skeleton
-                        aria-label="Loading price"
-                        className="h-10 w-32"
-                      />
-                    )
+                    <Price
+                      amount={quote(tier.price[cycle]).formattedTotal}
+                      period={`/ ${cycle}`}
+                      comparison={comparison}
+                      note={
+                        cycle === "year"
+                          ? "Billed once per year"
+                          : "Billed monthly"
+                      }
+                    />
                   }
                   action={
-                    currentPriceId === tier.priceId[cycle] ? (
+                    currentProductId === productId ? (
                       <Button
                         className="w-full"
                         size="lg"
@@ -222,9 +150,9 @@ export function PricingPlans({
                       >
                         Your plan
                       </Button>
-                    ) : currentPriceId ? (
+                    ) : currentProductId ? (
                       <Link
-                        href={`/settings/subscription?plan=${tier.priceId[cycle]}`}
+                        href={`/settings/subscription?plan=${productId}`}
                         className={buttonVariants({
                           variant: "primary",
                           size: "lg",
@@ -233,17 +161,12 @@ export function PricingPlans({
                       >
                         Change plan
                       </Link>
-                    ) : customer ? (
-                      <Button
-                        className="w-full"
-                        size="lg"
-                        variant="primary"
-                        disabled={!paddle || !quote}
-                        aria-label={`Subscribe to ${tier.name}, billed ${cycle === "year" ? "yearly" : "monthly"}`}
-                        onClick={() => subscribe(tier)}
-                      >
-                        Subscribe
-                      </Button>
+                    ) : signedIn ? (
+                      <form action={startCheckout.bind(null, productId)}>
+                        <SubscribeButton
+                          label={`Subscribe to ${tier.name}, billed ${cycle === "year" ? "yearly" : "monthly"}`}
+                        />
+                      </form>
                     ) : (
                       <Link
                         href={loginUrl("signup", "/pricing")}
@@ -264,6 +187,22 @@ export function PricingPlans({
         </ul>
       </div>
     </div>
+  );
+}
+
+function SubscribeButton({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      className="w-full"
+      size="lg"
+      variant="primary"
+      disabled={pending}
+      aria-label={label}
+    >
+      {pending ? "Opening checkout…" : "Subscribe"}
+    </Button>
   );
 }
 

@@ -54,6 +54,15 @@ export function Tutorials() {
                 <Text as="span" size="xs" tone="muted" className="block">
                   {tutorial.minutes} min <span aria-hidden="true">·</span>{" "}
                   {tutorial.level}
+                  {tutorial.premium && (
+                    <>
+                      {" "}
+                      <span aria-hidden="true">·</span>{" "}
+                      <span className="font-semibold text-primary">
+                        Premium
+                      </span>
+                    </>
+                  )}
                 </Text>
               </span>
               <span

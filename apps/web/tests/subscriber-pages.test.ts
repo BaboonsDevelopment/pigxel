@@ -6,7 +6,7 @@ import { TIERS } from "@/features/billing/pricing";
 const mocks = vi.hoisted(() => ({ user: vi.fn(), plan: vi.fn() }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@paddle/paddle-js", () => ({ initializePaddle: vi.fn() }));
+vi.mock("@/features/billing/actions", () => ({ startCheckout: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/auth/session", () => ({ getUser: mocks.user }));
 vi.mock("@/features/billing/server", () => ({ getCurrentPlan: mocks.plan }));
@@ -18,17 +18,23 @@ const pro = TIERS.find((tier) => tier.name === "Pro")!;
 
 const pricing = (props: Partial<Parameters<typeof PricingPlans>[0]>) =>
   renderToStaticMarkup(
-    createElement(PricingPlans, {
-      environment: "sandbox",
-      token: "test_token",
-      heading: null,
-      ...props,
-    }),
+    createElement(PricingPlans, { heading: null, ...props }),
   );
 
 beforeEach(() => vi.resetAllMocks());
 
 describe("pricing for subscribers", () => {
+  it("shows prices and limits without JavaScript", () => {
+    const html = pricing({});
+    expect(html).toContain("$10.00");
+    expect(html).toContain("2,000 AI tokens every month");
+    expect(html).toContain("Premium assets and tutorials");
+    expect(html).toContain("5 arts in Pigxel cloud, unlimited in Google Drive");
+    expect(html).not.toContain("AI tokens to try");
+    expect(html).toContain("100 arts in Pigxel cloud");
+    expect(html).toContain("plus tax");
+  });
+
   it("asks guests to sign up before paying", () => {
     const html = pricing({});
     expect(html).toContain("Sign up to subscribe");
@@ -36,18 +42,18 @@ describe("pricing for subscribers", () => {
   });
 
   it("lets accounts subscribe", () => {
-    expect(pricing({ customer: { id: "user-1" } })).toContain(">Subscribe<");
+    expect(pricing({ signedIn: true })).toContain(">Subscribe<");
   });
 
   it("offers plan changes instead of a second subscription", () => {
     const html = pricing({
-      customer: { id: "user-1" },
-      currentPriceId: pro.priceId.month,
+      signedIn: true,
+      currentProductId: pro.productId.month,
     });
     expect(html).toContain("Your plan");
     expect(html).toContain("Change plan");
     expect(html).toContain(
-      `/settings/subscription?plan=${TIERS[0]!.priceId.month}`,
+      `/settings/subscription?plan=${TIERS[0]!.productId.month}`,
     );
     expect(html).not.toContain(">Subscribe<");
   });
@@ -64,7 +70,7 @@ describe("welcome page", () => {
     expect(html).toContain("Your plan is active");
   });
 
-  it("waits for Paddle instead of claiming the payment went through", async () => {
+  it("waits for Creem instead of claiming the payment went through", async () => {
     mocks.user.mockResolvedValue({ id: "user-1" });
     mocks.plan.mockResolvedValue({ name: "Free" });
     const html = await render();

@@ -106,7 +106,14 @@ export async function saveCloudTile(
         .insert(details)
         .select("id, user_id, name")
         .single();
-  if (error) throw new CloudError("Couldn’t save to Pigxel cloud. Try again.");
+  if (error) {
+    const limit = /cloud_tile_limit:(\d+)/.exec(error.message)?.[1];
+    throw new CloudError(
+      limit
+        ? `Your plan keeps up to ${limit} arts in Pigxel cloud. Delete one, save this to Google Drive or download it, or upgrade your plan for more room.`
+        : "Couldn’t save to Pigxel cloud. Try again.",
+    );
+  }
   if (!data)
     throw new CloudError(
       "This tile is no longer in Pigxel cloud. Save it again to keep it.",

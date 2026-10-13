@@ -1,92 +1,108 @@
 import { TIERS, type BillingCycle, type Tier } from "./pricing";
 
+export type SubscriptionStatus =
+  "active" | "trialing" | "past_due" | "paused" | "canceled" | "unpaid";
+
 export type SubscriptionRecord = {
   id: string;
   userId: string;
   customerId: string;
-  status: "active" | "trialing" | "past_due" | "paused" | "canceled";
-  priceId: string;
+  status: SubscriptionStatus;
+  productId: string;
   currentPeriodEndsAt: string | null;
   cancelsAt: string | null;
   eventAt: string;
-  pendingPriceId?: string | null;
+  pendingProductId?: string | null;
 };
 
-export type SubscriptionEvent = {
-  occurredAt: string;
-  data: {
-    id: string;
-    status: SubscriptionRecord["status"];
-    customerId: string;
-    items: { price: { id: string } | null }[];
-    currentBillingPeriod: { endsAt: string } | null;
-    scheduledChange: { action: string; effectiveAt: string } | null;
-    customData: Record<string, unknown> | null;
-  };
+/** A subscription as Creem sends it in webhooks and API responses. */
+export type CreemSubscription = {
+  id: string;
+  status: string;
+  product: string | { id: string };
+  customer: string | { id: string };
+  current_period_end_date?: string | null;
+  updated_at?: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function subscriptionRecord(
-  event: SubscriptionEvent,
-): SubscriptionRecord | null {
-  const { data } = event;
-  const userId = data.customData?.userId;
-  const priceId = data.items.find((item) => item.price)?.price?.id;
-  if (typeof userId !== "string" || !UUID.test(userId) || !priceId) return null;
-  return {
-    id: data.id,
-    userId,
-    customerId: data.customerId,
-    status: data.status,
-    priceId,
-    currentPeriodEndsAt: data.currentBillingPeriod?.endsAt ?? null,
-    cancelsAt:
-      data.scheduledChange?.action === "cancel"
-        ? data.scheduledChange.effectiveAt
-        : null,
-    eventAt: event.occurredAt,
-  };
-}
+const idOf = (value: string | { id: string }) =>
+  typeof value === "string" ? value : value.id;
 
-const PAID = new Set<SubscriptionRecord["status"]>([
+const STATUSES = new Set<string>([
   "active",
   "trialing",
   "past_due",
+  "paused",
+  "canceled",
+  "unpaid",
 ]);
 
-type PlanPrice = { name: Tier["name"]; cycle: BillingCycle };
+/**
+ * The row to store for a Creem subscription. The Pigxel account comes from
+ * the checkout metadata, or `userId` when the caller already knows it.
+ */
+export function subscriptionRecord(
+  subscription: CreemSubscription,
+  eventAt: string,
+  userId?: string,
+): SubscriptionRecord | null {
+  const owner = userId ?? subscription.metadata?.userId;
+  if (typeof owner !== "string" || !UUID.test(owner)) return null;
+  // A scheduled cancellation stays active until the period ends.
+  const ending = subscription.status === "scheduled_cancel";
+  const status = ending ? "active" : subscription.status;
+  if (!STATUSES.has(status)) return null;
+  const periodEnd = subscription.current_period_end_date ?? null;
+  return {
+    id: subscription.id,
+    userId: owner,
+    customerId: idOf(subscription.customer),
+    status: status as SubscriptionStatus,
+    productId: idOf(subscription.product),
+    currentPeriodEndsAt: periodEnd,
+    cancelsAt: ending ? periodEnd : null,
+    eventAt,
+  };
+}
+
+const PAID = new Set<SubscriptionStatus>(["active", "trialing", "past_due"]);
+
+type PlanProduct = { name: Tier["name"]; cycle: BillingCycle };
 
 export type CurrentPlan =
   | { name: "Free" }
-  | (PlanPrice & {
+  | (PlanProduct & {
       subscriptionId: string;
       customerId: string;
-      priceId: string;
-      status: SubscriptionRecord["status"];
+      productId: string;
+      status: SubscriptionStatus;
       renewsAt: string | null;
       cancelsAt: string | null;
-      switchesTo: PlanPrice | null;
+      switchesTo: PlanProduct | null;
     });
 
 export type PlanChange = "upgrade" | "downgrade" | "same";
 
 const CYCLES: BillingCycle[] = ["month", "year"];
 
-export function planOfPrice(priceId: string): PlanPrice | null {
+export function planOfProduct(productId: string): PlanProduct | null {
   for (const tier of TIERS)
     for (const cycle of CYCLES)
-      if (tier.priceId[cycle] === priceId) return { name: tier.name, cycle };
+      if (tier.productId[cycle] === productId)
+        return { name: tier.name, cycle };
   return null;
 }
 
-const rank = ({ name, cycle }: PlanPrice) =>
+const rank = ({ name, cycle }: PlanProduct) =>
   TIERS.findIndex((tier) => tier.name === name) * 2 + CYCLES.indexOf(cycle);
 
 /** A higher tier, or yearly billing on the same tier, is an upgrade. */
 export function planChange(from: string, to: string): PlanChange | null {
-  const current = planOfPrice(from);
-  const next = planOfPrice(to);
+  const current = planOfProduct(from);
+  const next = planOfProduct(to);
   if (!current || !next) return null;
   return from === to
     ? "same"
@@ -117,17 +133,19 @@ export function currentPlan(subscriptions: SubscriptionRecord[]): CurrentPlan {
     .filter((sub) => PAID.has(sub.status))
     .sort((a, b) => b.eventAt.localeCompare(a.eventAt));
   for (const sub of latest) {
-    const price = planOfPrice(sub.priceId);
-    if (price)
+    const product = planOfProduct(sub.productId);
+    if (product)
       return {
-        ...price,
+        ...product,
         subscriptionId: sub.id,
         customerId: sub.customerId,
-        priceId: sub.priceId,
+        productId: sub.productId,
         status: sub.status,
         renewsAt: sub.cancelsAt ? null : sub.currentPeriodEndsAt,
         cancelsAt: sub.cancelsAt,
-        switchesTo: sub.pendingPriceId ? planOfPrice(sub.pendingPriceId) : null,
+        switchesTo: sub.pendingProductId
+          ? planOfProduct(sub.pendingProductId)
+          : null,
       };
   }
   return { name: "Free" };

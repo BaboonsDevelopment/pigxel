@@ -5,7 +5,8 @@ import { useState } from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 
-export function ImportStarterSet() {
+/** Admins publish a set of assets drawn in code: free, or premium for paid plans. */
+export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
   const router = useRouter();
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -13,16 +14,25 @@ export function ImportStarterSet() {
   const importAll = async () => {
     setError(null);
     try {
-      const [{ STARTER_ASSETS, starterDocument }, { publishAsset }] =
-        await Promise.all([import("../starter"), import("../publish")]);
-      for (const [i, asset] of STARTER_ASSETS.entries()) {
-        setProgress(`Importing ${i + 1} of ${STARTER_ASSETS.length}…`);
+      const [
+        { STARTER_ASSETS, starterDocument },
+        { PREMIUM_ASSETS },
+        { publishAsset },
+      ] = await Promise.all([
+        import("../starter"),
+        import("../premium"),
+        import("../publish"),
+      ]);
+      const set = premium ? PREMIUM_ASSETS : STARTER_ASSETS;
+      for (const [i, asset] of set.entries()) {
+        setProgress(`Importing ${i + 1} of ${set.length}…`);
         await publishAsset({
           id: asset.id,
           name: asset.name,
           category: asset.category,
           document: starterDocument(asset),
-          sort: i,
+          sort: premium ? 100 + i : i,
+          premium,
         });
       }
       setProgress(null);
@@ -43,7 +53,8 @@ export function ImportStarterSet() {
         disabled={progress !== null}
         onClick={() => void importAll()}
       >
-        {progress ?? "Import the starter set"}
+        {progress ??
+          (premium ? "Import the premium set" : "Import the starter set")}
       </Button>
       {error && <FormMessage tone="error">{error}</FormMessage>}
     </div>

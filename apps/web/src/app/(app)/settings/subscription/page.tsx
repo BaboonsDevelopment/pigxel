@@ -10,7 +10,7 @@ import {
 } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
-import { planOfPrice } from "@/features/billing/subscription";
+import { planOfProduct } from "@/features/billing/subscription";
 import { ManagePlan } from "@/features/billing/components/manage-plan";
 
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
@@ -33,7 +33,7 @@ export default async function SubscriptionSettings({
     <section aria-labelledby="plan-heading">
       {billing === "error" && (
         <Notice tone="error" className="mb-4">
-          Couldn’t open Paddle’s billing page. Please try again in a moment.
+          Couldn’t open Creem’s billing page. Please try again in a moment.
         </Notice>
       )}
       <SectionTitle id="plan-heading">Your plan</SectionTitle>
@@ -51,7 +51,7 @@ export default async function SubscriptionSettings({
           {plan.name === "Free"
             ? "Starter, Pro and Advanced plans are on the Pricing page."
             : plan.status === "past_due"
-              ? "Your last payment didn’t go through. Paddle will retry it; update your payment method below to fix it sooner."
+              ? "Your last payment didn’t go through. Creem will retry it; update your payment method below to fix it sooner."
               : plan.cancelsAt
                 ? `Your plan ends on ${day(plan.cancelsAt)} and won’t renew.`
                 : plan.renewsAt
@@ -72,7 +72,7 @@ export default async function SubscriptionSettings({
         <ManagePlan
           plan={plan}
           periodEnd={periodEnd && day(periodEnd)}
-          chosen={chosen && planOfPrice(chosen) ? chosen : undefined}
+          chosen={chosen && planOfProduct(chosen) ? chosen : undefined}
         />
       )}
     </section>

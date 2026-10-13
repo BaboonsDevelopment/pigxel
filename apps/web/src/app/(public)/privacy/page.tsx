@@ -54,7 +54,7 @@ export default function Privacy() {
             an AI operation; saved chat history and AI usage records.
           </li>
           <li>
-            <strong>Payments:</strong> handled by Paddle. We receive your plan,
+            <strong>Payments:</strong> handled by Creem. We receive your plan,
             its status and billing country, never your card details.
           </li>
           <li>
@@ -192,6 +192,11 @@ export default function Privacy() {
           submitting personal information or confidential material you do not
           want processed by that service.
         </p>
+        <p>
+          Before any AI request runs, the text you typed is screened by Creem’s
+          moderation service, together with your account ID, to block requests
+          that break our content rules. Images are not sent for this check.
+        </p>
       </LegalSection>
 
       <LegalSection title="6. Who we share it with">
@@ -205,7 +210,9 @@ export default function Privacy() {
             Google (Gemini): the AI helper, with the request content described
             in section 5.
           </li>
-          <li>Paddle: payments, as Merchant of Record.</li>
+          <li>
+            Creem: payments, as Merchant of Record, and screening of AI prompts.
+          </li>
           <li>Google and Apple: when you choose to sign in with them.</li>
           <li>
             Google Drive: when you connect it, Pigxel only reaches the files it
@@ -257,7 +264,7 @@ export default function Privacy() {
           required for legal obligations, billing records, security or resolving
           disputes. Backup copies may remain until they are replaced or expire
           under the provider’s backup lifecycle. Data held independently by
-          Google or Paddle is subject to their retention policies.
+          Google or Creem is subject to their retention policies.
         </p>
         <p>
           Account deletion does not remove files from your own Google Drive or

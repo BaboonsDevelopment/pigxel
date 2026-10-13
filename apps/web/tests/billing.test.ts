@@ -6,10 +6,10 @@ import {
   formatMoney,
   planChange,
   subscriptionRecord,
-  type SubscriptionEvent,
+  type CreemSubscription,
   type SubscriptionRecord,
 } from "@/features/billing/subscription";
-import { TIERS } from "@/features/billing/pricing";
+import { aiAllowance, limitsOf, TIERS } from "@/features/billing/pricing";
 
 vi.mock("server-only", () => ({}));
 const saveSubscription = vi.fn();
@@ -21,60 +21,100 @@ const USER = "0b6f7c0e-4b8a-4c56-9a4e-3f1f2d6c9a11";
 const pro = TIERS.find((tier) => tier.name === "Pro")!;
 const starter = TIERS.find((tier) => tier.name === "Starter")!;
 const advanced = TIERS.find((tier) => tier.name === "Advanced")!;
+const AT = "2026-10-01T12:00:00.000Z";
 
-function event(
-  overrides: Partial<SubscriptionEvent["data"]> = {},
-): SubscriptionEvent {
+function subscription(
+  overrides: Partial<CreemSubscription> = {},
+): CreemSubscription {
   return {
-    occurredAt: "2026-10-01T12:00:00Z",
-    data: {
-      id: "sub_1",
-      status: "active",
-      customerId: "ctm_1",
-      items: [{ price: { id: pro.priceId.month } }],
-      currentBillingPeriod: { endsAt: "2026-11-01T12:00:00Z" },
-      scheduledChange: null,
-      customData: { userId: USER },
-      ...overrides,
-    },
+    id: "sub_1",
+    status: "active",
+    product: { id: pro.productId.month },
+    customer: { id: "cust_1" },
+    current_period_end_date: "2026-11-01T12:00:00.000Z",
+    metadata: { userId: USER },
+    ...overrides,
   };
 }
 
 function record(
   overrides: Partial<SubscriptionRecord> = {},
 ): SubscriptionRecord {
-  return { ...subscriptionRecord(event())!, ...overrides };
+  return { ...subscriptionRecord(subscription(), AT)!, ...overrides };
 }
 
 describe("subscription record", () => {
-  it("maps a Paddle event to the stored row", () => {
-    expect(subscriptionRecord(event())).toEqual({
+  it("maps a Creem subscription to the stored row", () => {
+    expect(subscriptionRecord(subscription(), AT)).toEqual({
       id: "sub_1",
       userId: USER,
-      customerId: "ctm_1",
+      customerId: "cust_1",
       status: "active",
-      priceId: pro.priceId.month,
-      currentPeriodEndsAt: "2026-11-01T12:00:00Z",
+      productId: pro.productId.month,
+      currentPeriodEndsAt: "2026-11-01T12:00:00.000Z",
       cancelsAt: null,
-      eventAt: "2026-10-01T12:00:00Z",
+      eventAt: AT,
     });
   });
 
-  it("keeps a scheduled cancellation", () => {
-    const scheduledChange = {
-      action: "cancel",
-      effectiveAt: "2026-11-01T12:00:00Z",
-    };
-    expect(subscriptionRecord(event({ scheduledChange }))?.cancelsAt).toBe(
-      "2026-11-01T12:00:00Z",
-    );
+  it("accepts products and customers given as IDs", () => {
+    expect(
+      subscriptionRecord(
+        subscription({ product: pro.productId.year, customer: "cust_2" }),
+        AT,
+      ),
+    ).toMatchObject({ productId: pro.productId.year, customerId: "cust_2" });
   });
 
-  it("skips events that aren't tied to an account", () => {
-    expect(subscriptionRecord(event({ customData: null }))).toBeNull();
+  it("keeps a scheduled cancellation active until the period ends", () => {
     expect(
-      subscriptionRecord(event({ customData: { userId: "someone" } })),
+      subscriptionRecord(subscription({ status: "scheduled_cancel" }), AT),
+    ).toMatchObject({
+      status: "active",
+      cancelsAt: "2026-11-01T12:00:00.000Z",
+    });
+  });
+
+  it("skips subscriptions that aren't tied to an account or have unknown statuses", () => {
+    expect(subscriptionRecord(subscription({ metadata: null }), AT)).toBeNull();
+    expect(
+      subscriptionRecord(subscription({ metadata: { userId: "someone" } }), AT),
     ).toBeNull();
+    expect(
+      subscriptionRecord(subscription({ status: "mystery" }), AT),
+    ).toBeNull();
+  });
+
+  it("uses the account the caller already knows", () => {
+    expect(
+      subscriptionRecord(subscription({ metadata: null }), AT, USER)?.userId,
+    ).toBe(USER);
+  });
+});
+
+describe("plan limits", () => {
+  it("gives each plan its cloud room and AI tokens", () => {
+    expect(limitsOf("Free")).toEqual({ cloudTiles: 5, aiTokens: 0 });
+    expect(limitsOf("Starter")).toEqual({ cloudTiles: 50, aiTokens: 1000 });
+    expect(limitsOf("Pro")).toEqual({ cloudTiles: 100, aiTokens: 2000 });
+    expect(limitsOf("Advanced")).toEqual({ cloudTiles: 200, aiTokens: 7000 });
+  });
+
+  it("gives Free no AI and counts paid tokens per calendar month", () => {
+    const now = new Date("2026-10-13T08:00:00Z");
+    expect(aiAllowance("Free", now)).toEqual({
+      tokens: 0,
+      since: null,
+      resetsAt: null,
+    });
+    expect(aiAllowance("Pro", now)).toEqual({
+      tokens: 2000,
+      since: "2026-10-01T00:00:00.000Z",
+      resetsAt: "2026-11-01T00:00:00.000Z",
+    });
+    expect(
+      aiAllowance("Starter", new Date("2026-12-31T23:59:00Z")).resetsAt,
+    ).toBe("2027-01-01T00:00:00.000Z");
   });
 });
 
@@ -87,14 +127,14 @@ describe("current plan", () => {
   });
 
   it("names the tier and cycle of the price", () => {
-    expect(currentPlan([record({ priceId: pro.priceId.year })])).toEqual({
+    expect(currentPlan([record({ productId: pro.productId.year })])).toEqual({
       name: "Pro",
       cycle: "year",
       subscriptionId: "sub_1",
-      customerId: "ctm_1",
-      priceId: pro.priceId.year,
+      customerId: "cust_1",
+      productId: pro.productId.year,
       status: "active",
-      renewsAt: "2026-11-01T12:00:00Z",
+      renewsAt: "2026-11-01T12:00:00.000Z",
       cancelsAt: null,
       switchesTo: null,
     });
@@ -102,7 +142,7 @@ describe("current plan", () => {
 
   it("shows a downgrade waiting for renewal", () => {
     const plan = currentPlan([
-      record({ pendingPriceId: starter.priceId.month }),
+      record({ pendingProductId: starter.productId.month }),
     ]);
     expect(plan).toMatchObject({
       switchesTo: { name: "Starter", cycle: "month" },
@@ -110,35 +150,39 @@ describe("current plan", () => {
   });
 
   it("doesn't renew once a cancellation is scheduled", () => {
-    const plan = currentPlan([record({ cancelsAt: "2026-11-01T12:00:00Z" })]);
+    const plan = currentPlan([
+      record({ cancelsAt: "2026-11-01T12:00:00.000Z" }),
+    ]);
     expect(plan).toMatchObject({
       renewsAt: null,
-      cancelsAt: "2026-11-01T12:00:00Z",
+      cancelsAt: "2026-11-01T12:00:00.000Z",
     });
   });
 });
 
 describe("plan changes", () => {
   it("treats a higher tier or yearly billing as an upgrade", () => {
-    expect(planChange(starter.priceId.month, pro.priceId.month)).toBe(
+    expect(planChange(starter.productId.month, pro.productId.month)).toBe(
       "upgrade",
     );
-    expect(planChange(pro.priceId.month, pro.priceId.year)).toBe("upgrade");
-    expect(planChange(pro.priceId.year, advanced.priceId.month)).toBe(
+    expect(planChange(pro.productId.month, pro.productId.year)).toBe("upgrade");
+    expect(planChange(pro.productId.year, advanced.productId.month)).toBe(
       "upgrade",
     );
   });
 
   it("treats a lower tier or monthly billing as a downgrade", () => {
-    expect(planChange(pro.priceId.month, starter.priceId.year)).toBe(
+    expect(planChange(pro.productId.month, starter.productId.year)).toBe(
       "downgrade",
     );
-    expect(planChange(pro.priceId.year, pro.priceId.month)).toBe("downgrade");
+    expect(planChange(pro.productId.year, pro.productId.month)).toBe(
+      "downgrade",
+    );
   });
 
   it("knows staying put and rejects unknown prices", () => {
-    expect(planChange(pro.priceId.month, pro.priceId.month)).toBe("same");
-    expect(planChange(pro.priceId.month, "pri_unknown")).toBeNull();
+    expect(planChange(pro.productId.month, pro.productId.month)).toBe("same");
+    expect(planChange(pro.productId.month, "prod_unknown")).toBeNull();
   });
 
   it("allows changes only on a healthy plan that isn't ending", () => {
@@ -146,27 +190,27 @@ describe("plan changes", () => {
       currentPlan([record(overrides)]);
     expect(canChangePlan(plan({}))).toBe(true);
     expect(canChangePlan(plan({ status: "past_due" }))).toBe(false);
-    expect(canChangePlan(plan({ cancelsAt: "2026-11-01T12:00:00Z" }))).toBe(
+    expect(canChangePlan(plan({ cancelsAt: "2026-11-01T12:00:00.000Z" }))).toBe(
       false,
     );
     expect(canChangePlan({ name: "Free" })).toBe(false);
   });
 
-  it("formats Paddle amounts in minor units", () => {
+  it("formats amounts in minor units", () => {
     expect(formatMoney("1234", "USD")).toBe("$12.34");
     expect(formatMoney("1234", "JPY")).toBe("¥1,234");
   });
 });
 
-describe("Paddle webhook", () => {
-  const SECRET = "pdl_ntfset_test_secret";
+describe("Creem webhook", () => {
+  const SECRET = "whsec_test_secret";
 
   async function post(body: string, signature?: string) {
-    const { POST } = await import("@/app/api/paddle/webhook/route");
+    const { POST } = await import("@/app/api/creem/webhook/route");
     const headers = new Headers();
-    if (signature) headers.set("paddle-signature", signature);
+    if (signature) headers.set("creem-signature", signature);
     return POST(
-      new Request("http://localhost/api/paddle/webhook", {
+      new Request("http://localhost/api/creem/webhook", {
         method: "POST",
         headers,
         body,
@@ -174,80 +218,24 @@ describe("Paddle webhook", () => {
     );
   }
 
-  function sign(body: string, secret = SECRET) {
-    const ts = Math.floor(Date.now() / 1000);
-    const h1 = createHmac("sha256", secret)
-      .update(`${ts}:${body}`)
-      .digest("hex");
-    return `ts=${ts};h1=${h1}`;
-  }
+  const sign = (body: string, secret = SECRET) =>
+    createHmac("sha256", secret).update(body).digest("hex");
 
   const body = JSON.stringify({
-    event_id: "evt_1",
-    notification_id: "ntf_1",
-    event_type: "subscription.created",
-    occurred_at: "2026-10-01T12:00:00Z",
-    data: {
-      id: "sub_1",
+    id: "evt_1",
+    eventType: "subscription.paid",
+    created_at: Date.parse(AT),
+    object: {
+      ...subscription(),
+      object: "subscription",
+      product: { id: pro.productId.month, price: 1000, currency: "USD" },
+      customer: { id: "cust_1", email: "artist@example.com" },
       status: "active",
-      customer_id: "ctm_1",
-      address_id: "add_1",
-      business_id: null,
-      currency_code: "USD",
-      created_at: "2026-10-01T12:00:00Z",
-      updated_at: "2026-10-01T12:00:00Z",
-      started_at: "2026-10-01T12:00:00Z",
-      first_billed_at: "2026-10-01T12:00:00Z",
-      next_billed_at: "2026-11-01T12:00:00Z",
-      paused_at: null,
-      canceled_at: null,
-      discount: null,
-      collection_mode: "automatic",
-      billing_details: null,
-      current_billing_period: {
-        starts_at: "2026-10-01T12:00:00Z",
-        ends_at: "2026-11-01T12:00:00Z",
-      },
-      billing_cycle: { interval: "month", frequency: 1 },
-      scheduled_change: null,
-      items: [
-        {
-          status: "active",
-          quantity: 1,
-          recurring: true,
-          created_at: "2026-10-01T12:00:00Z",
-          updated_at: "2026-10-01T12:00:00Z",
-          previously_billed_at: null,
-          next_billed_at: null,
-          trial_dates: null,
-          price: {
-            id: pro.priceId.month,
-            product_id: "pro_1",
-            description: "Pro monthly",
-            type: "standard",
-            name: null,
-            billing_cycle: { interval: "month", frequency: 1 },
-            trial_period: null,
-            tax_mode: "account_setting",
-            unit_price: { amount: "1000", currency_code: "USD" },
-            unit_price_overrides: [],
-            quantity: { minimum: 1, maximum: 1 },
-            status: "active",
-            custom_data: null,
-            import_meta: null,
-            created_at: "2026-10-01T12:00:00Z",
-            updated_at: "2026-10-01T12:00:00Z",
-          },
-        },
-      ],
-      custom_data: { userId: USER },
-      import_meta: null,
-      transaction_id: "txn_1",
     },
   });
 
   beforeEach(() => {
-    vi.stubEnv("PADDLE_WEBHOOK_SECRET", SECRET);
+    vi.stubEnv("CREEM_WEBHOOK_SECRET", SECRET);
     saveSubscription.mockResolvedValue(null);
   });
 
@@ -258,19 +246,32 @@ describe("Paddle webhook", () => {
       expect.objectContaining({
         id: "sub_1",
         userId: USER,
-        priceId: pro.priceId.month,
+        productId: pro.productId.month,
+        eventAt: AT,
       }),
     );
+  });
+
+  it("ignores other events", async () => {
+    const other = JSON.stringify({
+      eventType: "refund.created",
+      created_at: 1,
+      object: {},
+    });
+    expect((await post(other, sign(other))).status).toBe(200);
+    expect(saveSubscription).not.toHaveBeenCalled();
   });
 
   it("rejects missing or forged signatures", async () => {
     expect((await post(body)).status).toBe(400);
     expect((await post(body, sign(body, "wrong"))).status).toBe(401);
+    expect((await post(body, "not-hex")).status).toBe(401);
     expect(saveSubscription).not.toHaveBeenCalled();
   });
 
-  it("asks Paddle to retry when storing fails", async () => {
+  it("asks Creem to retry when storing fails", async () => {
     saveSubscription.mockResolvedValue({ code: "XX000", message: "down" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
     expect((await post(body, sign(body))).status).toBe(500);
   });
 });

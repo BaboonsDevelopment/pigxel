@@ -36,14 +36,11 @@ export default function Refunds() {
 
       <LegalSection title="2. How to ask">
         <p>
-          Our orders are processed by Paddle.com, our Merchant of Record, who
-          handles refunds. Reply to your Paddle receipt email or find your order
-          at{" "}
-          <a href="https://paddle.net" target="_blank" rel="noreferrer">
-            paddle.net
-          </a>
-          , or email us at <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>{" "}
-          and we’ll arrange it with Paddle.
+          Our orders are processed by Creem, our Merchant of Record, who handles
+          refunds. Email us at{" "}
+          <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a> with the email
+          address you paid with, or reply to your Creem receipt, and we’ll
+          arrange the refund with Creem.
         </p>
         <p>
           Refunds go back to the payment method you used, usually within 5–10

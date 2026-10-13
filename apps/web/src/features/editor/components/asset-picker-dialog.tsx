@@ -6,7 +6,11 @@ import { Button } from "@pigxel/ui/components/button";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionTitle } from "@pigxel/ui/components/typography";
 import { AssetImage } from "@/features/assets/components/asset-image";
-import { ASSET_CATEGORIES, type Asset } from "@/features/assets/assets";
+import {
+  ASSET_CATEGORIES,
+  isLocked,
+  type Asset,
+} from "@/features/assets/assets";
 import { listAssetsInBrowser } from "@/features/assets/publish";
 
 type Listing =
@@ -39,6 +43,12 @@ export default function AssetPickerDialog({
   }, []);
 
   const pick = async (asset: Asset) => {
+    if (isLocked(asset)) {
+      setProblem(
+        `“${asset.name}” is a premium asset. Starter, Pro and Advanced plans unlock it.`,
+      );
+      return;
+    }
     setPicking(asset.id);
     setProblem(null);
     const error = await onPick(asset);
@@ -76,7 +86,16 @@ export default function AssetPickerDialog({
       </p>
       {problem && (
         <FormMessage tone="error" className="px-5 pt-2">
-          {problem}
+          {problem}{" "}
+          {problem.includes("premium") && (
+            <Link
+              href="/pricing"
+              target="_blank"
+              className="underline underline-offset-2"
+            >
+              See plans
+            </Link>
+          )}
         </FormMessage>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
@@ -110,8 +129,18 @@ export default function AssetPickerDialog({
                         onClick={() => void pick(asset)}
                         className="flex w-full flex-col items-center gap-1 rounded-lg p-1.5 text-xs hover:bg-muted focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
                       >
-                        <span className="flex aspect-square w-full items-center justify-center rounded-md bg-checker p-2">
-                          <AssetImage asset={asset} className="w-full" />
+                        <span className="relative flex aspect-square w-full items-center justify-center rounded-md bg-checker p-2">
+                          <AssetImage
+                            asset={asset}
+                            className={
+                              isLocked(asset) ? "w-full opacity-50" : "w-full"
+                            }
+                          />
+                          {asset.premium && (
+                            <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
+                              Premium
+                            </span>
+                          )}
                         </span>
                         <span className="w-full truncate text-center">
                           {asset.name}
