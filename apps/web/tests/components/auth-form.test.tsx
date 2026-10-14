@@ -44,6 +44,18 @@ describe("auth form", () => {
     expect(screen.getByLabelText("Password")).toHaveValue("");
   });
 
+  it("reveals and hides the password with the eye toggle", async () => {
+    const { user } = renderWithUser(<AuthForm mode="login" configured />);
+    const password = screen.getByLabelText("Password");
+    expect(password).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "Show password" }));
+    expect(password).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(password).toHaveAttribute("type", "password");
+  });
+
   it("asks new accounts for a longer password", () => {
     renderWithUser(<AuthForm mode="signup" configured />);
     expect(screen.getByLabelText("Password")).toHaveAttribute("minlength", "8");
