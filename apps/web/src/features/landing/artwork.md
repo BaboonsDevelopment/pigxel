@@ -56,7 +56,7 @@ Asset: `apps/web/public/art/feature/garden-night.png`, used by the AI helper and
 
 ## Sky islands with a hidden pig (Inspiration zoom)
 
-Asset: `apps/web/public/art/feature/sky-islands-pig.png`, used by the Inspiration section, which zooms out from one of its pixels. Not a new generation: it is the art wall's sky islands scene (`public/art/wall/skyislands.png`), taken from the original Gemini render and averaged down to 240 × 161 with a cubic resize, so each pixel of the file is one pixel of the art. It was reduced to a 48-colour palette with no dithering. The landing's 16 × 16 pig (`PIG` in `components/pixel-art.tsx`, in the Draw chapter's colours) was then placed by hand on the small floating rock in the middle, with its top-left corner at (127, 83).
+Asset: `apps/web/public/art/feature/sky-islands-pig.png`, used by the Inspiration section, which zooms out from one of its pixels. Not a new generation: it is the art wall's sky islands scene (`public/art/wall/skyislands.png`), taken from the original Gemini render and averaged down to 240 × 161 with a cubic resize, so each pixel of the file is one pixel of the art. It was reduced to a 48-colour palette with no dithering. The mascot (`pigxel-mascot-sitting.png`: ears, blush, snout and red bandana) was then hand-drawn as an 18 × 19 sprite and placed on the small floating rock in the middle, with its top-left corner at (126, 79) and its feet on the rock's top edge. It replaced the landing's 16 × 16 pig (`PIG` in `components/pixel-art.tsx`), which first sat there at (127, 83); that pixel region was painted back to the surrounding sky (`#7ef0fd`). `PIG` in `worlds-zoom.tsx` is the sprite's centre and height, where the zoom starts.
 
 ## Footer scene
 
