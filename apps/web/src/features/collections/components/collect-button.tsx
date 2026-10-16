@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@pigxel/ui/lib/utils";
 import {
@@ -21,9 +28,13 @@ const GUTTER = 8;
 export function CollectButton({
   tileId,
   signedIn,
+  headless = false,
+  controls,
 }: {
   tileId: string;
   signedIn: boolean;
+  headless?: boolean;
+  controls?: Ref<{ open: () => void }>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -141,31 +152,39 @@ export function CollectButton({
     showSuccess("Collection created!");
   };
 
+  useImperativeHandle(controls, () => ({
+    open: () => {
+      if (!open) void toggleOpen();
+    },
+  }));
+
   return (
     <div ref={root} className="relative">
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        onClick={() => void toggleOpen()}
-        className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-4"
+      {!headless && (
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? panelId : undefined}
+          onClick={() => void toggleOpen()}
+          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted"
         >
-          <rect x="2" y="4.5" width="9.5" height="9" rx="1.5" />
-          <path d="M4.5 2.5h8a1.5 1.5 0 0 1 1.5 1.5v8M6.75 7v4M4.75 9h4" />
-        </svg>
-        {saved ? "Saved" : "Collect"}
-      </button>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="size-4"
+          >
+            <rect x="2" y="4.5" width="9.5" height="9" rx="1.5" />
+            <path d="M4.5 2.5h8a1.5 1.5 0 0 1 1.5 1.5v8M6.75 7v4M4.75 9h4" />
+          </svg>
+          {saved ? "Saved" : "Collect"}
+        </button>
+      )}
       {open &&
         place &&
         createPortal(

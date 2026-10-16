@@ -10,6 +10,8 @@ const comment = (id: string, replies: ArtComment[] = []): ArtComment => ({
   body: id,
   createdAt: "2026-10-08T00:00:00Z",
   edited: false,
+  likes: 0,
+  liked: false,
   parentId: null,
   replies,
   author: { id: "u", username: "u", name: "U", avatarUrl: null },

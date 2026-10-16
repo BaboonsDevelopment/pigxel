@@ -1,4 +1,4 @@
-import type { Size } from "@/features/explore/constants";
+import type { CanvasSize } from "@/features/explore/constants";
 
 export const FILTERS = [
   "All",
@@ -30,7 +30,7 @@ export const PUBLISHED = [
 export type Published = (typeof PUBLISHED)[number]["value"];
 
 export type ProjectFilters = {
-  size: Size;
+  size: CanvasSize;
   animated: boolean;
   storage: Storage;
   label: string | null;

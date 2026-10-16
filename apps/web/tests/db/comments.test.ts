@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aTile, admin, signUp } from "./helpers";
+import { aTile, admin, guest, signUp } from "./helpers";
 
 async function tile(visibility: "private" | "public") {
   const owner = await signUp("owner");
@@ -103,5 +103,60 @@ describe("comments", () => {
       code: "42501",
       message: "permission denied for table comment_reports",
     });
+  });
+
+  it("can be liked once per person, keeping a count only the database moves", async () => {
+    const tileId = await tile("public");
+    const author = await signUp("author");
+    const fan = await signUp("fan");
+    const { data: comment } = await author.client
+      .from("tile_comments")
+      .insert({ tile_id: tileId, body: "Hello" })
+      .select("id")
+      .single()
+      .throwOnError();
+    const count = async () =>
+      (
+        await admin
+          .from("tile_comments")
+          .select("like_count")
+          .eq("id", comment.id)
+          .single()
+          .throwOnError()
+      ).data.like_count;
+
+    await fan.client
+      .from("comment_likes")
+      .insert({ comment_id: comment.id })
+      .throwOnError();
+    const twice = await fan.client
+      .from("comment_likes")
+      .insert({ comment_id: comment.id });
+    expect(twice.error).toMatchObject({ code: "23505" });
+    expect(await count()).toBe(1);
+
+    const forged = await fan.client
+      .from("tile_comments")
+      .update({ like_count: 99 })
+      .eq("id", comment.id);
+    expect(forged.error).toMatchObject({ code: "42501" });
+
+    const seen = await author.client
+      .from("comment_likes")
+      .select("user_id")
+      .eq("comment_id", comment.id);
+    expect(seen).toMatchObject({ error: null, data: [] });
+    const anon = await guest()
+      .from("comment_likes")
+      .select("user_id")
+      .eq("comment_id", comment.id);
+    expect(anon).toMatchObject({ error: null, data: [] });
+
+    await fan.client
+      .from("comment_likes")
+      .delete()
+      .eq("comment_id", comment.id)
+      .throwOnError();
+    expect(await count()).toBe(0);
   });
 });

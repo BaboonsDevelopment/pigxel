@@ -63,7 +63,8 @@ export function AssetLibrary({
                 <li key={asset.id}>
                   <AssetCard
                     asset={asset}
-                    tint={assetTint(index)}
+                    tint={category.background ? "" : assetTint(index)}
+                    background={category.background}
                     onOpen={() => setOpen({ asset, block: category.name })}
                   />
                 </li>
@@ -99,10 +100,12 @@ export function AssetLibrary({
 function AssetCard({
   asset,
   tint,
+  background,
   onOpen,
 }: {
   asset: Asset;
   tint: string;
+  background: string | null;
   onOpen: () => void;
 }) {
   const tile = asset.kind === "tile";
@@ -117,6 +120,7 @@ function AssetCard({
           "relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl transition group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none",
           tint,
         )}
+        style={background ? { background } : undefined}
       >
         <AssetImage
           asset={asset}

@@ -41,6 +41,7 @@ type ManifestPack = {
   name: string;
   block: string;
   newBlock: boolean;
+  background: string | null;
   assets: ManifestAsset[];
 };
 
@@ -117,17 +118,21 @@ for (const pack of manifest.packs) {
     `${values["dry-run"] ? "Would be " : ""}${exists ? "named" : "added"} block: ${pack.block} “${pack.name}”`,
   );
   if (values["dry-run"]) continue;
-  const { error } = await supabase
-    .from("asset_blocks")
-    .upsert(
-      exists
-        ? {
-            id: pack.block,
-            name: pack.name,
-            updated_at: new Date().toISOString(),
-          }
-        : { id: pack.block, name: pack.name, sort: nextSort++ },
-    );
+  const { error } = await supabase.from("asset_blocks").upsert(
+    exists
+      ? {
+          id: pack.block,
+          name: pack.name,
+          ...(pack.background && { background: pack.background }),
+          updated_at: new Date().toISOString(),
+        }
+      : {
+          id: pack.block,
+          name: pack.name,
+          sort: nextSort++,
+          ...(pack.background && { background: pack.background }),
+        },
+  );
   if (error)
     throw new Error(`${pack.block}: couldn’t save the block: ${error.message}`);
   blockIds.add(pack.block);

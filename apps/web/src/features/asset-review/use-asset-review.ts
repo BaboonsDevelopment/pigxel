@@ -96,6 +96,12 @@ export function useReviewActions() {
       call(`/blocks/${id}`, "PATCH", { target }),
     ),
     reject: after((key: string) => call("/reject", "POST", { key })),
+    setBlockBackground: after((id: string, background: string | null) =>
+      call(`/blocks/${id}`, "PATCH", { background }),
+    ),
+    setProductionBackground: after((id: string, background: string | null) =>
+      call(`/production/blocks/${id}`, "PATCH", { background }),
+    ),
     setBlockPremium: after((id: string, premium: boolean) =>
       call(`/blocks/${id}`, "PATCH", { premium }),
     ),
