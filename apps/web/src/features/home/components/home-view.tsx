@@ -18,11 +18,13 @@ export function HomeView({
   userId,
   cloudTiles,
   aiAllowed,
+  tutorials,
 }: {
   userId: string;
   cloudTiles: CloudTileSummary[];
   /** Whether the plan includes the AI helper. */
   aiAllowed: boolean;
+  tutorials: { premium: boolean; finished: string[] };
 }) {
   return (
     <div className="relative xl:h-full xl:[container-type:size]">
@@ -57,7 +59,7 @@ export function HomeView({
 
         <div className="mt-6 grid grid-cols-1 gap-5 xl:min-h-56 xl:flex-1 xl:grid-cols-2">
           <PopularTemplates />
-          <Tutorials />
+          <Tutorials {...tutorials} />
         </div>
       </Page>
     </div>

@@ -8,75 +8,42 @@ import {
   type AssetRow,
 } from "@/features/assets/assets";
 import { assetIdFor, sheetPixels } from "@/features/assets/publish";
-import {
-  STARTER_ASSETS,
-  starterDocument,
-  starterPixels,
-} from "@/features/assets/starter";
-import { PREMIUM_ASSETS } from "@/features/assets/premium";
 import { normalizeColor, PALETTE_PRESETS } from "@/lib/palette/presets";
 import {
+  blankDocument,
   flattenDocument,
-  parsePigxel,
-  serializePigxel,
+  type PigxelDocument,
 } from "@/lib/pigxel-file/format";
-import { celOf } from "@/lib/sprite/frames";
+import { celOf, createFrame } from "@/lib/sprite/frames";
 import {
   TUTORIALS,
   findTutorial,
   type GuideState,
 } from "@/features/tutorials/tutorials";
 
-describe("the starter set", () => {
-  it("has unique ids that work as asset ids", () => {
-    const ids = STARTER_ASSETS.map((a) => a.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    for (const asset of STARTER_ASSETS)
-      expect(assetIdFor(asset.id)).toBe(asset.id);
-  });
-
-  it.each(STARTER_ASSETS)(
-    "$id is drawn on an even grid with known colours",
-    (asset) => {
-      const w = asset.frames[0]![0]!.length;
-      const h = asset.frames[0]!.length;
-      for (const frame of asset.frames) {
-        expect(frame).toHaveLength(h);
-        for (const row of frame) {
-          expect(row).toHaveLength(w);
-          for (const letter of row)
-            if (letter !== ".") expect(asset.colors[letter]).toBeDefined();
-        }
-      }
-      for (const color of Object.values(asset.colors))
-        expect(normalizeColor(color)).toBe(color);
-    },
+/** A 16 × 16 sprite whose frames are each filled with a different grey. */
+function animated(frameCount: number): PigxelDocument {
+  const doc = blankDocument(16, 16, "transparent");
+  const layer = doc.layers[0]!.id;
+  const frames = Array.from({ length: frameCount }, (_, i) =>
+    i === 0 ? doc.frames[0]! : createFrame(120),
   );
-
-  it("tiles are fully opaque, so they meet without gaps", () => {
-    for (const asset of STARTER_ASSETS.filter((a) => a.category === "tiles"))
-      for (const row of asset.frames.flat()) expect(row).not.toContain(".");
-  });
-
-  it("becomes a tile that saves and opens with every frame", () => {
-    const coin = STARTER_ASSETS.find((a) => a.id === "coin")!;
-    const doc = parsePigxel(serializePigxel(starterDocument(coin)));
-    expect(doc.width).toBe(16);
-    expect(doc.frames).toHaveLength(4);
-    expect(doc.frames[0]!.duration).toBe(coin.duration);
-    doc.frames.forEach((frame, i) =>
-      expect(celOf(doc.cels, frame.id, doc.layers[0]!.id)).toEqual(
-        starterPixels(coin, i),
-      ),
-    );
-  });
-});
+  const cels = new Map(
+    frames.map((frame, i) => {
+      const pixels = new Uint8ClampedArray(16 * 16 * 4);
+      for (let p = 0; p < pixels.length; p += 4)
+        pixels.set([i * 40, i * 40, i * 40, 255], p);
+      return [frame.id, new Map([[layer, pixels]])] as const;
+    }),
+  );
+  return { ...doc, frames, cels };
+}
 
 describe("assets from the database", () => {
   const row: AssetRow = {
     id: "coin",
     name: "Coin",
-    category: "items",
+    pack_id: "dungeon-heroes",
     kind: "sprite",
     width: 16,
     height: 16,
@@ -158,11 +125,10 @@ describe("assets from the database", () => {
   });
 
   it("can start a tile from their first frames only", () => {
-    const slime = STARTER_ASSETS.find((a) => a.id === "slime")!;
-    const doc = keepFrames(starterDocument(slime), 1);
+    const doc = keepFrames(animated(3), 1);
     expect(doc.frames).toHaveLength(1);
     expect(doc.cels.size).toBe(1);
-    expect(flattenDocument(doc)).toEqual(starterPixels(slime));
+    expect(flattenDocument(doc)).toEqual(flattenDocument(animated(1)));
   });
 });
 
@@ -176,8 +142,7 @@ describe("publishing", () => {
   });
 
   it("lays the frames side by side on the sheet", () => {
-    const coin = STARTER_ASSETS.find((a) => a.id === "coin")!;
-    const doc = starterDocument(coin);
+    const doc = animated(4);
     const sheet = sheetPixels(doc);
     expect(sheet).toMatchObject({ w: 64, h: 16 });
     const row = (
@@ -186,9 +151,8 @@ describe("publishing", () => {
       x: number,
       y: number,
     ) => [...pixels.subarray((y * w + x) * 4, (y * w + x + 16) * 4)];
-    expect(row(sheet.pixels, 64, 32, 5)).toEqual(
-      row(starterPixels(coin, 2), 16, 0, 5),
-    );
+    const third = celOf(doc.cels, doc.frames[2]!.id, doc.layers[0]!.id)!;
+    expect(row(sheet.pixels, 64, 32, 5)).toEqual(row(third, 16, 0, 5));
   });
 });
 
@@ -221,12 +185,12 @@ describe("tutorials", () => {
     inserted: 0,
   };
 
-  it("have unique slugs and practice tiles that exist", () => {
+  it("have unique slugs and practice tiles named like asset ids", () => {
     const slugs = TUTORIALS.map((t) => t.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
-    const ids = [...STARTER_ASSETS, ...PREMIUM_ASSETS].map((a) => a.id);
     for (const { practice } of TUTORIALS)
-      if (practice.asset) expect(ids).toContain(practice.asset);
+      if (practice.asset)
+        expect(assetIdFor(practice.asset)).toBe(practice.asset);
   });
 
   it("steps that wait for a change aren't done when nothing changed", () => {

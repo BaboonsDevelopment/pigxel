@@ -16,7 +16,13 @@ import { Chevron, TOOLBAR_PANEL, TOOLBAR_TRIGGER } from "./toolbar-menu";
 
 const ANY_LABEL = "any";
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div>
       <p className="mb-2 text-[13px] text-muted-foreground">{label}</p>
@@ -25,7 +31,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Select<Value extends string>({
+export function FilterSelect<Value extends string>({
   label,
   options,
   value,
@@ -37,7 +43,7 @@ function Select<Value extends string>({
   onChange: (value: Value) => void;
 }) {
   return (
-    <Field label={label}>
+    <FilterField label={label}>
       <span className="relative block">
         <select
           aria-label={label}
@@ -55,7 +61,7 @@ function Select<Value extends string>({
           <Chevron open={false} />
         </span>
       </span>
-    </Field>
+    </FilterField>
   );
 }
 
@@ -74,7 +80,6 @@ export function ProjectFiltersMenu({
   const [draft, setDraft] = useState(filters);
   const root = useDismiss(open, () => setOpen(false));
   const panelId = useId();
-  const animatedId = useId();
   const active =
     Number(filters.size !== "any") +
     Number(filters.storage !== "any") +
@@ -118,7 +123,7 @@ export function ProjectFiltersMenu({
           className={cn(TOOLBAR_PANEL, "w-[19rem] p-4")}
         >
           <div className="grid gap-4">
-            <Field label="Size">
+            <FilterField label="Size">
               <div
                 role="radiogroup"
                 aria-label="Size"
@@ -137,23 +142,23 @@ export function ProjectFiltersMenu({
                   </button>
                 ))}
               </div>
-            </Field>
+            </FilterField>
             {storage && (
-              <Select
+              <FilterSelect
                 label="Storage"
                 options={STORAGES}
                 value={draft.storage}
                 onChange={(value) => patch({ storage: value })}
               />
             )}
-            <Select
+            <FilterSelect
               label="Explore"
               options={PUBLISHED}
               value={draft.published}
               onChange={(value) => patch({ published: value })}
             />
             {labels.length > 0 && (
-              <Select
+              <FilterSelect
                 label="Label"
                 options={[
                   { value: ANY_LABEL, label: "Any label" },
@@ -165,23 +170,11 @@ export function ProjectFiltersMenu({
                 }
               />
             )}
-            <label
-              htmlFor={animatedId}
-              className="flex cursor-pointer items-center justify-between gap-3 text-[13px] text-[#4a1f35]"
-            >
-              Animated only
-              <span className="relative inline-flex">
-                <input
-                  id={animatedId}
-                  type="checkbox"
-                  role="switch"
-                  checked={draft.animated}
-                  onChange={(e) => patch({ animated: e.target.checked })}
-                  className="peer h-5 w-9 cursor-pointer appearance-none rounded-full bg-[#9a8790] transition-colors outline-none checked:bg-primary focus-visible:ring-2 focus-visible:ring-ring/40"
-                />
-                <span className="pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-4" />
-              </span>
-            </label>
+            <FilterSwitch
+              label="Animated only"
+              on={draft.animated}
+              onChange={(animated) => patch({ animated })}
+            />
           </div>
           <div className="mt-4 flex items-center justify-between border-t pt-4">
             <button
@@ -205,5 +198,36 @@ export function ProjectFiltersMenu({
         </div>
       )}
     </div>
+  );
+}
+
+export function FilterSwitch({
+  label,
+  on,
+  onChange,
+}: {
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <label
+      htmlFor={id}
+      className="flex cursor-pointer items-center justify-between gap-3 text-[13px] text-[#4a1f35]"
+    >
+      {label}
+      <span className="relative inline-flex">
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          checked={on}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer h-5 w-9 cursor-pointer appearance-none rounded-full bg-[#9a8790] transition-colors outline-none checked:bg-primary focus-visible:ring-2 focus-visible:ring-ring/40"
+        />
+        <span className="pointer-events-none absolute top-0.5 left-0.5 size-4 rounded-full bg-background shadow-sm transition-transform peer-checked:translate-x-4" />
+      </span>
+    </label>
   );
 }

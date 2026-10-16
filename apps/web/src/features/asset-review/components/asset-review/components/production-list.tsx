@@ -158,7 +158,7 @@ export function ProductionList({
   const sections = blocks
     .map((block) => ({
       block,
-      assets: production.data.filter((a) => a.category === block.id),
+      assets: production.data.filter((a) => a.packId === block.id),
     }))
     .filter(({ assets }) => assets.length > 0);
   if (!sections.length) return <EmptyState title="Nothing in production" />;

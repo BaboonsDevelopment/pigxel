@@ -60,7 +60,7 @@ export type ReviewSnapshot = {
 export type ProductionAsset = {
   id: string;
   name: string;
-  category: string;
+  packId: string;
   kind: "sprite" | "tile";
   width: number;
   height: number;

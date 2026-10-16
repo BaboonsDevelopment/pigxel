@@ -5,7 +5,7 @@ import { shownFrom } from "@/lib/utils/shown";
 const mocks = vi.hoisted(() => ({
   listFeedback: vi.fn(),
   countFeedback: vi.fn(),
-  listAssets: vi.fn(),
+  listPackCards: vi.fn(),
   listPublicTiles: vi.fn(),
 }));
 
@@ -33,11 +33,12 @@ vi.mock("@/features/feedback/server", () => ({
   countFeedback: mocks.countFeedback,
 }));
 vi.mock("@/features/assets/server", () => ({
-  listAssets: mocks.listAssets,
-  countPremiumAssets: async () => 0,
-  listAssetBlocks: async () => [
-    { id: "characters", name: "Characters", count: 500, background: null },
-  ],
+  listPackCards: mocks.listPackCards,
+  listAssetTags: async () => [],
+  listAssetFavourites: async () => ({ assets: [], packs: [] }),
+  listRecentAssets: async () => [],
+  listAssetPage: async () => ({ assets: [], count: 0 }),
+  findAsset: async () => null,
 }));
 vi.mock("@/features/profile/server", () => ({
   listPublicTiles: mocks.listPublicTiles,
@@ -120,35 +121,14 @@ describe("feedback board", () => {
 });
 
 describe("assets", () => {
-  const render = async (params: Record<string, string> = {}) =>
-    renderToStaticMarkup(
-      await Assets({ searchParams: Promise.resolve(params) }),
-    );
-  const asset = (i: number) => ({
-    id: `a${i}`,
-    name: `Asset ${i}`,
-    category: "characters",
-    width: 16,
-    height: 16,
-    url: "/a.png",
-  });
-
-  it("says it couldn't load instead of offering the starter set", async () => {
+  it("says it couldn't load instead of “no packs yet”", async () => {
     quiet();
-    mocks.listAssets.mockRejectedValue(new Error("db down"));
-    const html = await render();
+    mocks.listPackCards.mockRejectedValue(new Error("db down"));
+    const html = renderToStaticMarkup(
+      await Assets({ searchParams: Promise.resolve({}) }),
+    );
     expect(html).toContain("Couldn’t load assets.");
-    expect(html).not.toContain("No assets yet");
-  });
-
-  it("links to the next batch on a category page", async () => {
-    mocks.listAssets.mockResolvedValue({
-      assets: [asset(1), asset(2)],
-      total: 500,
-    });
-    const html = await render({ type: "characters" });
-    expect(mocks.listAssets).toHaveBeenCalledWith("characters", 240);
-    expect(html).toContain("/assets?type=characters&amp;shown=480");
+    expect(html).not.toContain("No packs yet");
   });
 });
 

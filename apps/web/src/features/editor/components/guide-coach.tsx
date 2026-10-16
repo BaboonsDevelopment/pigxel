@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button, buttonVariants } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { SpriteApi } from "../pixel-canvas/use-sprite";
 import type { GuideState, Tutorial } from "@/features/tutorials/tutorials";
+import { completeTutorial } from "@/features/tutorials/actions";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 
 const ADVANCE_MS = 900;
@@ -43,6 +44,15 @@ export function GuideCoach({
     const timer = setTimeout(advance, ADVANCE_MS);
     return () => clearTimeout(timer);
   }, [done, doneAtStart, index]);
+
+  // Reaching the end of the guide marks the tutorial finished, once.
+  const finished = !step;
+  const recorded = useRef(false);
+  useEffect(() => {
+    if (!finished || recorded.current) return;
+    recorded.current = true;
+    void completeTutorial(tutorial.slug).catch(() => {});
+  }, [finished, tutorial.slug]);
 
   if (hidden)
     return (

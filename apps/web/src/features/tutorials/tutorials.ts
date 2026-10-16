@@ -419,3 +419,24 @@ export function findTutorial(slug: string | null | undefined) {
 export function videoEmbedUrl(youtubeId: string) {
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(youtubeId)}?rel=0`;
 }
+
+/**
+ * The tutorials Home suggests: ones the person can open (free, or premium
+ * with access) and hasn't finished come first; finished ones fill the rest.
+ * Tutorials they can't open are never suggested.
+ */
+export function suggestedTutorials<
+  T extends { slug: string; premium?: boolean },
+>(
+  tutorials: readonly T[],
+  { premium, finished }: { premium: boolean; finished: ReadonlySet<string> },
+  limit = 3,
+): { tutorial: T; finished: boolean }[] {
+  const open = tutorials.filter((tutorial) => premium || !tutorial.premium);
+  return [
+    ...open.filter((tutorial) => !finished.has(tutorial.slug)),
+    ...open.filter((tutorial) => finished.has(tutorial.slug)),
+  ]
+    .slice(0, limit)
+    .map((tutorial) => ({ tutorial, finished: finished.has(tutorial.slug) }));
+}

@@ -23,9 +23,12 @@ const HUES =
 export function ColorPicker({
   color,
   onChange,
+  onAdd,
 }: {
   color: string;
   onChange: (color: string) => void;
+  /** Adds this colour to the palette; left out when it can't be added. */
+  onAdd?: () => void;
 }) {
   const alpha = alphaOf(color);
   const opaque = opaqueHex(color);
@@ -191,6 +194,76 @@ export function ColorPicker({
         </div>
       }
 
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="size-8 shrink-0 rounded-md ring-1 ring-black/15"
+          style={swatchStyle(color)}
+        />
+        <input
+          aria-label="Colour as hex"
+          value={text}
+          spellCheck={false}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={commitText}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitText();
+            if (e.key === "Escape") setText(color);
+          }}
+          className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2.5 font-mono text-xs tabular-nums"
+        />
+        <button
+          type="button"
+          aria-label="Add this colour to the palette"
+          title="Add this colour to the palette"
+          disabled={!onAdd}
+          onClick={onAdd}
+          className="grid size-8 shrink-0 place-items-center rounded-md text-lg leading-none text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+        >
+          +
+        </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1.5">
+        {(["R", "G", "B"] as const).map((label, i) => (
+          <label
+            key={label}
+            className="flex h-8 items-center gap-1 rounded-md border bg-background px-2 text-[11px] text-muted-foreground"
+          >
+            <span className="font-medium">{label}</span>
+            <NumericInput
+              min={0}
+              max={255}
+              aria-label={`${label} from 0 to 255`}
+              value={parseInt(opaque.slice(1 + i * 2, 3 + i * 2), 16)}
+              onValueChange={(n) => {
+                const value = Math.min(255, Math.max(0, Math.round(n)));
+                const hex =
+                  opaque.slice(0, 1 + i * 2) +
+                  value.toString(16).padStart(2, "0") +
+                  opaque.slice(3 + i * 2);
+                const next = hexToHsv(hex);
+                change(next.s && next.v ? next : { ...next, h: hsv.h });
+              }}
+              className="h-6 w-full min-w-0 bg-transparent text-right text-foreground tabular-nums outline-none"
+            />
+          </label>
+        ))}
+        <label className="flex h-8 items-center gap-1 rounded-md border bg-background px-2 text-[11px] text-muted-foreground">
+          <span className="font-medium">A</span>
+          <NumericInput
+            min={0}
+            max={255}
+            aria-label="Alpha from 0 to 255"
+            value={alpha}
+            onValueChange={(n) =>
+              onAlpha(Math.min(255, Math.max(0, Math.round(n))))
+            }
+            className="h-6 w-full min-w-0 bg-transparent text-right text-foreground tabular-nums outline-none"
+          />
+        </label>
+      </div>
+
       <div className="flex flex-col gap-1">
         <button
           type="button"
@@ -292,46 +365,6 @@ export function ColorPicker({
               style={swatchStyle(shade)}
             />
           ))}
-      </div>
-
-      <input
-        aria-label="Colour as hex"
-        value={text}
-        spellCheck={false}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={commitText}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commitText();
-          if (e.key === "Escape") setText(color);
-        }}
-        className="h-7 w-full rounded-md border bg-background px-2 text-center font-mono text-xs tabular-nums uppercase"
-      />
-
-      <div className="grid grid-cols-3 gap-1">
-        {(["R", "G", "B"] as const).map((label, i) => (
-          <label
-            key={label}
-            className="flex items-center gap-1 text-[11px] text-muted-foreground"
-          >
-            <span className="font-medium">{label}</span>
-            <NumericInput
-              min={0}
-              max={255}
-              aria-label={`${label} from 0 to 255`}
-              value={parseInt(opaque.slice(1 + i * 2, 3 + i * 2), 16)}
-              onValueChange={(n) => {
-                const value = Math.min(255, Math.max(0, Math.round(n)));
-                const hex =
-                  opaque.slice(0, 1 + i * 2) +
-                  value.toString(16).padStart(2, "0") +
-                  opaque.slice(3 + i * 2);
-                const next = hexToHsv(hex);
-                change(next.s && next.v ? next : { ...next, h: hsv.h });
-              }}
-              className="h-6 w-full min-w-0 rounded border bg-background px-1 text-right text-foreground tabular-nums"
-            />
-          </label>
-        ))}
       </div>
     </div>
   );

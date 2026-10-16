@@ -48,7 +48,7 @@ type ManifestPack = {
 type Row = {
   id: string;
   name: string;
-  category: string;
+  pack_id: string;
   kind: AssetKind;
   width: number;
   height: number;
@@ -90,19 +90,23 @@ const storage = supabase.storage.from(BUCKET);
 const { data: existing, error: listError } = await supabase
   .from("assets")
   .select(
-    "id, name, category, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
+    "id, name, pack_id, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
   )
   .returns<Row[]>();
 if (listError) throw new Error(`Couldn’t read assets: ${listError.message}`);
 const before = new Map(existing.map((row) => [row.id, row]));
 
 const { data: blockRows, error: blockError } = await supabase
-  .from("asset_blocks")
-  .select("id, sort")
-  .returns<{ id: string; sort: number }[]>();
+  .from("asset_packs")
+  .select("id, sort, premium")
+  .returns<{ id: string; sort: number; premium: boolean }[]>();
 if (blockError)
-  throw new Error(`Couldn’t read asset blocks: ${blockError.message}`);
+  throw new Error(`Couldn’t read asset packs: ${blockError.message}`);
 const blockIds = new Set(blockRows.map((row) => row.id));
+// Premium is set per pack: everything imported into a premium pack is too.
+const premiumPacks = new Set(
+  blockRows.filter((row) => row.premium).map((row) => row.id),
+);
 let nextSort = Math.max(-1, ...blockRows.map((row) => row.sort)) + 1;
 for (const pack of manifest.packs) {
   if (!pack.assets.length) continue;
@@ -115,26 +119,27 @@ for (const pack of manifest.packs) {
   }
   const exists = blockIds.has(pack.block);
   console.log(
-    `${values["dry-run"] ? "Would be " : ""}${exists ? "named" : "added"} block: ${pack.block} “${pack.name}”`,
+    `${values["dry-run"] ? "Would be " : ""}${exists ? "updated" : "added"} pack: ${pack.block} “${pack.name}”`,
   );
   if (values["dry-run"]) continue;
-  const { error } = await supabase.from("asset_blocks").upsert(
-    exists
-      ? {
-          id: pack.block,
-          name: pack.name,
+  // An existing pack keeps the name it has: admins rename packs on the
+  // Assets page, and pack.json names may still carry their size.
+  const { error } = exists
+    ? await supabase
+        .from("asset_packs")
+        .update({
           ...(pack.background && { background: pack.background }),
           updated_at: new Date().toISOString(),
-        }
-      : {
-          id: pack.block,
-          name: pack.name,
-          sort: nextSort++,
-          ...(pack.background && { background: pack.background }),
-        },
-  );
+        })
+        .eq("id", pack.block)
+    : await supabase.from("asset_packs").insert({
+        id: pack.block,
+        name: pack.name,
+        sort: nextSort++,
+        ...(pack.background && { background: pack.background }),
+      });
   if (error)
-    throw new Error(`${pack.block}: couldn’t save the block: ${error.message}`);
+    throw new Error(`${pack.block}: couldn’t save the pack: ${error.message}`);
   blockIds.add(pack.block);
 }
 
@@ -149,7 +154,7 @@ for (const asset of assets) {
   const row: Row = {
     id: asset.id,
     name: asset.name,
-    category: asset.category,
+    pack_id: asset.category,
     kind: asset.kind,
     width: asset.width,
     height: asset.height,
@@ -159,7 +164,7 @@ for (const asset of assets) {
     file_path: `${asset.id}/${hashOf(file)}.pigxel`,
     sheet_path: `${asset.id}/${hashOf(sheet)}.png`,
     sort: asset.sort,
-    premium: asset.premium,
+    premium: asset.premium || premiumPacks.has(asset.category),
   };
   const old = before.get(asset.id);
   if (old && JSON.stringify(old) === JSON.stringify(row)) {

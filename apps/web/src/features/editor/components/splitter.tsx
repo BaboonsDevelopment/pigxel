@@ -45,21 +45,3 @@ export function Splitter({
     />
   );
 }
-
-export function shareBetween(
-  bar: HTMLElement,
-  axis: "x" | "y",
-  weights: [number, number],
-  min: number,
-) {
-  const size = (el: Element | null) =>
-    el ? el.getBoundingClientRect()[axis === "x" ? "width" : "height"] : 0;
-  const a = size(bar.previousElementSibling);
-  const b = size(bar.nextElementSibling);
-  const total = weights[0] + weights[1];
-  return (delta: number): [number, number] => {
-    const next = Math.min(a + b - min, Math.max(min, a + delta));
-    const first = (total * next) / Math.max(1, a + b);
-    return [first, total - first];
-  };
-}

@@ -8,12 +8,13 @@ import { Field, FormMessage } from "@pigxel/ui/components/field";
 import { Input } from "@pigxel/ui/components/input";
 import { CheckboxField } from "@pigxel/ui/components/choice";
 import { SectionTitle } from "@pigxel/ui/components/typography";
-import type { AssetBlock } from "@/features/assets/assets";
+import type { AssetPack } from "@/features/assets/assets";
+import { assetViewUrl, NO_ASSET_FILTERS } from "@/features/assets/filters";
 import {
   ASSET_NAME_MAX,
   assetIdFor,
   assetExists,
-  listAssetBlocksInBrowser,
+  listAssetPacksInBrowser,
   publishAsset,
 } from "@/features/assets/publish";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
@@ -36,27 +37,27 @@ export default function PublishAssetDialog({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [name, setName] = useState(initialName.slice(0, ASSET_NAME_MAX));
-  const [blocks, setBlocks] = useState<AssetBlock[] | null>(null);
-  const [category, setCategory] = useState("");
+  const [packs, setPacks] = useState<AssetPack[] | null>(null);
+  const [packId, setPackId] = useState("");
   const [tile, setTile] = useState(false);
-  const [premium, setPremium] = useState(false);
   const [status, setStatus] = useState<Status>({ state: "editing" });
   const id = assetIdFor(name);
+  const premium = !!packs?.find((pack) => pack.id === packId)?.premium;
 
   useEffect(() => {
     dialog.current?.showModal();
     let stale = false;
-    listAssetBlocksInBrowser().then(
+    listAssetPacksInBrowser().then(
       (list) => {
         if (stale) return;
-        setBlocks(list);
-        setCategory((list.find((b) => b.id === "items") ?? list[0])?.id ?? "");
+        setPacks(list);
+        setPackId(list[0]?.id ?? "");
       },
       () =>
         !stale &&
         setStatus({
           state: "error",
-          message: "Couldn’t load the blocks. Close this and try again.",
+          message: "Couldn’t load the packs. Close this and try again.",
         }),
     );
     return () => {
@@ -65,7 +66,7 @@ export default function PublishAssetDialog({
   }, []);
 
   const publish = async () => {
-    if (!id || !category) return;
+    if (!id || !packId) return;
     setStatus({ state: "publishing" });
     try {
       const replacing = status.state === "replace" && status.id === id;
@@ -76,10 +77,9 @@ export default function PublishAssetDialog({
       await publishAsset({
         id,
         name: name.trim(),
-        category,
+        packId,
         kind: tile ? "tile" : "sprite",
         document: document(),
-        premium,
       });
       setStatus({ state: "done", id });
     } catch (e) {
@@ -110,7 +110,7 @@ export default function PublishAssetDialog({
           </p>
           <div className="mt-5 flex justify-end gap-2">
             <Link
-              href={`/assets?type=${category}`}
+              href={assetViewUrl("all", { ...NO_ASSET_FILTERS, pack: packId })}
               target="_blank"
               className={buttonVariants({ variant: "secondary" })}
             >
@@ -149,15 +149,23 @@ export default function PublishAssetDialog({
               }}
             />
           </Field>
-          <Field label="Block" htmlFor="asset-category">
+          <Field
+            label="Pack"
+            htmlFor="asset-pack"
+            hint={
+              premium
+                ? "A premium pack: only paid plans can use it."
+                : undefined
+            }
+          >
             <EditorSelect
-              id="asset-category"
-              value={category}
-              onChange={setCategory}
+              id="asset-pack"
+              value={packId}
+              onChange={setPackId}
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
-              options={(blocks ?? []).map((b) => ({
-                value: b.id,
-                label: b.name,
+              options={(packs ?? []).map((pack) => ({
+                value: pack.id,
+                label: pack.premium ? `${pack.name} (Premium)` : pack.name,
               }))}
             />
           </Field>
@@ -165,11 +173,6 @@ export default function PublishAssetDialog({
             label="Seamless tile: repeats edge to edge"
             checked={tile}
             onChange={(e) => setTile(e.target.checked)}
-          />
-          <CheckboxField
-            label="Premium: only paid plans can use it"
-            checked={premium}
-            onChange={(e) => setPremium(e.target.checked)}
           />
           {status.state === "replace" && (
             <FormMessage>
@@ -188,9 +191,7 @@ export default function PublishAssetDialog({
             >
               Cancel
             </Button>
-            <Button
-              disabled={!id || !category || status.state === "publishing"}
-            >
+            <Button disabled={!id || !packId || status.state === "publishing"}>
               {status.state === "publishing"
                 ? "Publishing…"
                 : status.state === "replace"

@@ -9,43 +9,31 @@ import {
 } from "@/lib/pigxel-file/format";
 import { createClient } from "@/lib/supabase/client";
 import {
-  ASSET_BLOCK_COLUMNS,
+  assetIdFor,
   ASSET_BUCKET,
-  ASSET_COLUMNS,
+  ASSET_PACK_COLUMNS,
   PREMIUM_ASSET_BUCKET,
-  toAssetBlock,
-  toAssets,
-  type Asset,
-  type AssetBlock,
-  type AssetBlockRow,
+  toAssetPack,
   type AssetKind,
+  type AssetPack,
+  type AssetPackRow,
   type AssetRow,
 } from "./assets";
+
+export { assetIdFor };
 
 export const ASSET_NAME_MAX = 40;
 const ASSET_MAX_FRAMES = 64;
 
-export async function listAssetsInBrowser(): Promise<Asset[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("assets")
-    .select(ASSET_COLUMNS)
-    .order("sort")
-    .order("name")
-    .returns<AssetRow[]>();
-  if (error || !data) throw new Error("Couldn’t load the assets.");
-  return toAssets(supabase, data);
-}
-
-export async function listAssetBlocksInBrowser(): Promise<AssetBlock[]> {
+export async function listAssetPacksInBrowser(): Promise<AssetPack[]> {
   const { data, error } = await createClient()
-    .from("asset_blocks")
-    .select(ASSET_BLOCK_COLUMNS)
+    .from("asset_packs")
+    .select(ASSET_PACK_COLUMNS)
     .order("sort")
     .order("name")
-    .returns<AssetBlockRow[]>();
-  if (error || !data) throw new Error("Couldn’t load the asset blocks.");
-  return data.map(toAssetBlock);
+    .returns<AssetPackRow[]>();
+  if (error || !data) throw new Error("Couldn’t load the asset packs.");
+  return data.map(toAssetPack);
 }
 
 export async function assetExists(id: string): Promise<boolean> {
@@ -55,17 +43,6 @@ export async function assetExists(id: string): Promise<boolean> {
     .eq("id", id);
   if (error) throw new Error("Couldn’t check the assets. Try again.");
   return (count ?? 0) > 0;
-}
-
-export function assetIdFor(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40)
-    .replace(/-+$/, "");
 }
 
 export function sheetPixels(doc: PigxelDocument) {
@@ -110,27 +87,35 @@ function pngOf({ pixels, w, h }: ReturnType<typeof sheetPixels>) {
   );
 }
 
+/**
+ * Publishes a picture into a pack. Premium follows the pack: a premium
+ * pack's .pigxel files go to the private bucket.
+ */
 export async function publishAsset({
   id,
   name,
-  category,
+  packId,
   kind,
   document: doc,
   sort,
-  premium = false,
 }: {
   id: string;
   name: string;
-  category: string;
+  packId: string;
   kind: AssetKind;
   document: PigxelDocument;
   sort?: number;
-  /** Paid plans only: the .pigxel file goes to the private bucket. */
-  premium?: boolean;
 }): Promise<void> {
   if (doc.frames.length > ASSET_MAX_FRAMES)
     throw new Error(`An asset can have at most ${ASSET_MAX_FRAMES} frames.`);
   const supabase = createClient();
+  const { data: pack, error: packError } = await supabase
+    .from("asset_packs")
+    .select("premium")
+    .eq("id", packId)
+    .maybeSingle<{ premium: boolean }>();
+  if (packError || !pack) throw new Error("Couldn’t find that pack.");
+  const { premium } = pack;
   const sheet = sheetPixels(doc);
   const png = await pngOf(sheet);
   const file = new TextEncoder().encode(serializePigxel(doc));
@@ -164,7 +149,7 @@ export async function publishAsset({
   const { error } = await supabase.from("assets").upsert({
     id,
     name,
-    category,
+    pack_id: packId,
     kind,
     width: doc.width,
     height: doc.height,

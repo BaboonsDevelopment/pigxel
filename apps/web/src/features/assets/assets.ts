@@ -3,27 +3,39 @@ import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 
 export type AssetKind = "sprite" | "tile";
 
-export type AssetBlock = {
+/** A set of assets made together, such as "Dungeon Heroes". */
+export type AssetPack = {
   id: string;
   name: string;
   count: number;
   background: string | null;
+  description: string | null;
+  /** Paid plans only: every asset in it is premium. */
+  premium: boolean;
+  createdAt: string;
 };
 
-export const ASSET_BLOCK_COLUMNS = "id, name, background, assets(count)";
+export const ASSET_PACK_COLUMNS =
+  "id, name, background, description, premium, created_at, assets(count)";
 
-export type AssetBlockRow = {
+export type AssetPackRow = {
   id: string;
   name: string;
   background: string | null;
+  description: string | null;
+  premium: boolean;
+  created_at: string;
   assets: { count: number }[];
 };
 
-export const toAssetBlock = (row: AssetBlockRow): AssetBlock => ({
+export const toAssetPack = (row: AssetPackRow): AssetPack => ({
   id: row.id,
   name: row.name,
   count: row.assets[0]?.count ?? 0,
   background: row.background,
+  description: row.description,
+  premium: row.premium,
+  createdAt: row.created_at,
 });
 
 export const ASSET_BUCKET = "assets";
@@ -31,12 +43,12 @@ export const ASSET_BUCKET = "assets";
 export const PREMIUM_ASSET_BUCKET = "premium-assets";
 
 export const ASSET_COLUMNS =
-  "id, name, category, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium";
+  "id, name, pack_id, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium, uses, asset_tag_links(tag_id)";
 
 export type AssetRow = {
   id: string;
   name: string;
-  category: string;
+  pack_id: string;
   kind: AssetKind;
   width: number;
   height: number;
@@ -47,12 +59,14 @@ export type AssetRow = {
   sheet_path: string;
   sort: number;
   premium: boolean;
+  uses?: number;
+  asset_tag_links?: { tag_id: string }[];
 };
 
 export type Asset = {
   id: string;
   name: string;
-  category: string;
+  packId: string;
   kind: AssetKind;
   width: number;
   height: number;
@@ -63,6 +77,10 @@ export type Asset = {
   /** Null when it's premium and the viewer isn't on a paid plan. */
   fileUrl: string | null;
   sheetUrl: string;
+  /** How many people started a tile from it, downloaded or copied it. */
+  uses: number;
+  /** Tag ids. */
+  tags: string[];
 };
 
 export function assetFileUrl(path: string) {
@@ -81,7 +99,7 @@ export function toAsset(
   return {
     id: row.id,
     name: row.name,
-    category: row.category,
+    packId: row.pack_id,
     kind: row.kind,
     width: row.width,
     height: row.height,
@@ -93,6 +111,8 @@ export function toAsset(
       ? (signed.get(row.file_path) ?? null)
       : assetFileUrl(row.file_path),
     sheetUrl: assetFileUrl(row.sheet_path),
+    uses: row.uses ?? 0,
+    tags: (row.asset_tag_links ?? []).map((link) => link.tag_id),
   };
 }
 
@@ -182,4 +202,16 @@ async function frameCanvas(
   } finally {
     bitmap.close();
   }
+}
+
+/** An id from a name: lowercase words joined by dashes, at most 40. */
+export function assetIdFor(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/, "");
 }

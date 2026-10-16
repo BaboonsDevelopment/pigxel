@@ -95,7 +95,11 @@ export function failed(error: unknown) {
       { status: error.status },
     );
   console.error(error);
-  if (error instanceof Error && "code" in error && typeof error.code === "string")
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
     return NextResponse.json(
       { error: "Couldn’t read or save the asset files. Please try again." },
       { status: 503 },
@@ -114,7 +118,7 @@ async function production() {
       .select("id, updated_at")
       .returns<{ id: string; updated_at: string | null }[]>(),
     supabase
-      .from("asset_blocks")
+      .from("asset_packs")
       .select("id, name, background")
       .order("sort")
       .order("name")
@@ -176,17 +180,15 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
     tiles: pack.assets
       // A published asset can change locally and must return to review. Keep
       // its newly approved replacement visible until that approval is uploaded.
-      .filter(
-        (source) => {
-          if (!publishedAt.has(source.id)) return true;
-          const entry = reviews[source.key];
-          if (reviewState(source, entry) === "changed") return true;
-          return (
-            entry?.status === "approved" &&
-            Date.parse(entry.at) > Date.parse(publishedAt.get(source.id) ?? "")
-          );
-        },
-      )
+      .filter((source) => {
+        if (!publishedAt.has(source.id)) return true;
+        const entry = reviews[source.key];
+        if (reviewState(source, entry) === "changed") return true;
+        return (
+          entry?.status === "approved" &&
+          Date.parse(entry.at) > Date.parse(publishedAt.get(source.id) ?? "")
+        );
+      })
       .map((source) => tileOf(pack, source, reviews[source.key])),
   }));
   return { blocks, targets, productionError };
@@ -317,7 +319,7 @@ export async function setProductionBackground(id: string, background: unknown) {
   if (background !== null && !isAssetBackground(background))
     throw new ReviewError("Pick one of the background colours.");
   const { data, error } = await createAdminClient()
-    .from("asset_blocks")
+    .from("asset_packs")
     .update({ background, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("id");
@@ -351,7 +353,7 @@ export function stripPng(packId: string, id: string) {
 type ProductionRow = {
   id: string;
   name: string;
-  category: string;
+  pack_id: string;
   kind: "sprite" | "tile";
   width: number;
   height: number;
@@ -365,9 +367,9 @@ export async function productionAssets(): Promise<ProductionAsset[]> {
   const { data, error } = await createAdminClient()
     .from("assets")
     .select(
-      "id, name, category, kind, width, height, frame_count, frame_ms, premium, sheet_path",
+      "id, name, pack_id, kind, width, height, frame_count, frame_ms, premium, sheet_path",
     )
-    .order("category")
+    .order("pack_id")
     .order("sort")
     .order("name")
     .returns<ProductionRow[]>();
@@ -375,7 +377,7 @@ export async function productionAssets(): Promise<ProductionAsset[]> {
   return data.map((row) => ({
     id: row.id,
     name: row.name,
-    category: row.category,
+    packId: row.pack_id,
     kind: row.kind,
     width: row.width,
     height: row.height,

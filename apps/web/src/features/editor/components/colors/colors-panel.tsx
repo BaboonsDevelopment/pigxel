@@ -1,57 +1,39 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ColorSlot } from "../../pixel-canvas/pen";
 import type { PenSettings } from "../../pixel-canvas/pen";
 import { ColorPicker } from "./color-picker";
 import { swatchProps, swatchStyle, withColor } from "./helpers";
 
+type ColorsProps = {
+  pen: PenSettings;
+  onChange: (pen: PenSettings) => void;
+  /** Which colour the picker edits. */
+  editing: ColorSlot;
+  onEditing: (slot: ColorSlot) => void;
+  /** Adds a colour to the palette; left out when it can't take more. */
+  onAddToPalette?: (color: string) => void;
+};
+
+/** The picker and recent colours, for the colour being edited. */
 export function ColorsPanel({
   pen,
   onChange,
-}: {
-  pen: PenSettings;
-  onChange: (pen: PenSettings) => void;
-}) {
-  const [editing, setEditing] = useState<ColorSlot>("primary");
+  editing,
+  onAddToPalette,
+}: ColorsProps) {
   const pick = (color: string, slot: ColorSlot) =>
     onChange(withColor(pen, color, slot));
   const edited = editing === "primary" ? pen.color : pen.secondary;
 
   return (
-    <div className="flex flex-col gap-3 p-2">
-      <div className="flex">
-        <div className="relative h-15 w-16 shrink-0">
-          <ColorWell
-            label="Secondary colour (right button)"
-            color={pen.secondary}
-            active={editing === "secondary"}
-            onClick={() => setEditing("secondary")}
-            className="right-0 bottom-0"
-          />
-          <ColorWell
-            label="Primary colour (left button)"
-            color={pen.color}
-            active={editing === "primary"}
-            onClick={() => setEditing("primary")}
-            className="top-0 left-0 z-10"
-          />
-          <button
-            type="button"
-            title="Swap colours (X)"
-            aria-label="Swap primary and secondary colours"
-            onClick={() =>
-              onChange({ ...pen, color: pen.secondary, secondary: pen.color })
-            }
-            className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            ⇄
-          </button>
-        </div>
-      </div>
-
-      <ColorPicker color={edited} onChange={(color) => pick(color, editing)} />
+    <div className="flex flex-col gap-3">
+      <ColorPicker
+        color={edited}
+        onChange={(color) => pick(color, editing)}
+        onAdd={onAddToPalette && (() => onAddToPalette(edited))}
+      />
 
       {pen.recent.length > 0 && (
         <div>
@@ -77,6 +59,39 @@ export function ColorsPanel({
   );
 }
 
+/** Primary and secondary colours, and swapping them; click one to edit it. */
+export function ColorWells({ pen, onChange, editing, onEditing }: ColorsProps) {
+  return (
+    <div className="relative h-12 w-12 shrink-0">
+      <ColorWell
+        label="Secondary colour (right button)"
+        color={pen.secondary}
+        active={editing === "secondary"}
+        onClick={() => onEditing("secondary")}
+        className="right-0 bottom-0"
+      />
+      <ColorWell
+        label="Primary colour (left button)"
+        color={pen.color}
+        active={editing === "primary"}
+        onClick={() => onEditing("primary")}
+        className="top-0 left-0 z-10"
+      />
+      <button
+        type="button"
+        title="Swap colours (X)"
+        aria-label="Swap primary and secondary colours"
+        onClick={() =>
+          onChange({ ...pen, color: pen.secondary, secondary: pen.color })
+        }
+        className="absolute -right-1 -bottom-6 flex size-6 items-center justify-center rounded text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        ⇄
+      </button>
+    </div>
+  );
+}
+
 function ColorWell({
   label,
   color,
@@ -98,7 +113,7 @@ function ColorWell({
       title={`${label}: ${color} · click to edit it`}
       onClick={onClick}
       className={cn(
-        "absolute size-10 rounded-md border-2 border-background shadow ring-1 ring-black/15",
+        "absolute size-8 rounded-md border-2 border-background shadow ring-1 ring-black/15",
         active && "ring-2 ring-foreground",
         className,
       )}

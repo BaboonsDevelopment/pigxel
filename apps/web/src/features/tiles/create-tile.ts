@@ -1,3 +1,4 @@
+import { recordAssetUse } from "@/features/assets/actions";
 import { loadAssetDocument, type Asset } from "@/features/assets/assets";
 import { moveTileToFolder } from "@/features/tiles/actions";
 import type { StartKind } from "@/features/editor/constants";
@@ -72,6 +73,7 @@ export async function createTile(
         "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from My projects.",
     };
   if (!tile.asset) writeNewTileDefaults(userId, { width, height, background });
+  else void recordAssetUse(tile.asset.id, "start").catch(() => {});
   return { draftId: draft.id };
 }
 

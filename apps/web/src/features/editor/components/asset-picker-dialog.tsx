@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogBody,
@@ -10,24 +10,20 @@ import {
 } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
-import { cn } from "@pigxel/ui/lib/utils";
 import { ModalButton } from "@/components/ui/modal-button";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
-import { AssetImage } from "@/features/assets/components/asset-image";
+import { UpgradeDialog } from "@/features/billing/components/upgrade-dialog";
+import { loadAssetLibrary } from "@/features/assets/actions";
+import { isLocked, type Asset } from "@/features/assets/assets";
 import {
-  isLocked,
-  type Asset,
-  type AssetBlock,
-} from "@/features/assets/assets";
-import {
-  listAssetBlocksInBrowser,
-  listAssetsInBrowser,
-} from "@/features/assets/publish";
+  AssetResults,
+  AssetToolbar,
+  useAssetFilters,
+  useFavourites,
+} from "@/features/assets/components/asset-browser";
+import { NO_ASSET_FILTERS } from "@/features/assets/filters";
 
-type Listing =
-  | { state: "loading" }
-  | { state: "ready"; assets: Asset[]; blocks: AssetBlock[] }
-  | { state: "error" };
+type Library = Awaited<ReturnType<typeof loadAssetLibrary>>;
 
 type PickerProps = {
   onPick: (asset: Asset) => Promise<string | null>;
@@ -46,121 +42,39 @@ export default function AssetPickerDialog({
 
 function AssetPicker({ onPick }: PickerProps) {
   const { close } = useDialog();
-  const [listing, setListing] = useState<Listing>({ state: "loading" });
-  const [picking, setPicking] = useState<string | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [library, setLibrary] = useState<Library | "error" | null>(null);
 
   useEffect(() => {
     let stale = false;
-    Promise.all([listAssetsInBrowser(), listAssetBlocksInBrowser()]).then(
-      ([assets, blocks]) =>
-        !stale && setListing({ state: "ready", assets, blocks }),
-      () => !stale && setListing({ state: "error" }),
+    loadAssetLibrary().then(
+      (loaded) => !stale && setLibrary(loaded),
+      () => !stale && setLibrary("error"),
     );
     return () => {
       stale = true;
     };
   }, []);
 
-  const pick = async (asset: Asset) => {
-    if (isLocked(asset)) {
-      setProblem(
-        `“${asset.name}” is a premium asset. Starter, Pro and Advanced plans unlock it.`,
-      );
-      return;
-    }
-    setPicking(asset.id);
-    setProblem(null);
-    const error = await onPick(asset);
-    setPicking(null);
-    if (error) setProblem(error);
-    else close();
-  };
-
-  const status = cn(
-    "rounded-xl border bg-background px-4 py-6 text-center text-sm",
-    listing.state === "error" ? "text-destructive" : "text-muted-foreground",
-  );
-
   return (
     <>
       <ModalHeader title="Insert Asset" />
-      <DialogBody className="grid gap-4 py-5">
-        <p className="-mb-1 text-sm text-muted-foreground">
-          It lands in the middle of the layer you’re drawing on, ready to move.
-          Animations bring their first frame.
-        </p>
-        {problem && (
-          <FormMessage tone="error">
-            {problem}{" "}
-            {problem.includes("premium") && (
-              <Link
-                href="/pricing"
-                target="_blank"
-                className={textLinkClassName}
-              >
-                See plans
-              </Link>
-            )}
-          </FormMessage>
-        )}
-        {listing.state === "loading" ? (
-          <p className={status}>Loading…</p>
-        ) : listing.state === "error" ? (
-          <p className={status}>
-            Couldn’t load the assets. Close this and try again.
+      {library === null || library === "error" ? (
+        <DialogBody className="py-5">
+          <p
+            className={
+              library === "error"
+                ? "rounded-xl border bg-background px-4 py-6 text-center text-sm text-destructive"
+                : "rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground"
+            }
+          >
+            {library === "error"
+              ? "Couldn’t load the assets. Close this and try again."
+              : "Loading…"}
           </p>
-        ) : listing.assets.length === 0 ? (
-          <p className={status}>No assets yet.</p>
-        ) : (
-          <div>
-            {listing.blocks.map((category) => {
-              const assets = listing.assets.filter(
-                (a) => a.category === category.id,
-              );
-              if (!assets.length) return null;
-              return (
-                <section key={category.id} className="mb-4 last:mb-0">
-                  <h3 className="mb-2 text-sm font-semibold">
-                    {category.name}
-                  </h3>
-                  <ul className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                    {assets.map((asset) => (
-                      <li key={asset.id}>
-                        <button
-                          type="button"
-                          title={asset.name}
-                          disabled={picking !== null}
-                          aria-busy={picking === asset.id}
-                          onClick={() => void pick(asset)}
-                          className="flex w-full flex-col items-center gap-1 rounded-xl p-1.5 text-xs transition-colors hover:bg-muted/60 focus-visible:outline-2 disabled:opacity-60 aria-busy:animate-pulse"
-                        >
-                          <span className="relative flex aspect-square w-full items-center justify-center rounded-lg border bg-checker p-2">
-                            <AssetImage
-                              asset={asset}
-                              className={
-                                isLocked(asset) ? "w-full opacity-50" : "w-full"
-                              }
-                            />
-                            {asset.premium && (
-                              <span className="absolute top-0.5 left-0.5 rounded bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
-                                Premium
-                              </span>
-                            )}
-                          </span>
-                          <span className="w-full truncate text-center">
-                            {asset.name}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              );
-            })}
-          </div>
-        )}
-      </DialogBody>
+        </DialogBody>
+      ) : (
+        <Browser library={library} onPick={onPick} onDone={close} />
+      )}
       <DialogFooter className={`${MODAL_FOOTER} items-center`}>
         <p className="mr-auto text-xs text-muted-foreground">
           Palettes are in the colour panel’s Load… menu.{" "}
@@ -173,5 +87,81 @@ function AssetPicker({ onPick }: PickerProps) {
         </ModalButton>
       </DialogFooter>
     </>
+  );
+}
+
+function Browser({
+  library,
+  onPick,
+  onDone,
+}: {
+  library: Library;
+  onPick: PickerProps["onPick"];
+  onDone: () => void;
+}) {
+  const { filters, typed, setTyped, setFilters } =
+    useAssetFilters(NO_ASSET_FILTERS);
+  const favourites = useFavourites(library.favourites);
+  const [picking, setPicking] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [upgrading, setUpgrading] = useState<Asset | null>(null);
+  const packs = useMemo(
+    () =>
+      new Map(library.packs.map((pack, index) => [pack.id, { pack, index }])),
+    [library.packs],
+  );
+
+  const pick = async (asset: Asset) => {
+    if (picking) return;
+    if (isLocked(asset)) return setUpgrading(asset);
+    setPicking(true);
+    setProblem(null);
+    const error = await onPick(asset);
+    setPicking(false);
+    if (error) setProblem(error);
+    else onDone();
+  };
+
+  return (
+    <DialogBody className="grid gap-4 py-5" aria-busy={picking}>
+      <p className="-mb-1 text-sm text-muted-foreground">
+        It lands in the middle of the layer you’re drawing on, ready to move.
+        Animations bring their first frame.
+      </p>
+      <AssetToolbar
+        typed={typed}
+        onTyped={setTyped}
+        placeholder="Search assets, packs or tags…"
+        filters={filters}
+        onFilters={setFilters}
+        tags={library.tags}
+        packs={library.packs}
+      />
+      {problem && <FormMessage tone="error">{problem}</FormMessage>}
+      {favourites.error && (
+        <FormMessage tone="error">{favourites.error}</FormMessage>
+      )}
+      <AssetResults
+        title={
+          filters.pack
+            ? (packs.get(filters.pack)?.pack.name ?? "Assets")
+            : "All assets"
+        }
+        grid="grid grid-cols-3 gap-3 sm:grid-cols-4"
+        filters={filters}
+        firstPage={null}
+        packs={packs}
+        favourites={favourites.assets}
+        onFavourite={favourites.asset}
+        onOpen={(asset) => void pick(asset)}
+      />
+      {upgrading && (
+        <UpgradeDialog
+          title="Premium asset"
+          description={`“${upgrading.name}” is in a premium pack. Upgrade to drop it into your tiles.`}
+          onClose={() => setUpgrading(null)}
+        />
+      )}
+    </DialogBody>
   );
 }

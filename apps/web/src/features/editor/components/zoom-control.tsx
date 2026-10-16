@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { cn } from "@pigxel/ui/lib/utils";
 import { MAX_SCALE, MIN_SCALE } from "../pixel-canvas/constants";
 
 // A scale of four is the 100% reference size in the zoom control.
@@ -13,6 +14,7 @@ export function ZoomControl({
   onZoomOut,
   onReset,
   onFit,
+  className,
 }: {
   scale: number;
   onChange: (scale: number) => void;
@@ -20,6 +22,7 @@ export function ZoomControl({
   onZoomOut: () => void;
   onReset: () => void;
   onFit: () => void;
+  className?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const canceled = useRef(false);
@@ -37,16 +40,12 @@ export function ZoomControl({
     setDraft(null);
   };
   return (
-    <div className="flex items-center gap-0.5 rounded-md border bg-background/95 p-0.5 text-xs shadow-sm">
-      <button
-        type="button"
-        aria-label="Fit to window"
-        title="Fit the whole tile to the canvas area"
-        onClick={onFit}
-        className="h-6 rounded px-1.5 hover:bg-muted"
-      >
-        Fit
-      </button>
+    <div
+      className={cn(
+        "flex items-center gap-0.5 rounded-md border bg-background/95 p-0.5 text-xs shadow-sm",
+        className,
+      )}
+    >
       <button
         type="button"
         aria-label="Zoom out"
@@ -93,6 +92,26 @@ export function ZoomControl({
         className="size-6 rounded hover:bg-muted"
       >
         +
+      </button>
+      <button
+        type="button"
+        aria-label="Fit to window"
+        title="Fit the whole tile to the canvas area"
+        onClick={onFit}
+        className="grid size-6 place-items-center rounded hover:bg-muted"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="size-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+        </svg>
       </button>
       <button
         type="button"

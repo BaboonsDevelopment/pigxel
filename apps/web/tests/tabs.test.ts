@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  movedTab,
   readTabs,
   tabAfterClosing,
   withTab,
@@ -29,11 +28,8 @@ describe("editor tabs", () => {
     expect(withTab(["a", "b"], "a", "b")).toEqual(["a", "b"]);
     expect(withTab(["a"], "c", "missing")).toEqual(["a", "c"]);
   });
-  it("closes and moves tabs", () => {
+  it("closes tabs", () => {
     expect(withoutTab(["a", "b", "c"], "b")).toEqual(["a", "c"]);
-    expect(movedTab(["a", "b", "c"], "a", 2)).toEqual(["b", "c", "a"]);
-    expect(movedTab(["a", "b", "c"], "c", 0)).toEqual(["c", "a", "b"]);
-    expect(movedTab(["a", "b", "c"], "b", 9)).toEqual(["a", "c", "b"]);
   });
   it("shows the next tab after closing one, else the one before", () => {
     expect(tabAfterClosing(["a", "b", "c"], "b")).toBe("c");

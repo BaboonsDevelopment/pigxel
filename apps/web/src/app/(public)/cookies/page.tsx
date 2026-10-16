@@ -49,10 +49,10 @@ const FUNCTIONAL: Item[] = [
     lasts: "Until you clear site data",
   },
   {
-    name: "pigxel:layout:…, pigxel:layout-at:…, pigxel:layout-presets:…, pigxel:keys:…, pigxel:brushes:…, pigxel:new-tile:…",
+    name: "pigxel:layout:…, pigxel:layout-at:…, pigxel:keys:…, pigxel:brushes:…, pigxel:new-tile:…",
     kind: "Local storage",
     purpose:
-      "Editor panels, layout presets, keyboard shortcuts, brushes and new-tile settings.",
+      "Editor layout (sidebar, timeline and tools), keyboard shortcuts, brushes and new-tile settings.",
     lasts: "Until you clear site data",
   },
   {

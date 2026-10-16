@@ -3,19 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  DEFAULT_LAYOUT,
-  readLayout,
-  setPanelCollapsed,
-  setPanelShown,
-  type Layout,
-  type PanelId,
-} from "./layout";
+  DEFAULT_PREFS,
+  openedFor,
+  readPrefs,
+  type EditorPrefs,
+} from "./editor-prefs";
 
-const layoutKey = (userId: string) => `pigxel:layout:v2:${userId}`;
-const changedKey = (userId: string) => `pigxel:layout-at:v2:${userId}`;
-const oldKey = (userId: string) => `pigxel:layout:v1:${userId}`;
+const prefsKey = (userId: string) => `pigxel:layout:v3:${userId}`;
+const changedKey = (userId: string) => `pigxel:layout-at:v3:${userId}`;
+/** The movable-panels layout before; read once for its tool choices. */
+const oldKey = (userId: string) => `pigxel:layout:v2:${userId}`;
 
 const SYNC_DELAY = 1500;
+
+type Start = Parameters<typeof openedFor>[1];
 
 function storage() {
   try {
@@ -25,11 +26,6 @@ function storage() {
   }
 }
 
-const opened = (layout: Layout, panel?: PanelId) =>
-  panel
-    ? setPanelCollapsed(setPanelShown(layout, panel, true), panel, false)
-    : layout;
-
 function changedAt(userId: string) {
   try {
     return Number(storage()?.getItem(changedKey(userId))) || 0;
@@ -38,12 +34,16 @@ function changedAt(userId: string) {
   }
 }
 
-export function useEditorLayout(userId: string, open?: PanelId) {
-  const [layout, setLayout] = useState<Layout>(() =>
-    opened(read(userId), open),
+/**
+ * The editor's prefs, kept in this browser and synced to the account
+ * (editor_layouts), newest wins.
+ */
+export function useEditorPrefs(userId: string, start?: Start) {
+  const [prefs, setPrefs] = useState<EditorPrefs>(() =>
+    openedFor(read(userId), start),
   );
-  const initial = useRef(layout);
-  const fromServer = useRef<Layout | null>(null);
+  const initial = useRef(prefs);
+  const fromServer = useRef<EditorPrefs | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -60,7 +60,7 @@ export function useEditorLayout(userId: string, open?: PanelId) {
           return;
         }
         if (Date.parse(data.updated_at) === local) return;
-        const next = opened(readLayout(data.layout), open);
+        const next = openedFor(readPrefs(data.layout), start);
         try {
           storage()?.setItem(
             changedKey(userId),
@@ -68,51 +68,46 @@ export function useEditorLayout(userId: string, open?: PanelId) {
           );
         } catch {}
         fromServer.current = next;
-        setLayout(next);
+        setPrefs(next);
       });
     return () => {
       live = false;
     };
-  }, [userId, open]);
+  }, [userId, start]);
 
   useEffect(() => {
     try {
-      storage()?.setItem(layoutKey(userId), JSON.stringify(layout));
+      storage()?.setItem(prefsKey(userId), JSON.stringify(prefs));
     } catch {}
-    if (layout === initial.current || layout === fromServer.current) return;
+    if (prefs === initial.current || prefs === fromServer.current) return;
     const at = Date.now();
     try {
       storage()?.setItem(changedKey(userId), String(at));
     } catch {}
-    const timer = setTimeout(() => void push(userId, layout, at), SYNC_DELAY);
+    const timer = setTimeout(() => void push(userId, prefs, at), SYNC_DELAY);
     return () => clearTimeout(timer);
-  }, [userId, layout]);
+  }, [userId, prefs]);
 
-  return [layout, setLayout] as const;
+  return [prefs, setPrefs] as const;
 }
 
-async function push(userId: string, layout: Layout, at: number) {
+async function push(userId: string, prefs: EditorPrefs, at: number) {
   await createClient()
     .from("editor_layouts")
     .upsert({
       user_id: userId,
-      layout,
+      layout: prefs,
       updated_at: new Date(at).toISOString(),
     });
 }
 
-function read(userId: string): Layout {
+function read(userId: string): EditorPrefs {
   try {
-    const raw = storage()?.getItem(layoutKey(userId));
-    if (raw) return readLayout(JSON.parse(raw));
-    const old = storage()?.getItem(oldKey(userId));
-    const tools = old ? readLayout(JSON.parse(old)) : DEFAULT_LAYOUT;
-    return {
-      ...DEFAULT_LAYOUT,
-      hiddenTools: tools.hiddenTools,
-      groupTools: tools.groupTools,
-    };
+    const raw =
+      storage()?.getItem(prefsKey(userId)) ??
+      storage()?.getItem(oldKey(userId));
+    return raw ? readPrefs(JSON.parse(raw)) : DEFAULT_PREFS;
   } catch {
-    return DEFAULT_LAYOUT;
+    return DEFAULT_PREFS;
   }
 }

@@ -57,7 +57,9 @@ export default function Privacy() {
             <strong>Your work:</strong> the tiles you save to Pigxel cloud and
             their earlier versions, thumbnails, folders, labels, pins,
             collections, which tiles you publish, and the days you worked on
-            them (for your activity chart).
+            them (for your activity chart); the assets and asset packs you mark
+            as favourites, and which assets you started a tile from, downloaded
+            or copied, and when (for Recently used and Popular).
           </li>
           <li>
             <strong>Sharing:</strong> the people you share projects with, their

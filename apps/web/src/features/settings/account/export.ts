@@ -39,12 +39,19 @@ const TABLES: { name: string; table: string; by: string; columns?: string }[] =
     { name: "views", table: "tile_view_people", by: "user_id" },
     { name: "downloads", table: "tile_download_people", by: "user_id" },
     { name: "editor_layout", table: "editor_layouts", by: "user_id" },
+    { name: "subscriptions", table: "subscriptions", by: "user_id" },
     {
-      name: "editor_layout_presets",
-      table: "editor_layout_presets",
+      name: "tutorial_completions",
+      table: "tutorial_completions",
       by: "user_id",
     },
-    { name: "subscriptions", table: "subscriptions", by: "user_id" },
+    { name: "asset_uses", table: "asset_uses", by: "user_id" },
+    { name: "asset_favourites", table: "asset_favourites", by: "user_id" },
+    {
+      name: "asset_pack_favourites",
+      table: "asset_pack_favourites",
+      by: "user_id",
+    },
   ];
 
 /** A ZIP of everything Pigxel stores about a person, and their tile files. */
