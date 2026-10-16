@@ -21,6 +21,7 @@ const PACK: PackSource = {
   name: "Test",
   tier: "free",
   block: null,
+  background: null,
   premium: [],
   description: "",
   palette: ["#181425", "#63c74d", "#3e8948", "#a7f070", "#ffffff"],

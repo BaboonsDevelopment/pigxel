@@ -3,13 +3,19 @@ import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
 
 export type AssetKind = "sprite" | "tile";
 
-export type AssetBlock = { id: string; name: string; count: number };
+export type AssetBlock = {
+  id: string;
+  name: string;
+  count: number;
+  background: string | null;
+};
 
-export const ASSET_BLOCK_COLUMNS = "id, name, assets(count)";
+export const ASSET_BLOCK_COLUMNS = "id, name, background, assets(count)";
 
 export type AssetBlockRow = {
   id: string;
   name: string;
+  background: string | null;
   assets: { count: number }[];
 };
 
@@ -17,6 +23,7 @@ export const toAssetBlock = (row: AssetBlockRow): AssetBlock => ({
   id: row.id,
   name: row.name,
   count: row.assets[0]?.count ?? 0,
+  background: row.background,
 });
 
 export const ASSET_BUCKET = "assets";

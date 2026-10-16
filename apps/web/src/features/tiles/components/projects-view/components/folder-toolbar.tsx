@@ -5,7 +5,6 @@ import {
   InputGroupInput,
   InputGroupText,
 } from "@pigxel/ui/components/input";
-import { OptionMenu } from "@/features/explore/components/explore-header/components/option-menu";
 import type { Label } from "../../../labels";
 import {
   PROJECT_SORTS,
@@ -14,6 +13,7 @@ import {
 } from "../constants";
 import { ProjectFiltersMenu } from "./project-filters-menu";
 import { SortIcon } from "./toolbar-icons";
+import { ToolbarMenu } from "./toolbar-menu";
 
 export function FolderToolbar({
   query,
@@ -57,7 +57,7 @@ export function FolderToolbar({
           onChange={(e) => onQueryChange(e.target.value)}
         />
       </InputGroup>
-      <OptionMenu
+      <ToolbarMenu
         label="Sort"
         icon={<SortIcon />}
         options={PROJECT_SORTS}

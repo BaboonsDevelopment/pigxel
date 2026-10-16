@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { CloudError } from "@/lib/pigxel-file/cloud";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
@@ -13,10 +18,8 @@ import { remixArt } from "../../../remix";
 import { setFollowing } from "@/features/profile/actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { PublicTile } from "@/features/profile/profile";
-import type { AuthorArt } from "@/features/profile/server";
-import { PixelImage } from "@/components/ui/pixel-image";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
-import { manrope } from "@/lib/fonts/manrope";
+import { madimiOne } from "@/lib/fonts/madimi";
 import { formatCount } from "../../popular-card/helpers";
 import {
   recordDownload,
@@ -25,8 +28,8 @@ import {
   setTileLiked,
   setTileSaved,
 } from "../../../actions";
-import { DownloadDialog } from "@/features/tiles/components/projects-view/components/download-dialog";
 import type { Picture } from "../helpers";
+import { DownloadArtDialog } from "./download-art-dialog";
 import { EditDetailsDialog } from "./edit-details-dialog";
 import { ReportDialog } from "./report-dialog";
 import type { ReportReason } from "../../../constants";
@@ -41,6 +44,70 @@ import { projectKeys } from "@/features/tiles/queries/keys";
 
 const counting = new Set<string>();
 
+const ACTION =
+  "h-9 cursor-pointer rounded-xl border bg-background text-xs font-medium transition-colors hover:bg-muted disabled:cursor-default disabled:bg-muted disabled:text-muted-foreground";
+
+const published = new Intl.DateTimeFormat("en", { dateStyle: "long" });
+
+function Stat({
+  icon,
+  value,
+  label,
+}: {
+  icon: ReactNode;
+  value: number;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[#4a1f35] [&>svg]:size-[18px]">{icon}</span>
+      <span>
+        <span className="block text-[13px] leading-tight font-semibold tabular-nums">
+          {formatCount(value)}
+        </span>
+        <span className="block text-[10px] leading-tight text-muted-foreground">
+          {label}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function Svg({
+  children,
+  fill = "none",
+}: {
+  children: ReactNode;
+  fill?: string;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      fill={fill}
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+    >
+      {children}
+    </svg>
+  );
+}
+
+const HEART =
+  "M8 13.5S2.5 10.3 2.5 6.4A3 3 0 0 1 8 4.8a3 3 0 0 1 5.5 1.6c0 3.9-5.5 7.1-5.5 7.1Z";
+
+const RemixIcon = () => (
+  <Svg>
+    <circle cx="4.5" cy="3.5" r="1.5" />
+    <circle cx="11.5" cy="3.5" r="1.5" />
+    <circle cx="8" cy="12.5" r="1.5" />
+    <path d="M4.5 5v1.5a2 2 0 0 0 2 2h3a2 2 0 0 0 2-2V5M8 8.5V11" />
+  </Svg>
+);
+
 export function ArtDetails({
   tile,
   viewerId,
@@ -48,9 +115,7 @@ export function ArtDetails({
   saved,
   file,
   picture,
-  palette,
-  moreArts,
-  className,
+  commentCount,
 }: {
   tile: PublicTile;
   viewerId: string | null;
@@ -58,9 +123,7 @@ export function ArtDetails({
   saved: boolean;
   file: string | null;
   picture: Picture | null;
-  palette: string[];
-  moreArts: AuthorArt[];
-  className?: string;
+  commentCount: number;
 }) {
   const { author } = tile;
   const router = useRouter();
@@ -69,7 +132,6 @@ export function ArtDetails({
   const [copied, setCopied] = useState<string | null>(null);
   const [follows, setFollows] = useState(following);
   const [followPending, startFollow] = useTransition();
-  const [downloads, setDownloads] = useState(tile.downloads);
   const [downloading, setDownloading] = useState(false);
   const [views, setViews] = useState(tile.views ?? 0);
 
@@ -95,6 +157,7 @@ export function ArtDetails({
   const [isSaved, setIsSaved] = useState(saved);
   const [savePending, startSave] = useTransition();
   const client = useQueryClient();
+  const collect = useRef<{ open: () => void }>(null);
   const own = viewerId === author.id;
   const [details, setDetails] = useState({
     tags: tile.tags,
@@ -113,11 +176,6 @@ export function ArtDetails({
     setReported(true);
     showSuccess("Thanks, we’ll take a look.");
     return null;
-  };
-
-  const counted = async () => {
-    const total = await recordDownload(tile.id);
-    if (total !== null) setDownloads(total);
   };
 
   const toggleLike = () => {
@@ -201,25 +259,40 @@ export function ArtDetails({
   };
 
   return (
-    <section
-      aria-labelledby="art-title"
-      className={cn(
-        manrope.className,
-        "flex flex-col rounded-2xl border bg-background px-5 py-4 text-[#4a1f35] [&>*]:shrink-0 shadow-[0_1px_2px_rgb(59_42_51/0.06)] lg:min-h-0 lg:overflow-y-auto",
-        className,
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <ul aria-label="Tags" className="flex flex-wrap gap-2">
-          {details.tags.map((tag) => (
-            <li
-              key={tag}
-              className="rounded-md bg-pastel-pink-soft px-2 py-0.5 text-[10px] text-primary"
+    <section aria-labelledby="art-title" className="flex flex-col">
+      <div className="flex items-center gap-3">
+        <Link
+          href={`/u/${author.username}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          <ProfileAvatar
+            name={author.name}
+            url={author.avatarUrl}
+            className="size-8 bg-pastel-pink-soft text-sm text-primary"
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-[13px] font-semibold">
+              {author.name}
+            </span>
+            <span
+              title={author.bio?.trim() || undefined}
+              className="block truncate text-[10px] text-muted-foreground"
             >
-              {tag}
-            </li>
-          ))}
-        </ul>
+              {author.bio?.trim() || `@${author.username}`}
+            </span>
+          </span>
+        </Link>
+        {!own && (
+          <button
+            type="button"
+            aria-pressed={follows}
+            disabled={followPending}
+            onClick={toggleFollow}
+            className="h-7 shrink-0 cursor-pointer rounded-lg border bg-background px-5 text-xs transition-colors hover:bg-muted aria-pressed:text-muted-foreground"
+          >
+            {follows ? "Following" : "Follow"}
+          </button>
+        )}
         <ProjectMenu
           label={`More for ${tile.name}`}
           icon={
@@ -242,7 +315,32 @@ export function ArtDetails({
               label: "View profile",
               onSelect: () => router.push(`/u/${author.username}`),
             },
+            {
+              label: isSaved ? "Remove from favorites" : "Add to favorites",
+              onSelect: () => {
+                if (!savePending) toggleSave();
+              },
+            },
+            {
+              label: "Add to collection",
+              onSelect: () => collect.current?.open(),
+            },
+            ...(viewerId && !own && !reported
+              ? [
+                  {
+                    label: "Report art",
+                    destructive: true,
+                    onSelect: () => setReporting(true),
+                  },
+                ]
+              : []),
           ]}
+        />
+        <CollectButton
+          tileId={tile.id}
+          signedIn={!!viewerId}
+          headless
+          controls={collect}
         />
       </div>
       {editing && (
@@ -260,455 +358,188 @@ export function ArtDetails({
         />
       )}
 
-      <Heading
-        as="h1"
+      <h1
         id="art-title"
-        className="mt-3 text-[34px] leading-[1.1] font-bold text-[#4a1f35]"
+        className={cn(
+          madimiOne.className,
+          "mt-2 text-[28px] leading-[1.1] tracking-[0.02em] break-words text-[#4a1f35]",
+        )}
       >
         {details.name}
-      </Heading>
-
-      <div className="mt-3 flex items-center gap-3">
-        <Link
-          href={`/u/${author.username}`}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-offset-2"
-        >
-          <ProfileAvatar
-            name={author.name}
-            url={author.avatarUrl}
-            className="size-8 bg-pastel-pink-soft text-sm text-primary"
-          />
-          <span className="min-w-0">
-            <span className="block truncate text-[13px] font-semibold">
-              {author.name}
-            </span>
-            <span className="block truncate text-[10px] text-muted-foreground">
-              @{author.username}
-            </span>
-            {author.bio?.trim() && (
-              <span
-                title={author.bio}
-                className="mt-0.5 block truncate text-[11px] text-muted-foreground"
-              >
-                {author.bio.trim()}
-              </span>
+      </h1>
+      <p className="mt-1 text-[10px] text-muted-foreground">
+        {tile.publishedAt &&
+          `Published ${published.format(new Date(tile.publishedAt))}`}
+        {tile.remixOf && (
+          <>
+            {tile.publishedAt && " · "}
+            {tile.remixOf.tile ? (
+              <>
+                Remix of{" "}
+                <Link
+                  href={`/explore/${tile.remixOf.tile.id}`}
+                  className="text-foreground underline-offset-2 hover:underline"
+                >
+                  {tile.remixOf.tile.name}
+                </Link>{" "}
+                by{" "}
+              </>
+            ) : (
+              "Remixed from "
             )}
-          </span>
-        </Link>
-        {!own && (
-          <button
-            type="button"
-            aria-pressed={follows}
-            disabled={followPending}
-            onClick={toggleFollow}
-            className="h-7 shrink-0 cursor-pointer rounded-lg border border-primary-soft bg-pastel-pink-soft px-3 text-[11px] text-primary transition-colors hover:bg-pastel-pink aria-pressed:border-border aria-pressed:bg-background aria-pressed:text-muted-foreground"
-          >
-            {follows ? "Following" : "Follow"}
-          </button>
+            <Link
+              href={`/u/${tile.remixOf.username}`}
+              className="text-foreground underline-offset-2 hover:underline"
+            >
+              @{tile.remixOf.username}
+            </Link>
+          </>
         )}
-      </div>
+      </p>
 
       {details.description && (
-        <p className="mt-3 text-xs leading-relaxed break-words whitespace-pre-line text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug break-words whitespace-pre-line">
           {details.description}
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-4 rounded-xl border border-[#f6dbe4] bg-[#fef6f8] py-2">
-        <button
-          type="button"
-          aria-pressed={like.liked}
-          aria-label={like.liked ? "Unlike" : "Like"}
-          disabled={likePending}
-          onClick={toggleLike}
-          className={cn(
-            "flex cursor-pointer items-center justify-center gap-2 border-r border-[#f6dbe4] px-2 text-left transition-colors hover:text-primary",
-            like.liked && "text-primary",
-          )}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill={like.liked ? "currentColor" : "none"}
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-            className="size-5"
-          >
-            <path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">
-              {formatCount(like.count)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">likes</p>
-          </div>
-        </button>
-        <div className="flex items-center justify-center gap-2 border-r border-[#f6dbe4] px-2">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-5"
-          >
-            <path d="M2.5 5h8.5M9 2.5 11.5 5 9 7.5M13.5 11H5M7 8.5 4.5 11 7 13.5" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">
-              {formatCount(tile.remixes ?? 0)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {tile.remixes === 1 ? "remix" : "remixes"}
-            </p>
-          </div>
-        </div>
-        <div className="flex border-r border-[#f6dbe4]">
-          <button
-            type="button"
-            disabled={!picture}
-            onClick={() => setDownloading(true)}
-            className="flex flex-1 cursor-pointer items-center justify-center gap-2 px-2 text-left transition-colors hover:text-primary disabled:cursor-default"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="size-5"
-            >
-              <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
-            </svg>
-            <span>
-              <span className="block text-sm font-semibold tabular-nums">
-                {formatCount(downloads)}
-              </span>
-              <span className="block text-[10px] text-muted-foreground">
-                downloads
-              </span>
-            </span>
-          </button>
-        </div>
-        <div className="flex items-center justify-center gap-2 px-2">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-5"
-          >
-            <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
-            <circle cx="8" cy="8" r="2" />
-          </svg>
-          <div>
-            <p className="text-sm font-semibold tabular-nums">
-              {formatCount(views)}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {views === 1 ? "view" : "views"}
-            </p>
-          </div>
-        </div>
+      {details.tags.length > 0 && (
+        <ul aria-label="Tags" className="mt-2 flex flex-wrap gap-2">
+          {details.tags.map((tag) => (
+            <li key={tag}>
+              <Link
+                href={`/explore?tag=${encodeURIComponent(tag)}`}
+                className="block rounded-md bg-pastel-pink-soft px-2.5 py-1 text-[10px] text-[#4a1f35] transition-colors hover:bg-pastel-pink"
+              >
+                #{tag.toLowerCase()}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        <Stat
+          icon={
+            <Svg>
+              <path d={HEART} />
+            </Svg>
+          }
+          value={like.count}
+          label="Likes"
+        />
+        <Stat
+          icon={
+            <Svg>
+              <path d="M13.5 7.5c0 2.8-2.5 5-5.5 5a6 6 0 0 1-2.4-.5L2.5 13l.9-2.6a4.7 4.7 0 0 1-.9-2.9c0-2.8 2.5-5 5.5-5s5.5 2.2 5.5 5Z" />
+            </Svg>
+          }
+          value={commentCount}
+          label="Comments"
+        />
+        <Stat icon={<RemixIcon />} value={tile.remixes ?? 0} label="Remixes" />
+        <Stat
+          icon={
+            <Svg>
+              <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+              <circle cx="8" cy="8" r="2" />
+            </Svg>
+          }
+          value={views}
+          label="Views"
+        />
       </div>
 
-      {canRemix ? (
-        <>
-          <button
-            type="button"
-            disabled={remixing || (!!viewerId && !file)}
-            onClick={() => void remix()}
-            className="relative mt-4 flex h-10 w-full cursor-pointer items-center justify-center rounded-xl bg-[#d9558a] text-[13px] font-medium text-white shadow-[0_8px_18px_-10px_#d9558a] transition-colors hover:bg-[#c94a7d] disabled:cursor-default disabled:opacity-60"
-          >
-            {remixing ? "Opening…" : "Open & remix in editor"}
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="absolute right-4 size-4"
-            >
-              <path d="M4 12 12 4M6 4h6v6" />
-            </svg>
-          </button>
-          <p className="mt-2 text-center text-[10px] leading-snug text-muted-foreground">
-            Make it your own. A copy will be added to My projects, with credit
-            to {author.username}.
-          </p>
-        </>
-      ) : (
-        <p className="mt-4 rounded-xl border border-dashed px-3 py-2.5 text-center text-[11px] text-muted-foreground">
-          The owner turned off remixing for this art.
-        </p>
-      )}
+      <div
+        className={cn(
+          "mt-3 flex items-center gap-3 rounded-xl border px-4 py-2",
+          canRemix
+            ? "border-[#f3c9d8] bg-[#fdeef3]"
+            : "border-[#ecd9e1] bg-[#f5eaef]",
+        )}
+      >
+        <span className="shrink-0 text-[#4a1f35]">
+          {canRemix ? (
+            <RemixIcon />
+          ) : (
+            <Svg>
+              <rect x="3" y="7" width="10" height="7" rx="1.5" />
+              <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+            </Svg>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold">
+            {canRemix ? "Remixes allowed" : "Remixing is disabled"}
+          </span>
+          <span className="block text-[10px] text-muted-foreground">
+            {canRemix
+              ? "Make it your own. The original artist will be credited."
+              : "The artist has turned off remixes for this artwork."}
+          </span>
+        </span>
+        <button
+          type="button"
+          disabled={!canRemix || remixing || (!!viewerId && !file)}
+          onClick={() => void remix()}
+          className="h-7 shrink-0 cursor-pointer rounded-lg border border-primary/40 bg-background px-3 text-[11px] font-medium text-primary transition-colors hover:bg-pastel-pink-soft disabled:cursor-default disabled:bg-transparent disabled:opacity-50"
+        >
+          {!canRemix ? "Remix" : remixing ? "Opening…" : "Create remix →"}
+        </button>
+      </div>
       {error && (
         <FormMessage tone="error" className="mt-2 text-center">
           {error}
         </FormMessage>
       )}
 
-      <div className="mt-3 flex flex-wrap justify-center gap-3">
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        <button
+          type="button"
+          aria-pressed={like.liked}
+          disabled={likePending}
+          onClick={toggleLike}
+          className={cn(
+            ACTION,
+            like.liked && "border-primary-soft bg-pastel-pink-soft text-primary",
+          )}
+        >
+          {like.liked ? "Liked" : "Like"}
+        </button>
+        <button
+          type="button"
+          disabled={!canRemix || remixing || (!!viewerId && !file)}
+          onClick={() => void remix()}
+          className={ACTION}
+        >
+          Remix
+        </button>
         <button
           type="button"
           disabled={!picture}
           onClick={() => setDownloading(true)}
-          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
+          className={ACTION}
         >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-4"
-          >
-            <path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2 10.5V12a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 14 12v-1.5" />
-          </svg>
           Download
         </button>
-        {reporting && (
-          <ReportDialog onReport={report} onClose={() => setReporting(false)} />
-        )}
-        {downloading && (
-          <DownloadDialog
-            name={tile.name}
-            file={file ?? undefined}
-            tileId={tile.id}
-            authorId={author.id}
-            withFile={canRemix}
-            onDownload={() => void counted()}
-            onClose={() => setDownloading(false)}
-          />
-        )}
-        <button
-          type="button"
-          aria-pressed={isSaved}
-          disabled={savePending}
-          onClick={toggleSave}
-          className={cn(
-            "flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted",
-            isSaved && "border-primary-soft bg-pastel-pink-soft text-primary",
-          )}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill={isSaved ? "currentColor" : "none"}
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinejoin="round"
-            className="size-4"
-          >
-            <path d="M4 2.5h8v11L8 10.5l-4 3Z" />
-          </svg>
-          {isSaved ? "Saved" : "Save project"}
+        <button type="button" onClick={() => void share()} className={ACTION}>
+          {copied === "link" ? "Copied" : "Share"}
         </button>
-        <CollectButton tileId={tile.id} signedIn={!!viewerId} />
-        <button
-          type="button"
-          onClick={() => void share()}
-          className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            className="size-4"
-          >
-            <circle cx="12" cy="3.5" r="1.8" />
-            <circle cx="4" cy="8" r="1.8" />
-            <circle cx="12" cy="12.5" r="1.8" />
-            <path d="m5.6 7.1 4.8-2.7M5.6 8.9l4.8 2.7" />
-          </svg>
-          {copied === "link" ? "Link copied" : "Share"}
-        </button>
-        {viewerId && !own && (
-          <span className="group relative flex">
-            <button
-              type="button"
-              aria-label={reported ? "Reported, thanks" : "Report art"}
-              disabled={reported}
-              onClick={() => setReporting(true)}
-              className={cn(
-                "flex size-8 cursor-pointer items-center justify-center rounded-lg border bg-background transition-colors hover:bg-muted hover:text-destructive disabled:cursor-default disabled:hover:bg-background",
-                reported && "text-destructive",
-              )}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 16 16"
-                fill={reported ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="size-4"
-              >
-                <path d="M3.5 14V2.5M3.5 3h8l-1.8 3 1.8 3h-8" />
-              </svg>
-            </button>
-            <span
-              role="tooltip"
-              className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-[10px] whitespace-nowrap text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100"
-            >
-              {reported ? "Reported · thanks" : "Report this art"}
-            </span>
-          </span>
-        )}
       </div>
-
-      <div className="mt-4 border-t pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <Heading as="h2" className="text-base font-bold text-[#4a1f35]">
-            Little colors, big mood
-          </Heading>
-          {palette.length > 0 ? (
-            <Link
-              href={`/tiles/new?${new URLSearchParams({
-                colors: palette.map((color) => color.slice(1)).join(","),
-                paletteName: `From “${tile.name}”`,
-              })}`}
-              className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border border-primary-soft bg-pastel-pink-soft px-2.5 text-[11px] text-primary transition-colors hover:bg-pastel-pink"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-                className="size-3.5"
-              >
-                <path d="M8 1.5a6.5 6.5 0 1 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2s.6-1.2 1.4-1.2h1.6a2.8 2.8 0 0 0 2.8-2.8C14.5 4 11.6 1.5 8 1.5Z" />
-                <circle cx="4.8" cy="7" r=".8" />
-                <circle cx="7" cy="4.5" r=".8" />
-                <circle cx="10.2" cy="5" r=".8" />
-              </svg>
-              Use this palette
-            </Link>
-          ) : null}
-        </div>
-        <ul className="mt-2.5 grid grid-cols-7 gap-2">
-          {palette.map((color) => (
-            <li key={color}>
-              <button
-                type="button"
-                title={copied === color ? "Copied" : color}
-                aria-label={`Copy ${color}`}
-                onClick={() => copy(color, color)}
-                className={cn(
-                  "block h-6 w-full cursor-pointer rounded-md border border-black/5 transition-transform hover:-translate-y-0.5",
-                  copied === color && "ring-2 ring-primary",
-                )}
-                style={{ background: color }}
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-4 flex items-start gap-3 border-t pt-4">
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
-          className="mt-0.5 size-4 shrink-0"
-        >
-          <circle cx="8" cy="8" r="6.2" />
-          <path d="M1.8 8h12.4M8 1.8c1.8 1.8 2.6 3.9 2.6 6.2S9.8 12.4 8 14.2C6.2 12.4 5.4 10.3 5.4 8S6.2 3.6 8 1.8Z" />
-        </svg>
-        <div>
-          <p className="text-[11px]">
-            Public project · Remix {details.allowRemix ? "enabled" : "disabled"}
-          </p>
-          <p className="text-[10px] text-muted-foreground">
-            {tile.remixOf ? (
-              <>
-                {tile.remixOf.tile ? (
-                  <>
-                    Remix of{" "}
-                    <Link
-                      href={`/explore/${tile.remixOf.tile.id}`}
-                      className="text-foreground underline-offset-2 hover:underline"
-                    >
-                      {tile.remixOf.tile.name}
-                    </Link>{" "}
-                    by{" "}
-                  </>
-                ) : (
-                  "Remixed from "
-                )}
-                <Link
-                  href={`/u/${tile.remixOf.username}`}
-                  className="text-foreground underline-offset-2 hover:underline"
-                >
-                  @{tile.remixOf.username}
-                </Link>
-              </>
-            ) : (
-              <>Original creation by {author.username}</>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {moreArts.length > 0 && (
-        <div className="mt-4 border-t pt-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <Heading as="h2" className="text-base font-bold text-[#4a1f35]">
-              More from @{author.username}
-            </Heading>
-            <Link
-              href={`/u/${author.username}`}
-              className="shrink-0 text-[10px] text-primary hover:underline"
-            >
-              View profile →
-            </Link>
-          </div>
-          <ul className="mt-2.5 grid grid-cols-3 gap-2">
-            {moreArts.map((art) => (
-              <li key={art.id}>
-                <Link
-                  href={`/explore/${art.id}`}
-                  title={art.name}
-                  aria-label={`Open ${art.name}`}
-                  className="group block aspect-square overflow-hidden rounded-lg border bg-checker"
-                >
-                  {art.thumbnail ? (
-                    <PixelImage
-                      src={art.thumbnail}
-                      alt=""
-                      loading="lazy"
-                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
-                    />
-                  ) : (
-                    <span className="flex size-full items-center justify-center text-[9px] text-muted-foreground">
-                      {art.name}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {reporting && (
+        <ReportDialog onReport={report} onClose={() => setReporting(false)} />
+      )}
+      {downloading && picture && (
+        <DownloadArtDialog
+          name={tile.name}
+          author={author.username}
+          thumbnail={tile.thumbnail}
+          picture={picture}
+          file={file}
+          withFile={canRemix}
+          onDownload={() => void recordDownload(tile.id)}
+          onClose={() => setDownloading(false)}
+        />
       )}
     </section>
   );

@@ -1,4 +1,4 @@
-import { SIZES, TAGS } from "@/features/explore/constants";
+import { CANVAS_SIZES, TAGS } from "@/features/explore/constants";
 
 const SEARCH_MAX = 100;
 
@@ -47,7 +47,7 @@ export function cloudFilter({
   trashed,
   sort,
 }: ProjectQuery) {
-  const range = SIZES.find((s) => s.value === size) ?? SIZES[0];
+  const range = CANVAS_SIZES.find((s) => s.value === size) ?? CANVAS_SIZES[0];
   return {
     min: range.min,
     max: range.max,

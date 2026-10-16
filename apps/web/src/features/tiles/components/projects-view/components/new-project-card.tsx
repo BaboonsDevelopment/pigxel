@@ -13,7 +13,7 @@ export function NewProjectCard({ folderId }: { folderId?: string }) {
         }
         className={cn(
           pixelifySans.className,
-          "flex h-full min-h-40 items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-input bg-background/70 text-sm text-foreground transition-colors hover:border-primary-soft hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
+          "flex h-full min-h-40 items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-[#eba9c0] bg-background text-sm text-primary transition-colors hover:border-primary hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
         )}
       >
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">

@@ -24,3 +24,7 @@ supabase/.branches/
 
 # Generated asset packs (pnpm --filter @pigxel/web assets:generate)
 apps/web/scripts/assets/out/
+
+# Local asset sources, generation files, and previews.
+apps/web/scripts/assets/packs/
+output/

@@ -7,6 +7,7 @@ import type { ReviewBlock, ReviewTarget, ReviewTile } from "../../../types";
 import { useReviewActions } from "../../../use-asset-review";
 import { PILL, REVIEW_GRID } from "../constants";
 import { errorText } from "../helpers";
+import { SwatchPicker } from "./swatch-picker";
 import { TileCard } from "./tile-card";
 
 const NEW_BLOCK = "new";
@@ -60,11 +61,14 @@ export function BlockSection({
   tiles: ReviewTile[];
   background: string;
 }) {
-  const { setBlockPremium, setBlockTarget } = useReviewActions();
+  const { setBlockPremium, setBlockTarget, setBlockBackground } =
+    useReviewActions();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const approved = block.tiles.filter((t) => t.state === "approved").length;
   const target = targets.find((t) => t.id === block.target);
+  const tint =
+    block.target === null ? block.background : (target?.background ?? null);
 
   const act = async (action: () => Promise<unknown>) => {
     setPending(true);
@@ -95,6 +99,15 @@ export function BlockSection({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {block.target === null && (
+            <SwatchPicker
+              value={block.background}
+              disabled={pending}
+              onChange={(value) =>
+                act(() => setBlockBackground(block.id, value))
+              }
+            />
+          )}
           <OptionMenu
             label="Goes to"
             options={[
@@ -135,6 +148,7 @@ export function BlockSection({
             <TileCard
               tile={tile}
               background={background}
+              tint={tint}
               blockPremium={block.premium}
             />
           </li>

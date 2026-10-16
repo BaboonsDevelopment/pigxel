@@ -101,6 +101,7 @@ export type PublicTile = ProfileTile & {
   allowRemix?: boolean;
   remixes?: number;
   views?: number;
+  publishedAt?: string | null;
   remixOf?: {
     username: string;
     tile: { id: string; name: string } | null;

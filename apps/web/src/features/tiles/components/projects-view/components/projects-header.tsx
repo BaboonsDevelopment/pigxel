@@ -1,10 +1,6 @@
 import Image from "next/image";
-import {
-  InputGroup,
-  InputGroupInput,
-  InputGroupText,
-} from "@pigxel/ui/components/input";
-import { Heading } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
+import { madimiOne } from "@/lib/fonts/madimi";
 import mascot from "../../../../../../public/art/pigxel-mascot-studying.png";
 import {
   FILTERS,
@@ -14,61 +10,15 @@ import {
   type ProjectSort,
 } from "../constants";
 import { ProjectFiltersMenu } from "./project-filters-menu";
-import { SortIcon } from "./toolbar-icons";
-import { StatsHover } from "./stats-hover";
-import { OptionMenu } from "@/features/explore/components/explore-header/components/option-menu";
+import { CATEGORY_ICONS, SortIcon } from "./toolbar-icons";
+import { ToolbarMenu } from "./toolbar-menu";
 import type { Label } from "../../../labels";
 
-const SIDE_VIEWS: ReadonlySet<Filter> = new Set(["Archive", "Trash"]);
-
-const SHOWN = FILTERS.filter((name) => !SIDE_VIEWS.has(name));
-const SHOW_OPTIONS = SHOWN.map((name) => ({ value: name, label: name })) as [
-  { value: Filter; label: string },
-  ...{ value: Filter; label: string }[],
-];
-
-function ViewButton({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <span className="group relative flex">
-      <button
-        type="button"
-        aria-label={label}
-        aria-pressed={active}
-        onClick={onClick}
-        className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border bg-background text-foreground transition-colors hover:bg-muted aria-pressed:border-transparent aria-pressed:bg-pastel-pink"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-[18px]"
-        >
-          {children}
-        </svg>
-      </button>
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute top-full left-1/2 z-20 mt-1.5 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-[10px] whitespace-nowrap text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100"
-      >
-        {label}
-      </span>
-    </span>
-  );
-}
+const CATEGORIES = FILTERS.map((name) => ({
+  value: name,
+  label: name,
+  icon: CATEGORY_ICONS[name],
+}));
 
 export function ProjectsHeader({
   filter,
@@ -92,116 +42,71 @@ export function ProjectsHeader({
   onSortChange: (sort: ProjectSort) => void;
 }) {
   return (
-    <header className="@container mb-3">
-      <div className="flex flex-col gap-3 @min-[1200px]:flex-row @min-[1200px]:items-end @min-[1200px]:justify-between @min-[1200px]:gap-6">
-        <div className="min-w-0">
-          <Heading
-            as="h1"
-            className="text-[2.5rem] leading-[1.1] font-semibold"
+    <header className="relative mb-8 border-b border-[#f0dde5] pb-4 md:pt-4 lg:[zoom:clamp(0.7,tan(atan2(100vw,1920px)),1)]">
+      <h1
+        className={cn(
+          madimiOne.className,
+          "text-[48px] leading-[63px] tracking-[0.03em] text-[#4a2434]",
+        )}
+      >
+        My projects
+      </h1>
+      <div className="mt-2.5 flex items-center gap-[23px] max-lg:flex-wrap lg:pr-[310px]">
+        <label className="flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-[#e7c6d2] bg-background px-3 text-[#4a1f35] transition-colors focus-within:border-[#8c3a57] sm:w-[426px] sm:shrink">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            className="size-4 shrink-0 text-muted-foreground"
           >
-            My projects
-          </Heading>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Manage, organize and keep creating ✨
-          </p>
-          <div
-            role="group"
-            aria-label="Show"
-            className="mt-6 flex min-h-10 flex-wrap items-center gap-2"
-          >
-            <div className="@min-[680px]:hidden">
-              <OptionMenu
-                label="Show"
-                options={SHOW_OPTIONS}
-                value={filter}
-                onChange={onFilterChange}
-              />
-            </div>
-            {SHOWN.map((name) => (
-              <button
-                key={name}
-                type="button"
-                aria-pressed={filter === name}
-                onClick={() => onFilterChange(name)}
-                className="hidden h-9 cursor-pointer rounded-lg @min-[680px]:block border bg-background px-4 text-xs transition-colors hover:bg-muted aria-pressed:border-transparent aria-pressed:bg-pastel-pink"
-              >
-                {name}
-              </button>
-            ))}
-            {(filter === "All" || filter === "Projects") && (
-              <>
-                <OptionMenu
-                  label="Sort"
-                  icon={<SortIcon />}
-                  options={PROJECT_SORTS}
-                  value={sort}
-                  onChange={onSortChange}
-                />
-                <ProjectFiltersMenu
-                  filters={projectFilters}
-                  onChange={onProjectFiltersChange}
-                  labels={labels}
-                />
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex w-full max-w-[460px] shrink-0 flex-col items-end">
-          <Image
-            src={mascot}
-            alt=""
-            width={237}
-            height={158}
-            priority
-            className="-mt-[30px] -mb-[16px] hidden h-auto w-[237px] @min-[1200px]:block"
+            <circle cx="9" cy="9" r="5.5" />
+            <path d="m13 13 3.5 3.5" />
+          </svg>
+          <span className="sr-only">Search</span>
+          <input
+            type="search"
+            placeholder="Search your projects…"
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
           />
-          <div className="flex w-full items-center gap-2">
-            <StatsHover tile={null} />
-            <ViewButton
-              label="Archive"
-              active={filter === "Archive"}
-              onClick={() =>
-                onFilterChange(filter === "Archive" ? "All" : "Archive")
-              }
-            >
-              <rect x="2.5" y="3" width="15" height="4" rx="1" />
-              <path d="M3.5 7v8.5a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5V7M8 10.5h4" />
-            </ViewButton>
-            <ViewButton
-              label="Trash"
-              active={filter === "Trash"}
-              onClick={() =>
-                onFilterChange(filter === "Trash" ? "All" : "Trash")
-              }
-            >
-              <path d="M3 5.5h14M8 5.5V3.5h4v2M4.5 5.5l.8 11a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4l.8-11M8.5 9v5.5M11.5 9v5.5" />
-            </ViewButton>
-            <InputGroup className="flex-1">
-              <InputGroupText className="pr-0">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  className="size-4"
-                >
-                  <circle cx="9" cy="9" r="5.5" />
-                  <path d="m13 13 3.5 3.5" />
-                </svg>
-              </InputGroupText>
-              <InputGroupInput
-                type="search"
-                aria-label="Search"
-                placeholder="Search projects, templates, assets…"
-                value={query}
-                onChange={(e) => onQueryChange(e.target.value)}
-              />
-            </InputGroup>
-          </div>
-        </div>
+        </label>
+        <ToolbarMenu
+          label="Category"
+          title="Category"
+          icon={CATEGORY_ICONS[filter]}
+          options={CATEGORIES}
+          value={filter}
+          onChange={onFilterChange}
+        />
+        {(filter === "All" || filter === "Projects") && (
+          <>
+            <ToolbarMenu
+              label="Sort"
+              icon={<SortIcon />}
+              options={PROJECT_SORTS}
+              value={sort}
+              onChange={onSortChange}
+            />
+            <ProjectFiltersMenu
+              filters={projectFilters}
+              onChange={onProjectFiltersChange}
+              labels={labels}
+            />
+          </>
+        )}
       </div>
+      <Image
+        src={mascot}
+        alt=""
+        width={237}
+        height={158}
+        priority
+        className="pointer-events-none absolute right-12 bottom-0 hidden h-auto w-[250px] translate-y-[9%] lg:block"
+      />
     </header>
   );
 }

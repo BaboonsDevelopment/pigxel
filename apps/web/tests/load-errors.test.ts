@@ -36,7 +36,7 @@ vi.mock("@/features/assets/server", () => ({
   listAssets: mocks.listAssets,
   countPremiumAssets: async () => 0,
   listAssetBlocks: async () => [
-    { id: "characters", name: "Characters", count: 500 },
+    { id: "characters", name: "Characters", count: 500, background: null },
   ],
 }));
 vi.mock("@/features/profile/server", () => ({

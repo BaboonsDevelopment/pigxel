@@ -148,6 +148,7 @@ type ArtFilter = {
   min?: number;
   max?: number;
   animated?: boolean;
+  still?: boolean;
   query?: string;
   order?: "relevance" | "recent" | "az";
   likedBy?: string;
@@ -221,6 +222,7 @@ export async function listPublicTiles(
   if (filter.min)
     query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
   if (filter.animated) query = query.gt("frame_count", 1);
+  if (filter.still) query = query.lte("frame_count", 1);
   const mine = filter.likedBy ?? viewerId;
   if (mine) query = query.eq("mine.user_id", mine);
   if (followees) query = query.in("user_id", followees);
@@ -306,6 +308,7 @@ export async function countPublicTilesByTag(
       if (filter.min)
         query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
       if (filter.animated) query = query.gt("frame_count", 1);
+      if (filter.still) query = query.lte("frame_count", 1);
       const { count, error } = await query;
       if (error)
         throw new Error(`Couldn’t count public arts: ${error.message}`);
@@ -376,11 +379,12 @@ export async function getPublicTile(
     supabase
       .from("tiles")
       .select(
-        "tags, description, allow_remix, remix_of_user, original:remix_of_tile(id, name), original_author:remix_of_user(username)",
+        "tags, description, allow_remix, published_at, remix_of_user, original:remix_of_tile(id, name), original_author:remix_of_user(username)",
       )
       .eq("id", tile.id)
       .maybeSingle<{
         tags: string[];
+        published_at: string | null;
         description: string | null;
         allow_remix: boolean;
         remix_of_user: string | null;
@@ -402,6 +406,7 @@ export async function getPublicTile(
     tags: details.data?.tags ?? [],
     description: details.data?.description ?? null,
     allowRemix: details.data?.allow_remix ?? true,
+    publishedAt: details.data?.published_at ?? null,
     remixOf: details.data?.original_author
       ? {
           username: details.data.original_author.username,
@@ -411,28 +416,31 @@ export async function getPublicTile(
   };
 }
 
-export type AuthorArt = {
-  id: string;
-  name: string;
-  thumbnail: string | null;
-};
-
-export async function listMoreByAuthor(
-  authorId: string,
-  exceptId: string,
-  limit = 6,
-): Promise<AuthorArt[]> {
+export async function listRemixes(
+  tileId: string,
+  limit = 4,
+): Promise<PublicTile[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tiles")
-    .select("id, name, thumbnail")
-    .eq("user_id", authorId)
+    .select(PUBLIC_TILE_COLUMNS)
+    .eq("remix_of_tile", tileId)
     .eq("visibility", "public")
-    .neq("id", exceptId)
     .order("published_at", { ascending: false })
+    .order("id")
     .limit(limit);
-  if (error) throw new Error(`Couldn’t load more arts: ${error.message}`);
-  return data;
+  if (error) throw new Error(`Couldn’t load remixes: ${error.message}`);
+  return (data as unknown as PublicTileRow[]).map(toPublicTile);
+}
+
+export async function listSimilarArts(
+  tile: Pick<PublicTile, "id" | "tags">,
+  viewerId: string | null,
+  limit = 4,
+): Promise<PublicTile[]> {
+  if (!tile.tags.length) return [];
+  const { tiles } = await listPublicTiles(0, limit + 1, 0, viewerId, tile.tags);
+  return tiles.filter((t) => t.id !== tile.id).slice(0, limit);
 }
 
 export async function getFollowStats(

@@ -36,10 +36,12 @@ const STATE_TONES: Record<ReviewState, string> = {
 export function TileCard({
   tile,
   background,
+  tint,
   blockPremium,
 }: {
   tile: ReviewTile;
   background: string;
+  tint: string | null;
   blockPremium: boolean;
 }) {
   const actions = useReviewActions();
@@ -84,8 +86,9 @@ export function TileCard({
       <div
         className={cn(
           "relative flex aspect-square items-center justify-center overflow-hidden",
-          background,
+          !tint && background,
         )}
+        style={tint ? { background: tint } : undefined}
       >
         {image && (
           <SpriteCanvas
