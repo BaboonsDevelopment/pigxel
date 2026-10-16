@@ -9,10 +9,8 @@ import {
   InputGroupText,
 } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
-import type { DriveStatus } from "@/lib/google-drive/status";
 import { PIGXEL_EXTENSION } from "@/lib/pigxel-file/format";
 import { IMAGE_FILE_TYPES } from "@/lib/pigxel-file/import-image";
-import type { OpenSource } from "../constants";
 import type { ActionId } from "../keymap";
 import type { TileFile } from "../use-tile-file";
 import { Menu } from "./menu/menu";
@@ -26,12 +24,10 @@ export function EditorHeader({
   hidden,
   file,
   fileInput,
-  drive,
   sprite,
   playback,
-  onOpenFrom,
+  onOpenCloud,
   recent,
-  onConnectDrive,
   onExport,
   onPublish,
   onPublishArt,
@@ -50,12 +46,10 @@ export function EditorHeader({
   hidden?: boolean;
   file: TileFile;
   fileInput: RefObject<HTMLInputElement | null>;
-  drive: DriveStatus;
   sprite: SpriteApi;
   playback: Playback;
-  onOpenFrom: (source: OpenSource) => void;
+  onOpenCloud: () => void;
   recent: MenuItem[];
-  onConnectDrive: () => void;
   onExport: () => void;
   onPublish?: () => void;
   onPublishArt?: () => void;
@@ -105,7 +99,7 @@ export function EditorHeader({
             },
             {
               label: "Open from Pigxel cloud…",
-              onSelect: () => onOpenFrom("cloud"),
+              onSelect: onOpenCloud,
             },
             {
               label: "Open recent",
@@ -120,14 +114,6 @@ export function EditorHeader({
                       },
                     ],
               ],
-            },
-            {
-              label: drive.connected
-                ? "Open from Google Drive…"
-                : "Connect Google Drive…",
-              onSelect: () =>
-                drive.connected ? onOpenFrom("drive") : onConnectDrive(),
-              hidden: !drive.available,
             },
             {
               label: "Import",
@@ -145,28 +131,9 @@ export function EditorHeader({
           ],
           [
             {
-              label:
-                file.location && file.location.kind !== "cloud"
-                  ? "Move to Pigxel cloud"
-                  : "Save to Pigxel cloud",
-              shortcut:
-                file.location?.kind === "cloud"
-                  ? keyOf("command:save")
-                  : undefined,
-              onSelect: file.saveToCloud,
-            },
-            {
-              label: !drive.connected
-                ? "Connect Google Drive…"
-                : file.location && file.location.kind !== "drive"
-                  ? "Move to Google Drive"
-                  : "Save to Google Drive",
-              shortcut:
-                file.location?.kind === "drive"
-                  ? keyOf("command:save")
-                  : undefined,
-              onSelect: drive.connected ? file.saveToDrive : onConnectDrive,
-              hidden: !drive.available,
+              label: "Save to Pigxel cloud",
+              shortcut: keyOf("command:save"),
+              onSelect: file.save,
             },
             {
               label: "Save as copy",
@@ -183,7 +150,6 @@ export function EditorHeader({
             },
             {
               label: "Download .pigxel",
-              shortcut: file.location ? undefined : keyOf("command:save"),
               onSelect: file.download,
             },
           ],
@@ -278,21 +244,13 @@ export function EditorHeader({
           type="button"
           variant="secondary"
           size="sm"
-          onClick={file.status.connect ? onConnectDrive : file.save}
+          onClick={file.save}
           className="shrink-0"
         >
           {file.status.retry}
         </Button>
       )}
       <div className="ml-auto flex min-w-0 items-center gap-2">
-        {drive.connected && (
-          <p
-            className="hidden min-w-0 truncate text-xs text-muted-foreground 2xl:block"
-            title={`Google Drive · ${drive.email ?? "connected"}`}
-          >
-            Google Drive · {drive.email ?? "connected"}
-          </p>
-        )}
         {onShare && (
           <Button
             type="button"

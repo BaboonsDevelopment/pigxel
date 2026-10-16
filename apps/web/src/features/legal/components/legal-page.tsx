@@ -51,11 +51,7 @@ export function LegalSection({
 export function ContactDetails() {
   return (
     <p>
-      {LEGAL.operator} is run by {LEGAL.legalName}
-      {LEGAL.registrationNumber &&
-        `, registration number ${LEGAL.registrationNumber}`}
-      , {LEGAL.address}. Email:{" "}
-      <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
+      Email: <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
     </p>
   );
 }

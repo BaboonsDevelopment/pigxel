@@ -6,7 +6,11 @@ import { memo, useEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { readDraft, removeDraft } from "@/lib/pigxel-file/draft";
 import { flattenDocument, parsePigxel } from "@/lib/pigxel-file/format";
-import { LOCATION_LABELS, type TileLocation } from "@/lib/pigxel-file/location";
+import {
+  CLOUD_LABEL,
+  NOT_SAVED_LABEL,
+  type TileLocation,
+} from "@/lib/pigxel-file/location";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import {
   movedTab,
@@ -120,9 +124,7 @@ export function TileTabs({
               location: draft.location,
             };
         if (!tile) return null;
-        const place = tile.location
-          ? LOCATION_LABELS[tile.location.kind]
-          : "this browser";
+        const place = tile.location ? CLOUD_LABEL : NOT_SAVED_LABEL;
         return (
           <div
             key={id}

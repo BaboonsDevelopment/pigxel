@@ -7,7 +7,6 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { DriveStatus } from "@/lib/google-drive/status";
 import {
   CloudConflictError,
   CloudError,
@@ -25,20 +24,14 @@ import {
   serializePigxel,
   type PigxelDocument,
 } from "@/lib/pigxel-file/format";
-import {
-  DriveError,
-  saveDriveFile,
-  type DriveFile,
-} from "@/lib/pigxel-file/google-drive";
 import { downloadPigxel } from "@/lib/pigxel-file/local";
 import {
-  LOCATION_LABELS,
+  CLOUD_LABEL,
   type CloudTile,
   type TileLocation,
 } from "@/lib/pigxel-file/location";
 import {
   draftForCloudTile,
-  draftForDriveFile,
   draftFromDocument,
   draftFromFile,
 } from "@/lib/pigxel-file/open-tile";
@@ -69,7 +62,6 @@ type FileStatus = {
   tone: "info" | "error";
   text: string;
   retry?: string;
-  connect?: boolean;
 };
 
 export type TileFile = ReturnType<typeof useTileFile>;
@@ -84,16 +76,13 @@ const PROJECT_SAVED = "Project saved successfully!";
 const SAVING = "Saving project…";
 
 const isKnownError = (error: unknown): error is Error =>
-  error instanceof PigxelFileError ||
-  error instanceof DriveError ||
-  error instanceof CloudError;
+  error instanceof PigxelFileError || error instanceof CloudError;
 
 export function useTileFile({
   tile,
   fileInput,
   userId,
   initial,
-  drive,
   notice,
   onOpen,
   onDraft,
@@ -103,7 +92,6 @@ export function useTileFile({
   fileInput: RefObject<HTMLInputElement | null>;
   userId: string;
   initial: Draft;
-  drive: DriveStatus;
   notice?: FileStatus;
   onOpen: (draftId: string) => void;
 }) {
@@ -158,46 +146,28 @@ export function useTileFile({
     return doc;
   };
 
+  /** Saves to Pigxel cloud: over `current`, or as a new tile when null. */
   const saveTo = async (
-    target: TileLocation["kind"],
     current: TileLocation | null,
     image = currentImage(),
     tileName = name,
     force = false,
   ): Promise<TileLocation> => {
-    const contents = serializePigxel(image);
-    if (
-      target === "cloud" &&
-      current?.kind === "cloud" &&
-      Date.now() - lastSnapshot.current > VERSION_EVERY_MS
-    ) {
+    if (current && Date.now() - lastSnapshot.current > VERSION_EVERY_MS) {
       if (await snapshotVersion(current.tile.id).catch(() => false))
         lastSnapshot.current = Date.now();
     }
-    if (target === "cloud") {
-      const tile: CloudTile = await saveCloudTile(
-        {
-          id: current?.kind === "cloud" ? current.tile.id : undefined,
-          name: tileName,
-          version:
-            current?.kind === "cloud" && !force
-              ? current.tile.version
-              : undefined,
-        },
-        contents,
-        image,
-        thumbnailDataUrl(image),
-      );
-      return { kind: "cloud", tile };
-    }
-    const file: DriveFile = await saveDriveFile(
+    const tile: CloudTile = await saveCloudTile(
       {
-        id: current?.kind === "drive" ? current.file.id : undefined,
+        id: current?.tile.id,
         name: tileName,
+        version: current && !force ? current.tile.version : undefined,
       },
-      contents,
+      serializePigxel(image),
+      image,
+      thumbnailDataUrl(image),
     );
-    return { kind: "drive", file };
+    return { kind: "cloud", tile };
   };
 
   const [failures, setFailures] = useState(0);
@@ -220,27 +190,22 @@ export function useTileFile({
     )
       return;
     if (pause) return;
-    if (location.kind === "drive" && !drive.available) return;
     const timer = setTimeout(
       async () => {
         const savedRevision = latestRevision.current;
         setSync("saving");
         try {
-          saved(await saveTo(location.kind, location), savedRevision);
+          saved(await saveTo(location), savedRevision);
         } catch (error) {
           if (error instanceof CloudConflictError) return setSync("conflict");
           setSyncError(
             isKnownError(error)
               ? error
-              : new Error(
-                  `Couldn’t save to ${LOCATION_LABELS[location.kind]}.`,
-                ),
+              : new Error(`Couldn’t save to ${CLOUD_LABEL}.`),
           );
           const tries = failures + 1;
-          const needsConnect =
-            error instanceof DriveError && error.needsConnect;
           setFailures(tries);
-          const gaveUp = tries >= AUTO_RETRIES || needsConnect;
+          const gaveUp = tries >= AUTO_RETRIES;
           if (gaveUp) showSnackbar(SAVE_FAILED);
           setSync(gaveUp ? "failed" : "retrying");
         }
@@ -249,7 +214,7 @@ export function useTileFile({
     );
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, dirty, name, revision, sync, drive.available, pause, failures]);
+  }, [location, dirty, name, revision, sync, pause, failures]);
 
   const changed = () => {
     setDirty(true);
@@ -279,12 +244,17 @@ export function useTileFile({
 
   const openFromComputer = () => fileInput.current?.click();
 
+  /** Opens `doc` as a new tile in Pigxel cloud, or unsaved when that fails. */
   const openNew = async (doc: PigxelDocument, tileName: string) => {
     let home: TileLocation | null = null;
-    if (location && (location.kind === "cloud" || drive.available))
-      try {
-        home = await saveTo(location.kind, null, doc, tileName);
-      } catch {}
+    try {
+      home = await saveTo(null, doc, tileName);
+    } catch (error) {
+      showSnackbar(
+        `${isKnownError(error) ? error.message : `Couldn’t save to ${CLOUD_LABEL}.`} It opens unsaved.`,
+        { tone: "warning" },
+      );
+    }
     onOpen(await draftFromDocument(userId, doc, tileName, home));
   };
 
@@ -333,9 +303,6 @@ export function useTileFile({
   const openDocument = (doc: PigxelDocument, tileName: string) =>
     void run(() => openNew(doc, tileName));
 
-  const openDriveFile = (picked: DriveFile) =>
-    void run(async () => onOpen(await draftForDriveFile(userId, picked)));
-
   const openCloudTile = (picked: CloudTile) =>
     void run(async () => onOpen(await draftForCloudTile(userId, picked)));
 
@@ -346,15 +313,12 @@ export function useTileFile({
       setStatus({ tone: "info", text: `Downloaded ${pigxelFileName(name)}` });
     });
 
-  const saveNow = (target: TileLocation["kind"]) =>
+  const saveNow = () =>
     void run(async () => {
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        saved(
-          await withLoading(SAVING, () => saveTo(target, location)),
-          savedRevision,
-        );
+        saved(await withLoading(SAVING, () => saveTo(location)), savedRevision);
         showSuccess(PROJECT_SAVED);
       } catch (error) {
         setSync(
@@ -375,10 +339,10 @@ export function useTileFile({
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        const next = await withLoading(SAVING, () => saveTo("cloud", location));
+        const next = await withLoading(SAVING, () => saveTo(location));
         saved(next, savedRevision);
         showSuccess(PROJECT_SAVED);
-        if (next.kind === "cloud") cloud = next.tile;
+        cloud = next.tile;
       } catch (error) {
         setSync(
           error instanceof CloudConflictError
@@ -394,8 +358,6 @@ export function useTileFile({
     return cloud;
   };
 
-  const save = () => (location ? saveNow(location.kind) : download());
-
   const leaving = useRef(false);
   const unsaved = !!location && (dirty || sync === "saving");
   useEffect(() => {
@@ -407,8 +369,8 @@ export function useTileFile({
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
 
-  const place = location ? LOCATION_LABELS[location.kind] : null;
-  const locationStatus: FileStatus | null = !place
+  const place = CLOUD_LABEL;
+  const locationStatus: FileStatus | null = !location
     ? null
     : pause
       ? { tone: "error", text: pause }
@@ -421,12 +383,7 @@ export function useTileFile({
           ? {
               tone: "error",
               text: syncError?.message ?? `Couldn’t save to ${place}.`,
-              retry:
-                syncError instanceof DriveError && syncError.needsConnect
-                  ? "Connect Google Drive"
-                  : "Try again",
-              connect:
-                syncError instanceof DriveError && syncError.needsConnect,
+              retry: "Try again",
             }
           : sync === "retrying"
             ? {
@@ -462,7 +419,7 @@ export function useTileFile({
         setSync("saving");
         try {
           saved(
-            await saveTo(location.kind, location, currentImage(), name, true),
+            await saveTo(location, currentImage(), name, true),
             savedRevision,
           );
         } catch (error) {
@@ -472,7 +429,7 @@ export function useTileFile({
       }),
     reloadFromCloud: () =>
       void run(async () => {
-        if (location?.kind !== "cloud") return;
+        if (!location) return;
         const cloud = await readCloudTileVersion(location.tile.id);
         writeDraft(userId, {
           id: initial.id,
@@ -500,22 +457,16 @@ export function useTileFile({
     openFromComputer,
     openDocument,
     openFrames,
-    openDriveFile,
     openCloudTile,
     download,
-    saveToCloud: () => saveNow("cloud"),
     saveToCloudFirst,
-    saveToDrive: () => saveNow("drive"),
-    save,
+    save: saveNow,
     saveBeforeLeaving: async () => {
       if (!location) return true;
       const savedRevision = latestRevision.current;
       setSync("saving");
       try {
-        saved(
-          await withLoading(SAVING, () => saveTo(location.kind, location)),
-          savedRevision,
-        );
+        saved(await withLoading(SAVING, () => saveTo(location)), savedRevision);
         showSuccess(PROJECT_SAVED);
         return true;
       } catch (error) {

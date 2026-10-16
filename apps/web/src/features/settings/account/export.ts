@@ -45,13 +45,6 @@ const TABLES: { name: string; table: string; by: string; columns?: string }[] =
       by: "user_id",
     },
     { name: "subscriptions", table: "subscriptions", by: "user_id" },
-    {
-      name: "google_drive_connection",
-      table: "google_drive_connections",
-      by: "user_id",
-      // Never the refresh token: it's a credential, not your data.
-      columns: "google_email, created_at, updated_at",
-    },
   ];
 
 /** A ZIP of everything Pigxel stores about a person, and their tile files. */

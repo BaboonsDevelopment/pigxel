@@ -5,7 +5,7 @@ import { Landing } from "@/features/landing/components/landing";
 export const metadata: Metadata = {
   title: "Pigxel Studio",
   description:
-    "Pigxel Studio is a pixel art editor that runs in your browser. Draw and animate pixel art, then sign in with Google to save your projects to Pigxel cloud or your own Google Drive.",
+    "Pigxel Studio is a pixel art editor that runs in your browser. Draw and animate pixel art, then sign in with Google to save your projects to Pigxel cloud.",
   alternates: { canonical: "https://www.pigxel.studio/" },
 };
 

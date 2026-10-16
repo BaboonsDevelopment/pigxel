@@ -71,9 +71,4 @@ export const CATEGORY_ICONS: Record<Filter, ReactNode> = {
       <path d="M2.8 5.7v6.8a1 1 0 0 0 1 1h8.4a1 1 0 0 0 1-1V5.7M6.5 8.5h3" />
     </Icon>
   ),
-  Trash: (
-    <Icon>
-      <path d="M2.5 4.5h11M6.3 4.5V3h3.4v1.5M3.8 4.5l.6 8.8a1 1 0 0 0 1 .9h5.2a1 1 0 0 0 1-.9l.6-8.8M6.8 7.2v4.3M9.2 7.2v4.3" />
-    </Icon>
-  ),
 };

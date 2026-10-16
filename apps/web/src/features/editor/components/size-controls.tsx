@@ -12,6 +12,7 @@ export function SizeField({
   value,
   unit,
   min = 1,
+  placeholder,
   disabled,
   onChange,
 }: {
@@ -20,6 +21,8 @@ export function SizeField({
   value: string;
   unit: string;
   min?: number | null;
+  /** Shown greyed out while the field is empty. */
+  placeholder?: string;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -35,6 +38,7 @@ export function SizeField({
           inputMode="numeric"
           min={min ?? undefined}
           value={value}
+          placeholder={placeholder}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           className="h-14 rounded-xl px-5 pr-12 text-base tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"

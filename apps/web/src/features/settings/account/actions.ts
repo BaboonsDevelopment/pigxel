@@ -1,25 +1,12 @@
 "use server";
 
-import { redirect } from "next/navigation";
-import { refresh, revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { authUrl } from "@/lib/auth/config";
 import { requireUser } from "@/lib/auth/session";
 import type { AuthState } from "@/lib/auth/types";
-import {
-  deleteDriveConnection,
-  isDriveAvailable,
-} from "@/lib/google-drive/server";
 import { createClient } from "@/lib/supabase/server";
 
 const ACCOUNT_PATH = "/settings/account";
-
-export async function disconnectDrive() {
-  const user = await requireUser();
-  if (isDriveAvailable())
-    await deleteDriveConnection(user.id, { revoke: true });
-  revalidatePath("/", "layout");
-  redirect(`${ACCOUNT_PATH}?drive=disconnected`);
-}
 
 export async function changeEmail(
   _state: AuthState,
@@ -59,7 +46,7 @@ export async function changeEmail(
 export async function unlinkProvider(
   provider: "google" | "apple",
 ): Promise<{ error?: string }> {
-  const user = await requireUser();
+  await requireUser();
   if (provider !== "google" && provider !== "apple")
     return { error: "Invalid request." };
   try {
@@ -75,8 +62,6 @@ export async function unlinkProvider(
       };
     const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity);
     if (unlinkError) return { error: "Couldn’t disconnect. Try again." };
-    if (provider === "google" && isDriveAvailable())
-      await deleteDriveConnection(user.id, { revoke: true });
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }

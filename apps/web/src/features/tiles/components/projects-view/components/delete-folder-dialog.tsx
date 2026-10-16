@@ -13,7 +13,6 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { showSuccess } from "@/components/ui/snackbar";
 import { deleteFolder } from "../../../actions";
-import { TRASH_DAYS } from "../../../constants";
 import type { Folder } from "../../../folders";
 import { PixelImage } from "@/components/ui/pixel-image";
 
@@ -89,7 +88,7 @@ function DeleteFolderForm({
         />
         {withProjects && (
           <p className="-mt-2 text-xs text-muted-foreground">
-            They go to Trash, where you can restore them for {TRASH_DAYS} days.
+            They’re deleted for good, with their versions, likes and comments.
           </p>
         )}
         {error && <FormMessage tone="error">{error}</FormMessage>}

@@ -69,16 +69,22 @@ export async function removeVersions(
   await admin.from("tile_versions").delete().in("id", ids);
 }
 
-export async function removeAllVersions(admin: Admin, tileIds: string[]) {
-  if (!tileIds.length) return;
-  const { data } = await admin
+/** Removes the saved version files of tiles. Returns an error, or null. */
+export async function removeAllVersions(
+  admin: Admin,
+  tileIds: string[],
+): Promise<string | null> {
+  if (!tileIds.length) return null;
+  const { data, error } = await admin
     .from("tile_versions")
     .select("id, tile_id")
     .in("tile_id", tileIds);
-  if (!data?.length) return;
-  await admin.storage
+  if (error) return error.message;
+  if (!data.length) return null;
+  const removed = await admin.storage
     .from(VERSIONS_BUCKET)
     .remove(data.map((v) => versionPath(v.tile_id, v.id)));
+  return removed.error?.message ?? null;
 }
 
 export async function restoreVersionFile(

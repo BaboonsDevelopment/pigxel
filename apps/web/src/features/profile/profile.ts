@@ -81,6 +81,8 @@ export type ProfileTile = {
   updatedAt: string;
   likes?: number;
   views?: number;
+  /** Has a tilemap layer: a tileset. */
+  tilemap?: boolean;
 };
 
 export type TileAuthor = {

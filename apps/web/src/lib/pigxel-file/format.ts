@@ -37,7 +37,8 @@ import {
 export const PIGXEL_EXTENSION = ".pigxel";
 export const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
 const PIGXEL_VERSION = 7;
-export const MAX_PIGXEL_SIZE = 256;
+/** The largest tile side, in pixels, that Pigxel creates, opens and saves. */
+export const MAX_PIGXEL_SIZE = 4096;
 
 const BACKGROUNDS = ["transparent", "white", "black"] as const;
 export type Background = (typeof BACKGROUNDS)[number];

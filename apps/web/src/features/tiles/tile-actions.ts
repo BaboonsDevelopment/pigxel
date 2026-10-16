@@ -3,15 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CloudError, type CloudTileSummary } from "@/lib/pigxel-file/cloud";
-import { restoreProjects, trashProjects } from "./actions";
-import { useInvalidateProjects } from "./queries/project-list";
-import { showSnackbar, showUndo, withLoading } from "@/components/ui/snackbar";
-import { TRASH_DAYS } from "./constants";
+import { deleteProjects } from "./actions";
+import { showSuccess, withLoading } from "@/components/ui/snackbar";
 import {
   findDraftFor,
   loadDrafts,
   removeDraft,
-  writeDraft,
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { PigxelFileError } from "@/lib/pigxel-file/format";
@@ -24,7 +21,6 @@ import {
 
 export function useCloudTileActions(userId: string) {
   const router = useRouter();
-  const invalidate = useInvalidateProjects();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
@@ -52,7 +48,7 @@ export function useCloudTileActions(userId: string) {
       name: tile.name,
       thumbnail: tile.thumbnail,
       size: tile,
-      message: `Are you sure you want to delete this project? You can restore it from Trash for ${TRASH_DAYS} days.`,
+      message: DELETE_FOR_GOOD,
     });
     if (!confirmed) return;
     setError(null);
@@ -66,13 +62,7 @@ export function useCloudTileActions(userId: string) {
     try {
       await deleteCloudProject(userId, tile);
       router.refresh();
-      showUndo("Project moved to trash.", async () => {
-        const { error } = await restoreProjects([tile.id]);
-        if (error) return showSnackbar(error);
-        unremove();
-        router.refresh();
-        void invalidate();
-      });
+      showSuccess("Project deleted.");
     } catch (e) {
       unremove();
       setError(
@@ -84,46 +74,30 @@ export function useCloudTileActions(userId: string) {
   return { busy, error, removed, open, remove };
 }
 
+/** Deletes a cloud project for good, with its working copy in this browser. */
 export async function deleteCloudProject(
   userId: string,
   tile: { id: string; name: string },
 ) {
-  const { error } = await trashProjects([tile.id]);
+  const { error } = await deleteProjects([tile.id]);
   if (error) throw new CloudError(error);
   await loadDrafts(userId);
   const open = findDraftFor(userId, {
     kind: "cloud",
     tile: { id: tile.id, name: tile.name },
   });
-  if (open)
-    writeDraft(userId, {
-      id: open.id,
-      name: open.name,
-      file: open.file,
-      location: null,
-      dirty: true,
-    });
+  if (open) removeDraft(userId, open.id);
 }
 
 export async function confirmRemoveLocalTile(
   userId: string,
   tile: Draft,
 ): Promise<boolean> {
-  const confirmed =
-    tile.location?.kind === "drive"
-      ? await confirmDeleteProject({
-          title: "Remove from Browser",
-          confirmLabel: "Remove",
-          name: tile.name,
-          thumbnail: draftThumbnail(tile),
-          detail: "Google Drive",
-          message: `Are you sure you want to remove this project from this browser? It stays in Google Drive${tile.dirty ? ", without the changes not yet saved there" : ""}.`,
-        })
-      : await confirmDeleteProject({
-          name: tile.name,
-          thumbnail: draftThumbnail(tile),
-          message: DELETE_FOR_GOOD,
-        });
+  const confirmed = await confirmDeleteProject({
+    name: tile.name,
+    thumbnail: draftThumbnail(tile),
+    message: DELETE_FOR_GOOD,
+  });
   if (!confirmed) return false;
   removeDraft(userId, tile.id);
   return true;

@@ -1,14 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isSupabaseConfigured, supabaseConfig } from "@/lib/supabase/config";
-import {
-  ACCEPT_PATH,
-  HOME_PATH,
-  isProtectedPath,
-  isUngatedPath,
-  safeNext,
-} from "@/lib/auth/routes";
-import { hasAcceptedLegal } from "@/features/legal/legal";
+import { HOME_PATH, isProtectedPath, safeNext } from "@/lib/auth/routes";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -49,23 +42,6 @@ export async function proxy(request: NextRequest) {
     !searchParams.has("error")
   ) {
     destination = HOME_PATH;
-  } else if (
-    signedIn &&
-    (request.method === "GET" || request.method === "HEAD") &&
-    !isUngatedPath(pathname) &&
-    !(
-      pathname === "/" &&
-      (searchParams.has("code") || searchParams.has("error"))
-    ) &&
-    !hasAcceptedLegal(
-      data?.claims.user_metadata as { legal_version?: unknown } | undefined,
-    )
-  ) {
-    // Someone who hasn't accepted the current Terms and Privacy Policy (or
-    // confirmed their age) does that before using the app.
-    const next =
-      pathname === "/" ? HOME_PATH : pathname + request.nextUrl.search;
-    destination = `${ACCEPT_PATH}?next=${encodeURIComponent(next)}`;
   }
 
   if (destination) {

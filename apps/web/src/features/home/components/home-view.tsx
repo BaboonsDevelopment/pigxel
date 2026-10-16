@@ -17,9 +17,12 @@ export const RECENT = 4;
 export function HomeView({
   userId,
   cloudTiles,
+  aiAllowed,
 }: {
   userId: string;
   cloudTiles: CloudTileSummary[];
+  /** Whether the plan includes the AI helper. */
+  aiAllowed: boolean;
 }) {
   return (
     <div className="relative xl:h-full xl:[container-type:size]">
@@ -29,7 +32,7 @@ export function HomeView({
           <Heading as="h1" id="start-heading" className="mb-3">
             Start creating
           </Heading>
-          <StartCreating />
+          <StartCreating userId={userId} aiAllowed={aiAllowed} />
         </section>
 
         <section aria-labelledby="recent-heading" className="mt-6 shrink-0">

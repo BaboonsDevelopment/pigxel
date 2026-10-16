@@ -110,10 +110,31 @@ describe("tile drafts", () => {
     ).toBe(cloud.id);
     expect(
       findDraftFor("user-1", {
-        kind: "drive",
-        file: { id: "c1", name: "Grass" },
+        kind: "cloud",
+        tile: { id: "c2", name: "Grass" },
       }),
     ).toBeNull();
+  });
+  it("keeps drafts that lived in Google Drive as unsaved work", async () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      draftKey("user-1", "d1"),
+      JSON.stringify({
+        id: "d1",
+        name: "Drive art",
+        file: "{}",
+        location: { kind: "drive", file: { id: "f", name: "Drive art" } },
+        dirty: false,
+        savedAt: 1,
+      }),
+    );
+    await startDrafts("user-1", storageBackend(storage));
+    expect(readDraft("user-1", "d1")).toMatchObject({
+      name: "Drive art",
+      file: "{}",
+      location: null,
+      dirty: true,
+    });
   });
   it("moves drafts from localStorage to IndexedDB, freeing localStorage", async () => {
     const storage = memoryStorage();
@@ -147,7 +168,7 @@ describe("tile drafts", () => {
     expect(restored).toMatchObject({
       name: "Old",
       dirty: true,
-      location: { kind: "drive", file: { id: "d", name: "Old.pigxel" } },
+      location: null,
     });
     expect(readPen("user-1", storage).size).toBe(5);
     expect(storage.getItem("pigxel:draft:v1:user-1")).toBeNull();

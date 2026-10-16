@@ -22,13 +22,6 @@ const NECESSARY: Item[] = [
     lasts: "Until you sign out, at most 400 days",
   },
   {
-    name: "pigxel-accept",
-    kind: "Cookie",
-    purpose:
-      "Remembers, while you sign up with Google or Apple, that you accepted our terms.",
-    lasts: "15 minutes",
-  },
-  {
     name: "pigxel:consent:v1",
     kind: "Local storage",
     purpose: "Remembers your cookie choice, so we don’t ask again.",

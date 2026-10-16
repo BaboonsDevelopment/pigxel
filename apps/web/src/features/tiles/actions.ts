@@ -9,11 +9,7 @@ import {
   listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
-import {
-  createAdminClient,
-  isSupabaseAdminConfigured,
-} from "@/lib/supabase/admin";
-import { removeAllVersions } from "@/features/versions/server";
+import { removeTiles } from "./remove-tiles";
 import { requestReview } from "@/features/moderation/request";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
@@ -163,18 +159,16 @@ export async function deleteFolder(
   try {
     const supabase = await createClient();
     if (withProjects) {
-      const trashed = await supabase
+      const { data, error } = await supabase
         .from("tiles")
-        .update({
-          deleted_at: new Date().toISOString(),
-          visibility: "private",
-          review: null,
-        })
+        .select("id, user_id")
         .eq("folder_id", folderId)
-        .eq("user_id", user.id)
-        .is("deleted_at", null);
-      if (trashed.error)
-        return { error: "Couldn’t move the projects to Trash. Try again." };
+        .eq("user_id", user.id);
+      const failure = error?.message ?? (await removeTiles(supabase, data!));
+      if (failure) {
+        console.error("Couldn’t delete the folder’s projects:", failure);
+        return { error: "Couldn’t delete the projects. Try again." };
+      }
     }
     const { error } = await supabase
       .from("folders")
@@ -393,70 +387,25 @@ export async function publishProjects(tileIds: string[]): Promise<Result> {
 const validIds = (ids: string[]) =>
   ids.length > 0 && ids.length <= 200 && ids.every((id) => UUID.test(id));
 
-export async function trashProjects(tileIds: string[]): Promise<Result> {
+const DELETE_FAILED = "Couldn’t delete that. Try again.";
+
+/** Deletes the person's own projects for good. There is no Trash. */
+export async function deleteProjects(tileIds: string[]): Promise<Result> {
   const user = await requireUser();
   if (!validIds(tileIds)) return { error: "Invalid request." };
   try {
     const supabase = await createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("tiles")
-      .update({
-        deleted_at: new Date().toISOString(),
-        visibility: "private",
-        review: null,
-      })
+      .select("id, user_id")
       .in("id", tileIds)
       .eq("user_id", user.id);
-    if (error) return { error: "Couldn’t move that to Trash. Try again." };
-  } catch {
-    return { error: "We couldn’t connect. Please try again." };
-  }
-  return {};
-}
-
-export async function restoreProjects(tileIds: string[]): Promise<Result> {
-  const user = await requireUser();
-  if (!validIds(tileIds)) return { error: "Invalid request." };
-  try {
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from("tiles")
-      .update({ deleted_at: null })
-      .in("id", tileIds)
-      .eq("user_id", user.id);
-    if (error) return { error: "Couldn’t restore that. Try again." };
-  } catch {
-    return { error: "We couldn’t connect. Please try again." };
-  }
-  return {};
-}
-
-export async function deleteProjectsForever(
-  tileIds: string[] | "all",
-): Promise<Result> {
-  const user = await requireUser();
-  if (tileIds !== "all" && !validIds(tileIds))
-    return { error: "Invalid request." };
-  try {
-    const supabase = await createClient();
-    const query = supabase
-      .from("tiles")
-      .select("id")
-      .eq("user_id", user.id)
-      .not("deleted_at", "is", null);
-    const { data, error } = await (tileIds === "all"
-      ? query
-      : query.in("id", tileIds));
-    if (error) return { error: "Couldn’t empty Trash. Try again." };
-    if (!data.length) return {};
-    const ids = data.map((row) => row.id as string);
-    if (isSupabaseAdminConfigured())
-      await removeAllVersions(createAdminClient(), ids).catch(() => {});
-    await supabase.storage
-      .from("tiles")
-      .remove(ids.map((id) => `${user.id}/${id}.pigxel`));
-    const removed = await supabase.from("tiles").delete().in("id", ids);
-    if (removed.error) return { error: "Couldn’t empty Trash. Try again." };
+    if (error) return { error: DELETE_FAILED };
+    const failure = await removeTiles(supabase, data);
+    if (failure) {
+      console.error("Couldn’t delete projects:", failure);
+      return { error: DELETE_FAILED };
+    }
   } catch {
     return { error: "We couldn’t connect. Please try again." };
   }

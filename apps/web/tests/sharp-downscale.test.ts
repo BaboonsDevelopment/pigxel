@@ -5,6 +5,7 @@ import {
   looksLikePixelArt,
   tooLarge,
 } from "@/lib/pigxel-file/import-image";
+import { MAX_PIGXEL_SIZE } from "@/lib/pigxel-file/format";
 
 const RED = [255, 0, 0, 255];
 const BLUE = [0, 0, 255, 255];
@@ -29,7 +30,7 @@ describe("big pictures", () => {
   });
 
   it("scales pixel art down without blending colors", () => {
-    const out = fitted(checker(512, 512, 4));
+    const out = fitted(checker(512, 512, 4), { w: 256, h: 256 });
     expect([out.w, out.h]).toEqual([256, 256]);
     const colors = new Set<string>();
     const rgba = out.frames[0]!.rgba;
@@ -39,10 +40,11 @@ describe("big pictures", () => {
   });
 
   it("crops a piece at full size", () => {
-    const big = checker(300, 280, 10);
+    // A thin strip wider than the largest tile, so the test stays small.
+    const big = checker(MAX_PIGXEL_SIZE + 44, 20, 10);
     expect(tooLarge(big)).toBe(true);
-    const piece = croppedAnimation(big, { x: 10, y: 0, w: 256, h: 256 });
-    expect([piece.w, piece.h]).toEqual([256, 256]);
+    const piece = croppedAnimation(big, { x: 10, y: 0, w: 256, h: 20 });
+    expect([piece.w, piece.h]).toEqual([256, 20]);
     expect([...piece.frames[0]!.rgba.slice(0, 4)]).toEqual(BLUE);
     expect(tooLarge(piece)).toBe(false);
   });

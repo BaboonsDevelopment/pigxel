@@ -101,8 +101,8 @@ describe("importing a sprite sheet", () => {
   it("explains what is wrong with a grid", () => {
     const grid = guessSheetGrid(sheet(8, 8));
     expect(sheetGridProblem(grid, 8, 8)).toBeNull();
-    expect(sheetGridProblem({ ...grid, frameW: 300 }, 600, 8)).toMatch(
-      "at most 256",
+    expect(sheetGridProblem({ ...grid, frameW: 5000 }, 10000, 8)).toMatch(
+      "at most 4096",
     );
     expect(sheetGridProblem({ ...grid, offsetX: 4 }, 8, 8)).toMatch(
       "No whole frame",

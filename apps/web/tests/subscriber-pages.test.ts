@@ -29,7 +29,7 @@ describe("pricing for subscribers", () => {
     expect(html).toContain("$10.00");
     expect(html).toContain("2,000 AI tokens every month");
     expect(html).toContain("Premium assets and tutorials");
-    expect(html).toContain("5 arts in Pigxel cloud, unlimited in Google Drive");
+    expect(html).toContain("5 arts in Pigxel cloud");
     expect(html).not.toContain("AI tokens to try");
     expect(html).toContain("100 arts in Pigxel cloud");
     expect(html).toContain("plus tax");

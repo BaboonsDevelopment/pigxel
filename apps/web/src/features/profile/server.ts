@@ -33,6 +33,7 @@ type TileRow = {
   review?: string | null;
   likes?: { count: number }[];
   views?: { total: number } | null;
+  tilemap?: boolean;
 };
 
 export const getOwnProfile = cache(
@@ -125,6 +126,7 @@ const toProfileTile = (row: TileRow): ProfileTile => ({
   updatedAt: row.updated_at,
   ...(row.likes && { likes: row.likes[0]?.count ?? 0 }),
   ...(row.views !== undefined && { views: Number(row.views?.total ?? 0) }),
+  ...(row.tilemap && { tilemap: true }),
 });
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -180,7 +182,7 @@ const publicTiles = (
 };
 
 const PUBLIC_TILE_COLUMNS =
-  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, tilemap, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
 
 const ART_PAGE_COLUMNS = PUBLIC_TILE_COLUMNS.replace(
   "provider_avatar_url)",

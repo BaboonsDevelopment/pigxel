@@ -5,10 +5,6 @@ import { requireUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { creemApi } from "@/features/billing/creem";
-import {
-  deleteDriveConnection,
-  isDriveAvailable,
-} from "@/lib/google-drive/server";
 import { DELETE_PHRASE } from "./delete-phrase";
 import { listFiles, USER_BUCKETS } from "./user-files";
 
@@ -51,12 +47,6 @@ export async function deleteAccount(
         "We couldn’t cancel your subscription, so nothing was deleted. Cancel it in Settings › Subscription, then try again.",
     };
   }
-
-  if (isDriveAvailable())
-    await deleteDriveConnection(user.id, { revoke: true }).catch(
-      (error: unknown) =>
-        console.error("Couldn’t revoke Drive before deletion:", error),
-    );
 
   try {
     for (const bucket of USER_BUCKETS) {

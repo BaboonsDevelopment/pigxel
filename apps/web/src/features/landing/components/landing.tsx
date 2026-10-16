@@ -96,7 +96,7 @@ const FAQ = [
   {
     question: "Is Pigxel free?",
     answer:
-      "Yes. Every drawing tool, layers, frames and export are free, with 5 arts in Pigxel cloud and unlimited saving to Google Drive. Paid plans add the AI helper, more room in Pigxel cloud, and premium assets and tutorials.",
+      "Yes. Every drawing tool, layers, frames and export are free, with 5 arts in Pigxel cloud. Paid plans add the AI helper, more room in Pigxel cloud, and premium assets and tutorials.",
   },
   {
     question: "Do I need to install anything?",
@@ -106,12 +106,12 @@ const FAQ = [
   {
     question: "Where is my art saved?",
     answer:
-      "In Pigxel cloud by default, or in your own Google Drive, where every change saves itself. You can also keep a tile in your browser and download it as a .pigxel file.",
+      "In Pigxel cloud, where every change saves itself and you can open your art from any device. You can also download any tile as a .pigxel file.",
   },
   {
     question: "How does Pigxel use my Google account?",
     answer:
-      "You can sign in to Pigxel with Google; we use your name, email and profile picture to create your account. If you choose to save to Google Drive, Pigxel can only see the files it creates or that you open with it, never the rest of your Drive. See the Privacy Policy for details.",
+      "You can sign in to Pigxel with Google; we use your name, email and profile picture to create your account, and nothing else from your Google account. See the Privacy Policy for details.",
   },
   {
     question: "What can I export?",

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { NewProjectButton, type ProjectKind } from "./new-project-button";
 import blankCanvas from "../../../../public/art/start/blank-canvas.png";
 import generateAi from "../../../../public/art/start/generate-ai.png";
 import spriteAnimation from "../../../../public/art/start/sprite-animation.png";
@@ -14,6 +16,8 @@ type Start = {
   image: StaticImageData;
   tint: string;
   href?: string;
+  /** Opens this start modal instead of following `href`. */
+  opens?: ProjectKind;
 };
 
 const STARTS: Start[] = [
@@ -22,46 +26,63 @@ const STARTS: Start[] = [
     description: "Start from scratch",
     image: blankCanvas,
     tint: "bg-pastel-pink",
-    href: "/tiles/new",
+    opens: "blank",
+  },
+  {
+    title: "Start from an asset",
+    description: "Pick a ready-made sprite",
+    image: spriteAnimation,
+    tint: "bg-pastel-peach",
+    href: "/assets",
+  },
+  {
+    title: "Tileset",
+    description: "Build levels from tiles",
+    image: tileset,
+    tint: "bg-pastel-mint",
+    opens: "tilemap",
   },
   {
     title: "Generate with AI",
     description: "Turn ideas into pixel art",
     image: generateAi,
     tint: "bg-pastel-lavender",
-    href: "/tiles/new?start=ai",
-  },
-  {
-    title: "Sprite animation",
-    description: "Create and edit animations",
-    image: spriteAnimation,
-    tint: "bg-pastel-peach",
-    href: "/tiles/new?start=animation",
-  },
-  {
-    title: "Tileset",
-    description: "Build custom tilesets",
-    image: tileset,
-    tint: "bg-pastel-mint",
-    href: "/tiles/new?start=tileset",
+    opens: "ai",
   },
 ];
 
-export function StartCreating() {
+export function StartCreating({
+  userId,
+  aiAllowed,
+}: {
+  userId: string;
+  aiAllowed: boolean;
+}) {
   return (
     <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
       {STARTS.map((start) => (
         <li key={start.title}>
-          <StartCard start={start} />
+          <StartCard start={start} userId={userId} aiAllowed={aiAllowed} />
         </li>
       ))}
     </ul>
   );
 }
 
-function StartCard({ start }: { start: Start }) {
+function StartCard({
+  start,
+  userId,
+  aiAllowed,
+}: {
+  start: Start;
+  userId: string;
+  aiAllowed: boolean;
+}) {
   const body = (
     <>
+      {start.opens === "ai" && (
+        <PremiumBadge className="absolute top-3 right-3" />
+      )}
       <Image
         src={start.image}
         alt=""
@@ -97,6 +118,20 @@ function StartCard({ start }: { start: Start }) {
     start.tint,
   );
 
+  if (start.opens)
+    return (
+      <NewProjectButton
+        userId={userId}
+        kind={start.opens}
+        aiAllowed={aiAllowed}
+        className={cn(
+          className,
+          "w-full text-left hover:-translate-y-0.5 hover:shadow-md",
+        )}
+      >
+        {body}
+      </NewProjectButton>
+    );
   if (start.href)
     return (
       <Link

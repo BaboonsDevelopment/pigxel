@@ -7,7 +7,6 @@ vi.mock("@/features/auth/actions", () => ({ authenticate: vi.fn() }));
 import { CookieBanner } from "@/features/legal/components/cookie-banner";
 import { SignupChoices } from "@/features/auth/components/signup-choices";
 import { VideoEmbed } from "@/features/tutorials/components/video-embed";
-import { LEGAL_VERSION } from "@/features/legal/legal";
 
 const video = (
   <VideoEmbed
@@ -44,9 +43,9 @@ describe("embedded videos", () => {
   });
 });
 
-describe("sign-up consent", () => {
-  it("keeps every way to sign up closed until both boxes are ticked", async () => {
-    const { user } = renderWithUser(
+describe("sign-up", () => {
+  it("opens every way to sign up without a box to tick", () => {
+    renderWithUser(
       <SignupChoices
         googleHref="/auth/google?next=%2Fhome"
         appleHref="/auth/apple?next=%2Fhome"
@@ -54,21 +53,14 @@ describe("sign-up consent", () => {
         next="/home"
       />,
     );
-    const create = screen.getByRole("button", { name: "Create account" });
-    expect(create).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("checkbox")).toBeNull();
     expect(
-      screen.queryByRole("link", { name: "Continue with Google" }),
-    ).toBeNull();
-
-    await user.click(screen.getByLabelText(/at least 16/));
-    expect(create).toHaveProperty("disabled", true);
-    await user.click(screen.getByLabelText(/I agree to the/));
-
-    expect(create).toHaveProperty("disabled", false);
+      screen.getByRole("button", { name: "Create account" }),
+    ).toHaveProperty("disabled", false);
     expect(
       screen
         .getByRole("link", { name: "Continue with Google" })
         .getAttribute("href"),
-    ).toBe(`/auth/google?next=%2Fhome&accept=${LEGAL_VERSION}`);
+    ).toBe("/auth/google?next=%2Fhome");
   });
 });

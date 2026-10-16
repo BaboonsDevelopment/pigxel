@@ -15,10 +15,9 @@ export default function Terms() {
       title="Terms of Service"
       intro={
         <p>
-          These terms are an agreement between you and {LEGAL.legalName} (“we”,
-          “us”), who runs {LEGAL.operator}, a pixel art editor with an AI helper
-          at this website (the “Service”). By creating an account or using the
-          Service, you agree to them and to our{" "}
+          These terms cover your use of {LEGAL.operator} (“we”, “us”), a pixel
+          art editor with an AI helper at this website (the “Service”). By
+          creating an account or using the Service, you agree to them and to our{" "}
           <Link href="/privacy">Privacy Policy</Link>. If you don’t agree,
           please don’t use Pigxel.
         </p>
@@ -190,9 +189,8 @@ export default function Terms() {
 
       <LegalSection title="9. Other services">
         <p>
-          You can sign in with Google or Apple and save to Google Drive. Your
-          use of those services is covered by their own terms. We only reach the
-          files Pigxel creates or you open with it.
+          You can sign in with Google or Apple. Your use of those services is
+          covered by their own terms.
         </p>
       </LegalSection>
 
@@ -242,6 +240,12 @@ export default function Terms() {
       </LegalSection>
 
       <LegalSection title="14. Contact">
+        <p>
+          These terms are an agreement between you and {LEGAL.legalName}
+          {LEGAL.registrationNumber &&
+            `, registration number ${LEGAL.registrationNumber}`}
+          , {LEGAL.address}, who runs {LEGAL.operator}.
+        </p>
         <ContactDetails />
       </LegalSection>
     </LegalPage>

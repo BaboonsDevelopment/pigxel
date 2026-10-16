@@ -1,11 +1,9 @@
-import type { DriveFile } from "./google-drive";
-
 export type CloudTile = { id: string; name: string; version?: string };
 
-export type TileLocation =
-  { kind: "cloud"; tile: CloudTile } | { kind: "drive"; file: DriveFile };
+/** Where a tile is kept. Pigxel cloud is the only home a tile can have. */
+export type TileLocation = { kind: "cloud"; tile: CloudTile };
 
-export const LOCATION_LABELS: Record<TileLocation["kind"], string> = {
-  cloud: "Pigxel cloud",
-  drive: "Google Drive",
-};
+export const CLOUD_LABEL = "Pigxel cloud";
+
+/** Shown for working copies not yet saved to Pigxel cloud. */
+export const NOT_SAVED_LABEL = "Not saved";

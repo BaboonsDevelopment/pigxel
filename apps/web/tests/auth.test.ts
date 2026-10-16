@@ -90,8 +90,6 @@ function form(
   values: Record<string, string> = {
     email: "person@example.com",
     password: "test-password",
-    age: "on",
-    terms: "on",
   },
 ) {
   const data = new FormData();
@@ -150,11 +148,7 @@ describe("email/password authentication", () => {
   it("returns to a safe page after logging in or signing up", async () => {
     const values = { email: "person@example.com", password: "test-password" };
     await expect(
-      authenticate(
-        "signup",
-        {},
-        form({ ...values, age: "on", terms: "on", next: "/pricing" }),
-      ),
+      authenticate("signup", {}, form({ ...values, next: "/pricing" })),
     ).rejects.toThrow("REDIRECT:/pricing");
     await expect(
       authenticate(
@@ -192,16 +186,6 @@ describe("email/password authentication", () => {
     });
     expect(mocks.revalidate).toHaveBeenCalledWith("/", "layout");
   });
-  it("needs both consent boxes ticked to sign up", async () => {
-    for (const missing of ["age", "terms"]) {
-      const data = form();
-      data.delete(missing);
-      expect((await authenticate("signup", {}, data)).error).toContain(
-        `at least ${LEGAL.minAge}`,
-      );
-    }
-    expect(mocks.auth.signUp).not.toHaveBeenCalled();
-  });
   it("records what a new account agreed to", async () => {
     await expect(authenticate("signup", {}, form())).rejects.toThrow(
       "REDIRECT:/home",
@@ -215,7 +199,30 @@ describe("email/password authentication", () => {
     expect(mocks.auth.updateUser).toHaveBeenCalledWith({
       data: { legal_version: LEGAL_VERSION },
     });
-    expect(mocks.auth.refreshSession).toHaveBeenCalled();
+  });
+  it("records the terms on login once per version", async () => {
+    mocks.auth.signInWithPassword.mockResolvedValue({
+      data: { session, user: { user_metadata: {} } },
+      error: null,
+    });
+    await expect(authenticate("login", {}, form())).rejects.toThrow(
+      "REDIRECT:/home",
+    );
+    expect(mocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "login" }),
+    );
+    mocks.insert.mockClear();
+    mocks.auth.signInWithPassword.mockResolvedValue({
+      data: {
+        session,
+        user: { user_metadata: { legal_version: LEGAL_VERSION } },
+      },
+      error: null,
+    });
+    await expect(authenticate("login", {}, form())).rejects.toThrow(
+      "REDIRECT:/home",
+    );
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
   it("does not grant access when signup returns no session", async () => {
     mocks.auth.signUp.mockResolvedValue({
@@ -372,7 +379,7 @@ describe("email callbacks and route guards", () => {
       "http://localhost:3000/settings/account",
     );
   });
-  it("reports a cancelled Apple link as a linking error, not a Drive one", async () => {
+  it("reports a cancelled Apple link as a linking error", async () => {
     const response = await callback(
       new NextRequest(
         "http://localhost:3000/auth/callback?error=access_denied&next=/settings/account&provider=apple",
@@ -504,31 +511,14 @@ describe("proxy", () => {
       expect((await visit(path)).headers.get("location")).toBeNull();
     }
   });
-  it("asks signed-in people to accept the current terms first", async () => {
+  it("never stops signed-in people at a separate terms page", async () => {
     mocks.auth.getClaims.mockResolvedValue({
       data: { claims: { sub: "user-1", user_metadata: {} } },
       error: null,
     });
-    expect((await visit("/tiles/edit?id=t1")).headers.get("location")).toBe(
-      "http://localhost:3000/accept?next=%2Ftiles%2Fedit%3Fid%3Dt1",
-    );
-    expect((await visit("/")).headers.get("location")).toBe(
-      "http://localhost:3000/home",
-    );
-    for (const path of [
-      "/accept",
-      "/terms",
-      "/privacy",
-      "/settings/account",
-      "/account-deletion",
-      "/api/account/export",
-      "/?code=abc",
-    ])
-      expect((await visit(path)).headers.get("location")).toBeNull();
-    const post = await proxy(
-      new NextRequest("http://localhost:3000/tiles", { method: "POST" }),
-    );
-    expect(post.headers.get("location")).toBeNull();
+    expect(
+      (await visit("/tiles/edit?id=t1")).headers.get("location"),
+    ).toBeNull();
   });
   it("sends returning signed-in visitors to Home", async () => {
     for (const path of ["/", "/login"]) {

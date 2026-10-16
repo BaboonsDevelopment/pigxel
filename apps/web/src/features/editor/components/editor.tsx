@@ -74,7 +74,6 @@ import {
   loadExportSettings,
 } from "../export/saved-settings";
 import { decodeImage } from "@/lib/image/decode";
-import { connectDriveUrl } from "@/lib/google-drive/status";
 import {
   allLayers,
   findLayer,
@@ -94,7 +93,8 @@ import {
   type Draft,
 } from "@/lib/pigxel-file/draft";
 import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
-import { LOCATION_LABELS } from "@/lib/pigxel-file/location";
+import { CLOUD_LABEL, NOT_SAVED_LABEL } from "@/lib/pigxel-file/location";
+import { forgetStartOptions, readStartOptions } from "../start-options";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
@@ -146,7 +146,6 @@ import {
   NO_EDIT_WARN_GAP,
   type Command,
   type EditorProps,
-  type OpenSource,
   type ToolId,
 } from "../constants";
 import { isTyping, sizeKey } from "../helpers";
@@ -272,8 +271,6 @@ const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
 
 export function Editor({
   userId,
-  drive,
-  driveError,
   guide,
   start,
   canPublish,
@@ -304,7 +301,7 @@ export function Editor({
       })
       .catch(() => {});
   }, [router]);
-  const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [opening, setOpening] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [creatingTile, setCreatingTile] = useState(false);
@@ -385,10 +382,15 @@ export function Editor({
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
+  const [startOptions] = useState(() =>
+    isStartKind(start) ? readStartOptions(draft.id) : {},
+  );
+  // A tilemap started from Home already knows its tile size; otherwise ask.
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(() =>
-    start === "tileset" ? { convert: false } : null,
+    start === "tileset" && !startOptions.tile ? { convert: false } : null,
   );
   const [startedWith] = useState(start);
+  const startPrompt = startedWith === "ai" ? startOptions.prompt : undefined;
   useEffect(() => {
     if (isStartKind(start)) router.replace(editorUrl(draft.id));
   }, [start, router, draft.id]);
@@ -420,17 +422,10 @@ export function Editor({
     fileInput,
     userId,
     initial: draft,
-    drive,
     onOpen: (id) => {
       openTabAfter(userId, id, draft.id);
       router.push(editorUrl(id));
     },
-    notice: driveError
-      ? {
-          tone: "error",
-          text: "Google Drive wasn’t connected. Try again when you’re ready.",
-        }
-      : undefined,
   });
   const cloudTile = file.location?.kind === "cloud" ? file.location.tile : null;
   const cloudTileId = cloudTile?.id;
@@ -573,6 +568,17 @@ export function Editor({
   );
   const selection = useSelection(sprite);
 
+  const tiledFromStart = useRef(false);
+  useEffect(() => {
+    const tile = startedWith === "tileset" ? startOptions.tile : undefined;
+    if (!tile || tiledFromStart.current) return;
+    tiledFromStart.current = true;
+    sprite.addTilemapLayer(tile);
+    forgetStartOptions(draft.id);
+    // Runs once, for a tilemap started from Home.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [sliceId, setSliceId] = useState<string | null>(null);
   const slice = sprite.slices.find((s) => s.id === sliceId) ?? null;
   const changeSlice = (next: Slice) =>
@@ -583,9 +589,6 @@ export function Editor({
   };
 
   useEffect(() => writePen(userId, pen), [userId, pen]);
-
-  const connectDrive = () =>
-    window.location.assign(connectDriveUrl(editorUrl(draft.id)));
 
   const resizePen = (step: 1 | -1) => {
     const key = sizeKey(tool);
@@ -1544,6 +1547,8 @@ export function Editor({
       body: (
         <EditorChat
           autoFocus={startedWith === "ai"}
+          startPrompt={startPrompt}
+          onStarted={() => forgetStartOptions(draft.id)}
           canvas={canvas}
           sprite={sprite}
           playback={playback}
@@ -1604,10 +1609,9 @@ export function Editor({
         hidden={canvasOnly}
         file={file}
         fileInput={fileInput}
-        drive={drive}
         sprite={sprite}
         playback={playback}
-        onOpenFrom={setOpening}
+        onOpenCloud={() => setOpening(true)}
         recent={listDrafts(userId)
           .filter((other) => other.id !== draft.id)
           .sort((a, b) => b.savedAt - a.savedAt)
@@ -1625,20 +1629,16 @@ export function Editor({
                 )}
               </span>
             ),
-            shortcut: other.location
-              ? LOCATION_LABELS[other.location.kind]
-              : "This browser",
+            shortcut: other.location ? CLOUD_LABEL : NOT_SAVED_LABEL,
             onSelect: () => {
               const at = other.location;
-              if (at?.kind === "cloud") file.openCloudTile(at.tile);
-              else if (at?.kind === "drive") file.openDriveFile(at.file);
+              if (at) file.openCloudTile(at.tile);
               else {
                 openTabAfter(userId, other.id, draft.id);
                 router.push(editorUrl(other.id));
               }
             },
           }))}
-        onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         explorePublished={published}
@@ -1812,13 +1812,7 @@ export function Editor({
         />
       )}
       {opening && (
-        <OpenTileDialog
-          source={opening}
-          drive={drive}
-          draftId={draft.id}
-          file={file}
-          onClose={() => setOpening(null)}
-        />
+        <OpenTileDialog file={file} onClose={() => setOpening(false)} />
       )}
       {publishingArt && (
         <PublishArtDialog
@@ -1863,7 +1857,6 @@ export function Editor({
         <NewProjectDialog
           userId={userId}
           from={draft.id}
-          drive={drive}
           onClose={() => setCreatingTile(false)}
         />
       )}

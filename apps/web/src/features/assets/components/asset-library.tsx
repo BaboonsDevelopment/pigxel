@@ -13,6 +13,7 @@ import { isLocked, type Asset, type AssetBlock } from "../assets";
 import { assetTint } from "../constants";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
+import { TilesBadge } from "@/features/tiles/components/tiles-badge";
 
 export type AssetSection = {
   category: AssetBlock;
@@ -146,6 +147,7 @@ function AssetCard({
             Animated
           </Badge>
         )}
+        {tile && <TilesBadge className="absolute bottom-2 left-2" />}
       </span>
       <span className="mt-2 block truncate text-sm font-semibold">
         {asset.name}

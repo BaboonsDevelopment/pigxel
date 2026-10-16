@@ -13,6 +13,7 @@ import { PixelImage } from "@/components/ui/pixel-image";
 import { formatCount } from "./helpers";
 import { inter } from "@/lib/fonts/inter";
 import { manrope } from "@/lib/fonts/manrope";
+import { TilesBadge } from "@/features/tiles/components/tiles-badge";
 
 export function PopularCard({
   tile,
@@ -54,6 +55,9 @@ export function PopularCard({
             )}
           </span>
           <HoverOverlay label="Open project" />
+          {tile.tilemap && (
+            <TilesBadge className="pointer-events-none absolute top-2 left-2" />
+          )}
         </span>
       </Link>
       <div className={cn(manrope.className, "px-3 pt-2 pb-3 text-[#4a1f35]")}>

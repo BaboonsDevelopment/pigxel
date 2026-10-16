@@ -10,15 +10,9 @@ import {
   type Background,
   type PigxelDocument,
 } from "@/lib/pigxel-file/format";
-import { DriveError, saveDriveFile } from "@/lib/pigxel-file/google-drive";
-import type { TileLocation } from "@/lib/pigxel-file/location";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { createFrame } from "@/lib/sprite/frames";
-import {
-  readNewTileDefaults,
-  writeNewTileDefaults,
-  type NewTileStorage,
-} from "./new-tile-defaults";
+import { writeNewTileDefaults } from "./new-tile-defaults";
 
 export type NewTile = {
   userId: string;
@@ -27,17 +21,17 @@ export type NewTile = {
   height: number;
   background: Background;
   fill?: string;
-  storage: NewTileStorage;
   folder?: { id: string; name: string };
   asset?: Asset | null;
   palette?: PalettePreset | null;
   start?: StartKind;
 };
 
+/** Creates a tile in Pigxel cloud and a working copy to open in the editor. */
 export async function createTile(
   tile: NewTile,
 ): Promise<{ draftId: string } | { error: string }> {
-  const { userId, name, width, height, background, storage, folder } = tile;
+  const { userId, name, width, height, background, folder } = tile;
   let image: PigxelDocument;
   try {
     image = tile.asset
@@ -50,43 +44,34 @@ export async function createTile(
   if (tile.palette && !tile.asset) image.palette = [...tile.palette.colors];
   if (tile.start === "animation" && !tile.asset) image = withFrames(image, 4);
   const file = serializePigxel(image);
-  let location: TileLocation | null = null;
+  let saved;
   try {
-    if (storage === "cloud" || folder) {
-      const saved = await saveCloudTile(
-        { name },
-        file,
-        image,
-        thumbnailDataUrl(image),
-      );
-      if (folder) {
-        const moved = await moveTileToFolder(saved.id, folder.id);
-        if (moved.error) throw new CloudError(moved.error);
-      }
-      location = { kind: "cloud", tile: saved };
+    saved = await saveCloudTile({ name }, file, image, thumbnailDataUrl(image));
+    if (folder) {
+      const moved = await moveTileToFolder(saved.id, folder.id);
+      if (moved.error) throw new CloudError(moved.error);
     }
-    if (storage === "drive")
-      location = { kind: "drive", file: await saveDriveFile({ name }, file) };
   } catch (e) {
     return {
       error:
-        e instanceof DriveError || e instanceof CloudError
+        e instanceof CloudError
           ? e.message
           : "Couldn’t create the tile. Try again.",
     };
   }
   await loadDrafts(userId);
-  const draft = createDraft(userId, { name, file, location, dirty: false });
+  const draft = createDraft(userId, {
+    name,
+    file,
+    location: { kind: "cloud", tile: saved },
+    dirty: false,
+  });
   if (!draft)
     return {
-      error: location
-        ? "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from My projects."
-        : "This browser won’t keep the tile. Allow site data for Pigxel, or remove some tiles from this browser.",
+      error:
+        "The tile was saved, but this browser won’t keep a working copy. Allow site data for Pigxel, or remove some tiles from this browser, and open it from My projects.",
     };
-  if (!tile.asset)
-    writeNewTileDefaults(userId, { width, height, background, storage });
-  else
-    writeNewTileDefaults(userId, { ...readNewTileDefaults(userId), storage });
+  if (!tile.asset) writeNewTileDefaults(userId, { width, height, background });
   return { draftId: draft.id };
 }
 

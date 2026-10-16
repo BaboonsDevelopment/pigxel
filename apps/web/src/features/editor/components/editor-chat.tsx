@@ -20,12 +20,16 @@ import { allLayers, canPaint, isShown } from "@/lib/layers/tree";
 
 export default function EditorChat({
   autoFocus,
+  startPrompt,
+  onStarted,
   canvas,
   sprite,
   playback,
   onHighlight,
 }: {
   autoFocus?: boolean;
+  startPrompt?: string | null;
+  onStarted?: () => void;
   canvas: RefObject<PixelCanvasHandle | null>;
   sprite: SpriteApi;
   playback: Playback;
@@ -42,7 +46,15 @@ export default function EditorChat({
       () => canvas.current,
     ),
   );
-  return <ChatPanel canvas={bridge} tileId={sprite.id} autoFocus={autoFocus} />;
+  return (
+    <ChatPanel
+      canvas={bridge}
+      tileId={sprite.id}
+      autoFocus={autoFocus}
+      startPrompt={startPrompt}
+      onStarted={onStarted}
+    />
+  );
 }
 
 type Latest = {

@@ -9,6 +9,10 @@ export const MIN_TILE = 1;
 export const MAX_TILE = 256;
 export const DEFAULT_TILE: TileSize = { w: 16, h: 16 };
 
+/** Whether a picture has a tilemap layer: what makes it a tileset. */
+export const hasTilemap = (doc: { layers: readonly { kind: string }[] }) =>
+  doc.layers.some((layer) => layer.kind === "tilemap");
+
 export const NO_FLIP: TileFlip = { d: false, h: false, v: false };
 export const FLIP_X: TileFlip = { d: false, h: true, v: false };
 export const FLIP_Y: TileFlip = { d: false, h: false, v: true };

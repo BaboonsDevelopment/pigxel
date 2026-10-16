@@ -29,7 +29,6 @@ export type ProjectQuery = {
   query?: string;
   published?: string;
   archived?: boolean;
-  trashed?: boolean;
   sort?: string;
 };
 
@@ -44,7 +43,6 @@ export function cloudFilter({
   query,
   published,
   archived,
-  trashed,
   sort,
 }: ProjectQuery) {
   const range = CANVAS_SIZES.find((s) => s.value === size) ?? CANVAS_SIZES[0];
@@ -58,7 +56,6 @@ export function cloudFilter({
       published === "yes" ? true : published === "no" ? false : undefined,
     pinnedFirst: true,
     archived: archived === true,
-    trashed: trashed === true,
     order: SORTS.find((order) => order === sort) ?? "edited",
   };
 }

@@ -37,10 +37,15 @@ export function ChatPanel({
   canvas,
   tileId,
   autoFocus,
+  startPrompt,
+  onStarted,
 }: {
   canvas: CanvasBridge;
   tileId: string;
   autoFocus?: boolean;
+  /** Sent once, as soon as the chat is ready: the "Generate with AI" prompt. */
+  startPrompt?: string | null;
+  onStarted?: () => void;
 }) {
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -236,6 +241,16 @@ export function ChatPanel({
       ignoreStop(error);
     }
   };
+
+  const started = useRef(false);
+  useEffect(() => {
+    if (!loaded || !startPrompt || started.current) return;
+    started.current = true;
+    onStarted?.();
+    void send(startPrompt);
+    // Runs once, when the saved chat has loaded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   const choose = async (index: number, placement: Placement) => {
     const entry = messages[index];

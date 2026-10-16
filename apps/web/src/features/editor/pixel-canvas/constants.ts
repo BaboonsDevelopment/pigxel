@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { MAX_PIGXEL_SIZE } from "@/lib/pigxel-file/format";
 
 export type Edge = "e" | "s" | "se";
 export type Size = { w: number; h: number };
@@ -71,7 +72,7 @@ export const MIN_PLACEMENT_SIDE = 16;
 export const SNAPSHOT_SIDE = 512;
 export const SNAPSHOT_BACKGROUND = "#d4d4d4";
 export const MIN_SIZE = 1;
-export const MAX_SIZE = 256;
+export const MAX_SIZE = MAX_PIGXEL_SIZE;
 
 export const HANDLES: { edge: Edge; title: string; className: string }[] = [
   {

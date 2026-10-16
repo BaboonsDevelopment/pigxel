@@ -64,7 +64,6 @@ export function ProjectsView({
         view.query,
         folder?.id ?? null,
         false,
-        false,
         view.sort,
       ),
       page: initial,
@@ -232,7 +231,6 @@ export function ProjectsView({
         />
       )}
       {filter === "Archive" && <ProjectGrid {...gridProps} archived />}
-      {filter === "Trash" && <ProjectGrid {...gridProps} trashed />}
       {filter === "Favourite" && (
         <Favourites
           userId={userId}

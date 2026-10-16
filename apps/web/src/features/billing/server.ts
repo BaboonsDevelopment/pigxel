@@ -11,6 +11,7 @@ import {
   type CurrentPlan,
   type SubscriptionRecord,
 } from "./subscription";
+import { aiAllowance } from "./pricing";
 
 type SubscriptionRow = {
   id: string;
@@ -99,6 +100,14 @@ export async function dueDowngrades(cutoff: Date) {
     .returns<SubscriptionRow[]>();
   if (error) throw new Error(error.message);
   return data.map(recordOfRow);
+}
+
+/**
+ * Whether the plan includes the AI helper: the same rule the AI actions
+ * apply before running (plans with AI tokens).
+ */
+export async function hasAiAccess(userId: string) {
+  return aiAllowance((await getCurrentPlan(userId)).name).tokens > 0;
 }
 
 /** Premium assets and tutorials: paid plans, and admins who make them. */

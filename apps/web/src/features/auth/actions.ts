@@ -7,8 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { authUrl } from "@/lib/auth/config";
 import { safeNext } from "@/lib/auth/routes";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
-import { acceptedIn, recordAcceptance } from "@/features/legal/acceptance";
-import { LEGAL } from "@/features/legal/legal";
+import { recordAcceptanceOnce } from "@/features/legal/acceptance";
 
 export async function authenticate(
   mode: AuthMode,
@@ -36,10 +35,6 @@ export async function authenticate(
     if (mode === "signup" && password.length < 8)
       return reply({ error: "Use at least 8 characters for your password." });
   }
-  if (mode === "signup" && !acceptedIn(formData))
-    return reply({
-      error: `To create an account, confirm you’re at least ${LEGAL.minAge} and agree to the Terms of Service.`,
-    });
   try {
     const supabase = await createClient();
     if (mode === "forgot") {
@@ -90,9 +85,7 @@ export async function authenticate(
           error:
             "Your account was created but couldn’t be signed in. Please try logging in.",
         });
-      const acceptError = await recordAcceptance(supabase, "signup");
-      if (acceptError)
-        console.error("Couldn’t record the sign-up acceptance:", acceptError);
+      await recordAcceptanceOnce(supabase, data.user, "signup");
     } else {
       const { data, error } =
         await supabase.auth.signInWithPassword(credentials);
@@ -101,6 +94,7 @@ export async function authenticate(
           error:
             "Unable to log in. Check your email and password, or try again later.",
         });
+      await recordAcceptanceOnce(supabase, data.user, "login");
     }
   } catch {
     return reply({
