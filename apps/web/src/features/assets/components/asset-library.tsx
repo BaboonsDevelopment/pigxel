@@ -9,19 +9,14 @@ import {
   Text,
 } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
-import { isLocked, type Asset, type AssetCategory } from "../assets";
+import { isLocked, type Asset, type AssetBlock } from "../assets";
+import { assetTint } from "../constants";
 import { AssetDialog } from "./asset-dialog";
 import { AssetImage } from "./asset-image";
 
-const TINTS: Record<AssetCategory, string> = {
-  characters: "bg-pastel-pink",
-  items: "bg-pastel-peach",
-  nature: "bg-pastel-mint",
-  tiles: "bg-pastel-lavender",
-};
-
 export type AssetSection = {
-  category: { id: AssetCategory; label: string };
+  category: AssetBlock;
+  index: number;
   assets: Asset[];
   total: number;
   /** Link to the next batch, on a category's own page. */
@@ -35,11 +30,14 @@ export function AssetLibrary({
   sections: AssetSection[];
   canManage: boolean;
 }) {
-  const [open, setOpen] = useState<Asset | null>(null);
+  const [open, setOpen] = useState<{
+    asset: Asset;
+    block: string;
+  } | null>(null);
 
   return (
     <>
-      {sections.map(({ category, assets, total, more }) =>
+      {sections.map(({ category, index, assets, total, more }) =>
         assets.length === 0 ? null : (
           <section
             key={category.id}
@@ -48,7 +46,7 @@ export function AssetLibrary({
           >
             <SectionHeader
               id={`assets-${category.id}`}
-              title={category.label}
+              title={category.name}
               actions={
                 total > assets.length && (
                   <Link
@@ -63,7 +61,11 @@ export function AssetLibrary({
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
               {assets.map((asset) => (
                 <li key={asset.id}>
-                  <AssetCard asset={asset} onOpen={() => setOpen(asset)} />
+                  <AssetCard
+                    asset={asset}
+                    tint={assetTint(index)}
+                    onOpen={() => setOpen({ asset, block: category.name })}
+                  />
                 </li>
               ))}
             </ul>
@@ -83,8 +85,9 @@ export function AssetLibrary({
       )}
       {open && (
         <AssetDialog
-          key={open.id}
-          asset={open}
+          key={open.asset.id}
+          asset={open.asset}
+          blockName={open.block}
           canRemove={canManage}
           onClose={() => setOpen(null)}
         />
@@ -93,8 +96,16 @@ export function AssetLibrary({
   );
 }
 
-function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
-  const tile = asset.category === "tiles";
+function AssetCard({
+  asset,
+  tint,
+  onOpen,
+}: {
+  asset: Asset;
+  tint: string;
+  onOpen: () => void;
+}) {
+  const tile = asset.kind === "tile";
   return (
     <button
       type="button"
@@ -104,7 +115,7 @@ function AssetCard({ asset, onOpen }: { asset: Asset; onOpen: () => void }) {
       <span
         className={cn(
           "relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl transition group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none",
-          TINTS[asset.category],
+          tint,
         )}
       >
         <AssetImage

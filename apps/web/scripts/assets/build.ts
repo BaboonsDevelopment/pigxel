@@ -14,7 +14,7 @@ import { hasErrors, issuesOf } from "./lib/checks.ts";
 import { framesOf, paletteOf, pigxelFile, sheetOf } from "./lib/pigxel.ts";
 import { encodePng } from "./lib/png.ts";
 import { readReviews, reviewState } from "./lib/review.ts";
-import { loadPacks } from "./lib/source.ts";
+import { isPremium, loadPacks } from "./lib/source.ts";
 
 const { values } = parseArgs({
   options: {
@@ -66,9 +66,11 @@ const manifest = {
         {
           id: asset.id,
           name: asset.name,
-          category: asset.category,
+          category: pack.block ?? pack.id,
+          kind: asset.kind,
           tags: asset.tags,
           tier: pack.tier,
+          premium: isPremium(pack, asset.id),
           sort,
           width: frames.w,
           height: frames.h,
@@ -106,6 +108,8 @@ const manifest = {
     return {
       id: pack.id,
       name: pack.name,
+      block: pack.block ?? pack.id,
+      newBlock: !pack.block,
       tier: pack.tier,
       description: pack.description,
       assets,

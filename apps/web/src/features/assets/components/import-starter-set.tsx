@@ -15,7 +15,7 @@ export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
     setError(null);
     try {
       const [
-        { STARTER_ASSETS, starterDocument },
+        { STARTER_ASSETS, starterDocument, starterKind },
         { PREMIUM_ASSETS },
         { publishAsset },
       ] = await Promise.all([
@@ -30,6 +30,7 @@ export function ImportStarterSet({ premium = false }: { premium?: boolean }) {
           id: asset.id,
           name: asset.name,
           category: asset.category,
+          kind: starterKind(asset),
           document: starterDocument(asset),
           sort: premium ? 100 + i : i,
           premium,

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { localSupabase } from "../../tests/support/local-supabase";
+import { LEGAL, LEGAL_VERSION } from "../../src/features/legal/legal";
 
 /** Every account the end-to-end tests create uses this domain. */
 const DOMAIN = "e2e.pigxel.test";
@@ -20,15 +21,29 @@ function admin() {
   });
 }
 
-/** A confirmed account made through the admin API, ready to log in with. */
+/**
+ * A confirmed account made through the admin API, ready to log in with. It
+ * has accepted the current Terms the way sign-up records it, so the proxy
+ * doesn't send it to /accept first.
+ */
 export async function createAccount(name: string): Promise<Account> {
   const email = newEmail(name);
-  const { error } = await admin().auth.admin.createUser({
+  const client = admin();
+  const { data, error } = await client.auth.admin.createUser({
     email,
     password: PASSWORD,
     email_confirm: true,
+    user_metadata: { legal_version: LEGAL_VERSION },
   });
   if (error) throw error;
+  const { error: acceptError } = await client.from("legal_acceptances").insert({
+    user_id: data.user.id,
+    terms_version: LEGAL_VERSION,
+    privacy_version: LEGAL_VERSION,
+    min_age: LEGAL.minAge,
+    source: "signup",
+  });
+  if (acceptError) throw acceptError;
   return { email, password: PASSWORD };
 }
 

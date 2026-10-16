@@ -8,6 +8,7 @@ import { Input } from "@pigxel/ui/components/input";
 import { Notice } from "@pigxel/ui/components/notice";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { authenticate } from "../actions";
+import { PasswordInput } from "./password-input";
 import { HOME_PATH, loginUrl } from "@/lib/auth/routes";
 import type { AuthMode, AuthState } from "@/lib/auth/types";
 import {
@@ -64,10 +65,9 @@ export function AuthForm({
           htmlFor="password"
           hint={signup ? "At least 8 characters." : undefined}
         >
-          <Input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
             inputSize="lg"
             className="h-12 rounded-xl"
             autoComplete={signup ? "new-password" : "current-password"}

@@ -77,6 +77,7 @@ describe("assets from the database", () => {
     id: "coin",
     name: "Coin",
     category: "items",
+    kind: "sprite",
     width: 16,
     height: 16,
     frame_count: 4,

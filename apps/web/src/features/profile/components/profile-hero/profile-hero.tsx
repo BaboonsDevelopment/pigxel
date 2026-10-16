@@ -4,8 +4,11 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { PixelImage } from "@/components/ui/pixel-image";
 import { madimiOne, PROFILE_HEADING } from "@/lib/fonts/madimi";
 import { TokensButton } from "@/features/ai/components/tokens-button/tokens-button";
+import { StatsHover } from "@/features/tiles/components/projects-view/components/stats-hover";
 import { loginUrl } from "@/lib/auth/routes";
 import { joinedLabel, monthLabel, type ArtistProfile } from "../../profile";
+import type { ProfileActivity } from "../../server";
+import { ActivityHeatmap } from "../activity-heatmap";
 import { linkTitle } from "../../validation";
 import { BlockMenu } from "../block-menu";
 import { FollowButton } from "../follow-button";
@@ -17,6 +20,7 @@ import {
   PinIcon,
   SparkleIcon,
 } from "./components/meta-icons";
+import { ActivityButton } from "./components/activity-button";
 import { ShareProfileButton } from "./components/share-profile-button";
 import { BANNER_BUTTON, BANNER_HEIGHT, HERO_IMAGE } from "./constants";
 
@@ -27,6 +31,7 @@ export function ProfileHero({
   follows,
   blocked,
   tabHref,
+  activity,
 }: {
   profile: ArtistProfile;
   isOwner: boolean;
@@ -34,6 +39,7 @@ export function ProfileHero({
   follows: { followers: number; followed: number; following: boolean };
   blocked: boolean;
   tabHref: (tab: string) => string;
+  activity: ProfileActivity | null;
 }) {
   const joined = joinedLabel(profile.joinedAt);
   const premium = profile.premiumSince && monthLabel(profile.premiumSince);
@@ -59,7 +65,7 @@ export function ProfileHero({
             />
           )}
         </div>
-        <div className="absolute right-2.5 bottom-2.5 flex items-start gap-2">
+        <div className="absolute top-2.5 right-2.5 flex items-start gap-2 sm:top-auto sm:bottom-2.5">
           <ShareProfileButton username={profile.username} name={profile.name} />
           {isOwner ? (
             <Link href="/settings/profile" className={BANNER_BUTTON}>
@@ -183,7 +189,15 @@ export function ProfileHero({
             ))}
           </ul>
         </div>
-        {isOwner && <TokensButton card className="self-start sm:mt-3" />}
+        <div className="flex items-center gap-2 self-start sm:mt-3">
+          {activity && (
+            <ActivityButton>
+              <ActivityHeatmap activity={activity} />
+            </ActivityButton>
+          )}
+          <StatsHover tile={null} profileId={profile.id} />
+          {isOwner && <TokensButton card />}
+        </div>
       </div>
     </header>
   );

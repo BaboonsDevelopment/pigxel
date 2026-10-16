@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { unzlibSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { parsePigxel } from "@/lib/pigxel-file/format";
@@ -6,8 +9,10 @@ import { framesOf, pigxelFile, sheetOf } from "../scripts/assets/lib/pigxel";
 import { encodePng } from "../scripts/assets/lib/png";
 import { reviewState } from "../scripts/assets/lib/review";
 import {
+  isPremium,
   loadPacks,
   parseAsset,
+  updatePack,
   type PackSource,
 } from "../scripts/assets/lib/source";
 
@@ -15,6 +20,8 @@ const PACK: PackSource = {
   id: "test",
   name: "Test",
   tier: "free",
+  block: null,
+  premium: [],
   description: "",
   palette: ["#181425", "#63c74d", "#3e8948", "#a7f070", "#ffffff"],
   style: { outline: "#181425", maxColors: 5 },
@@ -40,7 +47,7 @@ function asset(overrides: Record<string, unknown> = {}) {
   return {
     id: "blob",
     name: "Blob",
-    category: "characters",
+    kind: "sprite",
     colors: COLORS,
     clips: [{ name: "idle", kind: "variant", frames: [blob] }],
     ...overrides,
@@ -94,12 +101,12 @@ describe("asset checks", () => {
   });
 
   it("rejects clear pixels in tiles and flags seams", () => {
-    expect(rules(asset({ category: "tiles" }))).toContain("error:tile");
+    expect(rules(asset({ kind: "tile" }))).toContain("error:tile");
     const seam = Array.from({ length: 8 }, () => "gggggggk");
     expect(
       rules(
         asset({
-          category: "tiles",
+          kind: "tile",
           clips: [{ name: "a", kind: "variant", frames: [seam] }],
         }),
       ),
@@ -108,7 +115,7 @@ describe("asset checks", () => {
     expect(
       rules(
         asset({
-          category: "tiles",
+          kind: "tile",
           clips: [{ name: "a", kind: "variant", frames: [even] }],
         }),
       ),
@@ -142,6 +149,40 @@ describe("review state", () => {
     expect(reviewState({ hash: "a" }, entry)).toBe("approved");
     expect(reviewState({ hash: "b" }, entry)).toBe("changed");
     expect(reviewState({ hash: "a" }, undefined)).toBe("pending");
+  });
+});
+
+describe("premium", () => {
+  it("covers the whole block on a paid tier, else only listed assets", () => {
+    expect(isPremium({ tier: "paid", premium: [] }, "a")).toBe(true);
+    expect(isPremium({ tier: "free", premium: ["a"] }, "a")).toBe(true);
+    expect(isPremium({ tier: "free", premium: ["a"] }, "b")).toBe(false);
+  });
+
+  it("reads premium ids from pack.json and keeps only listed assets", () => {
+    const dir = mkdtempSync(join(tmpdir(), "packs-"));
+    mkdirSync(join(dir, "kit"));
+    writeFileSync(
+      join(dir, "kit", "pack.json"),
+      JSON.stringify({
+        id: "kit",
+        name: "Kit",
+        tier: "free",
+        palette: "endesga-32",
+        assets: [],
+        premium: ["gone"],
+      }),
+    );
+    expect(loadPacks(dir)[0]!.premium).toEqual([]);
+    expect(loadPacks(dir)[0]!.block).toBeNull();
+    updatePack("kit", (json) => (json.name = "Forest"), dir);
+    const saved = JSON.parse(
+      readFileSync(join(dir, "kit", "pack.json"), "utf8"),
+    );
+    expect(saved.name).toBe("Forest");
+    expect(saved.premium).toEqual(["gone"]);
+    updatePack("kit", (json) => (json.block = "Not An Id"), dir);
+    expect(loadPacks(dir)[0]!.issues.map((i) => i.rule)).toEqual(["pack"]);
   });
 });
 

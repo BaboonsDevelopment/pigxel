@@ -1009,7 +1009,9 @@
 .worlds {
   position: relative;
   z-index: 1;
-  margin-top: calc(-1 * var(--scene-handoff, 0px));
+  /* One screen to fade in over the tour's handoff, one more so the zoom's
+     track is already pinned when that fade starts. */
+  margin-top: calc(-2 * var(--scene-handoff, 0px));
 }
 
 .worldsHead {
@@ -1396,7 +1398,8 @@
 
 .footerTop {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  /* Brand, then one column per link group: Product, Support, Legal. */
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 40px;
 }
 

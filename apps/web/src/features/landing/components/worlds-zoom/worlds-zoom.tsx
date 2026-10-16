@@ -35,8 +35,8 @@ const TILES: (Art | null)[] = [
 /** The sky islands are true pixel art: one file pixel is one art pixel. */
 const IMG_W = 240;
 const IMG_H = 161;
-/** The pig standing on the little floating rock, where the zoom starts. */
-const PIG = { x: 135, y: 91, height: 14 };
+/** The mascot sitting on the little floating rock, where the zoom starts. */
+const PIG = { x: 135, y: 88.5, height: 19 };
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
 const smooth = (t: number) => {
@@ -144,39 +144,49 @@ export function WorldsZoom({ header }: { header: ReactNode }) {
       geometry = { w, h, ratio, cell, tiles: placed };
     };
 
+    // The track's first screen is the handoff: the view, already pinned,
+    // fades in over the outgoing scene. The zoom starts after it.
+    const handoff = () =>
+      reducedMotion
+        ? 0
+        : (viewport.current?.clientHeight ?? window.innerHeight);
+
     const progress = () => {
       if (reducedMotion) return 1;
       const node = track.current;
       if (!node) return 0;
       const box = node.getBoundingClientRect();
+      const lead = handoff();
       const span = Math.max(
         1,
-        box.height - (viewport.current?.clientHeight ?? window.innerHeight),
+        box.height -
+          lead -
+          (viewport.current?.clientHeight ?? window.innerHeight),
       );
-      return clamp01(-box.top / span);
+      return clamp01((-box.top - lead) / span);
     };
 
     let drawn = false;
     const draw = () => {
       frame = 0;
       if (!geometry) return;
-      // Off screen there's nothing to update once it has been drawn.
       const span = track.current?.getBoundingClientRect();
       const view = viewport.current;
+      const lead = handoff();
       if (span && view) {
-        const height = view.clientHeight;
-        const arrival = reducedMotion ? 1 : smooth(1 - span.top / height);
-        // Meet the outgoing scene in the same screen coordinates. Only the
-        // opacity changes until this section reaches its own sticky position.
-        const offset = reducedMotion
-          ? 0
-          : Math.min(height, Math.max(0, span.top));
+        const arrival = reducedMotion
+          ? 1
+          : smooth(-span.top / view.clientHeight);
         view.style.setProperty("--arrival", arrival.toFixed(3));
-        view.style.setProperty("--arrival-offset", `${offset.toFixed(2)}px`);
         view.toggleAttribute("data-arrived", arrival >= 0.99);
         view.inert = arrival < 0.99;
       }
-      if (drawn && span && (span.bottom < 0 || span.top > window.innerHeight))
+      // Off screen there's nothing to update once it has been drawn.
+      if (
+        drawn &&
+        span &&
+        (span.bottom < 0 || span.top + lead > window.innerHeight)
+      )
         return;
       drawn = loaded;
       const { w: W, h: H, ratio, cell } = geometry;

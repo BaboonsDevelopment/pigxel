@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { ASSETS_DIR } from "./paths.ts";
 import type { AssetSource } from "./source.ts";
 
 /**
@@ -7,9 +8,9 @@ import type { AssetSource } from "./source.ts";
  * holds for the drawing it was made on: once the file changes, the asset
  * needs reviewing again. Rejection notes are the feedback to redraw from.
  */
-export const REVIEW_FILE = join(import.meta.dirname, "..", "review.json");
+export const REVIEW_FILE = join(ASSETS_DIR, "review.json");
 
-export type ReviewStatus = "approved" | "rejected" | "pending";
+export type ReviewStatus = "approved" | "fix" | "pending";
 
 export type ReviewEntry = {
   status: ReviewStatus;

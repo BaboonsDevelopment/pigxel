@@ -28,18 +28,29 @@ export async function reviewTile(tileId: string): Promise<Verdict> {
   if (!tile || (tile.review !== "pending" && tile.visibility !== "public"))
     return "skipped";
 
-  const file = await admin.storage
-    .from("tiles")
-    .download(`${tile.user_id}/${tile.id}.pigxel`);
-  const missing = !!file.error && /not.?found/i.test(file.error.message);
-  if (file.error && !missing)
+  const [ban, takedown] = await Promise.all([
+    admin.from("bans").select("user_id").eq("user_id", tile.user_id),
+    admin.from("tile_takedowns").select("tile_id").eq("tile_id", tile.id),
+  ]);
+  const blockError = ban.error ?? takedown.error;
+  if (blockError)
+    throw new Error(`Couldn’t check ${tileId}: ${blockError.message}`);
+  const blocked = !!ban.data?.length || !!takedown.data?.length;
+
+  const file = blocked
+    ? null
+    : await admin.storage
+        .from("tiles")
+        .download(`${tile.user_id}/${tile.id}.pigxel`);
+  const missing = !!file?.error && /not.?found/i.test(file.error.message);
+  if (file?.error && !missing)
     throw new Error(`Couldn’t read tile ${tileId}: ${file.error.message}`);
 
   let scores = null;
   let allowed = false;
   let thumbnail = null;
   try {
-    if (file.data) {
+    if (file?.data) {
       const doc = parsePigxel(await file.data.text());
       const frames = await scoreImages(frameImages(doc));
       scores = worstFrame(frames);

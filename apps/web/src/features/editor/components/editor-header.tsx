@@ -76,17 +76,18 @@ export function EditorHeader({
   return (
     <header
       hidden={hidden}
-      className="col-span-3 flex min-h-12 flex-wrap items-center gap-x-2 gap-y-2 border-b bg-background px-4 py-2"
+      className="col-span-3 flex min-h-12 min-w-0 items-center gap-1 border-b bg-background px-4 py-2"
     >
       <Link
         href="/tiles"
         className={buttonVariants({
           variant: "ghost",
           size: "sm",
-          className: "mr-2 text-sm",
+          className: "mr-1 shrink-0 text-sm xl:mr-2",
         })}
+        aria-label="My projects"
       >
-        ← My projects
+        ←<span className="hidden xl:inline"> My projects</span>
       </Link>
       <Menu
         label="File"
@@ -218,7 +219,7 @@ export function EditorHeader({
       {afterMenus.map((menu) => (
         <Menu key={menu.label} label={menu.label} sections={menu.sections} />
       ))}
-      <InputGroup className="ml-2 h-8 w-auto">
+      <InputGroup className="ml-1 h-8 w-auto shrink-0 xl:ml-2">
         <InputGroupInput
           aria-label="File name"
           value={file.name}
@@ -228,7 +229,7 @@ export function EditorHeader({
           }
           onChange={(e) => file.rename(e.target.value)}
           maxLength={100}
-          className="w-40 px-2"
+          className="w-28 px-2 xl:w-40"
         />
         <InputGroupText className="pr-2 pl-0 text-xs">
           {PIGXEL_EXTENSION}
@@ -262,8 +263,9 @@ export function EditorHeader({
       />
       <p
         role="status"
+        title={file.busy ? undefined : file.status?.text}
         className={cn(
-          "ml-2 text-sm",
+          "ml-2 min-w-0 truncate text-sm",
           file.status?.tone === "error"
             ? "text-destructive"
             : "text-muted-foreground",
@@ -277,32 +279,33 @@ export function EditorHeader({
           variant="secondary"
           size="sm"
           onClick={file.status.connect ? onConnectDrive : file.save}
+          className="shrink-0"
         >
           {file.status.retry}
         </Button>
       )}
-      {drive.connected && (
-        <p
-          className="ml-auto truncate text-xs text-muted-foreground"
-          title="Google account used for Google Drive"
-        >
-          Google Drive · {drive.email ?? "connected"}
-        </p>
-      )}
-      {onShare && (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={onShare}
-          className={drive.connected ? undefined : "ml-auto"}
-        >
-          Share…
-        </Button>
-      )}
-      <TokensButton
-        className={drive.connected || onShare ? undefined : "ml-auto"}
-      />
+      <div className="ml-auto flex min-w-0 items-center gap-2">
+        {drive.connected && (
+          <p
+            className="hidden min-w-0 truncate text-xs text-muted-foreground 2xl:block"
+            title={`Google Drive · ${drive.email ?? "connected"}`}
+          >
+            Google Drive · {drive.email ?? "connected"}
+          </p>
+        )}
+        {onShare && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={onShare}
+            className="shrink-0"
+          >
+            Share…
+          </Button>
+        )}
+        <TokensButton />
+      </div>
     </header>
   );
 }

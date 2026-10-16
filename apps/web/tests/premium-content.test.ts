@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { PREMIUM_ASSETS } from "@/features/assets/premium";
 import { STARTER_ASSETS } from "@/features/assets/starter";
-import { isAssetCategory, isLocked } from "@/features/assets/assets";
+import { isLocked } from "@/features/assets/assets";
 import { TUTORIALS } from "@/features/tutorials/tutorials";
 
 describe("premium asset set", () => {
   it("draws every frame as a full 16 × 16 grid in its own colours", () => {
     for (const asset of PREMIUM_ASSETS) {
-      expect(isAssetCategory(asset.category)).toBe(true);
+      expect(["characters", "items", "nature", "tiles"]).toContain(
+        asset.category,
+      );
       for (const frame of asset.frames) {
         expect(frame, asset.id).toHaveLength(16);
         for (const row of frame) {

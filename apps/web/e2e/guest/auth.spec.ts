@@ -13,6 +13,10 @@ test("signs up, signs out and logs back in @mobile", async ({
   newAddress,
 }) => {
   await page.goto("/login?mode=signup");
+  // On phones the cookie banner covers the Create account button.
+  await page.getByRole("button", { name: "Only necessary" }).click();
+  await page.getByLabel(/years old/).check();
+  await page.getByLabel(/I agree to the Terms of Service/).check();
   await page.getByLabel("Email").fill(newAddress);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();

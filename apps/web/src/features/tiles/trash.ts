@@ -34,25 +34,33 @@ async function purgeBatch(): Promise<{ purged: number; failed: boolean }> {
     return { purged: 0, failed: true };
   }
   if (!data.length) return { purged: 0, failed: false };
+  const failure = await removeTiles(supabase, data);
+  if (failure) {
+    console.error("Couldn’t delete expired trash:", failure);
+    return { purged: 0, failed: true };
+  }
+  return { purged: data.length, failed: false };
+}
+
+export async function removeTiles(
+  supabase: ReturnType<typeof createAdminClient>,
+  tiles: { id: string; user_id: string }[],
+): Promise<string | null> {
   await removeAllVersions(
     supabase,
-    data.map((tile) => tile.id),
+    tiles.map((tile) => tile.id),
   ).catch(() => {});
   const files = await supabase.storage
     .from("tiles")
-    .remove(data.map((tile) => `${tile.user_id}/${tile.id}.pigxel`));
+    .remove(tiles.map((tile) => `${tile.user_id}/${tile.id}.pigxel`));
   if (files.error)
-    console.error("Couldn’t remove expired trash files:", files.error.message);
+    console.error("Couldn’t remove tile files:", files.error.message);
   const removed = await supabase
     .from("tiles")
     .delete()
     .in(
       "id",
-      data.map((tile) => tile.id),
+      tiles.map((tile) => tile.id),
     );
-  if (removed.error) {
-    console.error("Couldn’t delete expired trash:", removed.error.message);
-    return { purged: 0, failed: true };
-  }
-  return { purged: data.length, failed: false };
+  return removed.error?.message ?? null;
 }

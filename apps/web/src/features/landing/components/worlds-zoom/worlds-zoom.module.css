@@ -4,18 +4,23 @@
  * the middle tile.
  */
 
+/*
+ * The track starts one handoff screen early (see `.worlds` on the landing),
+ * so the viewport is already stuck to the top while it fades in over the
+ * feature tour: the browser pins it, and nothing chases the scroll in JS.
+ */
 .track {
   --per: 85vh;
 
   position: relative;
-  height: calc(100vh + 2.4 * var(--per));
+  height: calc(100vh + 2.4 * var(--per) + var(--scene-handoff, 0px));
 }
 
 @supports (height: 1svh) {
   .track {
     --per: 85svh;
 
-    height: calc(100svh + 2.4 * var(--per));
+    height: calc(100svh + 2.4 * var(--per) + var(--scene-handoff, 0px));
   }
 }
 
@@ -28,7 +33,6 @@
   height: 100vh;
   height: 100svh;
   opacity: var(--arrival, 0);
-  transform: translateY(calc(-1 * var(--arrival-offset, 0px)));
   pointer-events: none;
 }
 

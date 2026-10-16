@@ -14,30 +14,41 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
-import type { LegacyCategory } from "./lib/asset.ts";
+import type { AssetKind } from "./lib/asset.ts";
+import { BUCKET, PREMIUM_BUCKET, removeAsset } from "./lib/remote.ts";
 
-const BUCKET = "assets";
 const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
 const CACHE_SECONDS = "31536000";
 
 type ManifestAsset = {
   id: string;
   name: string;
-  category: LegacyCategory;
+  category: string;
+  kind: AssetKind;
   sort: number;
   width: number;
   height: number;
   frameCount: number;
   frameMs: number;
   colors: string[];
+  premium: boolean;
   file: string;
   sheet: string;
+};
+
+type ManifestPack = {
+  id: string;
+  name: string;
+  block: string;
+  newBlock: boolean;
+  assets: ManifestAsset[];
 };
 
 type Row = {
   id: string;
   name: string;
-  category: LegacyCategory;
+  category: string;
+  kind: AssetKind;
   width: number;
   height: number;
   frame_count: number;
@@ -46,6 +57,7 @@ type Row = {
   file_path: string;
   sheet_path: string;
   sort: number;
+  premium: boolean;
 };
 
 const { values } = parseArgs({
@@ -66,7 +78,7 @@ if (!url || !key)
 const dir = values.dir!;
 const manifest = JSON.parse(
   readFileSync(join(dir, "manifest.json"), "utf8"),
-) as { packs: { assets: ManifestAsset[] }[] };
+) as { packs: ManifestPack[] };
 const assets = manifest.packs.flatMap((pack) => pack.assets);
 
 const supabase = createClient(url, key, {
@@ -77,11 +89,49 @@ const storage = supabase.storage.from(BUCKET);
 const { data: existing, error: listError } = await supabase
   .from("assets")
   .select(
-    "id, name, category, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort",
+    "id, name, category, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
   )
   .returns<Row[]>();
 if (listError) throw new Error(`Couldn’t read assets: ${listError.message}`);
 const before = new Map(existing.map((row) => [row.id, row]));
+
+const { data: blockRows, error: blockError } = await supabase
+  .from("asset_blocks")
+  .select("id, sort")
+  .returns<{ id: string; sort: number }[]>();
+if (blockError)
+  throw new Error(`Couldn’t read asset blocks: ${blockError.message}`);
+const blockIds = new Set(blockRows.map((row) => row.id));
+let nextSort = Math.max(-1, ...blockRows.map((row) => row.sort)) + 1;
+for (const pack of manifest.packs) {
+  if (!pack.assets.length) continue;
+  if (!pack.newBlock) {
+    if (!blockIds.has(pack.block))
+      throw new Error(
+        `${pack.id}: there's no block "${pack.block}" to add to.`,
+      );
+    continue;
+  }
+  const exists = blockIds.has(pack.block);
+  console.log(
+    `${values["dry-run"] ? "Would be " : ""}${exists ? "named" : "added"} block: ${pack.block} “${pack.name}”`,
+  );
+  if (values["dry-run"]) continue;
+  const { error } = await supabase
+    .from("asset_blocks")
+    .upsert(
+      exists
+        ? {
+            id: pack.block,
+            name: pack.name,
+            updated_at: new Date().toISOString(),
+          }
+        : { id: pack.block, name: pack.name, sort: nextSort++ },
+    );
+  if (error)
+    throw new Error(`${pack.block}: couldn’t save the block: ${error.message}`);
+  blockIds.add(pack.block);
+}
 
 /** Same as publish.ts: the first 8 bytes of the SHA-256, in hex. */
 const hashOf = (data: Uint8Array) =>
@@ -95,6 +145,7 @@ for (const asset of assets) {
     id: asset.id,
     name: asset.name,
     category: asset.category,
+    kind: asset.kind,
     width: asset.width,
     height: asset.height,
     frame_count: asset.frameCount,
@@ -103,6 +154,7 @@ for (const asset of assets) {
     file_path: `${asset.id}/${hashOf(file)}.pigxel`,
     sheet_path: `${asset.id}/${hashOf(sheet)}.png`,
     sort: asset.sort,
+    premium: asset.premium,
   };
   const old = before.get(asset.id);
   if (old && JSON.stringify(old) === JSON.stringify(row)) {
@@ -116,10 +168,12 @@ for (const asset of assets) {
 
   const options = { cacheControl: CACHE_SECONDS, upsert: true };
   const uploads = await Promise.all([
-    storage.upload(row.file_path, file, {
-      ...options,
-      contentType: PIGXEL_MIME_TYPE,
-    }),
+    supabase.storage
+      .from(row.premium ? PREMIUM_BUCKET : BUCKET)
+      .upload(row.file_path, file, {
+        ...options,
+        contentType: PIGXEL_MIME_TYPE,
+      }),
     storage.upload(row.sheet_path, sheet, {
       ...options,
       contentType: "image/png",
@@ -134,11 +188,12 @@ for (const asset of assets) {
     .upsert({ ...row, updated_at: new Date().toISOString() });
   if (error) throw new Error(`${asset.id}: couldn’t save: ${error.message}`);
 
-  const replaced = [old?.file_path, old?.sheet_path].filter(
-    (path): path is string =>
-      !!path && path !== row.file_path && path !== row.sheet_path,
-  );
-  if (replaced.length) await storage.remove(replaced);
+  if (old && old.sheet_path !== row.sheet_path)
+    await storage.remove([old.sheet_path]);
+  if (old && (old.premium !== row.premium || old.file_path !== row.file_path))
+    await supabase.storage
+      .from(old.premium ? PREMIUM_BUCKET : BUCKET)
+      .remove([old.file_path]);
 }
 
 if (values.prune) {
@@ -147,19 +202,7 @@ if (values.prune) {
     counts.removed++;
     console.log(`${values["dry-run"] ? "Would be " : ""}removed: ${row.id}`);
     if (values["dry-run"]) continue;
-    const { error: deleteError } = await supabase
-      .from("assets")
-      .delete()
-      .eq("id", row.id);
-    if (deleteError)
-      throw new Error(`${row.id}: couldn’t remove: ${deleteError.message}`);
-    const { data: files } = await storage.list(row.id);
-    const paths = [
-      row.file_path,
-      row.sheet_path,
-      ...(files ?? []).map((f) => `${row.id}/${f.name}`),
-    ];
-    await storage.remove([...new Set(paths)]);
+    await removeAsset(supabase, row.id);
   }
 }
 

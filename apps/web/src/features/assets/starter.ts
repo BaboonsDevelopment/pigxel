@@ -1,12 +1,12 @@
 import { createLayer } from "@/lib/layers/tree";
 import type { PigxelDocument } from "@/lib/pigxel-file/format";
 import { createFrame } from "@/lib/sprite/frames";
-import type { AssetCategory } from "./assets";
+import type { AssetKind } from "./assets";
 
 export type StarterAsset = {
   id: string;
   name: string;
-  category: AssetCategory;
+  category: "characters" | "items" | "nature" | "tiles";
   colors: Record<string, string>;
   frames: string[][];
   duration?: number;
@@ -850,3 +850,6 @@ export function starterDocument(asset: StarterAsset): PigxelDocument {
     slices: [],
   };
 }
+
+export const starterKind = (asset: StarterAsset): AssetKind =>
+  asset.category === "tiles" ? "tile" : "sprite";
