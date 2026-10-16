@@ -6,29 +6,13 @@ export function ProviderButton({
   logo,
   name,
   hint,
-  blocked,
 }: {
   href?: string;
   logo: React.ReactNode;
   name: string;
   hint?: string;
-  /** Why it can't be used yet, e.g. boxes still to tick. */
-  blocked?: string;
 }) {
   const label = `Continue with ${name}`;
-  if (href && blocked)
-    return (
-      <button
-        type="button"
-        disabled
-        className={providerClassName}
-        aria-label={`${label} (${blocked})`}
-        title={blocked}
-      >
-        {logo}
-        {name}
-      </button>
-    );
   return href ? (
     <a
       href={href}

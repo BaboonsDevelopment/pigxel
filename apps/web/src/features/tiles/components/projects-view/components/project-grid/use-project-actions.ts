@@ -9,7 +9,6 @@ import {
   type CloudTileSummary,
 } from "@/lib/pigxel-file/cloud";
 import {
-  createDraft,
   findDraftFor,
   loadDrafts,
   removeDraft,
@@ -23,11 +22,9 @@ import {
 } from "@/lib/pigxel-file/format";
 import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import {
-  deleteProjectsForever,
   moveTileToFolder,
   publishProjects,
   renameTile,
-  restoreProjects,
   setProjectArchived,
   setProjectPinned,
 } from "../../../../actions";
@@ -138,18 +135,22 @@ export function useProjectActions({
     onSettled: invalidate,
   });
 
+  /** Copies go to Pigxel cloud, whether the original is there or unsaved. */
   const duplicateMutation = useMutation({
     mutationFn: ({
-      tile,
+      project,
       name,
       target,
     }: {
-      tile: CloudTileSummary;
+      project: Project;
       name: string;
       target: string | null;
     }) =>
       withLoading("Duplicating…", async () => {
-        const file = await readCloudTile(tile.id);
+        const file =
+          project.kind === "cloud"
+            ? await readCloudTile(project.tile.id)
+            : project.draft.file;
         const image = parsePigxel(file);
         const copy = await saveCloudTile(
           { name },
@@ -206,46 +207,12 @@ export function useProjectActions({
           patchProjectLists(client, project.id, null);
       }),
     onError: fail,
-    onSuccess: (_, projects) => {
-      const ids = projects.flatMap((project) =>
-        project.kind === "cloud" ? [project.id] : [],
-      );
-      if (!ids.length) return;
-      showUndo(
-        ids.length === 1
-          ? "Project moved to trash."
-          : `${ids.length} projects moved to trash.`,
-        undoWith(() => restoreProjects(ids)),
-      );
-    },
-    onSettled: invalidate,
-  });
-
-  const restoreMutation = useMutation({
-    mutationFn: (tiles: CloudTileSummary[]) =>
-      ensure(restoreProjects(tiles.map((tile) => tile.id))),
-    onMutate: (tiles) =>
-      tiles.forEach((tile) =>
-        patchProjectLists(client, tile.id, null, (params) => params.trashed),
-      ),
-    onError: fail,
-    onSuccess: (_, tiles) =>
+    onSuccess: (_, projects) =>
       showSuccess(
-        tiles.length === 1
-          ? "Project restored!"
-          : `${tiles.length} projects restored!`,
+        projects.length === 1
+          ? "Project deleted."
+          : `${projects.length} projects deleted.`,
       ),
-    onSettled: invalidate,
-  });
-
-  const forgetMutation = useMutation({
-    mutationFn: ({ tiles, all }: { tiles: CloudTileSummary[]; all: boolean }) =>
-      ensure(deleteProjectsForever(all ? "all" : tiles.map((tile) => tile.id))),
-    onMutate: ({ tiles }) =>
-      tiles.forEach((tile) =>
-        patchProjectLists(client, tile.id, null, (params) => params.trashed),
-      ),
-    onError: fail,
     onSettled: invalidate,
   });
 
@@ -288,7 +255,7 @@ export function useProjectActions({
     error,
     clearError: () => setError(null),
     duplicating: duplicateMutation.isPending
-      ? duplicateMutation.variables.tile.id
+      ? duplicateMutation.variables.project.id
       : null,
     uploading: uploadMutation.isPending
       ? uploadMutation.variables.draft.id
@@ -331,27 +298,12 @@ export function useProjectActions({
       name: string,
       target: string | null,
     ): Promise<string | null> => {
-      if (project.kind === "cloud")
-        try {
-          await duplicateMutation.mutateAsync({
-            tile: project.tile,
-            name,
-            target,
-          });
-          return null;
-        } catch (e) {
-          return messageOf(e, DUPLICATE_FAILED);
-        }
-      const copy = createDraft(userId, {
-        name,
-        file: project.draft.file,
-        location: null,
-        dirty: true,
-      });
-      if (!copy) return DUPLICATE_FAILED;
-      local.refresh();
-      showSuccess(PROJECT_DUPLICATED);
-      return null;
+      try {
+        await duplicateMutation.mutateAsync({ project, name, target });
+        return null;
+      } catch (e) {
+        return messageOf(e, DUPLICATE_FAILED);
+      }
     },
 
     removeFromFolder: (tile: CloudTileSummary) => {
@@ -395,15 +347,5 @@ export function useProjectActions({
     },
 
     deleted: () => void invalidate(),
-
-    restore: (tiles: CloudTileSummary[]) => {
-      setError(null);
-      restoreMutation.mutate(tiles);
-    },
-
-    deleteForever: (tiles: CloudTileSummary[], all = false) => {
-      setError(null);
-      forgetMutation.mutate({ tiles, all });
-    },
   };
 }

@@ -7,7 +7,6 @@ import {
   stripPigxelExtension,
   type PigxelDocument,
 } from "./format";
-import { readDriveFile, type DriveFile } from "./google-drive";
 import type { CloudTile, TileLocation } from "./location";
 
 export function editorUrl(draftId: string) {
@@ -95,20 +94,4 @@ export async function draftForCloudTile(
     dirty: false,
   });
   return open.id;
-}
-
-export async function draftForDriveFile(
-  userId: string,
-  file: DriveFile,
-): Promise<string> {
-  const location: TileLocation = { kind: "drive", file };
-  await loadDrafts(userId);
-  const open = findDraftFor(userId, location);
-  if (open) return open.id;
-  return draftFromFile(
-    userId,
-    await readDriveFile(file.id),
-    file.name,
-    location,
-  );
 }

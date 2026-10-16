@@ -12,13 +12,7 @@ function headerSlot() {
   return target && getComputedStyle(target).display !== "none" ? target : null;
 }
 
-export function Breadcrumb({
-  name,
-  children,
-}: {
-  name: string;
-  children?: ReactNode;
-}) {
+export function Breadcrumb({ children }: { children?: ReactNode }) {
   const slot = useSyncExternalStore(subscribe, headerSlot, () => null);
   const back = useSyncExternalStore(
     subscribe,
@@ -49,12 +43,6 @@ export function Breadcrumb({
         </svg>
         Back to Explore
       </Link>
-      <span aria-hidden="true" className="text-muted-foreground">
-        /
-      </span>
-      <span aria-current="page" className="truncate text-muted-foreground">
-        {name}
-      </span>
       {children}
     </nav>
   );

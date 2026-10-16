@@ -35,12 +35,17 @@ export type ReviewTile = {
   premium: boolean;
 };
 
-export type ReviewTarget = { id: string; name: string };
+export type ReviewTarget = {
+  id: string;
+  name: string;
+  background: string | null;
+};
 
 export type ReviewBlock = {
   id: string;
   name: string;
   target: string | null;
+  background: string | null;
   premium: boolean;
   issues: ReviewIssue[];
   tiles: ReviewTile[];
@@ -55,7 +60,7 @@ export type ReviewSnapshot = {
 export type ProductionAsset = {
   id: string;
   name: string;
-  category: string;
+  packId: string;
   kind: "sprite" | "tile";
   width: number;
   height: number;

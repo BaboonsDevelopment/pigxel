@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -9,18 +10,16 @@ import {
   useDialog,
 } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Input } from "@pigxel/ui/components/input";
+import { Input, Textarea } from "@pigxel/ui/components/input";
 import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { ModalButton } from "@/components/ui/modal-button";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
-import { PixelImage } from "@/components/ui/pixel-image";
+import { canUseAi } from "@/features/billing/actions";
+import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { keepStartOptions, MAX_START_PROMPT } from "../start-options";
 import { createTile } from "@/features/tiles/create-tile";
-import {
-  readNewTileDefaults,
-  type NewTileStorage,
-} from "@/features/tiles/new-tile-defaults";
-import { connectDriveUrl, type DriveStatus } from "@/lib/google-drive/status";
+import { readNewTileDefaults } from "@/features/tiles/new-tile-defaults";
 import { MAX_PIGXEL_SIZE } from "@/lib/pigxel-file/format";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import { openTabAfter } from "@/lib/pigxel-file/tabs";
@@ -28,80 +27,63 @@ import { SIZE_LABEL, SizeField } from "./size-controls";
 
 type Fill = "transparent" | "white" | "custom";
 
-const option = (on: boolean) =>
+const DEFAULT_SIZE = 32;
+
+/** A choice button in the new-project modals; `on` when it's picked. */
+export const choiceClass = (on: boolean) =>
   cn(
-    "flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-1.5 text-sm whitespace-nowrap transition-colors disabled:cursor-default disabled:opacity-50",
+    "flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-1.5 text-sm whitespace-nowrap transition-colors",
     on
       ? "border-primary-soft bg-pastel-pink-soft font-semibold"
       : "bg-background hover:bg-pink-base",
   );
 
-const STORAGE: { value: NewTileStorage; label: string; hint: string }[] = [
-  {
-    value: "cloud",
-    label: "Pigxel cloud",
-    hint: "Saved to your Pigxel account and autosaved as you draw.",
-  },
-  {
-    value: "drive",
-    label: "Google Drive",
-    hint: "Created in your Google Drive and saved as you draw.",
-  },
-  {
-    value: "none",
-    label: "This browser",
-    hint: "Kept in this browser. Save it to the cloud or Drive any time.",
-  },
-];
-
-export function NewProjectDialog({
-  userId,
-  from,
-  drive,
-  onClose,
-}: {
+type FormProps = {
   userId: string;
-  from: string;
-  drive: DriveStatus;
-  onClose: () => void;
-}) {
+  from?: string;
+  /** Generate with AI: opens with the prompt shown and asks for one. */
+  ai?: boolean;
+  /** Whether the plan includes AI, when the caller already knows. */
+  aiAllowed?: boolean;
+};
+
+/**
+ * Creates a project in Pigxel cloud and opens it. `from` is the editor tab
+ * the new one opens next to; without it the project opens on its own.
+ */
+export function NewProjectDialog({
+  onClose,
+  ...props
+}: FormProps & { onClose: () => void }) {
   return (
-    <Dialog onClose={onClose} size="sm" portal>
-      <NewProjectForm userId={userId} from={from} drive={drive} />
+    <Dialog onClose={onClose} size="md" portal>
+      <NewProjectForm {...props} />
     </Dialog>
   );
 }
 
-function NewProjectForm({
-  userId,
-  from,
-  drive,
-}: {
-  userId: string;
-  from: string;
-  drive: DriveStatus;
-}) {
+function NewProjectForm({ userId, from, ai = false, aiAllowed }: FormProps) {
   const router = useRouter();
   const { close } = useDialog();
   const [defaults] = useState(() => readNewTileDefaults(userId));
   const [name, setName] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [aiOpen, setAiOpen] = useState(ai);
+  const [aiAccess, setAiAccess] = useState<boolean | null>(
+    ai ? true : (aiAllowed ?? null),
+  );
   const [width, setWidth] = useState(String(defaults.width));
   const [height, setHeight] = useState(String(defaults.height));
-  const [locked, setLocked] = useState(false);
   const [fill, setFill] = useState<Fill>(
     defaults.background === "white" ? "white" : "transparent",
   );
   const [custom, setCustom] = useState("#f8dde6");
-  const [storage, setStorage] = useState<NewTileStorage>(
-    defaults.storage === "drive" && !drive.connected
-      ? "cloud"
-      : defaults.storage,
-  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** An empty box means the size its placeholder shows. */
   const sizeOf = (value: string) => {
-    const n = Number(value);
+    const n = value.trim() === "" ? DEFAULT_SIZE : Number(value);
     return Number.isInteger(n) && n >= 1 && n <= MAX_PIGXEL_SIZE ? n : null;
   };
 
@@ -110,6 +92,10 @@ function NewProjectForm({
     const h = sizeOf(height);
     if (!w || !h)
       return setError(`Use a size from 1 to ${MAX_PIGXEL_SIZE} pixels.`);
+    const asked = prompt.trim();
+    if (ai && !asked) return setError("Describe what the AI should draw.");
+    // The AI runs only when its section is open, allowed and filled in.
+    const generate = aiOpen && aiAccess === true && asked !== "";
     setBusy(true);
     setError(null);
     const result = await createTile({
@@ -119,15 +105,17 @@ function NewProjectForm({
       height: h,
       background: fill === "transparent" ? "transparent" : "white",
       fill: fill === "custom" ? custom : undefined,
-      storage,
+      start: generate ? "ai" : undefined,
     });
     if ("error" in result) {
       setError(result.error);
       setBusy(false);
       return;
     }
-    openTabAfter(userId, result.draftId, from);
-    router.push(editorUrl(result.draftId));
+    if (from) openTabAfter(userId, result.draftId, from);
+    if (generate) keepStartOptions(result.draftId, { prompt: asked });
+    const url = editorUrl(result.draftId);
+    router.push(generate ? `${url}&start=ai` : url);
     close();
   };
 
@@ -139,12 +127,13 @@ function NewProjectForm({
       }}
       className="flex min-h-0 flex-col"
     >
-      <ModalHeader title="Create New Project" />
+      <ModalHeader title={ai ? "Generate with AI" : "Create New Project"} />
       <DialogBody className="grid gap-5 py-5">
+        {ai && <PromptField value={prompt} onChange={setPrompt} required />}
         <label className="block">
           <span className={SIZE_LABEL}>Project name</span>
           <Input
-            autoFocus
+            autoFocus={!ai}
             placeholder="My pixel art"
             maxLength={100}
             value={name}
@@ -152,51 +141,33 @@ function NewProjectForm({
             className="h-12 rounded-xl px-4"
           />
         </label>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
-          <SizeField
-            id="new-w"
-            label="Width"
-            unit="px"
-            value={width}
-            onChange={(text) => {
-              setWidth(text);
-              if (locked) setHeight(text);
-            }}
-          />
-          <button
-            type="button"
-            aria-pressed={locked}
-            aria-label="Keep it square"
-            title="Keep it square"
-            onClick={() => {
-              setLocked(!locked);
-              if (!locked) setHeight(width);
-            }}
-            className={cn(
-              "grid size-14 place-items-center rounded-xl border transition-colors",
-              locked
-                ? "border-primary-soft bg-pastel-pink-soft"
-                : "bg-background hover:bg-pink-base",
-            )}
-          >
-            <PixelImage
-              src="/art/icons/lock-icon.png"
-              alt=""
-              width={36}
-              height={36}
-              className={cn("size-9", !locked && "opacity-50")}
+        <div className="flex items-end gap-3">
+          <div className="min-w-0 flex-1">
+            <SizeField
+              id="new-w"
+              label="Width"
+              unit="px"
+              placeholder={String(DEFAULT_SIZE)}
+              value={width}
+              onChange={setWidth}
             />
-          </button>
-          <SizeField
-            id="new-h"
-            label="Height"
-            unit="px"
-            value={height}
-            onChange={(text) => {
-              setHeight(text);
-              if (locked) setWidth(text);
-            }}
-          />
+          </div>
+          <span
+            aria-hidden="true"
+            className="flex h-14 items-center text-muted-foreground"
+          >
+            ×
+          </span>
+          <div className="min-w-0 flex-1">
+            <SizeField
+              id="new-h"
+              label="Height"
+              unit="px"
+              placeholder={String(DEFAULT_SIZE)}
+              value={height}
+              onChange={setHeight}
+            />
+          </div>
         </div>
         <fieldset>
           <legend className={SIZE_LABEL}>Background</legend>
@@ -205,7 +176,7 @@ function NewProjectForm({
               type="button"
               aria-pressed={fill === "transparent"}
               onClick={() => setFill("transparent")}
-              className={option(fill === "transparent")}
+              className={choiceClass(fill === "transparent")}
             >
               <span className="size-4 shrink-0 rounded border bg-checker" />
               Transparent
@@ -214,14 +185,14 @@ function NewProjectForm({
               type="button"
               aria-pressed={fill === "white"}
               onClick={() => setFill("white")}
-              className={option(fill === "white")}
+              className={choiceClass(fill === "white")}
             >
               <span className="size-4 shrink-0 rounded border bg-white" />
               White
             </button>
             <label
               className={cn(
-                option(fill === "custom"),
+                choiceClass(fill === "custom"),
                 "relative cursor-pointer",
               )}
             >
@@ -244,37 +215,55 @@ function NewProjectForm({
             </label>
           </div>
         </fieldset>
-        <fieldset>
-          <legend className={SIZE_LABEL}>Where to keep it</legend>
-          <div className="grid grid-cols-3 gap-2">
-            {STORAGE.map((place) => (
-              <button
-                key={place.value}
-                type="button"
-                aria-pressed={storage === place.value}
-                disabled={place.value === "drive" && !drive.connected}
-                onClick={() => setStorage(place.value)}
-                className={option(storage === place.value)}
+        {!ai && (
+          <div className="grid gap-3">
+            <button
+              type="button"
+              aria-expanded={aiOpen}
+              onClick={() => {
+                setAiOpen(!aiOpen);
+                if (aiAccess === null)
+                  void canUseAi().then(setAiAccess, () => setAiAccess(true));
+              }}
+              className="flex h-11 w-full items-center gap-2 rounded-xl border bg-background px-4 text-sm font-semibold transition-colors hover:bg-pink-base"
+            >
+              Create with AI
+              <PremiumBadge />
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                className={cn(
+                  "ml-auto size-4 text-muted-foreground transition-transform",
+                  aiOpen && "rotate-180",
+                )}
+                fill="none"
               >
-                {place.label}
-              </button>
-            ))}
+                <path
+                  d="m4 6 4 4 4-4"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {aiOpen &&
+              (aiAccess === null ? (
+                <p className="text-sm text-muted-foreground">
+                  Checking your plan…
+                </p>
+              ) : aiAccess ? (
+                <PromptField value={prompt} onChange={setPrompt} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Creating with AI comes with the paid plans.{" "}
+                  <Link href="/pricing" className={textLinkClassName}>
+                    Upgrade
+                  </Link>
+                </p>
+              ))}
           </div>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {STORAGE.find((place) => place.value === storage)?.hint}
-            {drive.available && !drive.connected && (
-              <>
-                {" "}
-                <a
-                  href={connectDriveUrl(editorUrl(from))}
-                  className={textLinkClassName}
-                >
-                  Connect Google Drive
-                </a>
-              </>
-            )}
-          </p>
-        </fieldset>
+        )}
         {error && <FormMessage tone="error">{error}</FormMessage>}
       </DialogBody>
       <DialogFooter className={MODAL_FOOTER}>
@@ -282,9 +271,39 @@ function NewProjectForm({
           Cancel
         </ModalButton>
         <ModalButton type="submit" disabled={busy}>
-          {busy ? "Creating…" : "Create"}
+          {busy
+            ? "Creating…"
+            : ai || (aiOpen && aiAccess && prompt.trim())
+              ? "Generate"
+              : "Create"}
         </ModalButton>
       </DialogFooter>
     </form>
+  );
+}
+
+function PromptField({
+  value,
+  onChange,
+  required,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className={SIZE_LABEL}>What should the AI draw?</span>
+      <Textarea
+        autoFocus
+        required={required}
+        rows={3}
+        placeholder="A cozy cottage with a red roof, pine trees and a stone path"
+        maxLength={MAX_START_PROMPT}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="resize-none rounded-xl px-4 py-3"
+      />
+    </label>
   );
 }

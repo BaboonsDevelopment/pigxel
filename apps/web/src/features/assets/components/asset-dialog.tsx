@@ -9,24 +9,29 @@ import {
 } from "@pigxel/ui/components/button";
 import { Dialog, useDialog } from "@pigxel/ui/components/dialog";
 import { Heading, Text } from "@pigxel/ui/components/typography";
-import { removeAsset } from "../actions";
-import { confirmDialog } from "@/components/ui/confirm-dialog";
-import { useModifierLabel } from "@/lib/utils/use-modifier-label";
-import { assetBlob, assetFramePng, isLocked, type Asset } from "../assets";
+import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { UpgradeDialog } from "@/features/billing/components/upgrade-dialog";
 import { downloadBlob } from "@/lib/utils/download";
+import { useModifierLabel } from "@/lib/utils/use-modifier-label";
+import { recordAssetUse } from "../actions";
+import { assetBlob, assetFramePng, isLocked, type Asset } from "../assets";
 import { AssetImage } from "./asset-image";
+import { FavouriteButton } from "./favourite-button";
+
+type DialogProps = {
+  asset: Asset;
+  pack: { id: string; name: string; premium: boolean };
+  tagNames: ReadonlyMap<string, string>;
+  favourite: boolean;
+  onFavourite: (on: boolean) => void;
+  onPack: (packId: string) => void;
+  onTag: (tagId: string) => void;
+};
 
 export function AssetDialog({
-  asset,
-  blockName,
-  canRemove,
   onClose,
-}: {
-  asset: Asset;
-  blockName: string;
-  canRemove: boolean;
-  onClose: () => void;
-}) {
+  ...props
+}: DialogProps & { onClose: () => void }) {
   return (
     <Dialog
       onClose={onClose}
@@ -34,26 +39,29 @@ export function AssetDialog({
       portal
       className="backdrop:bg-black/50 backdrop:backdrop-blur-sm"
     >
-      <AssetDetails asset={asset} blockName={blockName} canRemove={canRemove} />
+      <AssetDetails {...props} />
     </Dialog>
   );
 }
 
 function AssetDetails({
   asset,
-  blockName,
-  canRemove,
-}: {
-  asset: Asset;
-  blockName: string;
-  canRemove: boolean;
-}) {
+  pack,
+  tagNames,
+  favourite,
+  onFavourite,
+  onPack,
+  onTag,
+}: DialogProps) {
   const { close, titleId } = useDialog();
   const [status, setStatus] = useState<{
     text: string;
     error?: boolean;
   } | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
   const mod = useModifierLabel();
+  const locked = isLocked(asset);
+  const { tags } = asset;
 
   const copy = () => {
     if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
@@ -66,7 +74,10 @@ function AssetDetails({
     navigator.clipboard
       .write([new ClipboardItem({ "image/png": assetFramePng(asset) })])
       .then(
-        () => setStatus({ text: `Copied. Paste it into a tile with ${mod}V.` }),
+        () => {
+          setStatus({ text: `Copied. Paste it into a tile with ${mod}V.` });
+          void recordAssetUse(asset.id, "copy").catch(() => {});
+        },
         () => setStatus({ error: true, text: "Couldn’t copy it. Try again." }),
       );
   };
@@ -74,56 +85,119 @@ function AssetDetails({
   const download = async (url: string, name: string) => {
     try {
       downloadBlob(await assetBlob(url), name);
+      void recordAssetUse(asset.id, "download").catch(() => {});
     } catch {
       setStatus({ error: true, text: "Couldn’t download it. Try again." });
     }
   };
 
-  const remove = async () => {
-    const confirmed = await confirmDialog({
-      title: `Remove “${asset.name}”?`,
-      message:
-        "It goes from the Assets page for everyone. Tiles already made from it keep their copy.",
-      confirmLabel: "Remove",
-    });
-    if (!confirmed) return;
-    const { error } = await removeAsset(asset.id);
-    if (error) setStatus({ error: true, text: error });
-    else close();
-  };
+  const copyId = () =>
+    navigator.clipboard?.writeText(asset.id).then(
+      () => setStatus({ text: `Copied the id “${asset.id}”.` }),
+      () => setStatus({ error: true, text: "Couldn’t copy the id." }),
+    );
+
+  /** Premium actions open the upgrade modal for people without a plan. */
+  const gated = (action: () => void) => () =>
+    locked ? setUpgrading(true) : action();
 
   return (
-    <div className="grid sm:grid-cols-[minmax(0,1fr)_17rem]">
-      <div className="flex aspect-square items-center justify-center bg-checker p-10">
+    <div className="grid sm:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="relative flex aspect-square items-center justify-center bg-checker p-10">
         <AssetImage
           asset={asset}
           repeat={asset.kind === "tile"}
           className="max-h-full w-full"
         />
+        {pack.premium && <PremiumBadge className="absolute top-3 left-3" />}
       </div>
-      <div className="flex flex-col gap-5 p-5">
+      <div className="flex flex-col gap-4 p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <Heading id={titleId} size="title">
               {asset.name}
             </Heading>
-            <Text
-              size="xs"
-              tone="muted"
-              className="mt-0.5 font-mono tabular-nums"
-            >
-              {blockName} · {asset.width} × {asset.height}
+            <Text size="xs" tone="muted" className="mt-0.5 tabular-nums">
+              <button
+                type="button"
+                onClick={() => {
+                  close();
+                  onPack(pack.id);
+                }}
+                className="font-semibold underline-offset-2 hover:text-foreground hover:underline"
+              >
+                {pack.name}
+              </button>{" "}
+              · {asset.width} × {asset.height}
               {asset.frames > 1 && ` · ${asset.frames} frames`}
             </Text>
           </div>
-          <IconButton
-            label="Close"
-            onClick={close}
-            className="-mt-1 -mr-1 text-lg leading-none"
-          >
-            ×
-          </IconButton>
+          <div className="-mt-1 -mr-1 flex items-center gap-1">
+            <FavouriteButton
+              on={favourite}
+              label={asset.name}
+              onChange={onFavourite}
+              className="shadow-none"
+            />
+            <IconButton
+              label="Close"
+              onClick={close}
+              className="text-lg leading-none"
+            >
+              ×
+            </IconButton>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => void copyId()}
+          title="Copy the id"
+          className="flex items-center gap-2 self-start rounded-md bg-muted px-2 py-1 font-mono text-xs text-muted-foreground hover:text-foreground"
+        >
+          {asset.id}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            className="size-3"
+            fill="none"
+          >
+            <rect
+              x="5"
+              y="5"
+              width="8"
+              height="9"
+              rx="1.5"
+              stroke="currentColor"
+              strokeWidth="1.4"
+            />
+            <path
+              d="M3 10.5V3.5A1.5 1.5 0 0 1 4.5 2H10"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        {tags.length > 0 && (
+          <ul aria-label="Tags" className="flex flex-wrap gap-1.5">
+            {tags.map((tag) => (
+              <li key={tag}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    onTag(tag);
+                  }}
+                  className="rounded-full border px-2.5 py-0.5 text-xs hover:bg-muted"
+                >
+                  {tagNames.get(tag) ?? tag}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {asset.colors.length > 0 && (
           <ul aria-label="Colours" className="flex flex-wrap gap-1">
@@ -138,77 +212,60 @@ function AssetDetails({
           </ul>
         )}
 
-        {isLocked(asset) ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-            <p className="font-semibold">Premium asset</p>
-            <Text size="sm" tone="muted" className="mt-1">
-              Starter, Pro and Advanced plans unlock every premium asset and
-              tutorial: start tiles from them, drop them into yours and download
-              them.
-            </Text>
-            <Link
-              href="/pricing"
-              className={buttonVariants({ className: "mt-3 w-full" })}
-            >
-              See plans
-            </Link>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
+          {locked ? (
+            <Button type="button" onClick={() => setUpgrading(true)}>
+              New tile from it
+            </Button>
+          ) : (
             <Link
               href={`/tiles/new?asset=${encodeURIComponent(asset.id)}`}
               className={buttonVariants()}
             >
               New tile from it
             </Link>
-            <Button type="button" variant="secondary" onClick={copy}>
-              Copy
-            </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void download(asset.sheetUrl, `${asset.id}.png`)}
-              >
-                {asset.frames > 1 ? "PNG sheet" : "PNG"}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() =>
-                  asset.fileUrl &&
-                  void download(asset.fileUrl, `${asset.id}.pigxel`)
-                }
-              >
-                .pigxel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {!isLocked(asset) && (
-          <Text
-            role="status"
-            size="xs"
-            tone={status?.error ? "error" : "muted"}
-          >
-            {status?.text ??
-              "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on."}
-          </Text>
-        )}
-
-        {canRemove && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void remove()}
-            className="mt-auto self-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-          >
-            Remove from Assets
+          )}
+          <Button type="button" variant="secondary" onClick={gated(copy)}>
+            Copy
           </Button>
-        )}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={gated(
+                () => void download(asset.sheetUrl, `${asset.id}.png`),
+              )}
+            >
+              {asset.frames > 1 ? "PNG sheet" : "PNG"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={gated(
+                () =>
+                  asset.fileUrl &&
+                  void download(asset.fileUrl, `${asset.id}.pigxel`),
+              )}
+            >
+              .pigxel
+            </Button>
+          </div>
+        </div>
+
+        <Text role="status" size="xs" tone={status?.error ? "error" : "muted"}>
+          {status?.text ??
+            (asset.uses > 0
+              ? `Used by ${asset.uses} ${asset.uses === 1 ? "person" : "people"}.`
+              : "In the editor, Edit › Insert asset… drops it onto the layer you’re drawing on.")}
+        </Text>
       </div>
+      {upgrading && (
+        <UpgradeDialog
+          title="Premium pack"
+          description={`“${pack.name}” comes with the paid plans. Upgrade to start tiles from its assets, copy and download them.`}
+          onClose={() => setUpgrading(false)}
+        />
+      )}
     </div>
   );
 }

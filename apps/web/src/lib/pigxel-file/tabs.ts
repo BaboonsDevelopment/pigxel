@@ -40,12 +40,6 @@ export function withoutTab(tabs: string[], id: string) {
   return tabs.filter((tab) => tab !== id);
 }
 
-export function movedTab(tabs: string[], id: string, index: number) {
-  const rest = withoutTab(tabs, id);
-  const at = Math.max(0, Math.min(rest.length, index));
-  return [...rest.slice(0, at), id, ...rest.slice(at)];
-}
-
 export function tabAfterClosing(tabs: string[], id: string): string | null {
   const at = tabs.indexOf(id);
   if (at < 0) return null;

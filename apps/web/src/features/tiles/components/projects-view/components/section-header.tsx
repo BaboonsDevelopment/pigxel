@@ -1,5 +1,5 @@
-import { Heading } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { madimiOne } from "@/lib/fonts/madimi";
 
 export function SectionHeader({
   id,
@@ -18,11 +18,17 @@ export function SectionHeader({
 }) {
   return (
     <div className={cn("flex items-center justify-between gap-4", className)}>
-      <div className="flex items-center gap-[18px]">
-        <Heading id={id} className="text-[28px] leading-tight font-semibold">
+      <div className="flex items-center gap-3.5">
+        <h2
+          id={id}
+          className={cn(
+            madimiOne.className,
+            "text-[28px] leading-tight tracking-[0.02em] text-[#4a2434]",
+          )}
+        >
           {title}
-        </Heading>
-        <span className="flex h-[22px] min-w-[41px] items-center justify-center rounded-full bg-[#f3edf0] px-2.5 text-xs text-muted-foreground tabular-nums">
+        </h2>
+        <span className="flex size-8 items-center justify-center rounded-full border border-[#f0dde5] bg-background text-xs text-[#4a1f35] tabular-nums">
           {count}
         </span>
       </div>
@@ -31,7 +37,7 @@ export function SectionHeader({
         <button
           type="button"
           onClick={onViewAll}
-          className="flex items-center gap-1.5 text-xs text-link-accent transition-colors hover:text-lavender-foreground"
+          className="flex cursor-pointer items-center gap-1.5 text-xs text-primary transition-colors hover:text-primary-hover"
         >
           View all
           <svg

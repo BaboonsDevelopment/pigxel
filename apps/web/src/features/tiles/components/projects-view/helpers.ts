@@ -1,8 +1,7 @@
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
-import { SIZES } from "@/features/explore/constants";
-import { TRASH_DAYS } from "../../constants";
+import { CANVAS_SIZES } from "@/features/explore/constants";
 import type { ProjectFilters } from "./constants";
 
 export type Project =
@@ -52,15 +51,14 @@ export function readLocalProjects(userId: string): Project[] {
 export function matchesLocal(project: Project, filters: ProjectFilters) {
   if (project.kind !== "local") return true;
   if (filters.label || filters.published === "yes") return false;
-  const range = SIZES.find((s) => s.value === filters.size) ?? SIZES[0];
+  const range =
+    CANVAS_SIZES.find((s) => s.value === filters.size) ?? CANVAS_SIZES[0];
   if (range.max && (project.width > range.max || project.height > range.max))
     return false;
   if (range.min && project.width < range.min && project.height < range.min)
     return false;
   if (filters.animated && project.image.frames.length < 2) return false;
-  const storage =
-    project.draft.location?.kind === "drive" ? "drive" : "browser";
-  return filters.storage === "any" || filters.storage === storage;
+  return filters.storage === "any" || filters.storage === "browser";
 }
 
 export function toCloudProject(tile: CloudTileSummary): Project {
@@ -91,11 +89,4 @@ export function editedAgo(then: number, now = Date.now()) {
     if (elapsed >= size)
       return format.format(-Math.floor(elapsed / size), unit);
   return "just now";
-}
-
-export function trashDaysLeft(deletedAt: string, now = Date.now()) {
-  return Math.max(
-    0,
-    TRASH_DAYS - Math.floor((now - Date.parse(deletedAt)) / 86_400_000),
-  );
 }

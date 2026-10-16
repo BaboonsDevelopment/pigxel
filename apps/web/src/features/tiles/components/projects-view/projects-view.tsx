@@ -27,12 +27,9 @@ import {
   ProjectGrid,
 } from "./components/project-grid/project-grid";
 import { ProjectsHeader } from "./components/projects-header";
-import { RecentRow } from "./components/recent-row";
 import { SectionHeader } from "./components/section-header";
 import { SharedProjects } from "./components/shared-projects";
 import {
-  NO_PROJECT_FILTERS,
-  filtersKey,
   type Filter,
   type ProjectFilters,
   type ProjectSort,
@@ -66,7 +63,6 @@ export function ProjectsView({
         view.filters,
         view.query,
         folder?.id ?? null,
-        false,
         false,
         view.sort,
       ),
@@ -138,8 +134,6 @@ export function ProjectsView({
       </ProjectDragProvider>
     );
 
-  const unfiltered =
-    filtersKey(projectFilters) === filtersKey(NO_PROJECT_FILTERS);
   const matchingFolders = sortedFolders.filter((f) =>
     hasName(f.name, query.trim()),
   );
@@ -166,13 +160,6 @@ export function ProjectsView({
         sort={sort}
         onSortChange={setSort}
       />
-      {filter === "All" && !query.trim() && unfiltered && (
-        <RecentRow
-          userId={userId}
-          busy={folderTiles.busy}
-          onOpen={(tile) => void folderTiles.open(tile)}
-        />
-      )}
       {(filter === "All" || filter === "Folders") && (
         <section aria-labelledby="folders-heading" className="mb-[35px]">
           <SectionHeader
@@ -196,7 +183,7 @@ export function ProjectsView({
                 onClick={() => setCreating(true)}
                 className={cn(
                   pixelifySans.className,
-                  "flex h-full min-h-[100px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border-2 border-dashed border-input bg-background/70 text-sm text-foreground transition-colors hover:border-primary-soft hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
+                  "flex h-full min-h-[100px] w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-[#eba9c0] bg-background text-sm text-primary transition-colors hover:border-primary hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
                 )}
               >
                 <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">
@@ -244,7 +231,6 @@ export function ProjectsView({
         />
       )}
       {filter === "Archive" && <ProjectGrid {...gridProps} archived />}
-      {filter === "Trash" && <ProjectGrid {...gridProps} trashed />}
       {filter === "Favourite" && (
         <Favourites
           userId={userId}

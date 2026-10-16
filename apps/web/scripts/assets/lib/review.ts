@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { ASSETS_DIR } from "./paths.ts";
 import type { AssetSource } from "./source.ts";
+import { readAssetText, writeAssetText } from "./file-io.ts";
 
 /**
  * What a person decided about each asset, keyed by `<pack>/<id>`. A decision
@@ -26,14 +27,14 @@ export type ReviewState = ReviewStatus | "changed";
 
 export function readReviews(file = REVIEW_FILE): Reviews {
   if (!existsSync(file)) return {};
-  return JSON.parse(readFileSync(file, "utf8")) as Reviews;
+  return JSON.parse(readAssetText(file)) as Reviews;
 }
 
 export function writeReviews(reviews: Reviews, file = REVIEW_FILE) {
   const sorted = Object.fromEntries(
     Object.entries(reviews).sort(([a], [b]) => a.localeCompare(b)),
   );
-  writeFileSync(file, JSON.stringify(sorted, null, 2) + "\n");
+  writeAssetText(file, JSON.stringify(sorted, null, 2) + "\n");
 }
 
 export function reviewState(

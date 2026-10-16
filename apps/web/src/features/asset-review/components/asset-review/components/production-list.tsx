@@ -11,13 +11,43 @@ import type { ProductionAsset, ReviewTarget } from "../../../types";
 import { useProduction, useReviewActions } from "../../../use-asset-review";
 import { CARD, GRID } from "../constants";
 import { errorText } from "../helpers";
+import { SwatchPicker } from "./swatch-picker";
+
+function BlockBackground({ block }: { block: ReviewTarget }) {
+  const { setProductionBackground } = useReviewActions();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const change = async (background: string | null) => {
+    setPending(true);
+    setError("");
+    try {
+      await setProductionBackground(block.id, background);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-destructive">{error}</span>}
+      <SwatchPicker
+        value={block.background}
+        disabled={pending}
+        onChange={change}
+      />
+    </div>
+  );
+}
 
 function ProductionCard({
   asset,
   background,
+  tint,
 }: {
   asset: ProductionAsset;
   background: string;
+  tint: string | null;
 }) {
   const { removeFromProduction } = useReviewActions();
   const [confirming, setConfirming] = useState(false);
@@ -41,8 +71,9 @@ function ProductionCard({
       <span
         className={cn(
           "relative flex aspect-square items-center justify-center overflow-hidden",
-          background,
+          !tint && background,
         )}
+        style={tint ? { background: tint } : undefined}
       >
         <AssetImage
           asset={asset}
@@ -127,7 +158,7 @@ export function ProductionList({
   const sections = blocks
     .map((block) => ({
       block,
-      assets: production.data.filter((a) => a.category === block.id),
+      assets: production.data.filter((a) => a.packId === block.id),
     }))
     .filter(({ assets }) => assets.length > 0);
   if (!sections.length) return <EmptyState title="Nothing in production" />;
@@ -141,9 +172,12 @@ export function ProductionList({
         id={`production-${block.id}`}
         title={block.name}
         actions={
-          <span className="font-mono text-[11px] text-muted-foreground">
-            {block.id} · {assets.length}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] text-muted-foreground">
+              {block.id} · {assets.length}
+            </span>
+            <BlockBackground block={block} />
+          </div>
         }
       />
       <ul className={GRID}>
@@ -152,6 +186,7 @@ export function ProductionList({
             key={asset.id}
             asset={asset}
             background={background}
+            tint={block.background}
           />
         ))}
       </ul>

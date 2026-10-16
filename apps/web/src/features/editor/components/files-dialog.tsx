@@ -12,7 +12,6 @@ import {
   useDialog,
 } from "@pigxel/ui/components/dialog";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { textLinkClassName } from "@pigxel/ui/components/typography";
 import { ModalButton } from "@/components/ui/modal-button";
 import { MODAL_FOOTER, ModalHeader } from "@/components/ui/modal-header";
 import { PixelImage } from "@/components/ui/pixel-image";
@@ -20,10 +19,8 @@ import type { FileItem, Listing } from "../constants";
 
 type FilesProps = {
   title: string;
-  subtitle?: string | null;
   empty: string;
   load: () => Promise<FileItem[]>;
-  errorAction?: (error: unknown) => { label: string; href: string } | null;
   onPick: (item: FileItem) => void;
 };
 
@@ -38,17 +35,9 @@ export function FilesDialog({
   );
 }
 
-function FilesList({
-  title,
-  subtitle,
-  empty,
-  load,
-  errorAction,
-  onPick,
-}: FilesProps) {
+function FilesList({ title, empty, load, onPick }: FilesProps) {
   const { close } = useDialog();
   const [listing, setListing] = useState<Listing>({ state: "loading" });
-  const [failure, setFailure] = useState<unknown>(null);
 
   useEffect(() => {
     let active = true;
@@ -56,7 +45,6 @@ function FilesList({
       (items) => active && setListing({ state: "ready", items }),
       (error) => {
         if (!active) return;
-        setFailure(error);
         setListing({
           state: "error",
           message:
@@ -72,15 +60,10 @@ function FilesList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fix = listing.state === "error" ? errorAction?.(failure) : null;
-
   return (
     <>
       <ModalHeader title={title} />
       <DialogBody className="grid gap-4 py-5">
-        {subtitle && (
-          <p className="-mb-1 text-sm text-muted-foreground">{subtitle}</p>
-        )}
         {listing.state === "loading" && (
           <p className="rounded-xl border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
             Loading…
@@ -89,14 +72,6 @@ function FilesList({
         {listing.state === "error" && (
           <div className="rounded-xl bg-error-soft px-4 py-3 text-sm">
             <FormMessage tone="error">{listing.message}</FormMessage>
-            {fix && (
-              <a
-                href={fix.href}
-                className={`mt-2 inline-block ${textLinkClassName}`}
-              >
-                {fix.label}
-              </a>
-            )}
           </div>
         )}
         {listing.state === "ready" && listing.items.length === 0 && (

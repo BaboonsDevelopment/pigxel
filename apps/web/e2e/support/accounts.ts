@@ -23,10 +23,13 @@ function admin() {
 
 /**
  * A confirmed account made through the admin API, ready to log in with. It
- * has accepted the current Terms the way sign-up records it, so the proxy
- * doesn't send it to /accept first.
+ * has accepted the current Terms the way sign-up records it. With `plan`, it also gets an active
+ * subscription, for tests that need that plan's room in Pigxel cloud.
  */
-export async function createAccount(name: string): Promise<Account> {
+export async function createAccount(
+  name: string,
+  { plan }: { plan?: "starter" | "pro" | "advanced" } = {},
+): Promise<Account> {
   const email = newEmail(name);
   const client = admin();
   const { data, error } = await client.auth.admin.createUser({
@@ -44,6 +47,18 @@ export async function createAccount(name: string): Promise<Account> {
     source: "signup",
   });
   if (acceptError) throw acceptError;
+  if (plan) {
+    const { error: planError } = await client.from("subscriptions").insert({
+      id: `e2e-${data.user.id}`,
+      user_id: data.user.id,
+      customer_id: "e2e",
+      product_id: "e2e",
+      plan,
+      status: "active",
+      event_at: new Date().toISOString(),
+    });
+    if (planError) throw planError;
+  }
   return { email, password: PASSWORD };
 }
 

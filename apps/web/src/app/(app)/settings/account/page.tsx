@@ -1,21 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
-import { FormMessage } from "@pigxel/ui/components/field";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Lead, Text } from "@pigxel/ui/components/typography";
 import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { requireUser } from "@/lib/auth/session";
-import {
-  getDriveStatus,
-  isGoogleSignInAvailable,
-} from "@/lib/google-drive/server";
-import { connectDriveUrl } from "@/lib/google-drive/status";
+import { isGoogleSignInAvailable } from "@/lib/auth/google";
 import {
   EmailForm,
   UnlinkButton,
 } from "@/features/settings/account/account-forms";
-import { disconnectDrive } from "@/features/settings/account/actions";
 import { SignOutButton } from "@/features/settings/account/sign-out-button";
 import { DeleteAccountForm } from "@/features/settings/account/delete-account-form";
 import { SettingsSection } from "@/features/settings/components/settings-section";
@@ -29,11 +23,10 @@ const secondaryButton = buttonVariants({ variant: "secondary" });
 export default async function AccountSettings({
   searchParams,
 }: {
-  searchParams: Promise<{ updated?: string; drive?: string; link?: string }>;
+  searchParams: Promise<{ updated?: string; link?: string }>;
 }) {
-  const { updated, drive: driveResult, link } = await searchParams;
+  const { updated, link } = await searchParams;
   const user = await requireUser();
-  const drive = await getDriveStatus(user.id);
   const identities = user.identities ?? [];
   const identity = (provider: string) =>
     identities.find((i) => i.provider === provider);
@@ -49,7 +42,7 @@ export default async function AccountSettings({
       id: "google" as const,
       label: "Google",
       available: isGoogleSignInAvailable(),
-      connectUrl: connectDriveUrl(ACCOUNT_PATH),
+      connectUrl: `/auth/google?next=${encodeURIComponent(ACCOUNT_PATH)}`,
     },
     {
       id: "apple" as const,
@@ -145,42 +138,6 @@ export default async function AccountSettings({
         </SettingsSection>
       )}
 
-      {drive.available && (
-        <SettingsSection title="Google Drive">
-          {driveResult === "error" && (
-            <FormMessage tone="error" className="mt-3">
-              Google Drive wasn’t connected. Try again when you’re ready.
-            </FormMessage>
-          )}
-          {driveResult === "disconnected" && (
-            <FormMessage role="status" className="mt-3">
-              Google Drive is disconnected. Your files stay in your Drive.
-            </FormMessage>
-          )}
-          <Lead className="mt-3">
-            {drive.connected
-              ? `Tiles can be saved to and opened from the Google Drive of ${drive.email ?? "your Google account"}. Pigxel only sees files it created.`
-              : "Link your Google account to save tiles in your own Google Drive, with autosave. Pigxel only sees files it creates."}
-          </Lead>
-          <div className="mt-4">
-            {drive.connected ? (
-              <form action={disconnectDrive}>
-                <button type="submit" className={secondaryButton}>
-                  Disconnect Google Drive
-                </button>
-              </form>
-            ) : (
-              <a
-                href={connectDriveUrl(ACCOUNT_PATH)}
-                className={secondaryButton}
-              >
-                Connect Google Drive
-              </a>
-            )}
-          </div>
-        </SettingsSection>
-      )}
-
       <SettingsSection title="Sign out">
         <Lead className="mt-2 mb-4">Sign out of Pigxel on this device.</Lead>
         <SignOutButton />
@@ -214,10 +171,7 @@ export default async function AccountSettings({
             </Link>{" "}
             before deleting.
           </li>
-          <li>
-            Files in your Google Drive and drafts in this browser aren’t
-            touched.
-          </li>
+          <li>Unsaved drafts in this browser aren’t touched.</li>
         </ul>
         <DeleteAccountForm />
       </SettingsSection>

@@ -1,13 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { authUrl, oauthCallbackUrl } from "@/lib/auth/config";
 import { safeNext, withParam } from "@/lib/auth/routes";
-import {
-  DRIVE_SCOPE,
-  isDriveAvailable,
-  isGoogleSignInAvailable,
-} from "@/lib/google-drive/server";
+import { isGoogleSignInAvailable } from "@/lib/auth/google";
 import { createClient } from "@/lib/supabase/server";
-import { rememberAcceptance } from "@/features/legal/accept-cookie";
 
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
@@ -23,36 +18,19 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const drive = isDriveAvailable();
-    failure = user
-      ? withParam(next, drive ? "drive" : "link", "error")
-      : failure;
+    failure = user ? withParam(next, "link", "error") : failure;
     const hasGoogle = user?.identities?.some((i) => i.provider === "google");
-    if (hasGoogle && !drive) return redirect(next);
+    if (hasGoogle) return redirect(next);
 
-    // Basic Google login works without Drive secrets or an admin key.
-    const options = {
-      redirectTo: oauthCallbackUrl("google", next),
-      ...(drive && {
-        scopes: DRIVE_SCOPE,
-        queryParams: {
-          access_type: "offline",
-          include_granted_scopes: "true",
-          ...(user && { prompt: "consent" }),
-        },
-      }),
-    };
+    const options = { redirectTo: oauthCallbackUrl("google", next) };
     const { data, error } =
       user && !hasGoogle
         ? await supabase.auth.linkIdentity({ provider: "google", options })
         : await supabase.auth.signInWithOAuth({ provider: "google", options });
     if (!error && data?.url)
-      return rememberAcceptance(
-        request,
-        NextResponse.redirect(data.url, {
-          headers: { "Cache-Control": "private, no-store" },
-        }),
-      );
+      return NextResponse.redirect(data.url, {
+        headers: { "Cache-Control": "private, no-store" },
+      });
   } catch {
     // Keep OAuth setup and network failures in the sign-in/linking flow.
   }

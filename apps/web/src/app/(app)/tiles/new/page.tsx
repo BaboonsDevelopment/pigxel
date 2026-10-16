@@ -6,7 +6,6 @@ import { findAsset } from "@/features/assets/server";
 import { isLocked } from "@/features/assets/assets";
 import { requireUser } from "@/lib/auth/session";
 import { listFolders } from "@/features/tiles/server";
-import { getDriveStatus } from "@/lib/google-drive/server";
 import { readPalette } from "@/lib/palette/presets";
 import { isStartKind, type StartKind } from "@/features/editor/constants";
 
@@ -23,7 +22,6 @@ export default async function NewTile({
   searchParams,
 }: {
   searchParams: Promise<{
-    drive?: string;
     asset?: string;
     palette?: string;
     colors?: string;
@@ -38,8 +36,7 @@ export default async function NewTile({
   const colors = readPalette(
     params.colors?.split(",").map((color) => `#${color}`) ?? [],
   );
-  const [drive, asset, folders] = await Promise.all([
-    getDriveStatus(user.id),
+  const [asset, folders] = await Promise.all([
     findAsset(params.asset),
     params.folder ? listFolders(user.id).catch(() => []) : [],
   ]);
@@ -52,8 +49,6 @@ export default async function NewTile({
       </PageTitle>
       <NewTileForm
         userId={user.id}
-        drive={drive}
-        driveError={params.drive === "error"}
         asset={asset && !isLocked(asset) ? asset : null}
         paletteId={params.palette}
         customPalette={

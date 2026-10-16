@@ -110,6 +110,7 @@ const manifest = {
       name: pack.name,
       block: pack.block ?? pack.id,
       newBlock: !pack.block,
+      background: pack.background,
       tier: pack.tier,
       description: pack.description,
       assets,

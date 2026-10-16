@@ -3,7 +3,6 @@ import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { authUrl, oauthCallbackUrl } from "@/lib/auth/config";
 import { safeNext, withParam } from "@/lib/auth/routes";
 import { createClient } from "@/lib/supabase/server";
-import { rememberAcceptance } from "@/features/legal/accept-cookie";
 
 export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
@@ -27,12 +26,9 @@ export async function GET(request: NextRequest) {
       ? await supabase.auth.linkIdentity({ provider: "apple", options })
       : await supabase.auth.signInWithOAuth({ provider: "apple", options });
     if (!error && data?.url)
-      return rememberAcceptance(
-        request,
-        NextResponse.redirect(data.url, {
-          headers: { "Cache-Control": "private, no-store" },
-        }),
-      );
+      return NextResponse.redirect(data.url, {
+        headers: { "Cache-Control": "private, no-store" },
+      });
   } catch {
     // Network/configuration errors return to the same sign-in or linking UI.
   }

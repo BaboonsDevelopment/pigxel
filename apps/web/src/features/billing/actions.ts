@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { authUrl } from "@/lib/auth/config";
 import { creemApi, storeSubscription } from "./creem";
-import { getCurrentPlan, setPendingProduct } from "./server";
+import { getCurrentPlan, hasAiAccess, setPendingProduct } from "./server";
 import {
   canChangePlan,
   planChange,
@@ -143,4 +143,13 @@ export async function keepPlan(): Promise<{ error?: string } | void> {
   const error = await setPendingProduct(plan.subscriptionId, plan.userId, null);
   if (error) return failed("keep your plan", error.message);
   revalidatePath("/", "layout");
+}
+
+/**
+ * Whether the signed-in person's plan includes the AI helper. If the plan
+ * can't be read, says yes: the AI still checks the plan when it runs.
+ */
+export async function canUseAi(): Promise<boolean> {
+  const user = await requireUser();
+  return hasAiAccess(user.id).catch(() => true);
 }

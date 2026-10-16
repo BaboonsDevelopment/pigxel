@@ -1,4 +1,4 @@
-import { SIZES } from "@/features/explore/constants";
+import { CANVAS_SIZES } from "@/features/explore/constants";
 import type { Label } from "../../labels";
 import { cleanSearch } from "../../search";
 import {
@@ -42,7 +42,7 @@ export function readView(
     sort: PROJECT_SORTS.find((s) => s.value === params.sort)?.value ?? "edited",
     filters: {
       size:
-        SIZES.find((s) => s.value === params.size)?.value ??
+        CANVAS_SIZES.find((s) => s.value === params.size)?.value ??
         NO_PROJECT_FILTERS.size,
       storage:
         STORAGES.find((s) => s.value === params.storage)?.value ??

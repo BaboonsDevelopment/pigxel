@@ -22,13 +22,6 @@ const NECESSARY: Item[] = [
     lasts: "Until you sign out, at most 400 days",
   },
   {
-    name: "pigxel-accept",
-    kind: "Cookie",
-    purpose:
-      "Remembers, while you sign up with Google or Apple, that you accepted our terms.",
-    lasts: "15 minutes",
-  },
-  {
     name: "pigxel:consent:v1",
     kind: "Local storage",
     purpose: "Remembers your cookie choice, so we don’t ask again.",
@@ -56,10 +49,10 @@ const FUNCTIONAL: Item[] = [
     lasts: "Until you clear site data",
   },
   {
-    name: "pigxel:layout:…, pigxel:layout-at:…, pigxel:layout-presets:…, pigxel:keys:…, pigxel:brushes:…, pigxel:new-tile:…",
+    name: "pigxel:layout:…, pigxel:layout-at:…, pigxel:keys:…, pigxel:brushes:…, pigxel:new-tile:…",
     kind: "Local storage",
     purpose:
-      "Editor panels, layout presets, keyboard shortcuts, brushes and new-tile settings.",
+      "Editor layout (sidebar, timeline and tools), keyboard shortcuts, brushes and new-tile settings.",
     lasts: "Until you clear site data",
   },
   {

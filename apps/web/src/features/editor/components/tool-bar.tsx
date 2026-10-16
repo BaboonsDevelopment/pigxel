@@ -4,8 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import type { ToolId } from "../constants";
 import { toolTitle } from "../helpers";
-import { toolById } from "../tools";
-import { orderedToolGroups } from "../tool-order";
+import { TOOL_GROUPS, toolById } from "../tools";
 
 const HOLD_MS = 400;
 type Beside = { top: number; left?: number; right?: number };
@@ -24,16 +23,12 @@ export function ToolBar({
   onSelect,
   hiddenTools,
   groupTools,
-  groupOrder,
-  toolOrder,
   keyOf,
 }: {
   tool: ToolId;
   onSelect: (tool: ToolId) => void;
   hiddenTools: string[];
   groupTools: Record<string, string>;
-  groupOrder: string[];
-  toolOrder: string[];
   keyOf: (tool: ToolId) => string | undefined;
 }) {
   const [open, setOpen] = useState<{ group: string; at: Beside } | null>(null);
@@ -58,7 +53,7 @@ export function ToolBar({
     };
   }, [open]);
 
-  const groups = orderedToolGroups(groupOrder, toolOrder).flatMap((group) => {
+  const groups = TOOL_GROUPS.flatMap((group) => {
     const tools = group.tools.filter((id) => !hiddenTools.includes(id));
     if (!tools.length) return [];
     const remembered = groupTools[group.id] as ToolId | undefined;
@@ -132,7 +127,7 @@ export function ToolBar({
             className={cn(
               "group relative flex aspect-square w-full max-w-10 items-center justify-center justify-self-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2",
               active &&
-                "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                "bg-[#fde2ea] text-pink-strong hover:bg-[#fde2ea] hover:text-pink-strong",
             )}
           >
             {entry.icon}

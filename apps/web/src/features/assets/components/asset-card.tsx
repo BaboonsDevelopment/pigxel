@@ -1,0 +1,88 @@
+"use client";
+
+import { Badge } from "@pigxel/ui/components/badge";
+import { Text } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
+import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { TilesBadge } from "@/features/tiles/components/tiles-badge";
+import type { Asset } from "../assets";
+import { AssetImage } from "./asset-image";
+import { FavouriteButton } from "./favourite-button";
+
+export function AssetCard({
+  asset,
+  premium,
+  tint,
+  background,
+  favourite,
+  onFavourite,
+  onOpen,
+}: {
+  asset: Asset;
+  /** Its pack is premium. */
+  premium: boolean;
+  tint: string;
+  background: string | null;
+  favourite: boolean;
+  onFavourite: (on: boolean) => void;
+  onOpen: () => void;
+}) {
+  const tile = asset.kind === "tile";
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2"
+      >
+        <span
+          className={cn(
+            "relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl transition group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none",
+            tint,
+          )}
+          style={background ? { background } : undefined}
+        >
+          <AssetImage
+            asset={asset}
+            repeat={tile}
+            className={cn(
+              "transition-transform duration-300 ease-out motion-reduce:transition-none",
+              tile
+                ? "w-full group-hover:scale-105"
+                : "w-3/5 group-hover:-translate-y-1 group-hover:-rotate-3",
+            )}
+          />
+          {premium && <PremiumBadge className="absolute top-2 left-2" />}
+          {asset.frames > 1 && (
+            <Badge tone="overlay" className="absolute bottom-2 right-2">
+              Animated
+            </Badge>
+          )}
+          {tile && <TilesBadge className="absolute bottom-2 left-2" />}
+        </span>
+        <span className="mt-2 block truncate text-sm font-semibold">
+          {asset.name}
+        </span>
+        <Text
+          as="span"
+          size="xs"
+          tone="muted"
+          className="block font-mono tabular-nums"
+        >
+          {asset.width} × {asset.height}
+          {asset.frames > 1 && ` · ${asset.frames} frames`}
+        </Text>
+      </button>
+      <FavouriteButton
+        on={favourite}
+        label={asset.name}
+        onChange={onFavourite}
+        className={cn(
+          "absolute top-2 right-2",
+          !favourite &&
+            "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+        )}
+      />
+    </div>
+  );
+}

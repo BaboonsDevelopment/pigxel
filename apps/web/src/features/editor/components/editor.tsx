@@ -8,6 +8,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { choiceDialog } from "@/components/ui/confirm-dialog";
@@ -24,6 +25,7 @@ import { rgbaOf, type Axes, type Stamp } from "../pixel-canvas/paint";
 import {
   clampPenSize,
   type ColorSlot,
+  type Point,
   type PenSettings,
   type TextStyle,
 } from "../pixel-canvas/pen";
@@ -74,7 +76,6 @@ import {
   loadExportSettings,
 } from "../export/saved-settings";
 import { decodeImage } from "@/lib/image/decode";
-import { connectDriveUrl } from "@/lib/google-drive/status";
 import {
   allLayers,
   findLayer,
@@ -85,7 +86,7 @@ import {
 import { nextSelectionName } from "@/lib/selections/saved";
 import { COLOR_MODES, recolorByPlace } from "@/lib/palette/color-mode";
 import { mapToPalette } from "@/lib/palette/reduce";
-import { colorsOf, pushRecent } from "@/lib/palette/presets";
+import { colorsOf, MAX_PALETTE, pushRecent } from "@/lib/palette/presets";
 import {
   listDrafts,
   readDraft,
@@ -93,8 +94,13 @@ import {
   writePen,
   type Draft,
 } from "@/lib/pigxel-file/draft";
-import { backgroundColor, type PigxelDocument } from "@/lib/pigxel-file/format";
-import { LOCATION_LABELS } from "@/lib/pigxel-file/location";
+import {
+  backgroundColor,
+  PIGXEL_EXTENSION,
+  type PigxelDocument,
+} from "@/lib/pigxel-file/format";
+import { CLOUD_LABEL, NOT_SAVED_LABEL } from "@/lib/pigxel-file/location";
+import { forgetStartOptions, readStartOptions } from "../start-options";
 import { DEFAULT_FRAME_DURATION } from "@/lib/sprite/constants";
 import { drawnBounds } from "@/lib/sprite/canvas-size";
 import type { TileTransform } from "@/lib/sprite/transform";
@@ -128,17 +134,7 @@ import {
 import { nativeSheet, type Picture } from "@/lib/pigxel-file/import-sheet";
 import type { Slice } from "@/lib/slices/slices";
 import { findTutorial } from "@/features/tutorials/tutorials";
-import {
-  DEFAULT_LAYOUT,
-  PANELS,
-  PANEL_LABELS,
-  movePanel,
-  movesPanel,
-  setPanelCollapsed,
-  setPanelShown,
-  setToolShown,
-  type PanelId,
-} from "../layout";
+import { setToolShown, SIDEBAR_LABELS, type SidebarTab } from "../editor-prefs";
 import {
   isStartKind,
   START_PANELS,
@@ -146,7 +142,6 @@ import {
   NO_EDIT_WARN_GAP,
   type Command,
   type EditorProps,
-  type OpenSource,
   type ToolId,
 } from "../constants";
 import { isTyping, sizeKey } from "../helpers";
@@ -156,25 +151,25 @@ import { useKeymap } from "../use-keymap";
 import { keepHistory, loadHistory } from "@/lib/pigxel-file/history-store";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
 import { usePan } from "../use-pan";
-import { useEditorLayout } from "../use-editor-layout";
-import { useLayoutPresets } from "../use-layout-presets";
-import { LAYOUT_PRESETS, presetLayout } from "../layout-presets";
+import { useEditorPrefs } from "../use-editor-prefs";
 import { withBrush } from "../brush-library";
 import { useBrushLibrary } from "../use-brush-library";
 import { useTileFile } from "../use-tile-file";
 import { groupOf, toolById } from "../tools";
 import { useZoom } from "../use-zoom";
 import { ChatPlaceholder } from "./chat-placeholder";
-import { ColorsPanel } from "./colors/colors-panel";
-import { PaletteActions } from "./colors/palette-actions";
+import { ColorsPanel, ColorWells } from "./colors/colors-panel";
+import { PaletteSection } from "./colors/palette-actions";
 import { PalettePanel } from "./colors/palette-panel";
-import { Dock, type PanelContent } from "./dock/dock";
-import { DragOverlay } from "./dock/drag-overlay";
-import { FloatingPanels } from "./dock/floating-panels";
-import { usePanelDrag } from "./dock/use-panel-drag";
 import { EditorHeader } from "./editor-header";
 import { GuideCoach } from "./guide-coach";
-import { TileTabs } from "./tile-tabs";
+import { FileSwitcher } from "./file-switcher";
+import { Menu } from "./menu/menu";
+import { frameActions, layerActions } from "../timeline/actions";
+import { EditorSidebar, SidebarToggle } from "./workspace/editor-sidebar";
+import { CanvasControls } from "./workspace/canvas-controls";
+import { StatusBar } from "./workspace/status-bar";
+import { TimelineDock } from "./workspace/timeline-dock";
 import type { ModifyKind } from "./modify-selection-dialog";
 import { ToolBar } from "./tool-bar";
 import { ToolOptions } from "./tool-options";
@@ -272,8 +267,6 @@ const PublishAssetDialog = dynamic(() => import("./publish-asset-dialog"), {
 
 export function Editor({
   userId,
-  drive,
-  driveError,
   guide,
   start,
   canPublish,
@@ -304,7 +297,7 @@ export function Editor({
       })
       .catch(() => {});
   }, [router]);
-  const [opening, setOpening] = useState<OpenSource | null>(null);
+  const [opening, setOpening] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [creatingTile, setCreatingTile] = useState(false);
@@ -357,20 +350,27 @@ export function Editor({
     loadExportSettings(userId, image.id),
   );
   const [tool, setTool] = useState<ToolId>("pen");
-  const [layout, setLayout] = useEditorLayout(
+  const [prefs, setPrefs] = useEditorPrefs(
     userId,
     isStartKind(start) ? START_PANELS[start] : undefined,
   );
-  const panelDrag = usePanelDrag(
-    (id, target) => setLayout((l) => movePanel(l, id, target)),
-    (id, target) => movesPanel(layout, id, target),
-    (id) => layout.floating[id],
-  );
-  const layoutPresets = useLayoutPresets(userId);
+  // A tutorial points at the palette and the timeline: show them once.
+  const [guided] = useState(() => !!findTutorial(guide));
+  useEffect(() => {
+    if (guided)
+      setPrefs((p) => ({
+        ...p,
+        sidebar: true,
+        tab: "palette",
+        timeline: true,
+      }));
+  }, [guided, setPrefs]);
   const [customizing, setCustomizing] = useState(false);
+  const [editingColor, setEditingColor] = useState<ColorSlot>("primary");
+  const [pointer, setPointer] = useState<Point | null>(null);
   const toolGroup = groupOf(tool)?.id;
-  if (toolGroup && layout.groupTools[toolGroup] !== tool)
-    setLayout((l) => ({
+  if (toolGroup && prefs.groupTools[toolGroup] !== tool)
+    setPrefs((l) => ({
       ...l,
       groupTools: { ...l.groupTools, [toolGroup]: tool },
     }));
@@ -385,10 +385,15 @@ export function Editor({
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const fullScreened = useRef(false);
+  const [startOptions] = useState(() =>
+    isStartKind(start) ? readStartOptions(draft.id) : {},
+  );
+  // A tilemap started from Home already knows its tile size; otherwise ask.
   const [tiling, setTiling] = useState<{ convert: boolean } | null>(() =>
-    start === "tileset" ? { convert: false } : null,
+    start === "tileset" && !startOptions.tile ? { convert: false } : null,
   );
   const [startedWith] = useState(start);
+  const startPrompt = startedWith === "ai" ? startOptions.prompt : undefined;
   useEffect(() => {
     if (isStartKind(start)) router.replace(editorUrl(draft.id));
   }, [start, router, draft.id]);
@@ -403,7 +408,7 @@ export function Editor({
   const canvas = useRef<PixelCanvasHandle>(null);
   const workspace = useRef<HTMLElement>(null);
   const pan = usePan();
-  const { scale, zoomIn, zoomOut, zoomReset, zoomFit } = useZoom({
+  const { scale, zoomIn, zoomOut, zoomReset, zoomFit, zoomSet } = useZoom({
     workspace,
     tileRect: () => canvas.current?.tileRect() ?? null,
     initial: kept?.scale,
@@ -420,17 +425,10 @@ export function Editor({
     fileInput,
     userId,
     initial: draft,
-    drive,
     onOpen: (id) => {
       openTabAfter(userId, id, draft.id);
       router.push(editorUrl(id));
     },
-    notice: driveError
-      ? {
-          tone: "error",
-          text: "Google Drive wasn’t connected. Try again when you’re ready.",
-        }
-      : undefined,
   });
   const cloudTile = file.location?.kind === "cloud" ? file.location.tile : null;
   const cloudTileId = cloudTile?.id;
@@ -515,24 +513,21 @@ export function Editor({
       layerIds.includes(sprite.layerId) &&
       seenLayers.every((id) => layerIds.includes(id))
     )
-      setLayout((l) =>
-        setPanelCollapsed(
-          setPanelShown(l, "timeline", true),
-          "timeline",
-          false,
-        ),
-      );
+      setPrefs((p) => ({ ...p, timeline: true }));
   }
   const tilemapKey =
     sprite.activeLayer?.kind === "tilemap" ? sprite.layerId : null;
   const [seenTilemap, setSeenTilemap] = useState(tilemapKey);
   if (seenTilemap !== tilemapKey) {
     setSeenTilemap(tilemapKey);
-    if (tilemapKey)
-      setLayout((l) =>
-        setPanelCollapsed(setPanelShown(l, "tileset", true), "tileset", false),
-      );
+    if (tilemapKey) setPrefs((p) => ({ ...p, sidebar: true, tab: "tileset" }));
   }
+  // Tileset shows once the file has a tilemap layer.
+  const sidebarTabs: SidebarTab[] = allLayers(sprite.tree).some(
+    (layer) => layer.kind === "tilemap",
+  )
+    ? ["palette", "tileset", "assistant"]
+    : ["palette", "assistant"];
   const latestScale = useRef(scale);
   useLayoutEffect(() => {
     tile.current = sprite;
@@ -573,6 +568,17 @@ export function Editor({
   );
   const selection = useSelection(sprite);
 
+  const tiledFromStart = useRef(false);
+  useEffect(() => {
+    const tile = startedWith === "tileset" ? startOptions.tile : undefined;
+    if (!tile || tiledFromStart.current) return;
+    tiledFromStart.current = true;
+    sprite.addTilemapLayer(tile);
+    forgetStartOptions(draft.id);
+    // Runs once, for a tilemap started from Home.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [sliceId, setSliceId] = useState<string | null>(null);
   const slice = sprite.slices.find((s) => s.id === sliceId) ?? null;
   const changeSlice = (next: Slice) =>
@@ -583,9 +589,6 @@ export function Editor({
   };
 
   useEffect(() => writePen(userId, pen), [userId, pen]);
-
-  const connectDrive = () =>
-    window.location.assign(connectDriveUrl(editorUrl(draft.id)));
 
   const resizePen = (step: 1 | -1) => {
     const key = sizeKey(tool);
@@ -1258,53 +1261,19 @@ export function Editor({
   const windowMenu: MenuSections = [
     [
       {
-        label: "Layout presets",
-        submenu: [
-          LAYOUT_PRESETS.map((name) => ({
-            label: name,
-            onSelect: () =>
-              setLayout(
-                structuredClone(
-                  layoutPresets.presets[name]?.layout ?? presetLayout(name),
-                ),
-              ),
-          })),
-          [
-            {
-              label: "Save current layout as",
-              submenu: [
-                LAYOUT_PRESETS.map((name) => ({
-                  label: name,
-                  onSelect: () => {
-                    void layoutPresets.save(name, layout);
-                  },
-                })),
-              ],
-            },
-          ],
-          ...(layoutPresets.status
-            ? [
-                [
-                  {
-                    label: layoutPresets.status,
-                    disabled: true,
-                    onSelect: () => {},
-                  },
-                ],
-              ]
-            : []),
-        ],
+        label: check(prefs.sidebar, "Sidebar"),
+        onSelect: () => setPrefs((p) => ({ ...p, sidebar: !p.sidebar })),
+      },
+      ...sidebarTabs.map((id) => ({
+        label: check(prefs.sidebar && prefs.tab === id, SIDEBAR_LABELS[id]),
+        onSelect: () => setPrefs((p) => ({ ...p, sidebar: true, tab: id })),
+      })),
+      {
+        label: check(prefs.timeline, "Layers and timeline"),
+        onSelect: () => setPrefs((p) => ({ ...p, timeline: !p.timeline })),
       },
     ],
-    PANELS.map((id) => ({
-      label: check(!layout.hidden.includes(id), PANEL_LABELS[id]),
-      onSelect: () =>
-        setLayout((l) => setPanelShown(l, id, l.hidden.includes(id))),
-    })),
-    [
-      { label: "Customize tools…", onSelect: () => setCustomizing(true) },
-      { label: "Reset layout", onSelect: () => setLayout(DEFAULT_LAYOUT) },
-    ],
+    [{ label: "Customize tools…", onSelect: () => setCustomizing(true) }],
   ];
 
   const onPaste = useEffectEvent(async (e: ClipboardEvent) => {
@@ -1483,76 +1452,90 @@ export function Editor({
       ),
   };
 
-  const panels: Record<PanelId, PanelContent> = {
-    tools: {
-      body: (
-        <ToolBar
-          tool={tool}
-          onSelect={setTool}
-          hiddenTools={layout.hiddenTools}
-          groupTools={layout.groupTools}
-          groupOrder={layout.groupOrder}
-          toolOrder={layout.toolOrder}
-          keyOf={(id) => keyOf(`tool:${id}`)}
-        />
-      ),
-    },
-    colors: { body: <ColorsPanel pen={pen} onChange={setPen} /> },
-    palette: {
-      actions: (
-        <PaletteActions
-          pen={pen}
-          palette={sprite.palette}
-          onPaletteChange={changePalette}
-          frameColors={() => colorsOf(sprite.composite(["reference"]))}
-          fileName={file.name}
-        />
-      ),
-      body: (
-        <PalettePanel
-          pen={pen}
-          onChange={setPen}
-          palette={sprite.palette}
-          colorMode={sprite.colorMode}
-          onPaletteChange={changePalette}
-        />
-      ),
-    },
-    tileset: {
-      body: (
-        <TilesetPanel
-          sprite={sprite}
-          onNewTilemap={(convert) => setTiling({ convert })}
-          onPickTile={() => setTool("tile")}
-          onExport={() => void saveExport(tilemapFiles(sprite, file.name))}
-        />
-      ),
-    },
-    timeline: {
-      fill: true,
-      body: (
-        <Timeline
-          sprite={sprite}
-          playback={playback}
-          onTilemap={(convert) => setTiling({ convert })}
-          onSelectContent={selectLayerContent}
-        />
-      ),
-    },
-    assistant: {
-      fill: true,
-      body: (
-        <EditorChat
-          autoFocus={startedWith === "ai"}
-          canvas={canvas}
-          sprite={sprite}
-          playback={playback}
-          onHighlight={setHighlight}
-        />
-      ),
-    },
+  const sidebarContent: Record<SidebarTab, ReactNode> = {
+    palette: (
+      <div className="grid gap-5 p-4">
+        <section aria-labelledby="sidebar-picker">
+          <div className="mb-3 flex items-center">
+            <h2 id="sidebar-picker" className="flex-1 text-sm font-semibold">
+              Color picker
+            </h2>
+            <button
+              type="button"
+              aria-pressed={tool === "pipette"}
+              aria-label="Pick a colour from the canvas"
+              title={`Pipette${keyOf("tool:pipette") ? ` (${keyOf("tool:pipette")})` : ""}`}
+              onClick={() => setTool("pipette")}
+              className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground aria-pressed:bg-[#fde2ea] aria-pressed:text-foreground"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                className="size-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m9.5 4.5 2 2M11 2.5a1.4 1.4 0 0 1 2 2l-1.5 1.5-2-2Z" />
+                <path d="m9.5 4.5-6 6-.5 2.5 2.5-.5 6-6" />
+              </svg>
+            </button>
+          </div>
+          <ColorsPanel
+            pen={pen}
+            onChange={setPen}
+            editing={editingColor}
+            onEditing={setEditingColor}
+            onAddToPalette={(color) => {
+              if (
+                !sprite.palette.includes(color) &&
+                sprite.palette.length < MAX_PALETTE
+              )
+                changePalette([...sprite.palette, color]);
+            }}
+          />
+        </section>
+        <section aria-label="Palette" className="border-t pt-4">
+          <PaletteSection
+            pen={pen}
+            palette={sprite.palette}
+            onPaletteChange={changePalette}
+            frameColors={() => colorsOf(sprite.composite(["reference"]))}
+            fileName={file.name}
+          >
+            <PalettePanel
+              pen={pen}
+              onChange={setPen}
+              palette={sprite.palette}
+              colorMode={sprite.colorMode}
+              onPaletteChange={changePalette}
+            />
+          </PaletteSection>
+        </section>
+      </div>
+    ),
+    tileset: (
+      <TilesetPanel
+        sprite={sprite}
+        onNewTilemap={(convert) => setTiling({ convert })}
+        onPickTile={() => setTool("tile")}
+        onExport={() => void saveExport(tilemapFiles(sprite, file.name))}
+      />
+    ),
+    assistant: (
+      <EditorChat
+        autoFocus={startedWith === "ai"}
+        startPrompt={startPrompt}
+        onStarted={() => forgetStartOptions(draft.id)}
+        canvas={canvas}
+        sprite={sprite}
+        playback={playback}
+        onHighlight={setHighlight}
+      />
+    ),
   };
-  const dockProps = { layout, panels, drag: panelDrag, setLayout };
 
   return (
     <div
@@ -1604,10 +1587,8 @@ export function Editor({
         hidden={canvasOnly}
         file={file}
         fileInput={fileInput}
-        drive={drive}
         sprite={sprite}
-        playback={playback}
-        onOpenFrom={setOpening}
+        onOpenCloud={() => setOpening(true)}
         recent={listDrafts(userId)
           .filter((other) => other.id !== draft.id)
           .sort((a, b) => b.savedAt - a.savedAt)
@@ -1625,20 +1606,16 @@ export function Editor({
                 )}
               </span>
             ),
-            shortcut: other.location
-              ? LOCATION_LABELS[other.location.kind]
-              : "This browser",
+            shortcut: other.location ? CLOUD_LABEL : NOT_SAVED_LABEL,
             onSelect: () => {
               const at = other.location;
-              if (at?.kind === "cloud") file.openCloudTile(at.tile);
-              else if (at?.kind === "drive") file.openDriveFile(at.file);
+              if (at) file.openCloudTile(at.tile);
               else {
                 openTabAfter(userId, other.id, draft.id);
                 router.push(editorUrl(other.id));
               }
             },
           }))}
-        onConnectDrive={connectDrive}
         onExport={() => setExporting(true)}
         onPublish={canPublish ? () => setPublishing(true) : undefined}
         explorePublished={published}
@@ -1692,15 +1669,37 @@ export function Editor({
         onImportSheet={() => sheetInput.current?.click()}
         onImportImage={() => setImporting(true)}
         onNewTile={() => setCreatingTile(true)}
-        onTilemap={(convert) => setTiling({ convert })}
         keyOf={keyOf}
         menus={[
-          { label: "Edit", sections: editMenu },
-          { label: "Select", sections: selectMenu },
-          { label: "Tile", sections: tileMenu },
+          {
+            label: "Edit",
+            sections: [...editMenu, [{ label: "Select", submenu: selectMenu }]],
+          },
+          { label: "Canvas", sections: tileMenu },
           { label: "View", sections: viewMenu },
         ]}
         afterMenus={[{ label: "Window", sections: windowMenu }]}
+        onUndo={commands.undo}
+        onRedo={commands.redo}
+        fileSwitcher={
+          <FileSwitcher
+            onSave={file.saveBeforeLeaving}
+            onNew={() => setCreatingTile(true)}
+            userId={userId}
+            current={{
+              id: draft.id,
+              name: file.name,
+              dirty: file.dirty,
+              location: file.location,
+            }}
+            revision={file.revision}
+            picture={() => ({
+              rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
+              w: sprite.size.w,
+              h: sprite.size.h,
+            })}
+          />
+        }
       />
       <div
         hidden={canvasOnly}
@@ -1734,32 +1733,31 @@ export function Editor({
         />
       </div>
       <div className="flex min-h-0 flex-1">
-        <div hidden={canvasOnly} className="contents">
-          <Dock side="left" {...dockProps} />
+        <div
+          hidden={canvasOnly}
+          className="flex w-14 shrink-0 flex-col items-center gap-3 overflow-y-auto border-r bg-background py-2"
+        >
+          <ToolBar
+            tool={tool}
+            onSelect={setTool}
+            hiddenTools={prefs.hiddenTools}
+            groupTools={prefs.groupTools}
+            keyOf={(id) => keyOf(`tool:${id}`)}
+          />
+          <div className="mt-auto pb-7">
+            <ColorWells
+              pen={pen}
+              onChange={setPen}
+              editing={editingColor}
+              onEditing={(slot) => {
+                setEditingColor(slot);
+                setPrefs((p) => ({ ...p, sidebar: true, tab: "palette" }));
+              }}
+            />
+          </div>
         </div>
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <TileTabs
-            hidden={canvasOnly}
-            onSave={file.saveBeforeLeaving}
-            onNew={() => setCreatingTile(true)}
-            userId={userId}
-            current={{
-              id: draft.id,
-              name: file.name,
-              dirty: file.dirty,
-              location: file.location,
-            }}
-            revision={file.revision}
-            picture={() => ({
-              rgba: sprite.composite(["reference"], sprite.frames[0]!.id),
-              w: sprite.size.w,
-              h: sprite.size.h,
-            })}
-          />
           <div className="flex min-h-0 flex-1">
-            <div hidden={canvasOnly} className="contents">
-              <Dock side="innerLeft" {...dockProps} />
-            </div>
             <div className="relative flex min-h-0 min-w-0 flex-1">
               <main
                 ref={workspace}
@@ -1772,9 +1770,43 @@ export function Editor({
                 )}
               >
                 <div className="m-auto">
-                  <PixelCanvas ref={canvas} scale={scale} {...canvasProps} />
+                  {!canvasOnly && (
+                    <div className="mb-2 flex items-center justify-between gap-4 text-xs text-muted-foreground">
+                      <span className="truncate">
+                        {file.name || "Untitled"}
+                        {PIGXEL_EXTENSION}
+                      </span>
+                      <span className="shrink-0 tabular-nums">
+                        {sprite.size.w} × {sprite.size.h} px
+                      </span>
+                    </div>
+                  )}
+                  <PixelCanvas
+                    ref={canvas}
+                    scale={scale}
+                    {...canvasProps}
+                    onPointerPosition={setPointer}
+                  />
                 </div>
               </main>
+              {!canvasOnly && (
+                <CanvasControls
+                  pixelGrid={view.pixelGrid}
+                  onPixelGrid={() =>
+                    setView((v) => ({ ...v, pixelGrid: !v.pixelGrid }))
+                  }
+                  onFullScreen={commands.toggleFullScreen}
+                  viewSettings={viewMenu}
+                >
+                  {!prefs.sidebar && (
+                    <SidebarToggle
+                      open={false}
+                      onClick={() => setPrefs((p) => ({ ...p, sidebar: true }))}
+                      className="size-8"
+                    />
+                  )}
+                </CanvasControls>
+              )}
             </div>
             {splitView && (
               <SecondView
@@ -1782,43 +1814,89 @@ export function Editor({
                 onClose={() => setSplitView(false)}
               />
             )}
-            <div hidden={canvasOnly} className="contents">
-              <Dock side="innerRight" {...dockProps} />
-            </div>
           </div>
           <div hidden={canvasOnly} className="contents">
-            <Dock side="bottom" {...dockProps} />
+            <TimelineDock
+              open={prefs.timeline}
+              height={prefs.timelineHeight}
+              frames={sprite.frames.length}
+              onToggle={() =>
+                setPrefs((p) => ({ ...p, timeline: !p.timeline }))
+              }
+              onHeight={(timelineHeight) =>
+                setPrefs((p) => ({ ...p, timelineHeight }))
+              }
+              onAddFrame={() => {
+                sprite.addFrame(false);
+                setPrefs((p) => ({ ...p, timeline: true }));
+              }}
+              menus={
+                <>
+                  <Menu
+                    up
+                    compact
+                    label="Layer"
+                    sections={layerActions(
+                      sprite,
+                      undefined,
+                      undefined,
+                      (convert) => setTiling({ convert }),
+                    )}
+                  />
+                  <Menu
+                    up
+                    compact
+                    label="Frame"
+                    sections={frameActions(sprite, playback)}
+                  />
+                </>
+              }
+            >
+              <Timeline
+                sprite={sprite}
+                playback={playback}
+                onTilemap={(convert) => setTiling({ convert })}
+                onSelectContent={selectLayerContent}
+              />
+            </TimelineDock>
           </div>
         </div>
-        <div hidden={canvasOnly} className="contents">
-          <Dock side="right" {...dockProps} />
-        </div>
+        {prefs.sidebar && !canvasOnly && (
+          <EditorSidebar
+            tabs={sidebarTabs}
+            tab={prefs.tab}
+            onTab={(tab) => setPrefs((p) => ({ ...p, tab }))}
+            onClose={() => setPrefs((p) => ({ ...p, sidebar: false }))}
+            content={sidebarContent}
+          />
+        )}
       </div>
       <div hidden={canvasOnly} className="contents">
-        <FloatingPanels {...dockProps} />
+        <StatusBar
+          tool={toolById(tool).label}
+          layer={sprite.activeLayer?.name ?? ""}
+          pointer={pointer}
+          size={sprite.size}
+          zoom={{
+            scale,
+            onChange: zoomSet,
+            onZoomIn: zoomIn,
+            onZoomOut: zoomOut,
+            onReset: zoomReset,
+            onFit: zoomFit,
+          }}
+        />
       </div>
-      <DragOverlay drag={panelDrag} />
       {customizing && (
         <CustomizeToolsDialog
           keyOf={(id) => keyOf(`tool:${id}`)}
-          hiddenTools={layout.hiddenTools}
-          onChange={(id, shown) => setLayout((l) => setToolShown(l, id, shown))}
-          groupOrder={layout.groupOrder}
-          toolOrder={layout.toolOrder}
-          onOrderChange={(groupOrder, toolOrder) =>
-            setLayout((l) => ({ ...l, groupOrder, toolOrder }))
-          }
+          hiddenTools={prefs.hiddenTools}
+          onChange={(id, shown) => setPrefs((p) => setToolShown(p, id, shown))}
           onClose={() => setCustomizing(false)}
         />
       )}
       {opening && (
-        <OpenTileDialog
-          source={opening}
-          drive={drive}
-          draftId={draft.id}
-          file={file}
-          onClose={() => setOpening(null)}
-        />
+        <OpenTileDialog file={file} onClose={() => setOpening(false)} />
       )}
       {publishingArt && (
         <PublishArtDialog
@@ -1863,7 +1941,6 @@ export function Editor({
         <NewProjectDialog
           userId={userId}
           from={draft.id}
-          drive={drive}
           onClose={() => setCreatingTile(false)}
         />
       )}

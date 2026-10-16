@@ -1,4 +1,4 @@
-import { SIZES, TAGS } from "@/features/explore/constants";
+import { CANVAS_SIZES, TAGS } from "@/features/explore/constants";
 
 const SEARCH_MAX = 100;
 
@@ -29,7 +29,6 @@ export type ProjectQuery = {
   query?: string;
   published?: string;
   archived?: boolean;
-  trashed?: boolean;
   sort?: string;
 };
 
@@ -44,10 +43,9 @@ export function cloudFilter({
   query,
   published,
   archived,
-  trashed,
   sort,
 }: ProjectQuery) {
-  const range = SIZES.find((s) => s.value === size) ?? SIZES[0];
+  const range = CANVAS_SIZES.find((s) => s.value === size) ?? CANVAS_SIZES[0];
   return {
     min: range.min,
     max: range.max,
@@ -58,7 +56,6 @@ export function cloudFilter({
       published === "yes" ? true : published === "no" ? false : undefined,
     pinnedFirst: true,
     archived: archived === true,
-    trashed: trashed === true,
     order: SORTS.find((order) => order === sort) ?? "edited",
   };
 }

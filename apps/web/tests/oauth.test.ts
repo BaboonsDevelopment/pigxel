@@ -4,31 +4,33 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   google: vi.fn(() => true),
   apple: vi.fn(() => true),
-  drive: vi.fn(() => false),
-  saveDrive: vi.fn(),
   auth: {
     getUser: vi.fn(),
     signInWithOAuth: vi.fn(),
     linkIdentity: vi.fn(),
     exchangeCodeForSession: vi.fn(),
+    updateUser: vi.fn(),
   },
+  insert: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: () => true }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: mocks.auth }),
+  createClient: async () => ({
+    auth: mocks.auth,
+    from: () => ({ insert: mocks.insert }),
+  }),
 }));
 vi.mock("@/lib/auth/apple", () => ({ isAppleSignInAvailable: mocks.apple }));
-vi.mock("@/lib/google-drive/server", () => ({
+vi.mock("@/lib/auth/google", () => ({
   isGoogleSignInAvailable: mocks.google,
-  isDriveAvailable: mocks.drive,
-  saveDriveConnection: mocks.saveDrive,
-  DRIVE_SCOPE: "https://www.googleapis.com/auth/drive.file",
 }));
 
 import { GET as google } from "@/app/auth/google/route";
 import { GET as apple } from "@/app/auth/apple/route";
 import { GET as callback } from "@/app/auth/callback/route";
+import { loginUrl, safeNext, withParam } from "@/lib/auth/routes";
+import { LEGAL_VERSION } from "@/features/legal/legal";
 
 const user = { id: "artist", identities: [{ provider: "email" }] };
 const visit = (path: string) => new NextRequest(`http://localhost:3000${path}`);
@@ -39,7 +41,6 @@ beforeEach(() => {
   vi.stubEnv("APP_URL", "http://localhost:3000");
   mocks.google.mockReturnValue(true);
   mocks.apple.mockReturnValue(true);
-  mocks.drive.mockReturnValue(false);
   mocks.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
   mocks.auth.signInWithOAuth.mockResolvedValue({
     data: { url: "https://supabase.test/auth/v1/authorize" },
@@ -53,10 +54,12 @@ beforeEach(() => {
     data: { session: { user } },
     error: null,
   });
+  mocks.insert.mockResolvedValue({ error: null });
+  mocks.auth.updateUser.mockResolvedValue({ error: null });
 });
 
 describe("Supabase social sign-in", () => {
-  it("starts basic Google login without requesting Drive permissions", async () => {
+  it("starts Google login asking only for sign-in, not Google Drive", async () => {
     const response = await google(visit("/auth/google?next=/home"));
     expect(location(response)).toBe("https://supabase.test/auth/v1/authorize");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
@@ -209,55 +212,6 @@ describe("OAuth callbacks", () => {
     );
   });
 
-  it("never stores an Apple refresh token as Drive even with a Google identity", async () => {
-    mocks.drive.mockReturnValue(true);
-    mocks.auth.exchangeCodeForSession.mockResolvedValue({
-      data: {
-        session: {
-          user: {
-            ...user,
-            identities: [{ provider: "google" }, { provider: "apple" }],
-          },
-          provider_refresh_token: "apple-refresh",
-        },
-      },
-      error: null,
-    });
-    await callback(visit("/auth/callback?code=apple&provider=apple"));
-    expect(mocks.saveDrive).not.toHaveBeenCalled();
-  });
-
-  it("keeps a valid Google session when storing Drive access fails", async () => {
-    mocks.drive.mockReturnValue(true);
-    mocks.auth.exchangeCodeForSession.mockResolvedValue({
-      data: {
-        session: {
-          user: {
-            ...user,
-            identities: [
-              {
-                provider: "google",
-                identity_data: { email: "artist@example.com" },
-              },
-            ],
-          },
-          provider_refresh_token: "google-refresh",
-        },
-      },
-      error: null,
-    });
-    mocks.saveDrive.mockRejectedValue(new Error("database unavailable"));
-    const response = await callback(
-      visit(
-        "/auth/callback?code=google&provider=google&next=/settings/account",
-      ),
-    );
-    expect(location(response)).toBe(
-      "http://localhost:3000/settings/account?drive=error",
-    );
-    expect(response.headers.get("cache-control")).toBe("private, no-store");
-  });
-
   it("keeps provider errors usable when session lookup also fails", async () => {
     mocks.auth.getUser.mockRejectedValue(new Error("network"));
     const response = await callback(
@@ -265,5 +219,73 @@ describe("OAuth callbacks", () => {
     );
     expect(location(response)).toBe("http://localhost:3000/login?error=apple");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+});
+
+describe("return destinations", () => {
+  it("only returns to known pages", () => {
+    expect(safeNext("/tiles/edit")).toBe("/tiles/edit");
+    expect(safeNext("/tiles/edit?id=3f2a-b1")).toBe("/tiles/edit?id=3f2a-b1");
+    expect(safeNext("/tiles/edit?id=<script>")).toBe("/tiles/edit");
+    expect(safeNext("/settings/account?id=x")).toBe("/settings/account");
+    expect(safeNext("/account")).toBe("/home");
+    expect(safeNext("/share/8c3d5cb8-ebd3-41eb-a6f4-867a4f842928")).toBe(
+      "/share/8c3d5cb8-ebd3-41eb-a6f4-867a4f842928",
+    );
+    expect(safeNext("/share/x")).toBe("/home");
+    expect(safeNext("https://evil.example/tiles/edit")).toBe("/home");
+    expect(withParam("/tiles/edit?id=a", "link", "error")).toBe(
+      "/tiles/edit?id=a&link=error",
+    );
+    expect(safeNext("//evil.example")).toBe("/home");
+    expect(safeNext(null)).toBe("/home");
+    expect(safeNext("/pricing")).toBe("/pricing");
+    expect(safeNext("/u/pixel_pig")).toBe("/u/pixel_pig");
+    expect(safeNext("/u/Not-A-Name")).toBe("/home");
+    expect(safeNext("/u/pixel_pig/extra")).toBe("/home");
+  });
+
+  it("builds login links that return to a safe page", () => {
+    expect(loginUrl()).toBe("/login");
+    expect(loginUrl("signup")).toBe("/login?mode=signup");
+    expect(loginUrl("signup", "/pricing")).toBe(
+      "/login?mode=signup&next=%2Fpricing",
+    );
+    expect(loginUrl("login", "/pricing")).toBe("/login?next=%2Fpricing");
+  });
+});
+
+describe("terms acceptance on OAuth sign-in", () => {
+  const signIn = () =>
+    callback(visit("/auth/callback?code=ok&provider=google&next=/home"));
+
+  it("records it once for someone who hasn't accepted this version", async () => {
+    mocks.insert.mockResolvedValue({ error: null });
+    mocks.auth.updateUser.mockResolvedValue({ error: null });
+    expect(location(await signIn())).toBe("http://localhost:3000/home");
+    expect(mocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ source: "oauth" }),
+    );
+    expect(mocks.auth.updateUser).toHaveBeenCalledWith({
+      data: { legal_version: LEGAL_VERSION },
+    });
+
+    mocks.insert.mockClear();
+    mocks.auth.exchangeCodeForSession.mockResolvedValue({
+      data: {
+        session: {
+          user: { ...user, user_metadata: { legal_version: LEGAL_VERSION } },
+        },
+      },
+      error: null,
+    });
+    await signIn();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it("still signs people in when recording it fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.insert.mockRejectedValue(new Error("database unavailable"));
+    expect(location(await signIn())).toBe("http://localhost:3000/home");
   });
 });

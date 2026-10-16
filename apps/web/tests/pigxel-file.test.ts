@@ -191,7 +191,7 @@ describe(".pigxel format", () => {
     expect(parsePigxel(file(messy)).palette).toEqual(["#ff004d", "#0a0b0c"]);
   });
   it("rejects invalid sizes, damaged pixels, kinds and frames", () => {
-    for (const size of [0, 257, 1.5, "32"]) {
+    for (const size of [0, 4097, 1.5, "32"]) {
       expect(() => parsePigxel(file({ ...valid, width: size }))).toThrow(
         PigxelFileError,
       );

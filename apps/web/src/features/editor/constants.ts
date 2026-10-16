@@ -1,11 +1,8 @@
 import type { ToolId } from "./tools";
-import type { DriveStatus } from "@/lib/google-drive/status";
 
 export type EditorProps = {
   userId: string;
   tileId?: string;
-  drive: DriveStatus;
-  driveError?: boolean;
   guide?: string;
   start?: string;
   canPublish?: boolean;
@@ -72,8 +69,6 @@ export type Command =
   | "showShortcuts";
 
 export type Shortcut = { command: Command } | { tool: ToolId };
-
-export type OpenSource = "cloud" | "drive";
 
 export type FileItem = {
   id: string;

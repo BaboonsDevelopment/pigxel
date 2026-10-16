@@ -1,19 +1,15 @@
 import { MAX_PIGXEL_SIZE, type Background } from "@/lib/pigxel-file/format";
 
-export type NewTileStorage = "cloud" | "drive" | "none";
-
 export type NewTileDefaults = {
   width: number;
   height: number;
   background: Background;
-  storage: NewTileStorage;
 };
 
 const FALLBACK: NewTileDefaults = {
   width: 32,
   height: 32,
   background: "transparent",
-  storage: "cloud",
 };
 
 const keyOf = (userId: string) => `pigxel:new-tile:${userId}`;
@@ -39,9 +35,6 @@ export function readNewTileDefaults(userId: string): NewTileDefaults {
       )
         ? (raw.background as Background)
         : FALLBACK.background,
-      storage: ["cloud", "drive", "none"].includes(raw.storage as string)
-        ? (raw.storage as NewTileStorage)
-        : FALLBACK.storage,
     };
   } catch {
     return FALLBACK;

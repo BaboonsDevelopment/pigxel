@@ -1,72 +1,54 @@
 ---
 name: pixel-assets
-description: Draw, check and ship pixel-art assets for the Pigxel Assets page (sprites, items, nature, seamless tiles, animations). Use when asked to draw, add, redraw or fix assets or asset packs, to act on review notes, or to build or upload assets.
+description: Create, regenerate, convert, animate, review, and publish Pigxel pixel-art asset packs. Use for sprites, creatures, characters, props, plants, tiles, review fixes, and animation alignment.
 ---
 
-# Pixel assets
+# Pigxel pixel assets
 
-Assets are drawn by hand as JSON pixel grids in `apps/web/scripts/assets/packs/<pack>/`, rendered, looked at, checked automatically, approved by a person in the review page, and only then built and uploaded. Run every command from `apps/web`.
+Use this workflow for **every** asset pack, including Halloween, Volcanic Caldera, Crystal Caverns, and future packs. Work in `apps/web`; source JSON lives in `scripts/assets/packs/<pack>/`. Keep generated source images and exact prompts in `output/<pack>/` when using ImageGen. Treat supplied screenshots as visual references; if the user says a reference shows *forms*, borrow forms without copying its style.
 
-| Command | What it does |
+## Interpret the request
+
+- Default or «звичайний» style: crisp **64×64** art, using `demonic-monsters-64` as the conversion reference. When the user explicitly says «якісний», use the more detailed **128×128** Halloween treatment. An explicit size overrides either default.
+- Respect the requested count, category, subjects, and animation scope. Do not assume every pack needs the same count or that half its creatures must animate; use those proportions only when requested. Vary silhouettes, proportions, poses, and creature types. Avoid making everything chibi or humanoid when the brief calls for wider variety.
+- Add to an existing pack or block when the user names one. Give assets short, evocative descriptions, usually one or two brief sentences. Keep conversion notes and prompts out of public descriptions.
+- The final *logical sprite*, not the large generated image, is the artwork to judge. Design for readable target-size pixels from the start.
+
+## Draw and convert
+
+1. Plan each sprite's silhouette, focal point, palette, target dimensions, and transparent margin. For animation, plan distinct poses and a fixed body/ground anchor first.
+2. For generated raster art, use ImageGen for each distinct subject. Ask for large, deliberate pixel clusters and a simple, recognizable composition that survives reduction. Save the source and exact prompt under `output/<pack>/`.
+3. Convert using nearest-neighbour sampling and deliberate solid-colour palette reduction. Do **not** introduce smoothing, blur, anti-aliasing, soft gradients, or dithering. Avoid noisy single pixels and excess microdetail. If the source looks good but the converted sprite is muddy, simplify or regenerate the source rather than accepting a poor transfer.
+4. Use the canvas well: scale the subject as large as its silhouette allows while retaining a small clear margin on all sides. Never cut off limbs, tails, wings, or props. If a wide subject cannot fit a square, widen **that asset's tile** instead of cropping it or shrinking the whole pack.
+5. Write `<id>.json`, add its ID to `pack.json`'s `assets` list, then render and **inspect the actual final-size PNG**. Fix until the silhouette and important details read immediately. Check the pack contact sheet for consistent palette, outlines, light, detail density, and pixel scale.
+
+Use a limited palette with clear contrast between neighbouring materials. Keep outlines and light direction consistent within a pack. Tiles must repeat without visible seams. Preserve recognizable details of approved source art while removing details too fine for the output size.
+
+## Animation: register every frame
+
+- Animate a real idle action with coherent poses: a head or gaze turn, breathing, cloak movement, a tail or wing adjustment, etc. Do not fake idle by stretching, uniformly scaling, or sliding the entire sprite. For a 5–6-frame request, make the transition and last-to-first loop smooth; do not replace it with two abrupt poses.
+- All frames must have identical canvas dimensions, subject scale, and **both horizontal and vertical registration**. Keep planted feet on one ground line; for flying or crawling creatures, define and hold a stable body anchor while only the intended parts move. Preserve intentional motion without letting the entire figure wander left/right or up/down.
+- Keep a clear margin in every frame. Remove stray disconnected fragments and prevent one frame or neighbouring sprite-sheet cell from bleeding into another.
+- From `apps/web`, run `node scripts/assets/fix-animation-alignment.cjs scripts/assets/packs/<pack> --apply` on **every generated animated pack**, including Crystal Caverns. This writes aligned frames back to source JSON; a preview-only correction is insufficient. Re-run without `--apply` and require zero remaining corrections. Inspect **every frame and the loop**, because automatic alignment can misread an intentional pose; repair such cases by hand or with an explicit anchor.
+- When changing the alignment helper itself, run `node --test scripts/assets/fix-animation-alignment.test.cjs`.
+
+## Validate and show the result
+
+Run from `apps/web`:
+
+| Command | Purpose |
 | --- | --- |
-| `pnpm assets:render --only <id>` | Writes `scripts/assets/out/render/<pack>/<id>.png` (frames ×8 on a checkerboard, tiles also 3×3) and prints the path |
-| `pnpm assets:check [--only <id>]` | Schema, palette and art checks, review state, and reviewers' notes |
-| `pnpm dev` → `/internal/assets` | Review page (dev only, needs `ASSETS_REVIEW_KEY`): the user approves, rejects or asks for fixes per asset, renames blocks (packs), marks blocks or single assets premium, publishes approved assets and deletes ones already in production |
-| `pnpm assets:build` | Builds approved, error-free assets into `scripts/assets/out/` |
-| `pnpm assets:import [--prune] [--dry-run]` | Uploads the build to the hosted Supabase |
+| `pnpm assets:render --only <id>` | Render one asset for pixel-level inspection |
+| `pnpm assets:render --pack <pack>` | Render the pack and contact sheet |
+| `pnpm assets:check --pack <pack>` | Check schema, art, palette, and review state |
+| `pnpm dev` → `/internal/assets` | Verify the user's actual review preview |
+| `pnpm assets:build` | Build approved, valid assets |
+| `pnpm assets:import [--dry-run]` | Import an authorized build to production |
 
-## The loop — for every asset
+Require zero errors; investigate warnings and fix unintended ones. Check the rendered sprites at 1× and in the app preview. Confirm `/internal/assets` shows the expected pack, count, images, animations, and review states; CLI output alone does not prove the assets are visible there. If review is empty, diagnose the review snapshot/filter or server state before claiming delivery. Provide a contact sheet or representative previews so the user can judge the result.
 
-1. **Plan** before drawing: size, silhouette, the 3–4 colour ramp per material from the pack palette, where the light comes from, and for animations the key poses.
-2. **Write** `packs/<pack>/<id>.json` and add the id to `"assets"` in `pack.json` (that order is the page order).
-3. **Render** with `pnpm assets:render --only <id>`, then **Read the PNG**. Never judge a drawing from its grid alone.
-4. **Critique** the render against the checklist below as a strict art director: say what is wrong, specifically.
-5. **Fix** and render again. Repeat until it passes the checklist — usually 2–4 rounds. If an asset still looks weak after several rounds, simplify it rather than adding detail.
-6. Run `pnpm assets:check --only <id>`: no errors, and every warning either fixed or deliberate (say why in `"notes"`).
-7. When a batch is done, render the contact sheet (`pnpm assets:render --pack <pack>`), Read `out/render/contact.png` and check the set looks like one game.
+Read review notes and fix the specific rejected or “To fix” assets. Keep `pack.json` and listed JSON files in sync so missing files cannot invalidate the whole pack. Do not write `review.json` or silently approve on the user's behalf. Publish/import only when covered by the user's current or earlier authorization; generation alone does not imply publication.
 
-Never write to `review.json` — approval is the user's. Never run `assets:import` without the user asking; it writes to the hosted project. Every request becomes its own pack folder. A pack either becomes a new block on the Assets page (block id = pack id, block name = `name` in `pack.json`) or adds to an existing block (`"block": "<block id>"` in `pack.json`, e.g. `items`). Set `block` when the user names an existing block; otherwise leave it out, and the user can change it on the review page. Block name, target and premium (`tier: "paid"` for the whole pack, `premium: [ids]` for single assets) are the review page's to change unless asked. Rejecting an asset on the review page deletes its JSON; deleting one from production deletes it everywhere. Acting on review: `pnpm assets:check` prints each asset's state and note. Redraw every `[fix]` asset from its note, and it returns to review on its own.
+## JSON essentials
 
-## File format
-
-```json
-{
-  "id": "slime",
-  "name": "Slime",
-  "kind": "sprite",
-  "tags": ["character", "enemy", "animated"],
-  "colors": { "k": "#181425", "d": "#265c42", "g": "#3e8948", "l": "#63c74d", "w": "#ffffff" },
-  "clips": [
-    { "name": "idle", "kind": "animation", "ms": 180, "frames": [["....kkkk....", "..."], ["..."]] }
-  ],
-  "notes": "Optional: anything a reviewer should know."
-}
-```
-
-- `id` is kebab-case, the file name, and unique across all packs. `kind` is `sprite`, or `tile` for a seamless tile (tile checks and the 3×3 render apply).
-- Each frame is a list of equal-length row strings; `.` is clear, every other character is a key in `colors`. All frames of an asset have the same size.
-- `colors` values are lowercase `#rrggbb` from the pack's palette (`pack.json` → `palette`; `endesga-32` is in `apps/web/src/lib/palette/presets.ts`). Pick mnemonic keys: `k` outline, `d`/`m`/`l` dark/mid/light, `w` highlight.
-- `kind: "animation"` loops its frames (`ms` per frame, `direction` `forward` or `pingpong`); `kind: "variant"` is a set of alternatives (open/closed chest, full/empty heart). An asset can have several clips (`idle`, `walk`).
-- `slices` (optional) mark 9-slice UI: `{ "name", "x", "y", "w", "h", "border" }`.
-
-## Sizes
-
-Items and small props 16×16. Characters 16×16 (chibi) or 16×24 / 24×24. Trees and large props up to 32×32 or 32×48. Tiles 16×16. Keep one scale across a pack: a coin is smaller than a chest, which is smaller than a hero.
-
-## Art checklist
-
-**Silhouette** — It reads as what it is at 1× and filled black. Big simple shapes first, then detail; one clear focal point. Use the canvas: leave 1px margin, no cramped corner drawings.
-
-**Outline** — 1px outline in the pack outline colour (`style.outline`) around sprites. Inner lines and the light side may use a dark tone of the local colour (selective outline). No double-thick outlines, no outline on tiles.
-
-**Light and shading** — One light from the top-left on every asset. Each material gets a ramp of 3–4 tones: shadow, base, light, and a sparing highlight. Shade by form (what faces away from the light is darker), never by concentric rings ("pillow shading"). Shift hue along the ramp: shadows cooler/redder-purple, highlights warmer/yellower, rather than only darker/lighter of one hue.
-
-**Clean pixels** — Curves and diagonals use consistent step lengths (1-1-1, 2-2-2, 2-1-2-1), no random jaggies. No lone stray pixels, no checkerboard dither on sprites this small, no parallel bands of equal-width colour following the outline (banding). Anti-alias sparingly, only to soften a hard step.
-
-**Colour** — Few colours, chosen on purpose; contrast between neighbouring materials. Characters need readable faces: eyes are 1–2px, high contrast.
-
-**Tiles** — Fully opaque, seamless: the 3×3 render must show no visible grid. Texture is sparse and evenly spread, no feature crossing an edge unless it continues on the other side, no single standout detail that repeats into an obvious pattern. Low contrast so sprites stand out on top.
-
-**Animation** — Idle 2–4 frames (breathing, bobbing 1px), walk 4–6 frames, effects 4–8 frames. Keep the ground line fixed, no 1px wobble of the whole body unless intended, change as few pixels per frame as reads clearly. Loops must join smoothly from last frame to first.
-
-**Set consistency** — Same palette subset, outline, light direction, detail density and pixel scale across the pack.
+`id` is unique kebab-case and matches the file name. `kind` is `sprite` or seamless `tile`. Each frame is an array of equal-length strings: `.` means transparent; every other character must map to a lowercase `#rrggbb` in `colors`. Frames of one asset share dimensions. Use `clips` with `kind: "animation"` for a looping action and `kind: "variant"` for alternatives; set frame timing deliberately. `pack.json` defines the palette and display order. Keep every source ID it lists present on disk.

@@ -91,12 +91,11 @@ export function rowByRow(pixels: string[]) {
   return [...new Set(pixels)].sort((a, b) => key(a) - key(b));
 }
 
-/** Opens a new, transparent 16×16 tile that is only kept in this browser. */
+/** Opens a new, transparent 16×16 tile in Pigxel cloud. */
 export async function openBlankTile(page: Page) {
   await page.goto("/tiles/new");
   await page.getByLabel("Name").fill("Tool test");
   await page.getByRole("button", { name: `${SIZE}×${SIZE}` }).click();
-  await page.getByLabel(/Don’t store it/).check();
   await page.getByRole("button", { name: "Create tile" }).click();
   await expect(page).toHaveURL(/\/tiles\/edit/);
   const canvas = page.getByLabel("Tile canvas");

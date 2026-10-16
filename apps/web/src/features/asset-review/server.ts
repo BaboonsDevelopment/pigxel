@@ -1,11 +1,12 @@
 import "server-only";
 import { execFile } from "node:child_process";
-import { rmSync, unlinkSync } from "node:fs";
+import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { NextResponse, type NextRequest } from "next/server";
 import { assetFileUrl } from "@/features/assets/assets";
+import { isAssetBackground } from "@/features/assets/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasErrors, issuesOf } from "../../../scripts/assets/lib/checks.ts";
 import { framesOf } from "../../../scripts/assets/lib/pigxel.ts";
@@ -44,6 +45,14 @@ import type {
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const PUBLISH_TIMEOUT = 5 * 60 * 1000;
+
+// A deleted tile's stale pack entry does not make the remaining art invalid.
+const blockingPackIssues = (pack: PackSource) =>
+  pack.issues.filter(
+    (issue) =>
+      issue.level === "error" &&
+      !/^pack\.json lists ".+", but .+\.json is missing\.$/.test(issue.message),
+  );
 
 export class ReviewError extends Error {
   constructor(
@@ -86,6 +95,15 @@ export function failed(error: unknown) {
       { status: error.status },
     );
   console.error(error);
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+  )
+    return NextResponse.json(
+      { error: "Couldn’t read or save the asset files. Please try again." },
+      { status: 503 },
+    );
   return NextResponse.json(
     { error: error instanceof Error ? error.message : String(error) },
     { status: 500 },
@@ -95,10 +113,13 @@ export function failed(error: unknown) {
 async function production() {
   const supabase = createAdminClient();
   const [assets, blocks] = await Promise.all([
-    supabase.from("assets").select("id").returns<{ id: string }[]>(),
     supabase
-      .from("asset_blocks")
-      .select("id, name")
+      .from("assets")
+      .select("id, updated_at")
+      .returns<{ id: string; updated_at: string | null }[]>(),
+    supabase
+      .from("asset_packs")
+      .select("id, name, background")
       .order("sort")
       .order("name")
       .returns<ReviewTarget[]>(),
@@ -106,7 +127,7 @@ async function production() {
   const error = assets.error ?? blocks.error;
   if (error) throw new Error(`Couldn’t read production: ${error.message}`);
   return {
-    ids: new Set(assets.data!.map((row) => row.id)),
+    publishedAt: new Map(assets.data!.map((row) => [row.id, row.updated_at])),
     blocks: blocks.data!,
   };
 }
@@ -132,7 +153,7 @@ function tileOf(
     frames: frames?.frames.map((f) => f.ms) ?? [],
     clips: frames?.tags ?? [],
     issues,
-    blocked: hasErrors([...pack.issues, ...issues]),
+    blocked: hasErrors([...blockingPackIssues(pack), ...issues]),
     state: reviewState(source, entry),
     note: entry?.note ?? "",
     premium: isPremium(pack, source.id),
@@ -140,11 +161,11 @@ function tileOf(
 }
 
 export async function reviewSnapshot(): Promise<ReviewSnapshot> {
-  let live = new Set<string>();
+  let publishedAt = new Map<string, string | null>();
   let targets: ReviewTarget[] = [];
   let productionError: string | null = null;
   try {
-    ({ ids: live, blocks: targets } = await production());
+    ({ publishedAt, blocks: targets } = await production());
   } catch (e) {
     productionError = e instanceof Error ? e.message : String(e);
   }
@@ -153,10 +174,21 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
     id: pack.id,
     name: pack.name,
     target: pack.block,
+    background: pack.background,
     premium: pack.tier === "paid",
     issues: pack.issues,
     tiles: pack.assets
-      .filter((source) => !live.has(source.id))
+      // A published asset can change locally and must return to review. Keep
+      // its newly approved replacement visible until that approval is uploaded.
+      .filter((source) => {
+        if (!publishedAt.has(source.id)) return true;
+        const entry = reviews[source.key];
+        if (reviewState(source, entry) === "changed") return true;
+        return (
+          entry?.status === "approved" &&
+          Date.parse(entry.at) > Date.parse(publishedAt.get(source.id) ?? "")
+        );
+      })
       .map((source) => tileOf(pack, source, reviews[source.key])),
   }));
   return { blocks, targets, productionError };
@@ -188,7 +220,7 @@ export function setReview(key: unknown, status: unknown, note: unknown) {
     .slice(0, MAX_NOTE);
   if (
     status === "approved" &&
-    hasErrors([...pack.issues, ...issuesOf(source, pack)])
+    hasErrors([...blockingPackIssues(pack), ...issuesOf(source, pack)])
   )
     throw new ReviewError("Fix its errors before approving it.");
   if (status === "fix" && !text)
@@ -208,20 +240,24 @@ function deleteLocal(pack: PackSource, source: AssetSource) {
   const reviews = readReviews(REVIEW_FILE);
   delete reviews[source.key];
   writeReviews(reviews, REVIEW_FILE);
-  if (pack.assets.length === 1) {
-    rmSync(join(PACKS_DIR, pack.id), { recursive: true });
-    return;
-  }
+  const dir = join(PACKS_DIR, pack.id);
+  let remaining = 0;
   updatePack(
     pack.id,
     (json) => {
-      json.assets = pack.assets
-        .map((a) => a.id)
-        .filter((id) => id !== source.id);
-      json.premium = pack.premium.filter((id) => id !== source.id);
+      const listed = Array.isArray(json.assets) ? json.assets.map(String) : [];
+      const assets = listed.filter(
+        (id) => id !== source.id && existsSync(join(dir, `${id}.json`)),
+      );
+      json.assets = assets;
+      json.premium = Array.isArray(json.premium)
+        ? json.premium.filter((id: unknown) => assets.includes(String(id)))
+        : [];
+      remaining = assets.length;
     },
     PACKS_DIR,
   );
+  if (remaining === 0) rmSync(dir, { recursive: true });
 }
 
 export function rejectTile(key: unknown) {
@@ -235,9 +271,21 @@ export async function updateBlock(
     name,
     premium,
     target,
-  }: { name?: unknown; premium?: unknown; target?: unknown },
+    background,
+  }: {
+    name?: unknown;
+    premium?: unknown;
+    target?: unknown;
+    background?: unknown;
+  },
 ) {
   const pack = findPack(id);
+  if (
+    background !== undefined &&
+    background !== null &&
+    !isAssetBackground(background)
+  )
+    throw new ReviewError("Pick one of the background colours.");
   if (target !== undefined && target !== null) {
     const { blocks } = await production();
     if (
@@ -259,9 +307,24 @@ export async function updateBlock(
       if (target === null) delete json.block;
       else if (typeof target === "string") json.block = target;
       if (typeof premium === "boolean") json.tier = premium ? "paid" : "free";
+      if (background === null) delete json.background;
+      else if (typeof background === "string") json.background = background;
     },
     PACKS_DIR,
   );
+}
+
+export async function setProductionBackground(id: string, background: unknown) {
+  if (!ID.test(id)) throw new ReviewError("No such block.", 404);
+  if (background !== null && !isAssetBackground(background))
+    throw new ReviewError("Pick one of the background colours.");
+  const { data, error } = await createAdminClient()
+    .from("asset_packs")
+    .update({ background, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id");
+  if (error) throw new Error(`Couldn’t save the block: ${error.message}`);
+  if (!data.length) throw new ReviewError("No such block.", 404);
 }
 
 export function setTilePremium(key: unknown, premium: unknown) {
@@ -290,7 +353,7 @@ export function stripPng(packId: string, id: string) {
 type ProductionRow = {
   id: string;
   name: string;
-  category: string;
+  pack_id: string;
   kind: "sprite" | "tile";
   width: number;
   height: number;
@@ -304,9 +367,9 @@ export async function productionAssets(): Promise<ProductionAsset[]> {
   const { data, error } = await createAdminClient()
     .from("assets")
     .select(
-      "id, name, category, kind, width, height, frame_count, frame_ms, premium, sheet_path",
+      "id, name, pack_id, kind, width, height, frame_count, frame_ms, premium, sheet_path",
     )
-    .order("category")
+    .order("pack_id")
     .order("sort")
     .order("name")
     .returns<ProductionRow[]>();
@@ -314,7 +377,7 @@ export async function productionAssets(): Promise<ProductionAsset[]> {
   return data.map((row) => ({
     id: row.id,
     name: row.name,
-    category: row.category,
+    packId: row.pack_id,
     kind: row.kind,
     width: row.width,
     height: row.height,

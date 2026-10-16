@@ -39,18 +39,18 @@ const TABLES: { name: string; table: string; by: string; columns?: string }[] =
     { name: "views", table: "tile_view_people", by: "user_id" },
     { name: "downloads", table: "tile_download_people", by: "user_id" },
     { name: "editor_layout", table: "editor_layouts", by: "user_id" },
-    {
-      name: "editor_layout_presets",
-      table: "editor_layout_presets",
-      by: "user_id",
-    },
     { name: "subscriptions", table: "subscriptions", by: "user_id" },
     {
-      name: "google_drive_connection",
-      table: "google_drive_connections",
+      name: "tutorial_completions",
+      table: "tutorial_completions",
       by: "user_id",
-      // Never the refresh token: it's a credential, not your data.
-      columns: "google_email, created_at, updated_at",
+    },
+    { name: "asset_uses", table: "asset_uses", by: "user_id" },
+    { name: "asset_favourites", table: "asset_favourites", by: "user_id" },
+    {
+      name: "asset_pack_favourites",
+      table: "asset_pack_favourites",
+      by: "user_id",
     },
   ];
 

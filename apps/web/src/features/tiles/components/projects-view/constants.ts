@@ -1,4 +1,4 @@
-import type { Size } from "@/features/explore/constants";
+import type { CanvasSize } from "@/features/explore/constants";
 
 export const FILTERS = [
   "All",
@@ -7,16 +7,14 @@ export const FILTERS = [
   "Shared",
   "Favourite",
   "Archive",
-  "Trash",
 ] as const;
 
 export type Filter = (typeof FILTERS)[number];
 
 export const STORAGES = [
   { value: "any", label: "Any storage" },
-  { value: "browser", label: "This browser" },
   { value: "cloud", label: "Pigxel cloud" },
-  { value: "drive", label: "Google Drive" },
+  { value: "browser", label: "Not saved" },
 ] as const;
 
 export type Storage = (typeof STORAGES)[number]["value"];
@@ -30,7 +28,7 @@ export const PUBLISHED = [
 export type Published = (typeof PUBLISHED)[number]["value"];
 
 export type ProjectFilters = {
-  size: Size;
+  size: CanvasSize;
   animated: boolean;
   storage: Storage;
   label: string | null;

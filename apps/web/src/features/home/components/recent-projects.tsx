@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useReducer } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
@@ -15,6 +14,9 @@ import {
 import { ProjectCard } from "@/features/tiles/components/project-card/project-card";
 import { TileThumbnail } from "@/features/tiles/components/tile-thumbnail";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { NewProjectButton } from "./new-project-button";
+import { TilesBadge } from "@/features/tiles/components/tiles-badge";
+import { hasTilemap } from "@/lib/tilemap/tilemap";
 
 type Project =
   | {
@@ -100,13 +102,11 @@ function Row({
               key={project.id}
               name={project.name}
               thumbnail={<TileThumbnail image={project.image} />}
+              badges={hasTilemap(project.image) && <TilesBadge />}
               open={{ href: editorUrl(project.id) }}
               menu={[
                 {
-                  label:
-                    project.draft.location?.kind === "drive"
-                      ? "Remove from this browser"
-                      : "Delete",
+                  label: "Delete",
                   destructive: true,
                   onSelect: async () => {
                     if (await confirmRemoveLocalTile(userId, project.draft))
@@ -124,6 +124,7 @@ function Row({
                   <PixelImage src={project.tile.thumbnail} alt="" />
                 )
               }
+              badges={project.tile.tilemap && <TilesBadge />}
               open={{ onClick: () => void cloud.open(project.tile) }}
               opening={cloud.busy === project.id}
               disabled={cloud.busy !== null}
@@ -138,18 +139,18 @@ function Row({
           ),
         )}
         <li>
-          <NewProjectCard />
+          <NewProjectCard userId={userId} />
         </li>
       </ul>
     </>
   );
 }
 
-function NewProjectCard() {
+function NewProjectCard({ userId }: { userId: string }) {
   return (
-    <Link
-      href="/tiles/new"
-      className="flex h-full min-h-32 items-center justify-center gap-2.5 rounded-xl border bg-card font-mono text-sm tracking-wide transition-colors hover:border-[#f7cfdc] hover:bg-[#fde2ea] focus-visible:bg-[#fde2ea]"
+    <NewProjectButton
+      userId={userId}
+      className="flex h-full min-h-32 w-full items-center justify-center gap-2.5 rounded-xl border bg-card font-mono text-sm tracking-wide transition-colors hover:border-[#f7cfdc] hover:bg-[#fde2ea] focus-visible:bg-[#fde2ea]"
     >
       <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">
         <path
@@ -160,6 +161,6 @@ function NewProjectCard() {
         />
       </svg>
       New project
-    </Link>
+    </NewProjectButton>
   );
 }

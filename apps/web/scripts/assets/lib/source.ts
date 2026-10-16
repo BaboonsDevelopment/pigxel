@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { ASSETS_DIR } from "./paths.ts";
 import { PALETTE_PRESETS } from "../../../src/lib/palette/presets.ts";
@@ -12,6 +12,7 @@ import type {
   Tier,
 } from "./asset.ts";
 import { put, sprite } from "./sprite.ts";
+import { readAssetText, writeAssetText } from "./file-io.ts";
 
 /**
  * Assets are drawn by hand (by people or Claude Code) as JSON pixel grids:
@@ -50,6 +51,7 @@ export type PackSource = {
   name: string;
   tier: Tier;
   block: string | null;
+  background: string | null;
   premium: string[];
   description: string;
   palette: string[];
@@ -256,7 +258,7 @@ export function parseAsset(
 
 function loadAsset(dir: string, pack: string, id: string): AssetSource {
   const file = join(dir, `${id}.json`);
-  const text = readFileSync(file, "utf8");
+  const text = readAssetText(file);
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -290,7 +292,7 @@ function loadAsset(dir: string, pack: string, id: string): AssetSource {
 function loadPack(dir: string, dirName: string): PackSource {
   const { issues, error } = issueList();
   const json: unknown = JSON.parse(
-    readFileSync(join(dir, "pack.json"), "utf8"),
+    readAssetText(join(dir, "pack.json")),
   );
   if (!isObject(json)) throw new Error(`${dirName}/pack.json: not an object`);
   if (json.id !== dirName)
@@ -302,6 +304,11 @@ function loadPack(dir: string, dirName: string): PackSource {
     (typeof json.block !== "string" || !ID.test(json.block))
   )
     error("pack", "block must be the id of a block on the Assets page.");
+  if (
+    json.background !== undefined &&
+    (typeof json.background !== "string" || !HEX.test(json.background))
+  )
+    error("pack", "background must be a lowercase #rrggbb colour.");
 
   let palette: string[] = [];
   if (typeof json.palette === "string") {
@@ -367,6 +374,7 @@ function loadPack(dir: string, dirName: string): PackSource {
     name: typeof json.name === "string" ? json.name : dirName,
     tier: json.tier === "paid" ? "paid" : "free",
     block: typeof json.block === "string" ? json.block : null,
+    background: typeof json.background === "string" ? json.background : null,
     premium,
     description: typeof json.description === "string" ? json.description : "",
     palette,
@@ -411,8 +419,8 @@ export function updatePack(
   dir = PACKS_DIR,
 ) {
   const file = join(dir, id, "pack.json");
-  const json: unknown = JSON.parse(readFileSync(file, "utf8"));
+  const json: unknown = JSON.parse(readAssetText(file));
   if (!isObject(json)) throw new Error(`${id}/pack.json: not an object`);
   change(json);
-  writeFileSync(file, JSON.stringify(json, null, 2) + "\n");
+  writeAssetText(file, JSON.stringify(json, null, 2) + "\n");
 }

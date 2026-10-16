@@ -15,6 +15,7 @@ import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import { useCloudTileActions } from "@/features/tiles/tile-actions";
 import { listDrafts } from "@/lib/pigxel-file/draft";
 import { useDraftsLoaded } from "@/lib/pigxel-file/use-drafts";
+import { NOT_SAVED_LABEL } from "@/lib/pigxel-file/location";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
 import type { SearchResults } from "../server";
 import { SearchIcon } from "@/components/ui/icons";
@@ -126,8 +127,7 @@ function SearchPanel({ userId, close }: { userId: string; close: () => void }) {
       key: `local:${draft.id}`,
       group: "Projects",
       title: draft.name,
-      detail:
-        draft.location?.kind === "drive" ? "Google Drive" : "In this browser",
+      detail: NOT_SAVED_LABEL,
       go: () => router.push(editorUrl(draft.id)),
     })),
     ...server.tiles.map((tile): Result => ({

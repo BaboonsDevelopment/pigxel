@@ -2,7 +2,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { avatarUrlOf, type ProfileRow } from "@/features/profile/profile";
-import { COMMENT_COLUMNS, COMMENT_PAGE, type ArtComment } from "./comments";
+import {
+  COMMENT_COLUMNS,
+  COMMENT_PAGE,
+  type ArtComment,
+  type CommentSort,
+} from "./comments";
 
 export type SavedArt = {
   id: string;
@@ -90,6 +95,7 @@ type CommentRow = {
   body: string;
   created_at: string;
   edited_at: string | null;
+  like_count: number;
   parent_id: string | null;
   user_id: string;
   author: Pick<
@@ -108,6 +114,8 @@ export function toComment(row: CommentRow): ArtComment {
     body: row.body,
     createdAt: row.created_at,
     edited: row.edited_at !== null,
+    likes: row.like_count,
+    liked: false,
     parentId: row.parent_id,
     replies: [],
     author: {
@@ -121,7 +129,8 @@ export function toComment(row: CommentRow): ArtComment {
 
 export async function listComments(
   tileId: string,
-  before?: string,
+  offset = 0,
+  sort: CommentSort = "newest",
 ): Promise<{ comments: ArtComment[]; count: number }> {
   const supabase = await createClient();
   const query = supabase
@@ -129,11 +138,12 @@ export async function listComments(
     .select(COMMENT_COLUMNS, { count: "exact" })
     .eq("tile_id", tileId)
     .is("parent_id", null);
-  const { data, count, error } = await (
-    before ? query.lt("created_at", before) : query
-  )
-    .order("created_at", { ascending: false })
-    .limit(COMMENT_PAGE);
+  const ordered =
+    sort === "top" ? query.order("like_count", { ascending: false }) : query;
+  const { data, count, error } = await ordered
+    .order("created_at", { ascending: sort === "oldest" })
+    .order("id")
+    .range(offset, offset + COMMENT_PAGE - 1);
   if (error) throw new Error(`Couldn’t load comments: ${error.message}`);
   const rows = data as unknown as CommentRow[];
   const comments = rows.map(toComment);
@@ -153,6 +163,16 @@ export async function listComments(
       const reply = toComment(row);
       byId.set(reply.id, reply);
       byId.get(row.parent_id!)?.replies.push(reply);
+    }
+    const mine = await supabase
+      .from("comment_likes")
+      .select("comment_id")
+      .in("comment_id", [...byId.keys()]);
+    if (mine.error)
+      throw new Error(`Couldn’t load comment likes: ${mine.error.message}`);
+    for (const { comment_id } of mine.data) {
+      const liked = byId.get(comment_id as string);
+      if (liked) liked.liked = true;
     }
   }
   return { comments, count: count ?? rows.length };

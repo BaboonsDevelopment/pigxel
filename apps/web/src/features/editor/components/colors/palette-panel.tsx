@@ -65,25 +65,22 @@ export function PalettePanel({
   };
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col p-2">
-      <div className="mb-1 flex items-center justify-between">
+    <div className="relative flex min-h-0 flex-col">
+      {colorMode !== "rgb" && (
         <p
-          className="text-[10px] tracking-wide text-muted-foreground uppercase"
+          className="mb-2 text-xs text-muted-foreground"
           title={
             colorMode === "indexed"
               ? "Indexed: the tile uses only these colours. Double-click one to change it everywhere."
               : "Double-click a colour to change it"
           }
         >
-          {palette.length} {palette.length === 1 ? "colour" : "colours"}
-          {colorMode !== "rgb" && (
-            <span className="ml-1 rounded bg-muted px-1 text-foreground normal-case">
-              {colorMode === "indexed" ? "Indexed" : "Grey"}
-            </span>
-          )}
+          <span className="rounded bg-muted px-1.5 py-0.5 text-foreground">
+            {colorMode === "indexed" ? "Indexed" : "Grey"}
+          </span>
         </p>
-      </div>
-      <ul className="grid min-h-0 grid-cols-[repeat(auto-fill,minmax(1.25rem,1fr))] content-start gap-0.5 overflow-y-auto p-1">
+      )}
+      <ul className="grid min-h-0 grid-cols-8 content-start gap-1.5">
         {palette.map((color, i) => (
           <li
             key={color}
@@ -103,7 +100,7 @@ export function PalettePanel({
               title={`${color} · click: primary, right-click: secondary, double-click: change`}
               onDoubleClick={(e) => editSwatch(color, e.currentTarget)}
               className={cn(
-                "relative block aspect-square w-full rounded-[2px] ring-1 ring-black/10",
+                "relative block aspect-square w-full rounded-md ring-1 ring-black/10",
                 color === pen.color &&
                   "z-10 ring-2 ring-foreground ring-offset-1",
                 dragged === i && "opacity-40",

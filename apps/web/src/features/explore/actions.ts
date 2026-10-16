@@ -10,58 +10,32 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import {
   DESCRIPTION_MAX,
-  FEEDS,
   PAGE_SIZE,
-  PERIODS,
-  QUERY_MAX,
   REPORT_DETAILS_MAX,
   REPORT_REASONS,
-  SIZES,
-  SORTS,
   TAGS,
   type ExploreFilters,
   type ReportReason,
 } from "./constants";
+import { artQuery, isValidFilters } from "./filters";
 import { findArtists, type ArtistResult } from "@/features/search/server";
-import { COMMENT_COLUMNS, COMMENT_MAX, type ArtComment } from "./comments";
+import {
+  COMMENT_COLUMNS,
+  COMMENT_MAX,
+  COMMENT_SORTS,
+  type ArtComment,
+  type CommentSort,
+} from "./comments";
 import { listComments, toComment } from "./server";
 import { requestReview } from "@/features/moderation/request";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function artFilter(filters: ExploreFilters) {
-  const days = PERIODS.find((p) => p.value === filters?.period)?.days;
-  const range = SIZES.find((s) => s.value === filters?.size);
-  if (
-    days === undefined ||
-    !range ||
-    typeof filters.animated !== "boolean" ||
-    typeof filters.query !== "string" ||
-    !SORTS.some((s) => s.value === filters.sort) ||
-    !FEEDS.some((s) => s.value === filters.feed) ||
-    !Array.isArray(filters.tags) ||
-    filters.tags.some((tag) => !(TAGS as readonly string[]).includes(tag))
-  )
-    return null;
+  if (!isValidFilters(filters)) return null;
   const user = await getUser();
-  if ((filters.sort === "liked" || filters.feed === "following") && !user)
-    return null;
-  return {
-    days,
-    user,
-    filter: {
-      order:
-        filters.sort === "recent" || filters.sort === "az"
-          ? filters.sort
-          : ("relevance" as const),
-      likedBy: filters.sort === "liked" ? user?.id : undefined,
-      followedBy: filters.feed === "following" ? user?.id : undefined,
-      min: range.min,
-      max: range.max,
-      animated: filters.animated,
-      query: filters.query.trim().slice(0, QUERY_MAX),
-    },
-  };
+  if ((filters.mine || filters.feed === "following") && !user) return null;
+  return { user, ...artQuery(filters, user?.id ?? null) };
 }
 
 export async function loadPopularTiles(
@@ -378,11 +352,45 @@ export async function linkRemix(
 
 export async function loadMoreComments(
   tileId: string,
-  before: string,
+  offset: number,
+  sort: CommentSort,
 ): Promise<ArtComment[]> {
-  if (!UUID.test(tileId) || Number.isNaN(Date.parse(before))) return [];
-  const { comments } = await listComments(tileId, before);
+  if (
+    !UUID.test(tileId) ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    !COMMENT_SORTS.some((s) => s.value === sort)
+  )
+    return [];
+  const { comments } = await listComments(tileId, offset, sort);
   return comments;
+}
+
+export async function setCommentLiked(
+  commentId: string,
+  liked: boolean,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (!UUID.test(commentId)) return { error: "Invalid request." };
+  try {
+    const supabase = await createClient();
+    const { error } = liked
+      ? await supabase
+          .from("comment_likes")
+          .upsert(
+            { comment_id: commentId },
+            { onConflict: "user_id,comment_id", ignoreDuplicates: true },
+          )
+      : await supabase
+          .from("comment_likes")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("comment_id", commentId);
+    if (error) return { error: "Couldn’t change that. Try again." };
+  } catch {
+    return { error: "We couldn’t connect. Please try again." };
+  }
+  return {};
 }
 
 export async function reportComment(

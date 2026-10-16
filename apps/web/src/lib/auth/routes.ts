@@ -11,35 +11,12 @@ const protectedPaths = [
   "/assets",
   "/tutorials",
   "/feedback",
+  "/internal/admin",
   "/auth/update-password",
 ];
 
 export function isProtectedPath(pathname: string) {
   return protectedPaths.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
-}
-
-/** Where people go to accept updated terms; never itself gated. */
-export const ACCEPT_PATH = "/accept";
-
-const ungatedPaths = [
-  ACCEPT_PATH,
-  "/login",
-  "/auth",
-  "/api",
-  "/terms",
-  "/privacy",
-  "/cookies",
-  "/refunds",
-  "/licenses",
-  "/account-deletion",
-  "/settings/account",
-];
-
-/** Pages a signed-in person can open before accepting the current terms. */
-export function isUngatedPath(pathname: string) {
-  return ungatedPaths.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
 }

@@ -1,80 +1,217 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
-import { Heading } from "@pigxel/ui/components/typography";
+import { cn } from "@pigxel/ui/lib/utils";
+import { madimiOne } from "@/lib/fonts/madimi";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import {
   deleteComment,
   editComment,
-  reportComment,
   loadMoreComments,
   postComment,
+  reportComment,
+  setCommentLiked,
 } from "../../../actions";
-import { scrollParent } from "@/lib/utils/scroll-parent";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import {
   COMMENT_MAX,
+  COMMENT_SORTS,
   commentAge,
   mapComment,
   removeComment,
   type ArtComment,
+  type CommentSort,
 } from "../../../comments";
 import { ProjectMenu } from "@/features/tiles/components/project-card/components/project-menu";
 import { EmojiButton } from "./emoji-button";
+import { useDismiss } from "../../explore-header/components/menu-button";
+import { CheckIcon, ChevronIcon } from "../../explore-header/components/icons";
+
+type Viewer = { id: string; name: string; avatarUrl: string | null };
+
+const FIELD =
+  "rounded-xl border bg-background p-2.5 transition-colors focus-within:border-[#8c3a57]";
+
+const SEND =
+  "h-8 shrink-0 cursor-pointer rounded-lg bg-primary px-4 text-[11px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-default disabled:bg-muted disabled:text-muted-foreground";
+
+const DOTS = (
+  <svg aria-hidden="true" viewBox="0 0 20 4" className="w-3.5">
+    <circle cx="2" cy="2" r="2" fill="currentColor" />
+    <circle cx="10" cy="2" r="2" fill="currentColor" />
+    <circle cx="18" cy="2" r="2" fill="currentColor" />
+  </svg>
+);
+
+function insertAtCaret(
+  field: HTMLTextAreaElement | null,
+  text: string,
+  insert: string,
+  apply: (next: string) => void,
+) {
+  const start = field?.selectionStart ?? text.length;
+  const end = field?.selectionEnd ?? text.length;
+  const next = (text.slice(0, start) + insert + text.slice(end)).slice(
+    0,
+    COMMENT_MAX,
+  );
+  apply(next);
+  requestAnimationFrame(() => {
+    const caret = Math.min(start + insert.length, next.length);
+    field?.focus();
+    field?.setSelectionRange(caret, caret);
+  });
+}
+
+function SortMenu({
+  value,
+  onChange,
+}: {
+  value: CommentSort;
+  onChange: (value: CommentSort) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useDismiss(open, () => setOpen(false));
+  return (
+    <div ref={root} className="relative">
+      <button
+        type="button"
+        aria-label={`Sort comments: ${value}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex h-8 cursor-pointer items-center gap-2 rounded-lg border bg-background px-3 text-xs transition-colors hover:bg-muted aria-expanded:border-primary"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          className="size-3.5"
+        >
+          <path d="m10 2.8 2.2 4.5 4.9.7-3.6 3.5.9 4.9L10 14.1l-4.4 2.3.9-4.9L2.9 8l4.9-.7Z" />
+        </svg>
+        {COMMENT_SORTS.find((s) => s.value === value)!.label}
+        <ChevronIcon />
+      </button>
+      {open && (
+        <ul
+          role="menu"
+          className="absolute top-full right-0 z-30 mt-2 min-w-36 rounded-xl border bg-popover p-1.5 shadow-lg animate-in fade-in slide-in-from-top-1"
+        >
+          {COMMENT_SORTS.map((o) => (
+            <li key={o.value} role="none">
+              <button
+                type="button"
+                role="menuitemradio"
+                aria-checked={o.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o.value);
+                }}
+                className={cn(
+                  "flex h-9 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-xs transition-colors hover:bg-muted",
+                  o.value === value && "bg-pastel-pink-soft",
+                )}
+              >
+                <span className="flex-1">{o.label}</span>
+                {o.value === value && (
+                  <span className="text-primary">
+                    <CheckIcon />
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export function CommunityCard({
   tileId,
+  artistId,
   viewer,
   initial,
   total,
-  onExpandedChange,
+  onCountChange,
 }: {
   tileId: string;
-  viewer: { id: string; name: string; avatarUrl: string | null } | null;
+  artistId: string;
+  viewer: Viewer | null;
   initial: ArtComment[];
   total: number;
-  onExpandedChange: (expanded: boolean) => void;
+  onCountChange: (count: number) => void;
 }) {
+  const router = useRouter();
   const [comments, setComments] = useState(initial);
   const [count, setCount] = useState(total);
   const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [all, setAll] = useState(false);
-  const [moreFailed, setMoreFailed] = useState(false);
-  const loading = useRef(false);
-  const sentinel = useRef<HTMLDivElement>(null);
+  const [sort, setSort] = useState<CommentSort>("newest");
+  const [sorting, setSorting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const version = useRef(0);
   const hasMore = comments.length < count;
-
-  useEffect(() => {
-    const target = sentinel.current;
-    if (!all || !hasMore || moreFailed || !target) return;
-    const last = comments.at(-1);
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry?.isIntersecting || loading.current || !last) return;
-        loading.current = true;
-        loadMoreComments(tileId, last.createdAt)
-          .then((more) => {
-            if (!more.length) setCount(comments.length);
-            setComments((list) => {
-              const shown = new Set(list.map((c) => c.id));
-              return [...list, ...more.filter((c) => !shown.has(c.id))];
-            });
-          })
-          .catch(() => setMoreFailed(true))
-          .finally(() => {
-            loading.current = false;
-          });
-      },
-      { root: scrollParent(target), rootMargin: "0px 0px 600px 0px" },
-    );
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [all, hasMore, moreFailed, comments, tileId]);
   const [posting, startPosting] = useTransition();
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
+  const [replyTo, setReplyTo] = useState<{
+    thread: string;
+    to: string | null;
+    text: string;
+  } | null>(null);
+  const [openThreads, setOpenThreads] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
+
+  useEffect(() => onCountChange(count), [count, onCountChange]);
+
+  const changeSort = (next: CommentSort) => {
+    if (next === sort) return;
+    const current = ++version.current;
+    setSort(next);
+    setSorting(true);
+    setError(null);
+    loadMoreComments(tileId, 0, next)
+      .then((list) => {
+        if (current === version.current) setComments(list);
+      })
+      .catch(() => {
+        if (current === version.current)
+          setError("Couldn’t sort comments. Try again.");
+      })
+      .finally(() => {
+        if (current === version.current) setSorting(false);
+      });
+  };
+
+  const loadMore = () => {
+    if (loadingMore || sorting) return;
+    const current = version.current;
+    setLoadingMore(true);
+    setError(null);
+    loadMoreComments(tileId, comments.length, sort)
+      .then((more) => {
+        if (current !== version.current) return;
+        if (!more.length) setCount(comments.length);
+        setComments((list) => {
+          const shown = new Set(list.map((c) => c.id));
+          return [...list, ...more.filter((c) => !shown.has(c.id))];
+        });
+      })
+      .catch(() => {
+        if (current === version.current)
+          setError("Couldn’t load more comments. Try again.");
+      })
+      .finally(() => setLoadingMore(false));
+  };
 
   const post = () =>
     startPosting(async () => {
@@ -82,48 +219,21 @@ export function CommunityCard({
       const result = await postComment(tileId, text);
       if (result.error || !result.comment)
         return setError(result.error ?? "Couldn’t post that. Try again.");
-      setComments((list) => [result.comment!, ...list]);
+      const added = result.comment;
+      if (sort !== "oldest") setComments((list) => [added, ...list]);
+      else if (!hasMore) setComments((list) => [...list, added]);
       setCount((n) => n + 1);
       setText("");
     });
 
-  const [replyTo, setReplyTo] = useState<{
-    thread: string;
-    text: string;
-  } | null>(null);
-  const [openThreads, setOpenThreads] = useState<ReadonlySet<string>>(
-    new Set(),
-  );
-  type Reply = typeof replyTo;
-  const layout = (next: {
-    all?: boolean;
-    threads?: ReadonlySet<string>;
-    replyTo?: Reply;
-  }) =>
-    onExpandedChange(
-      (next.all ?? all) ||
-        (next.threads ?? openThreads).size > 0 ||
-        !!("replyTo" in next ? next.replyTo : replyTo),
-    );
-  const expand = (next: boolean) => {
-    layout({ all: next });
-    setAll(next);
-  };
-  const openThread = (id: string) => {
-    const threads = new Set(openThreads).add(id);
-    layout({ threads });
-    setOpenThreads(threads);
-  };
-  const closeThread = (id: string) => {
-    const threads = new Set(openThreads);
-    threads.delete(id);
-    layout({ threads });
-    setOpenThreads(threads);
-  };
-  const setReply = (next: Reply) => {
-    layout({ replyTo: next });
-    setReplyTo(next);
-  };
+  const openThread = (id: string) =>
+    setOpenThreads((threads) => new Set(threads).add(id));
+  const closeThread = (id: string) =>
+    setOpenThreads((threads) => {
+      const next = new Set(threads);
+      next.delete(id);
+      return next;
+    });
 
   const postReply = async (parentId: string, body: string) => {
     const result = await postComment(tileId, body, parentId);
@@ -137,7 +247,7 @@ export function CommunityCard({
       })),
     );
     openThread(parentId);
-    setReply(null);
+    setReplyTo(null);
     return null;
   };
 
@@ -158,31 +268,39 @@ export function CommunityCard({
     }
   };
 
-  const insertEmoji = (emoji: string) => {
-    const field = input.current;
-    const start = field?.selectionStart ?? text.length;
-    const end = field?.selectionEnd ?? text.length;
-    const next = (text.slice(0, start) + emoji + text.slice(end)).slice(
-      0,
-      COMMENT_MAX,
-    );
-    setText(next);
-    requestAnimationFrame(() => {
-      const caret = Math.min(start + emoji.length, next.length);
-      field?.focus();
-      field?.setSelectionRange(caret, caret);
-    });
-  };
-
   const edit = async (comment: ArtComment, body: string) => {
     const result = await editComment(comment.id, body);
     if (result.error || !result.comment)
       return result.error ?? "Couldn’t save that. Try again.";
     const edited = result.comment;
     setComments((list) =>
-      mapComment(list, edited.id, (c) => ({ ...edited, replies: c.replies })),
+      mapComment(list, edited.id, (c) => ({
+        ...edited,
+        likes: c.likes,
+        liked: c.liked,
+        replies: c.replies,
+      })),
     );
     return null;
+  };
+
+  const like = async (comment: ArtComment) => {
+    if (!viewer) return router.push("/login");
+    const next = !comment.liked;
+    const flip = (liked: boolean) =>
+      setComments((list) =>
+        mapComment(list, comment.id, (c) =>
+          c.liked === liked
+            ? c
+            : { ...c, liked, likes: Math.max(0, c.likes + (liked ? 1 : -1)) },
+        ),
+      );
+    flip(next);
+    const result = await setCommentLiked(comment.id, next);
+    if (result.error) {
+      flip(!next);
+      setError(result.error);
+    }
   };
 
   const report = async (comment: ArtComment) => {
@@ -198,11 +316,12 @@ export function CommunityCard({
   };
 
   const reply = (comment: ArtComment) => {
-    if (!viewer) return;
+    if (!viewer) return router.push("/login");
     const root = comment.parentId ?? comment.id;
     openThread(root);
-    setReply({
+    setReplyTo({
       thread: root,
+      to: comment.author.username,
       text:
         comment.parentId && comment.author.username
           ? `@${comment.author.username} `
@@ -210,136 +329,160 @@ export function CommunityCard({
     });
   };
 
+  const item = (comment: ArtComment) => (
+    <CommentItem
+      key={comment.id}
+      comment={comment}
+      artist={comment.author.id === artistId}
+      own={!!viewer && viewer.id === comment.author.id}
+      signedIn={!!viewer}
+      onLike={() => void like(comment)}
+      onReply={() => reply(comment)}
+      onEdit={(body) => edit(comment, body)}
+      onDelete={() => void remove(comment)}
+      onReport={() => report(comment)}
+    />
+  );
+
   const thread = (comment: ArtComment) => {
     const open = openThreads.has(comment.id);
     const { replies } = comment;
     const replying = replyTo?.thread === comment.id && viewer;
-    const children = (
-      <>
-        {open || replies.length <= 2 ? (
-          <>
-            {replies.map(item)}
-            {replies.length > 2 && (
-              <button
-                type="button"
-                onClick={() => closeThread(comment.id)}
-                className="w-fit cursor-pointer text-[10px] text-primary hover:underline"
-              >
-                Hide replies
-              </button>
-            )}
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => openThread(comment.id)}
-            className="w-fit cursor-pointer text-[10px] text-primary hover:underline"
-          >
-            View {replies.length} replies
-          </button>
-        )}
-        {replying && (
-          <ReplyForm
-            key={replyTo.text}
-            initial={replyTo.text}
-            viewer={viewer}
-            onPost={(body) => postReply(comment.id, body)}
-            onCancel={() => setReply(null)}
-          />
-        )}
-      </>
-    );
     return (
-      <div key={comment.id} className="grid min-w-0 gap-2">
+      <div className="grid min-w-0 gap-3">
         {item(comment)}
         {(replies.length > 0 || replying) && (
-          <div className="ml-3.5 grid gap-2 border-l border-[#f6dbe4] pl-5">
-            {children}
+          <div className="ml-3.5 grid gap-3 border-l-2 border-[#f3d3de] pl-4">
+            {open || replies.length <= 2 ? (
+              <>
+                {replies.map(item)}
+                {replies.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => closeThread(comment.id)}
+                    className="w-fit cursor-pointer text-[10px] text-primary hover:underline"
+                  >
+                    Hide replies
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openThread(comment.id)}
+                className="w-fit cursor-pointer text-[10px] text-primary hover:underline"
+              >
+                View {replies.length} replies
+              </button>
+            )}
+            {replying && (
+              <ReplyForm
+                key={`${replyTo.to}:${replyTo.text}`}
+                to={replyTo.to}
+                initial={replyTo.text}
+                viewer={viewer}
+                onPost={(body) => postReply(comment.id, body)}
+                onCancel={() => setReplyTo(null)}
+              />
+            )}
           </div>
         )}
       </div>
     );
   };
 
-  const item = (comment: ArtComment) => (
-    <CommentItem
-      key={comment.id}
-      comment={comment}
-      canReply={!!viewer}
-      canEdit={!!viewer && viewer.id === comment.author.id}
-      onEdit={(body) => edit(comment, body)}
-      canDelete={!!viewer && viewer.id === comment.author.id}
-      onReply={() => reply(comment)}
-      onDelete={() => void remove(comment)}
-      canReport={!!viewer && viewer.id !== comment.author.id}
-      onReport={() => report(comment)}
-    />
-  );
+  const active = focused || !!text;
 
   return (
-    <section
-      aria-labelledby="community-heading"
-      className="rounded-2xl border bg-background p-5 shadow-[0_1px_2px_rgb(59_42_51/0.06)]"
-    >
+    <section aria-labelledby="community-heading" className="border-t pt-4">
       <div className="flex items-center justify-between gap-3">
-        <Heading
-          as="h2"
+        <h2
           id="community-heading"
-          className="text-lg font-semibold"
+          className={cn(
+            madimiOne.className,
+            "text-xl tracking-[0.02em] text-[#4a1f35]",
+          )}
         >
-          A little love from the community
-        </Heading>
-        {(all || count > 2) && (
-          <button
-            type="button"
-            onClick={() => expand(!all)}
-            className="shrink-0 cursor-pointer text-[10px] text-primary hover:underline"
-          >
-            {all ? "Show less" : `View all ${count} comments →`}
-          </button>
-        )}
+          Comments ({count})
+        </h2>
+        <SortMenu value={sort} onChange={changeSort} />
       </div>
       {viewer ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (text.trim()) post();
-          }}
-          className="mt-3 flex items-center gap-2.5"
+        <div
+          className={cn(
+            "mt-3 rounded-2xl transition-colors",
+            active && "bg-[#fdeef3] p-3",
+          )}
         >
-          <ProfileAvatar
-            name={viewer.name}
-            url={viewer.avatarUrl}
-            className="size-8 text-xs"
-          />
-          <div className="flex h-9 min-w-0 flex-1 items-center rounded-lg border bg-pastel-pink-soft/40 pr-1.5 transition-shadow focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
-            <label className="flex h-full min-w-0 flex-1 items-center">
-              <span className="sr-only">Comment</span>
-              <input
-                ref={input}
-                value={text}
-                maxLength={COMMENT_MAX}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Leave a little kindness…"
-                className="h-full min-w-0 flex-1 bg-transparent px-3 text-xs outline-none placeholder:text-muted-foreground"
-              />
-            </label>
-            <EmojiButton onPick={insertEmoji} />
-          </div>
-          <button
-            type="submit"
-            disabled={posting || !text.trim()}
-            className="h-9 shrink-0 cursor-pointer rounded-lg bg-pastel-pink px-4 text-xs text-primary-soft-foreground transition-colors hover:bg-primary-soft disabled:cursor-default disabled:opacity-60"
+          {active && (
+            <p
+              className={cn(
+                madimiOne.className,
+                "mb-2 text-base text-[#4a1f35]",
+              )}
+            >
+              Join the conversation
+            </p>
+          )}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (text.trim()) post();
+            }}
+            onFocus={() => setFocused(true)}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+                setFocused(false);
+            }}
+            className="flex items-start gap-2.5"
           >
-            {posting ? "Posting…" : "Post"}
-          </button>
-        </form>
+            <ProfileAvatar
+              name={viewer.name}
+              url={viewer.avatarUrl}
+              className="size-8 text-xs"
+            />
+            <div className={cn(FIELD, "min-w-0 flex-1")}>
+              <label className="block">
+                <span className="sr-only">Comment</span>
+                <textarea
+                  ref={input}
+                  rows={2}
+                  value={text}
+                  maxLength={COMMENT_MAX}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (text.trim() && !posting) post();
+                    }
+                  }}
+                  placeholder="Leave a comment…"
+                  className="block w-full resize-none bg-transparent px-1 text-xs outline-none placeholder:text-muted-foreground"
+                />
+              </label>
+              <div className="mt-1 flex items-center justify-between">
+                <EmojiButton
+                  onPick={(emoji) =>
+                    insertAtCaret(input.current, text, emoji, setText)
+                  }
+                />
+                <button
+                  type="submit"
+                  disabled={posting || !text.trim()}
+                  className={SEND}
+                >
+                  {posting ? "Posting…" : "Post"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       ) : (
         <p className="mt-3 text-xs text-muted-foreground">
           <Link href="/login" className="text-primary hover:underline">
             Log in
           </Link>{" "}
-          to leave a little kindness.
+          to leave a comment.
         </p>
       )}
       {error && (
@@ -348,9 +491,14 @@ export function CommunityCard({
         </FormMessage>
       )}
       {comments.length ? (
-        <ul className="mt-4 grid gap-3">
-          {(all ? comments : comments.slice(0, 2)).map((comment) => (
-            <li key={comment.id}>{thread(comment)}</li>
+        <ul
+          aria-busy={sorting}
+          className={cn("mt-2 divide-y", sorting && "opacity-60")}
+        >
+          {comments.map((comment) => (
+            <li key={comment.id} className="py-4">
+              {thread(comment)}
+            </li>
           ))}
         </ul>
       ) : (
@@ -358,25 +506,17 @@ export function CommunityCard({
           No comments yet. Be the first to leave some love.
         </p>
       )}
-      {all && hasMore && !moreFailed && (
-        <div
-          ref={sentinel}
-          className="mt-3 text-center text-[10px] text-muted-foreground"
-        >
-          Loading more comments…
-        </div>
-      )}
-      {moreFailed && (
-        <p role="alert" className="mt-3 text-center text-[11px]">
-          Couldn’t load more comments.{" "}
+      {hasMore && (
+        <div className="mt-1 flex justify-center">
           <button
             type="button"
-            onClick={() => setMoreFailed(false)}
-            className="cursor-pointer text-primary hover:underline"
+            disabled={loadingMore || sorting}
+            onClick={loadMore}
+            className="h-9 cursor-pointer rounded-lg border bg-background px-6 text-xs font-medium transition-colors hover:bg-muted disabled:cursor-default disabled:opacity-60"
           >
-            Try again
+            {loadingMore ? "Loading…" : "Load more comments"}
           </button>
-        </p>
+        </div>
       )}
     </section>
   );
@@ -384,23 +524,23 @@ export function CommunityCard({
 
 function CommentItem({
   comment,
-  canReply,
-  canEdit,
-  canDelete,
+  artist,
+  own,
+  signedIn,
+  onLike,
   onReply,
   onEdit,
   onDelete,
-  canReport,
   onReport,
 }: {
   comment: ArtComment;
-  canReply: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
+  artist: boolean;
+  own: boolean;
+  signedIn: boolean;
+  onLike: () => void;
   onReply: () => void;
   onEdit: (body: string) => Promise<string | null>;
   onDelete: () => void;
-  canReport: boolean;
   onReport: () => Promise<boolean>;
 }) {
   const { author } = comment;
@@ -418,6 +558,23 @@ function CommentItem({
       if (!error) setDraft(null);
     });
   };
+
+  const menu = own
+    ? [
+        { label: "Edit", onSelect: () => setDraft(comment.body) },
+        { label: "Delete", destructive: true, onSelect: onDelete },
+      ]
+    : signedIn && !reported
+      ? [
+          {
+            label: "Report",
+            destructive: true,
+            onSelect: () =>
+              void onReport().then((done) => done && setReported(true)),
+          },
+        ]
+      : [];
+
   return (
     <div className="flex min-w-0 gap-2.5">
       <ProfileAvatar
@@ -426,17 +583,22 @@ function CommentItem({
         className="size-7 bg-pastel-pink-soft text-[11px] text-primary"
       />
       <div className="min-w-0 flex-1">
-        <p className="flex items-baseline gap-1.5">
+        <p className="flex items-center gap-1.5">
           {author.username ? (
             <Link
               href={`/u/${author.username}`}
-              className="truncate text-xs font-semibold hover:text-primary"
+              className="truncate text-[11px] font-semibold hover:text-primary"
             >
               {author.username}
             </Link>
           ) : (
-            <span className="truncate text-xs font-semibold">
+            <span className="truncate text-[11px] font-semibold">
               {author.name}
+            </span>
+          )}
+          {artist && (
+            <span className="shrink-0 rounded bg-pastel-pink-soft px-1.5 text-[9px] leading-4 text-primary">
+              Artist
             </span>
           )}
           <span className="shrink-0 text-[10px] text-muted-foreground">
@@ -471,7 +633,7 @@ function CommentItem({
                   save();
                 }
               }}
-              className="block w-full min-w-48 resize-none rounded-md border bg-pastel-pink-soft/40 px-2 py-1 text-[11px] outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+              className="block w-full min-w-48 resize-none rounded-lg border bg-background px-2 py-1 text-[11px] outline-none focus:border-[#8c3a57]"
             />
             {editError && (
               <p role="alert" className="mt-0.5 text-[10px] text-destructive">
@@ -504,8 +666,31 @@ function CommentItem({
             {comment.body}
           </p>
         )}
-        {draft === null && canReply && (
-          <p className="mt-0.5 text-[10px]">
+        {draft === null && (
+          <p className="mt-1 flex items-center gap-4 text-[10px]">
+            <button
+              type="button"
+              aria-pressed={comment.liked}
+              aria-label={`${comment.liked ? "Unlike" : "Like"} comment`}
+              onClick={onLike}
+              className={cn(
+                "flex cursor-pointer items-center gap-1 text-muted-foreground transition-colors hover:text-primary",
+                comment.liked && "text-primary",
+              )}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill={comment.liked ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+                className="size-3"
+              >
+                <path d="M8 13.5S2.5 10.3 2.5 6.4A3 3 0 0 1 8 4.8a3 3 0 0 1 5.5 1.6c0 3.9-5.5 7.1-5.5 7.1Z" />
+              </svg>
+              <span className="tabular-nums">{comment.likes}</span>
+            </button>
             <button
               type="button"
               onClick={onReply}
@@ -514,56 +699,17 @@ function CommentItem({
               Reply
             </button>
             {reported && (
-              <span className="ml-3 text-muted-foreground">
-                Reported · thanks
-              </span>
+              <span className="text-muted-foreground">Reported · thanks</span>
             )}
           </p>
         )}
       </div>
-      {draft === null && canReport && !reported && (
-        <button
-          type="button"
-          aria-label="Report comment"
-          title="Report"
-          onClick={() =>
-            void onReport().then((done) => done && setReported(true))
-          }
-          className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="size-3.5"
-          >
-            <path d="M3.5 14V2.5M3.5 3h8l-1.8 3 1.8 3h-8" />
-          </svg>
-        </button>
-      )}
-      {draft === null && (canEdit || canDelete) && (
+      {draft === null && menu.length > 0 && (
         <ProjectMenu
           label="Comment options"
           placement="down"
-          icon={
-            <svg aria-hidden="true" viewBox="0 0 20 4" className="w-3.5">
-              <circle cx="2" cy="2" r="2" fill="currentColor" />
-              <circle cx="10" cy="2" r="2" fill="currentColor" />
-              <circle cx="18" cy="2" r="2" fill="currentColor" />
-            </svg>
-          }
-          items={[
-            ...(canEdit
-              ? [{ label: "Edit", onSelect: () => setDraft(comment.body) }]
-              : []),
-            ...(canDelete
-              ? [{ label: "Delete", destructive: true, onSelect: onDelete }]
-              : []),
-          ]}
+          icon={DOTS}
+          items={menu}
         />
       )}
     </div>
@@ -571,11 +717,13 @@ function CommentItem({
 }
 
 function ReplyForm({
+  to,
   initial,
   viewer,
   onPost,
   onCancel,
 }: {
+  to: string | null;
   initial: string;
   viewer: { name: string; avatarUrl: string | null };
   onPost: (body: string) => Promise<string | null>;
@@ -584,7 +732,7 @@ function ReplyForm({
   const [text, setText] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [posting, startPosting] = useTransition();
-  const field = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const input = field.current;
@@ -604,17 +752,42 @@ function ReplyForm({
         e.preventDefault();
         if (text.trim()) post();
       }}
-      className="flex items-center gap-2"
+      className="flex items-start gap-2.5"
     >
       <ProfileAvatar
         name={viewer.name}
         url={viewer.avatarUrl}
-        className="size-6 text-[10px]"
+        className="size-7 text-[10px]"
       />
-      <div className="min-w-0 flex-1">
-        <input
+      <div className={cn(FIELD, "min-w-0 flex-1 border-[#8c3a57]")}>
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="truncate text-[10px] text-muted-foreground">
+            {to ? `Replying to @${to}` : "Replying"}
+          </span>
+          <button
+            type="button"
+            aria-label="Cancel reply"
+            disabled={posting}
+            onClick={onCancel}
+            className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              className="size-3"
+            >
+              <path d="m4 4 8 8M12 4l-8 8" />
+            </svg>
+          </button>
+        </div>
+        <textarea
           ref={field}
           aria-label="Reply"
+          rows={2}
           value={text}
           maxLength={COMMENT_MAX}
           disabled={posting}
@@ -624,31 +797,34 @@ function ReplyForm({
               e.preventDefault();
               onCancel();
             }
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              if (text.trim() && !posting) post();
+            }
           }}
           placeholder="Write a reply…"
-          className="h-8 w-full rounded-lg border bg-pastel-pink-soft/40 px-3 text-[11px] outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+          className="mt-1 block w-full resize-none bg-transparent px-1 text-[11px] outline-none placeholder:text-muted-foreground"
         />
         {error && (
-          <p role="alert" className="mt-0.5 text-[10px] text-destructive">
+          <p role="alert" className="px-1 text-[10px] text-destructive">
             {error}
           </p>
         )}
+        <div className="mt-1 flex items-center justify-between">
+          <EmojiButton
+            onPick={(emoji) =>
+              insertAtCaret(field.current, text, emoji, setText)
+            }
+          />
+          <button
+            type="submit"
+            disabled={posting || !text.trim()}
+            className={SEND}
+          >
+            {posting ? "Posting…" : "Post reply"}
+          </button>
+        </div>
       </div>
-      <button
-        type="submit"
-        disabled={posting || !text.trim()}
-        className="h-8 shrink-0 cursor-pointer rounded-lg bg-pastel-pink px-3 text-[11px] text-primary-soft-foreground transition-colors hover:bg-primary-soft disabled:cursor-default disabled:opacity-60"
-      >
-        {posting ? "Posting…" : "Reply"}
-      </button>
-      <button
-        type="button"
-        disabled={posting}
-        onClick={onCancel}
-        className="h-8 shrink-0 cursor-pointer px-1 text-[11px] text-muted-foreground hover:text-foreground"
-      >
-        Cancel
-      </button>
     </form>
   );
 }

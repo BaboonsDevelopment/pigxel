@@ -42,7 +42,7 @@ export const FREE_PLAN: {
     "Layers, frames, onion skin",
     "Palettes, mirror and tiled mode",
     "Every export format",
-    `${FREE_LIMITS.cloudTiles} arts in Pigxel cloud, unlimited in Google Drive`,
+    `${FREE_LIMITS.cloudTiles} arts in Pigxel cloud`,
   ],
 };
 

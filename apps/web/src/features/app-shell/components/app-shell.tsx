@@ -24,7 +24,9 @@ export function AppShell({
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const isExplore = usePathname() === "/explore";
+  const pathname = usePathname();
+  const isExplore = pathname === "/explore";
+  const isProjects = pathname === "/tiles";
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -66,12 +68,12 @@ export function AppShell({
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <header
           className={cn(
             "flex shrink-0 items-center gap-3 px-4 md:px-8",
-            isExplore
-              ? "h-12"
+            isExplore || isProjects
+              ? "h-12 md:absolute md:top-0 md:right-0 md:z-20"
               : "h-16 border-b border-border bg-sidebar md:border-0 md:bg-transparent",
           )}
         >
@@ -92,7 +94,9 @@ export function AppShell({
           </Link>
           <div id="app-header-start" className="hidden min-w-0 md:flex" />
           <div className="ml-auto flex items-center gap-2.5">
-            <SearchButton userId={userId} />
+            <span className={cn(isProjects && "hidden")}>
+              <SearchButton userId={userId} />
+            </span>
             <NotificationBell unread={unreadNotifications} />
           </div>
         </header>

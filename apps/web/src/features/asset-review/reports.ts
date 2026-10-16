@@ -1,5 +1,5 @@
 import "server-only";
-import { removeTiles } from "@/features/tiles/trash";
+import { removeTiles } from "@/features/tiles/remove-tiles";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ReviewError } from "./server";
 import type {

@@ -5,6 +5,7 @@ import {
   type PigxelDocument,
 } from "./format";
 import type { CloudTile } from "./location";
+import { hasTilemap } from "@/lib/tilemap/tilemap";
 
 const BUCKET = "tiles";
 
@@ -17,7 +18,8 @@ export type CloudTileSummary = CloudTile & {
   labels?: string[];
   pinnedAt?: string | null;
   openedAt?: string | null;
-  deletedAt?: string | null;
+  /** Has a tilemap layer: a tileset. */
+  tilemap?: boolean;
 };
 
 export class CloudError extends Error {}
@@ -41,7 +43,7 @@ type TileRow = {
   labels?: { label_id: string }[];
   pinned_at?: string | null;
   opened_at?: string | null;
-  deleted_at?: string | null;
+  tilemap?: boolean;
 };
 
 const filePath = (row: { id: string; user_id: string }) =>
@@ -78,7 +80,7 @@ export function toSummary(row: TileRow): CloudTileSummary {
     ...(row.labels && { labels: row.labels.map((l) => l.label_id) }),
     ...(row.pinned_at !== undefined && { pinnedAt: row.pinned_at }),
     ...(row.opened_at !== undefined && { openedAt: row.opened_at }),
-    ...(row.deleted_at !== undefined && { deletedAt: row.deleted_at }),
+    ...(row.tilemap && { tilemap: true }),
   };
 }
 
@@ -156,6 +158,7 @@ async function writeCloudTile(
     height: image.height,
     background: image.background,
     frame_count: image.frames.length,
+    tilemap: hasTilemap(image),
     thumbnail: thumbnail.length <= 50000 ? thumbnail : null,
     updated_at: new Date().toISOString(),
   };
@@ -177,7 +180,7 @@ async function writeCloudTile(
     const limit = /cloud_tile_limit:(\d+)/.exec(error.message)?.[1];
     throw new CloudError(
       limit
-        ? `Your plan keeps up to ${limit} arts in Pigxel cloud. Delete one, save this to Google Drive or download it, or upgrade your plan for more room.`
+        ? `Your plan keeps up to ${limit} arts in Pigxel cloud. Delete one or upgrade your plan for more room.`
         : "Couldn’t save to Pigxel cloud. Try again.",
     );
   }

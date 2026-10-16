@@ -2,10 +2,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
-import { TUTORIALS } from "@/features/tutorials/tutorials";
+import { suggestedTutorials, TUTORIALS } from "@/features/tutorials/tutorials";
 import pigReading from "../../../../public/art/pigxel-mascot-reading.png";
 
-export function Tutorials() {
+export function Tutorials({
+  premium,
+  finished,
+}: {
+  premium: boolean;
+  finished: string[];
+}) {
+  const shown = suggestedTutorials(TUTORIALS, {
+    premium,
+    finished: new Set(finished),
+  });
   return (
     <section
       aria-labelledby="tutorials-heading"
@@ -32,7 +42,7 @@ export function Tutorials() {
         </Link>
       </div>
       <ul className="relative z-10 mt-3 flex min-h-0 flex-1 flex-col gap-2 sm:mr-40 xl:ml-4">
-        {TUTORIALS.map((tutorial) => (
+        {shown.map(({ tutorial, finished: done }) => (
           <li
             key={tutorial.slug}
             className="flex h-16 xl:h-auto xl:max-h-16 xl:min-h-10 xl:flex-1"
@@ -65,14 +75,32 @@ export function Tutorials() {
                   )}
                 </Text>
               </span>
-              <span
-                aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pastel-pink text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none"
-              >
-                <svg viewBox="0 0 16 16" className="ml-0.5 size-3.5">
-                  <path d="M4 2.5v11L13 8z" fill="currentColor" />
-                </svg>
-              </span>
+              {done ? (
+                <span
+                  role="img"
+                  aria-label="Finished"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success text-white"
+                >
+                  <svg viewBox="0 0 16 16" className="size-4" fill="none">
+                    <path
+                      d="m3.5 8.5 3 3 6-7"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pastel-pink text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none"
+                >
+                  <svg viewBox="0 0 16 16" className="ml-0.5 size-3.5">
+                    <path d="M4 2.5v11L13 8z" fill="currentColor" />
+                  </svg>
+                </span>
+              )}
             </Link>
           </li>
         ))}

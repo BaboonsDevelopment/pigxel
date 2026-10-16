@@ -81,6 +81,8 @@ export type ProfileTile = {
   updatedAt: string;
   likes?: number;
   views?: number;
+  /** Has a tilemap layer: a tileset. */
+  tilemap?: boolean;
 };
 
 export type TileAuthor = {
@@ -101,6 +103,7 @@ export type PublicTile = ProfileTile & {
   allowRemix?: boolean;
   remixes?: number;
   views?: number;
+  publishedAt?: string | null;
   remixOf?: {
     username: string;
     tile: { id: string; name: string } | null;

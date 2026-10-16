@@ -8,7 +8,7 @@ export function MissingTile() {
       <EmptyState
         className="max-w-md bg-background"
         title="This tile isn’t in this browser"
-        description="Tiles you haven’t saved to Pigxel cloud or Google Drive stay in the browser they were made in."
+        description="Tiles you haven’t saved to Pigxel cloud stay in the browser they were made in."
         action={
           <Link href="/tiles" className={buttonVariants({ size: "lg" })}>
             Go to My projects

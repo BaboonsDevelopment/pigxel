@@ -1,0 +1,47 @@
+"use client";
+
+import type { PointerEvent } from "react";
+import { cn } from "@pigxel/ui/lib/utils";
+
+export function Splitter({
+  axis,
+  onStart,
+  className,
+}: {
+  axis: "x" | "y";
+  onStart: (bar: HTMLElement) => (delta: number) => void;
+  className?: string;
+}) {
+  const start = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const bar = e.currentTarget;
+    const from = axis === "x" ? e.clientX : e.clientY;
+    const apply = onStart(bar);
+    bar.setPointerCapture(e.pointerId);
+    const move = (event: globalThis.PointerEvent) =>
+      apply((axis === "x" ? event.clientX : event.clientY) - from);
+    const end = () => {
+      bar.removeEventListener("pointermove", move);
+      bar.removeEventListener("pointerup", end);
+      bar.removeEventListener("pointercancel", end);
+    };
+    bar.addEventListener("pointermove", move);
+    bar.addEventListener("pointerup", end);
+    bar.addEventListener("pointercancel", end);
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+      title="Drag to resize"
+      onPointerDown={start}
+      className={cn(
+        "relative z-10 shrink-0 touch-none transition-colors hover:bg-primary/40 active:bg-primary/60",
+        axis === "x" ? "w-1.5 cursor-col-resize" : "h-1.5 cursor-row-resize",
+        className,
+      )}
+    />
+  );
+}

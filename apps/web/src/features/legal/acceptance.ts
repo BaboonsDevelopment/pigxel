@@ -1,13 +1,17 @@
 import "server-only";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { LEGAL, LEGAL_VERSION } from "./legal";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import { hasAcceptedLegal, LEGAL, LEGAL_VERSION } from "./legal";
 
-export type AcceptanceSource = "signup" | "oauth" | "gate";
+/**
+ * How someone agreed: email sign-up, Google or Apple, or email login. Each
+ * page says that continuing means agreeing to the Terms and Privacy Policy.
+ */
+export type AcceptanceSource = "signup" | "oauth" | "login";
 
 /**
  * Records that the signed-in person accepted the current Terms and Privacy
- * Policy and confirmed the minimum age, then stamps their session so the
- * proxy stops asking. Returns an error message, or null.
+ * Policy (the Terms set the minimum age), then stamps their account so it
+ * isn't recorded again for this version. Returns an error message, or null.
  */
 export async function recordAcceptance(
   supabase: SupabaseClient,
@@ -24,12 +28,22 @@ export async function recordAcceptance(
     data: { legal_version: LEGAL_VERSION },
   });
   if (metadataError) return metadataError.message;
-  // The proxy reads the stamp from the access token, so get a fresh one.
-  await supabase.auth.refreshSession();
   return null;
 }
 
-/** Both boxes on a sign-up or acceptance form were ticked. */
-export function acceptedIn(formData: FormData) {
-  return formData.get("age") === "on" && formData.get("terms") === "on";
+/**
+ * Records the acceptance for someone who just signed in, unless they already
+ * accepted the current version. Failures are logged, never shown: the sign-in
+ * itself worked.
+ */
+export async function recordAcceptanceOnce(
+  supabase: SupabaseClient,
+  user: User | null,
+  source: AcceptanceSource,
+) {
+  if (hasAcceptedLegal(user?.user_metadata)) return;
+  const error = await recordAcceptance(supabase, source).catch((e: unknown) =>
+    e instanceof Error ? e.message : String(e),
+  );
+  if (error) console.error("Couldn’t record the terms acceptance:", error);
 }

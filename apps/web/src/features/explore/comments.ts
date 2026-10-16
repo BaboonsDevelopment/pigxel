@@ -3,6 +3,8 @@ export type ArtComment = {
   body: string;
   createdAt: string;
   edited: boolean;
+  likes: number;
+  liked: boolean;
   parentId: string | null;
   replies: ArtComment[];
   author: {
@@ -15,10 +17,18 @@ export type ArtComment = {
 
 export const COMMENT_MAX = 500;
 
-export const COMMENT_PAGE = 30;
+export const COMMENT_PAGE = 10;
+
+export const COMMENT_SORTS = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "top", label: "Top" },
+] as const;
+
+export type CommentSort = (typeof COMMENT_SORTS)[number]["value"];
 
 export const COMMENT_COLUMNS =
-  "id, body, created_at, edited_at, parent_id, user_id, author:profiles(username, display_name, avatar_kind, avatar_path, provider_avatar_url)";
+  "id, body, created_at, edited_at, like_count, parent_id, user_id, author:profiles(username, display_name, avatar_kind, avatar_path, provider_avatar_url)";
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["year", 365 * 86_400_000],

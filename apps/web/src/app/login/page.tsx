@@ -6,11 +6,7 @@ import { AuthPage } from "@/features/auth/components/auth-page";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { safeNext } from "@/lib/auth/routes";
-import { connectDriveUrl } from "@/lib/google-drive/status";
-import {
-  isDriveAvailable,
-  isGoogleSignInAvailable,
-} from "@/lib/google-drive/server";
+import { isGoogleSignInAvailable } from "@/lib/auth/google";
 import { isAppleSignInAvailable } from "@/lib/auth/apple";
 import { AuthForm } from "@/features/auth/components/auth-form";
 import { SignupChoices } from "@/features/auth/components/signup-choices";
@@ -66,11 +62,8 @@ export default async function Login({
       )}
       {authMode === "signup" ? (
         <SignupChoices
-          googleHref={google ? connectDriveUrl(next) : undefined}
-          googleHint={
-            isDriveAvailable()
-              ? "Also connects your Google Drive for saving tiles."
-              : undefined
+          googleHref={
+            google ? `/auth/google?next=${encodeURIComponent(next)}` : undefined
           }
           appleHref={
             apple ? `/auth/apple?next=${encodeURIComponent(next)}` : undefined
@@ -84,14 +77,13 @@ export default async function Login({
             <>
               <div className="grid grid-cols-2 gap-3">
                 <ProviderButton
-                  href={google ? connectDriveUrl(next) : undefined}
-                  logo={<GoogleLogo />}
-                  name="Google"
-                  hint={
-                    isDriveAvailable()
-                      ? "Also connects your Google Drive for saving tiles."
+                  href={
+                    google
+                      ? `/auth/google?next=${encodeURIComponent(next)}`
                       : undefined
                   }
+                  logo={<GoogleLogo />}
+                  name="Google"
                 />
                 <ProviderButton
                   href={
@@ -118,9 +110,10 @@ export default async function Login({
           />
         </>
       )}
-      {authMode === "login" && (
+      {authMode !== "forgot" && (
         <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground">
-          By logging in, you agree to Pigxel’s{" "}
+          By {authMode === "signup" ? "signing up" : "logging in"}, you agree to
+          Pigxel’s{" "}
           <Link
             href="/terms"
             className="underline underline-offset-2 hover:text-foreground"

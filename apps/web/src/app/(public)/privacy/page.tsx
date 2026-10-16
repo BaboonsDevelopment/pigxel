@@ -6,12 +6,11 @@ import {
   LegalSection,
 } from "@/features/legal/components/legal-page";
 import { LEGAL } from "@/features/legal/legal";
-import { TRASH_DAYS } from "@/features/tiles/constants";
 
 export const metadata: Metadata = {
   title: "Privacy Policy · Pigxel",
   description:
-    "How Pigxel collects, uses, stores and shares account, artwork and Google Drive data, your rights, and how to request deletion.",
+    "How Pigxel collects, uses, stores and shares account and artwork data, your rights, and how to request deletion.",
   robots: { nosnippet: true },
 };
 
@@ -26,12 +25,11 @@ export default function Privacy() {
             storage, public profiles, sharing and an optional AI helper. This
             policy explains how Pigxel accesses, collects, uses, stores and
             shares your information, including information received through
-            Google Sign-In and Google Drive, and the rights you have over it.
+            Google Sign-In, and the rights you have over it.
           </p>
           <p>
-            The controller of your data is {LEGAL.legalName}, who runs{" "}
-            {LEGAL.operator} from Ukraine. Contact details are at the end of
-            this policy. It applies wherever you use Pigxel, including the
+            {LEGAL.operator} is run from Ukraine. Contact details are at the end
+            of this policy. It applies wherever you use Pigxel, including the
             European Union, the United Kingdom and the United States.
           </p>
         </>
@@ -41,8 +39,7 @@ export default function Privacy() {
         <ul>
           <li>
             <strong>Agreements:</strong> when you accepted our Terms of Service
-            and this policy, which versions, and that you confirmed you’re at
-            least {LEGAL.minAge}.
+            and this policy, and which versions.
           </li>
           <li>
             <strong>Account details:</strong> your email address, account ID,
@@ -59,8 +56,10 @@ export default function Privacy() {
           <li>
             <strong>Your work:</strong> the tiles you save to Pigxel cloud and
             their earlier versions, thumbnails, folders, labels, pins,
-            collections, the projects in your trash, which tiles you publish,
-            and the days you worked on them (for your activity chart).
+            collections, which tiles you publish, and the days you worked on
+            them (for your activity chart); the assets and asset packs you mark
+            as favourites, and which assets you started a tile from, downloaded
+            or copied, and when (for Recently used and Popular).
           </li>
           <li>
             <strong>Sharing:</strong> the people you share projects with, their
@@ -102,11 +101,10 @@ export default function Privacy() {
           layout settings, and pictures from AI chats are kept in your browser’s
           storage so they survive a reload. Local drafts are not automatically
           published. Their content leaves your device when you use features that
-          need it, such as saving to Pigxel cloud or Google Drive, publishing
-          artwork, or requesting AI assistance. You can remove them by clearing
-          Pigxel’s site data in your browser; export work you want to keep
-          first. The <Link href="/cookies">Cookie Policy</Link> lists every
-          item.
+          need it, such as saving to Pigxel cloud, publishing artwork, or
+          requesting AI assistance. You can remove them by clearing Pigxel’s
+          site data in your browser; export work you want to keep first. The{" "}
+          <Link href="/cookies">Cookie Policy</Link> lists every item.
         </p>
       </LegalSection>
 
@@ -156,7 +154,7 @@ export default function Privacy() {
         </p>
       </LegalSection>
 
-      <LegalSection title="4. Google account and Google Drive data">
+      <LegalSection title="4. Google account data">
         <p>
           <strong>Google Sign-In:</strong> with your authorization, Pigxel
           receives your Google account identifier, email address and available
@@ -165,50 +163,23 @@ export default function Privacy() {
           authenticate you, connect the Google identity to your Pigxel account,
           and populate your profile. Authentication and profile records are
           stored in Supabase. You can edit your profile and its visibility in
-          Settings.
+          Settings. Pigxel never receives your Google password and doesn’t ask
+          for access to your Google Drive or other Google services.
         </p>
         <p>
-          <strong>Google Drive:</strong> when Drive integration is enabled and
-          you authorize it, Pigxel requests the{" "}
-          <code>https://www.googleapis.com/auth/drive.file</code> permission.
-          This limits access to files created by Pigxel or specifically made
-          available to it; it does not grant access to your entire Drive. Pigxel
-          lists accessible Pigxel files and reads their file IDs, names and
-          modification times. When you open a file, we read its artwork contents
-          into the editor. When you save, we create or update that file’s name
-          and contents in your Drive. These actions let you save, reopen and
-          continue editing your pixel art.
+          <strong>Purpose and sharing:</strong> we use Google data only to
+          provide sign-in and your profile. Google and Supabase process the data
+          needed to provide those features. We do not sell Google user data or
+          use it for advertising, credit decisions or data brokerage.
         </p>
         <p>
-          <strong>Authorization storage:</strong> Pigxel stores the connected
-          Google email and an OAuth refresh token in a server-only Supabase
-          database table. The server uses that token to obtain short-lived
-          access tokens so your Drive connection can continue across sessions.
-          The browser receives a short-lived token to communicate with Google
-          Drive over HTTPS. The saved refresh token is not available through the
-          browser database client. Pigxel never receives your Google password.
-        </p>
-        <p>
-          <strong>Purpose and sharing:</strong> we use Google data to provide
-          the sign-in, profile and Drive features described here. Google and
-          Supabase process the data needed to provide those features. Opening a
-          Drive file does not itself publish its contents or send them to an AI
-          service. If you subsequently publish that artwork or request an AI
-          operation using it, the visibility and sharing described in sections 5
-          and 7 apply. We do not sell Google user data or use it for
-          advertising, credit decisions or data brokerage.
-        </p>
-        <p>
-          <strong>Disconnecting:</strong> use the Google Drive disconnect
-          control in Account settings to delete Pigxel’s saved Drive connection
-          and request revocation of its Google token. You can also revoke
-          Pigxel’s access directly in your{" "}
+          <strong>Disconnecting:</strong> you can disconnect Google under
+          Connected accounts in Account settings, once you have another way to
+          sign in. You can also revoke Pigxel’s access in your{" "}
           <a href="https://myaccount.google.com/connections">
             Google Account connections
           </a>
-          . Revoking Google access prevents further authorized Drive access, but
-          does not delete your Pigxel account or artwork files in Drive. Delete
-          those files in Google Drive if you no longer want them.
+          . Neither deletes your Pigxel account.
         </p>
         <p>
           Pigxel’s use and transfer of information received from Google APIs
@@ -216,9 +187,7 @@ export default function Privacy() {
           <a href="https://developers.google.com/terms/api-services-user-data-policy">
             Google API Services User Data Policy
           </a>
-          , including its Limited Use requirements. Pigxel does not use Google
-          Workspace API data to develop, improve or train generalized or
-          non-personalized AI or machine-learning models.
+          , including its Limited Use requirements.
         </p>
       </LegalSection>
 
@@ -228,10 +197,8 @@ export default function Privacy() {
           operation, Pigxel sends your prompt, relevant recent conversation,
           reference images, canvas image or selected area, and editing context
           such as layer names to Google’s Gemini API. The purpose is to
-          generate, analyze or edit artwork, or answer your request. This may
-          include artwork you previously opened from Drive if you choose to use
-          it in an AI operation. Your Google sign-in credentials and Drive
-          authorization tokens are not included in AI requests.
+          generate, analyze or edit artwork, or answer your request. Your Google
+          sign-in credentials are not included in AI requests.
         </p>
         <p>
           Chat history associated with a tile is stored in Supabase so you can
@@ -282,9 +249,8 @@ export default function Privacy() {
           </li>
           <li>
             <strong>Google LLC</strong> (USA): the Gemini AI helper, with the
-            request content described in section 5; Google Sign-In and Google
-            Drive when you choose them; and the email service we answer support
-            emails with.
+            request content described in section 5; Google Sign-In when you
+            choose it; and the email service we answer support emails with.
           </li>
           <li>
             <strong>Apple Inc.</strong> (USA): Sign in with Apple, when you
@@ -326,9 +292,8 @@ export default function Privacy() {
       <LegalSection title="9. Security">
         <p>
           Pigxel uses HTTPS for all communication. Authentication checks and
-          database access rules restrict private records to authorized accounts;
-          Drive refresh tokens are restricted to server-side access. These
-          controls reduce unauthorized access, but no online service can
+          database access rules restrict private records to authorized accounts.
+          These controls reduce unauthorized access, but no online service can
           guarantee complete security. If a breach puts your rights at risk,
           we’ll tell you and the authorities as the law requires.
         </p>
@@ -343,8 +308,8 @@ export default function Privacy() {
             while your account exists, or until you delete them.
           </li>
           <li>
-            <strong>Trash:</strong> projects you delete stay in your trash for{" "}
-            {TRASH_DAYS} days, then are erased.
+            <strong>Deleted projects:</strong> erased right away, with their
+            versions, likes and comments.
           </li>
           <li>
             <strong>Notifications:</strong> deleted after 180 days.
@@ -352,9 +317,6 @@ export default function Privacy() {
           <li>
             <strong>Feedback posts:</strong> the page and browser details are
             removed after 90 days; the post stays until you delete it.
-          </li>
-          <li>
-            <strong>Drive connection:</strong> until you disconnect Drive.
           </li>
           <li>
             <strong>Billing records:</strong> kept by Creem, and by us as long
@@ -371,10 +333,9 @@ export default function Privacy() {
           </li>
         </ul>
         <p>
-          Account deletion does not remove files from your own Google Drive or
-          drafts from your browser. You control those copies and can delete them
-          separately. Export any work you want to keep before deleting your
-          account.
+          Account deletion does not remove unsaved drafts from your browser. You
+          control those copies and can delete them separately. Export any work
+          you want to keep before deleting your account.
         </p>
       </LegalSection>
 

@@ -2,7 +2,6 @@ import {
   DEFAULT_PEN,
   type PenSettings,
 } from "@/features/editor/pixel-canvas/pen";
-import type { DriveFile } from "./google-drive";
 import type { TileLocation } from "./location";
 
 export type Draft = {
@@ -282,7 +281,17 @@ async function indexedDbBackend(): Promise<DraftBackend | null> {
 }
 
 function locationId(location: TileLocation) {
-  return location.kind === "cloud" ? location.tile.id : location.file.id;
+  return location.tile.id;
+}
+
+/**
+ * Pigxel cloud is the only place a tile can be kept. Drafts saved before
+ * Google Drive was removed lose their Drive home and become unsaved, so
+ * their work stays in the browser until it is saved to the cloud.
+ */
+function knownLocation(draft: Partial<Draft>) {
+  const location = draft.location as { kind?: unknown } | null | undefined;
+  return location?.kind === "cloud" ? (location as TileLocation) : null;
 }
 
 function newDraftId() {
@@ -303,12 +312,13 @@ function parseDraft(raw: string | object | null): Draft | null {
       typeof draft.file !== "string"
     )
       return null;
+    const location = knownLocation(draft);
     return {
       id: draft.id,
       name: draft.name,
       file: draft.file,
-      location: draft.location ?? null,
-      dirty: Boolean(draft.dirty),
+      location,
+      dirty: Boolean(draft.dirty) || (!location && Boolean(draft.location)),
       savedAt: typeof draft.savedAt === "number" ? draft.savedAt : 0,
     };
   } catch {
@@ -321,15 +331,11 @@ function migrateLegacyDraft(userId: string, storage: Storage) {
   if (!raw) return;
   try {
     const old = JSON.parse(raw) as Partial<Draft> & {
-      driveFile?: DriveFile | null;
+      driveFile?: unknown;
       pen?: PenSettings;
     };
     if (typeof old.name === "string" && typeof old.file === "string") {
-      const location =
-        old.location ??
-        (old.driveFile
-          ? { kind: "drive" as const, file: old.driveFile }
-          : null);
+      const location = knownLocation(old);
       storage.setItem(
         draftKey(userId, "restored"),
         JSON.stringify({
@@ -337,7 +343,7 @@ function migrateLegacyDraft(userId: string, storage: Storage) {
           name: old.name,
           file: old.file,
           location,
-          dirty: Boolean(old.dirty),
+          dirty: Boolean(old.dirty) || (!location && Boolean(old.driveFile)),
           savedAt: old.savedAt ?? Date.now(),
         }),
       );
