@@ -14,7 +14,6 @@ import {
   CrownIcon,
   SettingsIcon,
   SignOutIcon,
-  UserIcon,
 } from "@/components/ui/icons";
 
 export function AccountMenu({
@@ -53,8 +52,12 @@ export function AccountMenu({
     setOpen(false);
     onNavigate?.();
   };
+  // Plain icons at one size, like a native menu.
   const item =
-    "flex h-9 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm text-foreground/90 transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2";
+    "flex h-10 w-full items-center gap-3 rounded-lg px-2.5 text-left text-sm text-foreground/90 transition-colors hover:bg-pastel-pink-soft hover:text-foreground focus-visible:outline-2 [&>svg]:size-[18px] [&>svg]:shrink-0";
+  const plan = profile.plan ?? "Free";
+  const topPlan = plan === "Advanced";
+  const divider = <div role="separator" className="mx-2.5 my-1.5 border-t" />;
 
   return (
     <div ref={root} className="relative mx-3 mb-4 border-t border-border pt-3">
@@ -63,32 +66,39 @@ export function AccountMenu({
           id={menuId}
           role="menu"
           aria-label="Account"
-          className="absolute inset-x-0 bottom-full z-50 mb-2 overflow-hidden rounded-2xl border bg-popover shadow-xl md:inset-x-auto md:bottom-0 md:left-full md:mb-0 md:ml-4 md:w-60"
+          className="absolute inset-x-0 bottom-full z-50 mb-2 overflow-hidden rounded-2xl border bg-popover shadow-xl md:inset-x-auto md:bottom-0 md:left-full md:mb-0 md:ml-4 md:w-64"
         >
-          <div className="flex items-center gap-3 bg-linear-120 from-[#f6e8f0] to-[#efe6f8] px-3 py-3">
-            <ProfileAvatar
-              name={profile.name}
-              url={profile.avatarUrl}
-              className="size-10 text-base"
-            />
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">
-                {profile.name}
-              </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {profile.username ? `@${profile.username}` : profile.email}
-              </span>
-            </span>
-          </div>
           <div className="p-1.5">
             <Link
               role="menuitem"
               href={profileHref}
               onClick={follow}
-              className={item}
+              className="flex items-center gap-3 rounded-xl bg-pastel-pink-soft px-2.5 py-2 transition-colors hover:bg-pastel-pink focus-visible:outline-2"
             >
-              <UserIcon />
-              Your profile
+              <ProfileAvatar
+                name={profile.name}
+                url={profile.avatarUrl}
+                className="size-9 text-sm"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  {profile.name}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {plan}
+                </span>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+            {divider}
+            <Link
+              role="menuitem"
+              href={topPlan ? "/settings/subscription" : "/pricing"}
+              onClick={follow}
+              className={cn(item, "text-accent-pink hover:text-accent-pink")}
+            >
+              <CrownIcon />
+              {topPlan ? "Manage plan" : "Upgrade plan"}
             </Link>
             <Link
               role="menuitem"
@@ -101,18 +111,6 @@ export function AccountMenu({
             </Link>
             <Link
               role="menuitem"
-              href="/pricing"
-              onClick={follow}
-              className={cn(
-                item,
-                "font-medium text-primary hover:bg-primary/10 hover:text-primary",
-              )}
-            >
-              <CrownIcon />
-              Upgrade plan
-            </Link>
-            <Link
-              role="menuitem"
               href={`/feedback?from=${encodeURIComponent(path)}`}
               onClick={follow}
               className={item}
@@ -120,28 +118,29 @@ export function AccountMenu({
               <BugIcon />
               Bugs &amp; feature requests
             </Link>
-          </div>
-          <form action={action} className="border-t p-1.5">
-            <button
-              role="menuitem"
-              disabled={pending}
-              className={cn(
-                item,
-                "text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-60",
-              )}
-            >
-              <SignOutIcon />
-              {pending ? "Signing out…" : "Sign out"}
-            </button>
-            {state.error && (
-              <p
-                role="alert"
-                className="px-2.5 pt-1 pb-1 text-xs text-destructive"
+            {divider}
+            <form action={action}>
+              <button
+                role="menuitem"
+                disabled={pending}
+                className={cn(
+                  item,
+                  "text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-60",
+                )}
               >
-                {state.error}
-              </p>
-            )}
-          </form>
+                <SignOutIcon />
+                {pending ? "Signing out…" : "Sign out"}
+              </button>
+              {state.error && (
+                <p
+                  role="alert"
+                  className="px-2.5 pt-1 pb-1 text-xs text-destructive"
+                >
+                  {state.error}
+                </p>
+              )}
+            </form>
+          </div>
         </div>
       )}
       <button

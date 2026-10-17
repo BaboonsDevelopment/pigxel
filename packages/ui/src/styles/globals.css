@@ -3,6 +3,9 @@
 @source "../**/*.{ts,tsx}";
 @source "../../../../apps/web/src/**/*.{ts,tsx}";
 
+/* Laptop screens with little height: the app chrome gets compact. */
+@custom-variant short (@media (max-height: 800px));
+
 :root {
   --background: #ffffff;
   --foreground: #3b2a33;

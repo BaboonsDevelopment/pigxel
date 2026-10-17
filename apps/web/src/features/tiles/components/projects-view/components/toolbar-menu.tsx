@@ -8,7 +8,7 @@ export const TOOLBAR_TRIGGER =
   "flex h-10 shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border border-[#e7c6d2] bg-background px-4 text-base whitespace-nowrap text-[#4a1f35] transition-colors hover:bg-muted aria-expanded:border-[#8c3a57]";
 
 export const TOOLBAR_PANEL =
-  "absolute top-full left-0 z-30 mt-2 rounded-xl border bg-popover p-2 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150";
+  "absolute top-full left-0 z-50 mt-2 rounded-xl border bg-popover p-2 shadow-lg animate-in fade-in slide-in-from-top-1 duration-150";
 
 export function Chevron({ open }: { open: boolean }) {
   return (

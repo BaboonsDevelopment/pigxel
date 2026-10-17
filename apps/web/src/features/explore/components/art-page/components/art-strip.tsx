@@ -20,7 +20,7 @@ export function ArtStrip({
         <h2
           className={cn(
             madimiOne.className,
-            "text-xl tracking-[0.02em] text-[#4a1f35]",
+            "text-2xl tracking-[0.02em] text-[#4a1f35]",
           )}
         >
           {title}
@@ -28,18 +28,18 @@ export function ArtStrip({
         {viewAll && (
           <Link
             href={viewAll}
-            className="shrink-0 text-[11px] text-primary hover:underline"
+            className="shrink-0 text-sm font-medium text-accent-pink hover:underline"
           >
             View all →
           </Link>
         )}
       </div>
-      <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {arts.map((art) => (
           <li key={art.id}>
             <Link
               href={`/explore/${art.id}`}
-              className="group block overflow-hidden rounded-lg border bg-background transition-shadow hover:shadow-[0_4px_12px_-6px_rgb(59_42_51/0.3)]"
+              className="group block overflow-hidden rounded-xl border bg-background transition-shadow hover:shadow-[0_6px_16px_-8px_rgb(59_42_51/0.35)]"
             >
               <span className="block aspect-[4/3] overflow-hidden bg-checker">
                 {art.thumbnail && (
@@ -51,11 +51,11 @@ export function ArtStrip({
                   />
                 )}
               </span>
-              <span className="block px-2 py-1.5">
-                <span className="block truncate text-[11px] text-[#4a1f35]">
+              <span className="block px-3 py-2.5">
+                <span className="block truncate text-sm text-[#4a1f35]">
                   {art.name}
                 </span>
-                <span className="block truncate text-[10px] text-muted-foreground">
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                   @{art.author.username} · ♡ {formatCount(art.likes)}
                 </span>
               </span>

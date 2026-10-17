@@ -44,6 +44,19 @@ export const CANVAS_SIZES: readonly [CanvasSizeOption, ...CanvasSizeOption[]] =
     { value: "256", label: "256×256", min: 129, max: 256 },
   ];
 
+/**
+ * The Explore size filter an art falls in, by its longest side; null past
+ * the largest one.
+ */
+export function canvasSizeOf(width: number, height: number) {
+  const longest = Math.max(width, height);
+  return (
+    CANVAS_SIZES.find(
+      (s) => s.max !== undefined && longest >= (s.min ?? 1) && longest <= s.max,
+    ) ?? null
+  );
+}
+
 export const ANIMATIONS = [
   { value: "all", label: "All artwork" },
   { value: "animated", label: "Animated only" },

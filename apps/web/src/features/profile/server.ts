@@ -5,6 +5,10 @@ import { profileOf, type Profile } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { CANVAS_SIZES, canvasSizeOf } from "@/features/explore/constants";
+
+/** The largest side the Explore size filter covers. */
+const LARGEST_SIZE = Math.max(...CANVAS_SIZES.map((s) => s.max ?? 0));
 import {
   PROFILE_COLUMNS,
   PROFILE_PAGE_COLUMNS,
@@ -435,7 +439,8 @@ export async function listRemixes(
   return (data as unknown as PublicTileRow[]).map(toPublicTile);
 }
 
-export async function listSimilarArts(
+/** Public works sharing any of this one's tags, most popular first. */
+export async function listSameTagArts(
   tile: Pick<PublicTile, "id" | "tags">,
   viewerId: string | null,
   limit = 4,
@@ -443,6 +448,30 @@ export async function listSimilarArts(
   if (!tile.tags.length) return [];
   const { tiles } = await listPublicTiles(0, limit + 1, 0, viewerId, tile.tags);
   return tiles.filter((t) => t.id !== tile.id).slice(0, limit);
+}
+
+/**
+ * Public works at the same canvas size as this one, most popular first:
+ * there's always something, tags or not. Leaves out `exclude`, such as the
+ * works already shown for its tags.
+ */
+export async function listSimilarArts(
+  tile: Pick<PublicTile, "id" | "width" | "height">,
+  viewerId: string | null,
+  exclude: string[] = [],
+  limit = 4,
+): Promise<PublicTile[]> {
+  const size = canvasSizeOf(tile.width, tile.height);
+  const skip = new Set([tile.id, ...exclude]);
+  const { tiles } = await listPublicTiles(
+    0,
+    limit + skip.size,
+    0,
+    viewerId,
+    [],
+    size ? { min: size.min, max: size.max } : { min: LARGEST_SIZE + 1 },
+  );
+  return tiles.filter((t) => !skip.has(t.id)).slice(0, limit);
 }
 
 export async function getFollowStats(

@@ -45,7 +45,7 @@ import { projectKeys } from "@/features/tiles/queries/keys";
 const counting = new Set<string>();
 
 const ACTION =
-  "h-9 cursor-pointer rounded-xl border bg-background text-xs font-medium transition-colors hover:bg-muted disabled:cursor-default disabled:bg-muted disabled:text-muted-foreground";
+  "flex size-11 cursor-pointer items-center justify-center rounded-xl border bg-background text-[#4a1f35] shadow-[0_1px_2px_rgb(59_42_51/0.06)] transition-colors hover:bg-pastel-pink-soft disabled:cursor-default disabled:opacity-50 [&_svg]:size-5";
 
 const published = new Intl.DateTimeFormat("en", { dateStyle: "long" });
 
@@ -59,13 +59,13 @@ function Stat({
   label: string;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[#4a1f35] [&>svg]:size-[18px]">{icon}</span>
+    <div className="flex items-center gap-2.5">
+      <span className="text-[#4a1f35] [&>svg]:size-5">{icon}</span>
       <span>
-        <span className="block text-[13px] leading-tight font-semibold tabular-nums">
+        <span className="block text-lg leading-tight font-semibold tabular-nums">
           {formatCount(value)}
         </span>
-        <span className="block text-[10px] leading-tight text-muted-foreground">
+        <span className="block text-xs leading-tight text-muted-foreground">
           {label}
         </span>
       </span>
@@ -268,15 +268,15 @@ export function ArtDetails({
           <ProfileAvatar
             name={author.name}
             url={author.avatarUrl}
-            className="size-8 bg-pastel-pink-soft text-sm text-primary"
+            className="size-12 bg-pastel-pink-soft text-lg text-primary"
           />
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-semibold">
+            <span className="block truncate text-base font-semibold">
               {author.name}
             </span>
             <span
               title={author.bio?.trim() || undefined}
-              className="block truncate text-[10px] text-muted-foreground"
+              className="block truncate text-xs text-muted-foreground"
             >
               {author.bio?.trim() || `@${author.username}`}
             </span>
@@ -288,7 +288,7 @@ export function ArtDetails({
             aria-pressed={follows}
             disabled={followPending}
             onClick={toggleFollow}
-            className="h-7 shrink-0 cursor-pointer rounded-lg border bg-background px-5 text-xs transition-colors hover:bg-muted aria-pressed:text-muted-foreground"
+            className="h-10 shrink-0 cursor-pointer rounded-xl border border-accent-pink/40 bg-background px-6 text-sm font-semibold text-accent-pink transition-colors hover:bg-pastel-pink-soft aria-pressed:border-border aria-pressed:font-medium aria-pressed:text-muted-foreground"
           >
             {follows ? "Following" : "Follow"}
           </button>
@@ -362,12 +362,12 @@ export function ArtDetails({
         id="art-title"
         className={cn(
           madimiOne.className,
-          "mt-2 text-[28px] leading-[1.1] tracking-[0.02em] break-words text-[#4a1f35]",
+          "mt-5 text-[40px] leading-[1.1] tracking-[0.02em] break-words text-[#4a1f35]",
         )}
       >
         {details.name}
       </h1>
-      <p className="mt-1 text-[10px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         {tile.publishedAt &&
           `Published ${published.format(new Date(tile.publishedAt))}`}
         {tile.remixOf && (
@@ -398,18 +398,18 @@ export function ArtDetails({
       </p>
 
       {details.description && (
-        <p className="mt-2 text-xs leading-snug break-words whitespace-pre-line">
+        <p className="mt-3 text-sm leading-relaxed break-words whitespace-pre-line">
           {details.description}
         </p>
       )}
 
       {details.tags.length > 0 && (
-        <ul aria-label="Tags" className="mt-2 flex flex-wrap gap-2">
+        <ul aria-label="Tags" className="mt-4 flex flex-wrap gap-2">
           {details.tags.map((tag) => (
             <li key={tag}>
               <Link
                 href={`/explore?tag=${encodeURIComponent(tag)}`}
-                className="block rounded-md bg-pastel-pink-soft px-2.5 py-1 text-[10px] text-[#4a1f35] transition-colors hover:bg-pastel-pink"
+                className="block rounded-lg bg-pastel-pink-soft px-3 py-1.5 text-xs text-[#4a1f35] transition-colors hover:bg-pastel-pink"
               >
                 #{tag.toLowerCase()}
               </Link>
@@ -418,7 +418,7 @@ export function ArtDetails({
         </ul>
       )}
 
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <div className="mt-6 grid grid-cols-4 gap-3">
         <Stat
           icon={
             <Svg>
@@ -452,7 +452,7 @@ export function ArtDetails({
 
       <div
         className={cn(
-          "mt-3 flex items-center gap-3 rounded-xl border px-4 py-2",
+          "mt-6 flex items-center gap-4 rounded-2xl border px-5 py-4",
           canRemix
             ? "border-[#f3c9d8] bg-[#fdeef3]"
             : "border-[#ecd9e1] bg-[#f5eaef]",
@@ -469,10 +469,10 @@ export function ArtDetails({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-xs font-semibold">
+          <span className="block text-sm font-semibold">
             {canRemix ? "Remixes allowed" : "Remixing is disabled"}
           </span>
-          <span className="block text-[10px] text-muted-foreground">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             {canRemix
               ? "Make it your own. The original artist will be credited."
               : "The artist has turned off remixes for this artwork."}
@@ -482,7 +482,7 @@ export function ArtDetails({
           type="button"
           disabled={!canRemix || remixing || (!!viewerId && !file)}
           onClick={() => void remix()}
-          className="h-7 shrink-0 cursor-pointer rounded-lg border border-primary/40 bg-background px-3 text-[11px] font-medium text-primary transition-colors hover:bg-pastel-pink-soft disabled:cursor-default disabled:bg-transparent disabled:opacity-50"
+          className="h-10 shrink-0 cursor-pointer rounded-xl border border-accent-pink/40 bg-background px-4 text-sm font-semibold text-accent-pink transition-colors hover:bg-pastel-pink-soft disabled:cursor-default disabled:bg-transparent disabled:opacity-50"
         >
           {!canRemix ? "Remix" : remixing ? "Opening…" : "Create remix →"}
         </button>
@@ -493,37 +493,55 @@ export function ArtDetails({
         </FormMessage>
       )}
 
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <div className="mt-6 mb-2 flex justify-center gap-3">
         <button
           type="button"
           aria-pressed={like.liked}
+          aria-label={like.liked ? "Liked" : "Like"}
+          title={like.liked ? "Liked" : "Like"}
           disabled={likePending}
           onClick={toggleLike}
           className={cn(
             ACTION,
-            like.liked && "border-primary-soft bg-pastel-pink-soft text-primary",
+            like.liked &&
+              "border-accent-pink/40 bg-pastel-pink-soft text-accent-pink",
           )}
         >
-          {like.liked ? "Liked" : "Like"}
+          <Svg fill={like.liked ? "currentColor" : "none"}>
+            <path d={HEART} />
+          </Svg>
         </button>
         <button
           type="button"
-          disabled={!canRemix || remixing || (!!viewerId && !file)}
-          onClick={() => void remix()}
-          className={ACTION}
-        >
-          Remix
-        </button>
-        <button
-          type="button"
+          aria-label="Download"
+          title="Download"
           disabled={!picture}
           onClick={() => setDownloading(true)}
           className={ACTION}
         >
-          Download
+          <Svg>
+            <path d="M8 2.5v7.5M4.8 7 8 10.2 11.2 7M3 12.5v.5a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-.5" />
+          </Svg>
         </button>
-        <button type="button" onClick={() => void share()} className={ACTION}>
-          {copied === "link" ? "Copied" : "Share"}
+        <button
+          type="button"
+          aria-label={copied === "link" ? "Link copied" : "Share"}
+          title={copied === "link" ? "Link copied" : "Share"}
+          onClick={() => void share()}
+          className={ACTION}
+        >
+          {copied === "link" ? (
+            <Svg>
+              <path d="m3.5 8.5 3 3 6-7" />
+            </Svg>
+          ) : (
+            <Svg>
+              <circle cx="4" cy="8" r="1.75" />
+              <circle cx="12" cy="4" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <path d="m5.6 7.2 4.8-2.4M5.6 8.8l4.8 2.4" />
+            </Svg>
+          )}
         </button>
       </div>
       {reporting && (
