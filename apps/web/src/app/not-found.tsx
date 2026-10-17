@@ -24,7 +24,7 @@ export default async function NotFound() {
         />
         <p
           aria-hidden="true"
-          className="mt-6 font-display text-7xl font-semibold tracking-tight text-primary"
+          className="mt-6 font-display text-7xl tracking-[0.03em] text-primary"
         >
           404
         </p>

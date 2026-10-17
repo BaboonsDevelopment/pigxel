@@ -49,6 +49,7 @@
   --pastel-lilac: #efe6f8;
   --lavender-foreground: #5b3f8f;
   --link-accent: #794bc0;
+  --accent-pink: #ae3f69;
   --radius: 0.625rem;
 }
 
@@ -98,12 +99,15 @@
   --color-pastel-lilac: var(--pastel-lilac);
   --color-lavender-foreground: var(--lavender-foreground);
   --color-link-accent: var(--link-accent);
+  --color-accent-pink: var(--accent-pink);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-poppins), Arial, Helvetica, sans-serif;
-  --font-display: var(--font-fredoka), var(--font-poppins), sans-serif;
+  --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
+  --font-display: var(--font-madimi), var(--font-manrope), sans-serif;
+  /* The Pigxel wordmark keeps its own face. */
+  --font-brand: var(--font-fredoka), var(--font-manrope), sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
 }
 

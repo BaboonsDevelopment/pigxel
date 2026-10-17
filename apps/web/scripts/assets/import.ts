@@ -151,10 +151,13 @@ const counts = { added: 0, updated: 0, unchanged: 0, removed: 0 };
 for (const asset of assets) {
   const file = readFileSync(join(dir, asset.file));
   const sheet = readFileSync(join(dir, asset.sheet));
+  const old = before.get(asset.id);
+  // Once published, an asset's pack, place and premium are managed in the
+  // review tool's In production tab: only new assets take them from here.
   const row: Row = {
     id: asset.id,
     name: asset.name,
-    pack_id: asset.category,
+    pack_id: old?.pack_id ?? asset.category,
     kind: asset.kind,
     width: asset.width,
     height: asset.height,
@@ -163,10 +166,10 @@ for (const asset of assets) {
     colors: asset.colors,
     file_path: `${asset.id}/${hashOf(file)}.pigxel`,
     sheet_path: `${asset.id}/${hashOf(sheet)}.png`,
-    sort: asset.sort,
-    premium: asset.premium || premiumPacks.has(asset.category),
+    sort: old?.sort ?? asset.sort,
+    premium:
+      old?.premium ?? (asset.premium || premiumPacks.has(asset.category)),
   };
-  const old = before.get(asset.id);
   if (old && JSON.stringify(old) === JSON.stringify(row)) {
     counts.unchanged++;
     continue;

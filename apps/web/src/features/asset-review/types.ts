@@ -68,6 +68,24 @@ export type ProductionAsset = {
   frameMs: number;
   premium: boolean;
   sheetUrl: string;
+  /** Tag ids. */
+  tags: string[];
+};
+
+export type ProductionPack = {
+  id: string;
+  name: string;
+  description: string | null;
+  background: string | null;
+  premium: boolean;
+};
+
+export type ProductionTag = { id: string; name: string };
+
+export type ProductionCatalog = {
+  packs: ProductionPack[];
+  assets: ProductionAsset[];
+  tags: ProductionTag[];
 };
 
 export type ReportAuthor = {

@@ -22,6 +22,7 @@ export function ProjectCard({
   dragging = false,
   corner,
   sort,
+  aspect,
 }: {
   name: string;
   thumbnail: ReactNode;
@@ -38,11 +39,13 @@ export function ProjectCard({
   dragging?: boolean;
   corner?: ReactNode;
   sort?: SortProps;
+  /** The thumbnail's aspect class, such as "aspect-[7/6]"; set by its layout. */
+  aspect?: string;
 }) {
   const { lifted, ...sortProps } = sort ?? { lifted: false };
   const face = (
     <span
-      className={`relative block ${meta ? "aspect-[204/165]" : "aspect-[16/10]"} overflow-hidden bg-checker`}
+      className={`relative block ${aspect ?? (meta ? "aspect-[204/165]" : "aspect-[16/10]")} overflow-hidden bg-checker`}
     >
       <span className="block size-full transition duration-300 ease-out group-hover:scale-105 group-hover:blur-[2px] group-hover:brightness-90 group-has-[:focus-visible]:scale-105 group-has-[:focus-visible]:blur-[2px] motion-reduce:transition-none [&>*]:size-full [&>*]:object-cover [&>*]:[image-rendering:pixelated]">
         {thumbnail}
@@ -129,7 +132,7 @@ export function ProjectCard({
             </span>
           </span>
         ) : (
-          <span className="truncate font-mono text-sm">{name}</span>
+          <span className="truncate text-sm tracking-wide">{name}</span>
         )}
         {selected === undefined && (
           <ProjectMenu

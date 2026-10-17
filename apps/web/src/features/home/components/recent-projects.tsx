@@ -2,6 +2,7 @@
 
 import { useReducer } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
+import { cn } from "@pigxel/ui/lib/utils";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { listDrafts, type Draft } from "@/lib/pigxel-file/draft";
 import { parsePigxel, type PigxelDocument } from "@/lib/pigxel-file/format";
@@ -14,6 +15,7 @@ import {
 import { ProjectCard } from "@/features/tiles/components/project-card/project-card";
 import { TileThumbnail } from "@/features/tiles/components/tile-thumbnail";
 import { PixelImage } from "@/components/ui/pixel-image";
+import { pixelifySans } from "@/lib/fonts/pixelify";
 import { NewProjectButton } from "./new-project-button";
 import { TilesBadge } from "@/features/tiles/components/tiles-badge";
 import { hasTilemap } from "@/lib/tilemap/tilemap";
@@ -100,6 +102,7 @@ function Row({
           project.kind === "local" ? (
             <ProjectCard
               key={project.id}
+              aspect={THUMBNAIL}
               name={project.name}
               thumbnail={<TileThumbnail image={project.image} />}
               badges={hasTilemap(project.image) && <TilesBadge />}
@@ -118,6 +121,7 @@ function Row({
           ) : (
             <ProjectCard
               key={project.id}
+              aspect={THUMBNAIL}
               name={project.name}
               thumbnail={
                 project.tile.thumbnail && (
@@ -146,12 +150,33 @@ function Row({
   );
 }
 
+// With the name row under it, this makes a project card about square.
+const THUMBNAIL = "aspect-[7/6]";
+
 function NewProjectCard({ userId }: { userId: string }) {
   return (
     <NewProjectButton
       userId={userId}
-      className="flex h-full min-h-32 w-full items-center justify-center gap-2.5 rounded-xl border bg-card font-mono text-sm tracking-wide transition-colors hover:border-[#f7cfdc] hover:bg-[#fde2ea] focus-visible:bg-[#fde2ea]"
+      className={cn(
+        pixelifySans.className,
+        "group relative flex h-full min-h-32 w-full items-center justify-center gap-2.5 rounded-xl bg-background text-sm text-accent-pink transition-colors hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
+      )}
     >
+      {/* CSS dashes are too short at this width; the design has long ones. */}
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 size-full overflow-visible text-[#eba9c0] transition-colors group-hover:text-accent-pink"
+      >
+        <rect
+          width="100%"
+          height="100%"
+          rx="12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeDasharray="6 5"
+        />
+      </svg>
       <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">
         <path
           d="M8 2v12M2 8h12"

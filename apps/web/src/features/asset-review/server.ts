@@ -5,7 +5,6 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { NextResponse, type NextRequest } from "next/server";
-import { assetFileUrl } from "@/features/assets/assets";
 import { isAssetBackground } from "@/features/assets/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasErrors, issuesOf } from "../../../scripts/assets/lib/checks.ts";
@@ -36,7 +35,6 @@ import {
   REVIEW_STATUSES,
 } from "./constants";
 import type {
-  ProductionAsset,
   ReviewSnapshot,
   ReviewStatus,
   ReviewTarget,
@@ -53,6 +51,10 @@ const blockingPackIssues = (pack: PackSource) =>
       issue.level === "error" &&
       !/^pack\.json lists ".+", but .+\.json is missing\.$/.test(issue.message),
   );
+
+// Pack sources are local and git-ignored; without them there is nothing to
+// review, but what's in production still comes from the database.
+const localPacks = () => (existsSync(PACKS_DIR) ? loadPacks(PACKS_DIR) : []);
 
 export class ReviewError extends Error {
   constructor(
@@ -170,7 +172,7 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
     productionError = e instanceof Error ? e.message : String(e);
   }
   const reviews = readReviews(REVIEW_FILE);
-  const blocks = loadPacks(PACKS_DIR).map((pack) => ({
+  const blocks = localPacks().map((pack) => ({
     id: pack.id,
     name: pack.name,
     target: pack.block,
@@ -314,19 +316,6 @@ export async function updateBlock(
   );
 }
 
-export async function setProductionBackground(id: string, background: unknown) {
-  if (!ID.test(id)) throw new ReviewError("No such block.", 404);
-  if (background !== null && !isAssetBackground(background))
-    throw new ReviewError("Pick one of the background colours.");
-  const { data, error } = await createAdminClient()
-    .from("asset_packs")
-    .update({ background, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select("id");
-  if (error) throw new Error(`Couldn’t save the block: ${error.message}`);
-  if (!data.length) throw new ReviewError("No such block.", 404);
-}
-
 export function setTilePremium(key: unknown, premium: unknown) {
   const { pack, source } = findTile(key);
   if (typeof premium !== "boolean")
@@ -350,49 +339,11 @@ export function stripPng(packId: string, id: string) {
   return encodePng(sheet.w, sheet.h, sheet.data);
 }
 
-type ProductionRow = {
-  id: string;
-  name: string;
-  pack_id: string;
-  kind: "sprite" | "tile";
-  width: number;
-  height: number;
-  frame_count: number;
-  frame_ms: number;
-  premium: boolean;
-  sheet_path: string;
-};
-
-export async function productionAssets(): Promise<ProductionAsset[]> {
-  const { data, error } = await createAdminClient()
-    .from("assets")
-    .select(
-      "id, name, pack_id, kind, width, height, frame_count, frame_ms, premium, sheet_path",
-    )
-    .order("pack_id")
-    .order("sort")
-    .order("name")
-    .returns<ProductionRow[]>();
-  if (error) throw new Error(`Couldn’t read production: ${error.message}`);
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    packId: row.pack_id,
-    kind: row.kind,
-    width: row.width,
-    height: row.height,
-    frames: row.frame_count,
-    frameMs: row.frame_ms,
-    premium: row.premium,
-    sheetUrl: assetFileUrl(row.sheet_path),
-  }));
-}
-
 export async function removeFromProduction(id: string) {
   if (!ID.test(id)) throw new ReviewError("No such asset.", 404);
   if (!(await removeAsset(createAdminClient(), id)))
     throw new ReviewError("No such asset.", 404);
-  for (const pack of loadPacks(PACKS_DIR)) {
+  for (const pack of localPacks()) {
     const source = pack.assets.find((a) => a.id === id);
     if (source) deleteLocal(pack, source);
   }

@@ -86,7 +86,7 @@ export function Sidebar({
         className="mx-5 mt-6 flex items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
       >
         <Image src={pig} alt="" width={56} priority className="h-auto" />
-        <span className="font-display text-[32px] leading-none font-semibold tracking-tight text-foreground">
+        <span className="font-brand text-[32px] leading-none font-semibold tracking-tight text-foreground">
           Pigxel
         </span>
       </Link>

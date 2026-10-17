@@ -11,7 +11,6 @@ const protectedPaths = [
   "/assets",
   "/tutorials",
   "/feedback",
-  "/internal/admin",
   "/auth/update-password",
 ];
 

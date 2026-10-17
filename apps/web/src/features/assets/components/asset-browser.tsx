@@ -14,10 +14,13 @@ import { assetTint } from "../constants";
 import { ASSET_SORTS, type AssetFilters } from "../filters";
 import type { AssetTag, PackCard as Pack } from "../server";
 import { AssetCard } from "./asset-card";
-import { AssetFiltersMenu } from "./asset-filters-menu";
+import { AssetFiltersMenu, AssetFiltersToggle } from "./asset-filters-menu";
 
 export const ASSET_GRID =
   "grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+/** The same grid beside the filters sidebar, one column narrower. */
+export const ASSET_GRID_BESIDE_FILTERS =
+  "grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5";
 const SEARCH_DELAY = 300;
 const PRELOAD = "1200px";
 
@@ -97,6 +100,7 @@ export function AssetToolbar({
   packs,
   kind,
   pack,
+  sidebar,
 }: {
   typed: string;
   onTyped: (text: string) => void;
@@ -107,6 +111,8 @@ export function AssetToolbar({
   packs: { id: string; name: string }[];
   kind?: boolean;
   pack?: boolean;
+  /** Filters open a sidebar the page lays out, instead of a dropdown. */
+  sidebar?: { id: string; open: boolean; onToggle: () => void };
 }) {
   return (
     <div className="flex items-center gap-[23px] max-lg:flex-wrap">
@@ -139,14 +145,23 @@ export function AssetToolbar({
         value={filters.sort}
         onChange={(sort) => onFilters({ ...filters, sort })}
       />
-      <AssetFiltersMenu
-        filters={filters}
-        onChange={(next) => onFilters({ ...next, query: filters.query })}
-        tags={tags}
-        packs={packs}
-        kind={kind}
-        pack={pack}
-      />
+      {sidebar ? (
+        <AssetFiltersToggle
+          filters={filters}
+          open={sidebar.open}
+          onToggle={sidebar.onToggle}
+          controls={sidebar.id}
+        />
+      ) : (
+        <AssetFiltersMenu
+          filters={filters}
+          onChange={(next) => onFilters({ ...next, query: filters.query })}
+          tags={tags}
+          packs={packs}
+          kind={kind}
+          pack={pack}
+        />
+      )}
     </div>
   );
 }

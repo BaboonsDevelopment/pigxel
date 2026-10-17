@@ -88,7 +88,7 @@ export function AppShell({
           </button>
           <Link href="/home" className="flex items-center gap-2 md:hidden">
             <Image src={pig} alt="" width={30} className="h-auto" />
-            <span className="font-display text-xl font-semibold text-foreground">
+            <span className="font-brand text-xl font-semibold text-foreground">
               Pigxel
             </span>
           </Link>

@@ -28,7 +28,7 @@ export function Brand() {
       className="inline-flex items-center gap-2 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4"
     >
       <BrandMascot className="h-auto w-10" />
-      <span className="font-display text-2xl leading-none font-semibold tracking-tight">
+      <span className="font-brand text-2xl leading-none font-semibold tracking-tight">
         Pigxel
       </span>
     </Link>
