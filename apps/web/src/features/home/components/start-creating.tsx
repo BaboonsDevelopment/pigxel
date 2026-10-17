@@ -7,7 +7,7 @@ import { PremiumBadge } from "@/features/billing/components/premium-badge";
 import { NewProjectButton, type ProjectKind } from "./new-project-button";
 import blankCanvas from "../../../../public/art/start/blank-canvas.png";
 import generateAi from "../../../../public/art/start/generate-ai.png";
-import spriteAnimation from "../../../../public/art/start/sprite-animation.png";
+import startFromAsset from "../../../../public/art/start/start-from-asset.png";
 import tileset from "../../../../public/art/start/tileset.png";
 
 type Start = {
@@ -31,7 +31,7 @@ const STARTS: Start[] = [
   {
     title: "Start from an asset",
     description: "Pick a ready-made sprite",
-    image: spriteAnimation,
+    image: startFromAsset,
     tint: "bg-pastel-peach",
     href: "/assets",
   },

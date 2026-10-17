@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { cardVariants } from "@pigxel/ui/components/card";
-import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 import { suggestedTutorials, TUTORIALS } from "@/features/tutorials/tutorials";
 import pigReading from "../../../../public/art/pigxel-mascot-reading.png";
+import { ViewAllLink } from "./view-all-link";
 
 export function Tutorials({
   premium,
@@ -31,15 +32,11 @@ export function Tutorials({
             Step-by-step guides to improve your skills
           </Text>
         </div>
-        <Link
+        <ViewAllLink
           href="/tutorials"
-          className={linkVariants({
-            variant: "accent",
-            className: "relative z-10",
-          })}
-        >
-          View all <span aria-hidden="true">→</span>
-        </Link>
+          variant="pill"
+          className="relative z-10 shrink-0"
+        />
       </div>
       <ul className="relative z-10 mt-3 flex min-h-0 flex-1 flex-col gap-2 sm:mr-40 xl:ml-4">
         {shown.map(({ tutorial, finished: done }) => (
@@ -79,7 +76,7 @@ export function Tutorials({
                 <span
                   role="img"
                   aria-label="Finished"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-success text-white"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-success text-white"
                 >
                   <svg viewBox="0 0 16 16" className="size-4" fill="none">
                     <path
@@ -94,9 +91,9 @@ export function Tutorials({
               ) : (
                 <span
                   aria-hidden="true"
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-pastel-pink text-foreground transition-transform group-hover:scale-110 motion-reduce:transition-none"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-pastel-pink text-accent-pink transition-transform group-hover:scale-110 motion-reduce:transition-none"
                 >
-                  <svg viewBox="0 0 16 16" className="ml-0.5 size-3.5">
+                  <svg viewBox="0 0 16 16" className="ml-0.5 size-4">
                     <path d="M4 2.5v11L13 8z" fill="currentColor" />
                   </svg>
                 </span>

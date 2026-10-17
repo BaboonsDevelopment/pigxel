@@ -29,7 +29,7 @@ export function Heading({
   return (
     <Tag
       className={cn(
-        "font-display tracking-tight break-words text-foreground",
+        "font-display tracking-[0.03em] break-words text-foreground",
         headingSizes[size],
         className,
       )}

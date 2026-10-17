@@ -6,7 +6,7 @@ import { Notice } from "@pigxel/ui/components/notice";
 import { Page } from "@pigxel/ui/components/page";
 import { useReviewActions, useReviewSnapshot } from "../../use-asset-review";
 import { BlockSection } from "./components/block-section";
-import { ProductionList } from "./components/production-list";
+import { ProductionManager } from "./components/production/production-manager";
 import { ReportList } from "./components/report-list";
 import { ReviewHeader } from "./components/review-header";
 import { BACKGROUNDS, FILTERS, type Filter, type View } from "./constants";
@@ -89,7 +89,7 @@ export function AssetReview({ view, filter }: { view: View; filter: Filter }) {
       {view === "reports" ? (
         <ReportList />
       ) : view === "production" ? (
-        <ProductionList blocks={targets} background={background} />
+        <ProductionManager background={background} />
       ) : snapshot.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : shown.length ? (

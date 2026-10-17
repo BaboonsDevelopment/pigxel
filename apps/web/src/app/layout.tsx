@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { DM_Mono, Fredoka, Poppins } from "next/font/google";
+import { DM_Mono, Fredoka, Manrope } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
 import { ConnectionWatch } from "@/components/layout/connection-watch";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { CookieBanner } from "@/features/legal/components/cookie-banner";
+import { madimiOne } from "@/lib/fonts/madimi";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_URL || "http://localhost:3000"),
@@ -12,10 +13,10 @@ export const metadata: Metadata = {
   description: "Pixel art with an AI helper.",
 };
 
-const poppins = Poppins({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-poppins",
+const manrope = Manrope({
+  subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-manrope",
 });
 const fredoka = Fredoka({
   subsets: ["latin"],
@@ -34,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${fredoka.variable} ${dmMono.variable}`}
+      className={`${manrope.variable} ${madimiOne.variable} ${fredoka.variable} ${dmMono.variable}`}
     >
       <body className="min-h-screen" suppressHydrationWarning>
         <QueryProvider>{children}</QueryProvider>

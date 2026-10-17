@@ -5,7 +5,9 @@ import { POLL_MS, REVIEW_API } from "./constants";
 import type {
   ArtAction,
   CommentAction,
-  ProductionAsset,
+  ProductionCatalog,
+  ProductionPack,
+  ProductionTag,
   Reports,
   ReviewSnapshot,
   ReviewStatus,
@@ -51,8 +53,60 @@ export function useReviewSnapshot() {
 export function useProduction() {
   return useQuery({
     queryKey: PRODUCTION_KEY,
-    queryFn: () => call<ProductionAsset[]>("/production"),
+    queryFn: () => call<ProductionCatalog>("/production"),
   });
+}
+
+export type PackDetails = {
+  name?: string;
+  description?: string | null;
+  background?: string | null;
+  premium?: boolean;
+};
+
+export function useProductionActions() {
+  const client = useQueryClient();
+  // The Review tab lists production packs as move targets, so refresh both.
+  const refresh = () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: PRODUCTION_KEY }),
+      client.invalidateQueries({ queryKey: SNAPSHOT_KEY, exact: true }),
+    ]);
+  const after =
+    <A extends unknown[], T>(action: (...args: A) => Promise<T>) =>
+    async (...args: A) => {
+      try {
+        return await action(...args);
+      } finally {
+        // A batch can fail part-way; show what did change.
+        await refresh();
+      }
+    };
+  const assets = (body: Record<string, unknown>) =>
+    call("/production/assets", "POST", body);
+
+  return {
+    createPack: after((name: string, description: string) =>
+      call<ProductionPack>("/production/packs", "POST", { name, description }),
+    ),
+    updatePack: after((id: string, details: PackDetails) =>
+      call(`/production/packs/${id}`, "PATCH", details),
+    ),
+    deletePack: after((id: string) =>
+      call(`/production/packs/${id}`, "DELETE"),
+    ),
+    createTag: after((name: string) =>
+      call<ProductionTag>("/production/tags", "POST", { name }),
+    ),
+    moveAssets: after((ids: string[], packId: string) =>
+      assets({ action: "move", ids, packId }),
+    ),
+    tagAssets: after((ids: string[], add: string[], remove: string[]) =>
+      assets({ action: "tags", ids, add, remove }),
+    ),
+    moveToFront: after((ids: string[]) => assets({ action: "front", ids })),
+    deleteAssets: after((ids: string[]) => assets({ action: "delete", ids })),
+  };
 }
 
 export function useReports() {
@@ -99,9 +153,6 @@ export function useReviewActions() {
     setBlockBackground: after((id: string, background: string | null) =>
       call(`/blocks/${id}`, "PATCH", { background }),
     ),
-    setProductionBackground: after((id: string, background: string | null) =>
-      call(`/production/blocks/${id}`, "PATCH", { background }),
-    ),
     setBlockPremium: after((id: string, premium: boolean) =>
       call(`/blocks/${id}`, "PATCH", { premium }),
     ),
@@ -112,10 +163,6 @@ export function useReviewActions() {
       const { output } = await call<{ output: string }>("/publish", "POST");
       await client.invalidateQueries({ queryKey: SNAPSHOT_KEY });
       return output;
-    },
-    removeFromProduction: async (id: string) => {
-      await call(`/production/${id}`, "DELETE");
-      await client.invalidateQueries({ queryKey: SNAPSHOT_KEY });
     },
   };
 }

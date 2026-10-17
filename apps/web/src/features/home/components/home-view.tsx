@@ -1,16 +1,13 @@
-import Link from "next/link";
 import { Page } from "@pigxel/ui/components/page";
-import {
-  Heading,
-  linkVariants,
-  SectionHeader,
-} from "@pigxel/ui/components/typography";
+import { Heading, SectionHeader } from "@pigxel/ui/components/typography";
+import type { PublicTile } from "@/features/profile/profile";
 import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import { PixelBackdrop } from "./pixel-backdrop";
-import { PopularTemplates } from "./popular-templates";
 import { RecentProjects } from "./recent-projects";
 import { StartCreating } from "./start-creating";
+import { TrendingWorks } from "./trending-works";
 import { Tutorials } from "./tutorials";
+import { ViewAllLink } from "./view-all-link";
 
 export const RECENT = 4;
 
@@ -19,17 +16,20 @@ export function HomeView({
   cloudTiles,
   aiAllowed,
   tutorials,
+  trending,
 }: {
   userId: string;
   cloudTiles: CloudTileSummary[];
   /** Whether the plan includes the AI helper. */
   aiAllowed: boolean;
   tutorials: { premium: boolean; finished: string[] };
+  /** Null when they couldn't be loaded. */
+  trending: PublicTile[] | null;
 }) {
   return (
     <div className="relative xl:h-full xl:[container-type:size]">
       <PixelBackdrop />
-      <Page className="relative flex max-w-[88rem] flex-col pb-6 xl:h-[726px] xl:w-[1290px] xl:max-w-none xl:[zoom:max(0.8,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,726px))))]">
+      <Page className="relative flex max-w-[88rem] flex-col pb-6 xl:h-[820px] xl:w-[1290px] xl:max-w-none xl:[zoom:max(0.8,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,820px))))]">
         <section aria-labelledby="start-heading" className="shrink-0">
           <Heading as="h1" id="start-heading" className="mb-3">
             Start creating
@@ -41,14 +41,7 @@ export function HomeView({
           <SectionHeader
             id="recent-heading"
             title="Recent projects"
-            actions={
-              <Link
-                href="/tiles"
-                className={linkVariants({ variant: "accent" })}
-              >
-                View all <span aria-hidden="true">→</span>
-              </Link>
-            }
+            actions={<ViewAllLink href="/tiles" />}
           />
           <RecentProjects
             userId={userId}
@@ -58,7 +51,7 @@ export function HomeView({
         </section>
 
         <div className="mt-6 grid grid-cols-1 gap-5 xl:min-h-56 xl:flex-1 xl:grid-cols-2">
-          <PopularTemplates />
+          <TrendingWorks works={trending} />
           <Tutorials {...tutorials} />
         </div>
       </Page>

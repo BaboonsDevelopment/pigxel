@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionHeader } from "@pigxel/ui/components/typography";
@@ -23,6 +23,7 @@ import {
 import type { AssetTag, PackCard as Pack } from "../server";
 import {
   ASSET_GRID,
+  ASSET_GRID_BESIDE_FILTERS,
   AssetCardItem,
   AssetResults,
   AssetToolbar,
@@ -31,6 +32,7 @@ import {
   type AssetPage,
 } from "./asset-browser";
 import { AssetDialog } from "./asset-dialog";
+import { AssetFiltersSidebar } from "./asset-filters-menu";
 import { PackCard } from "./pack-card";
 import { PaletteList } from "./palette-list";
 
@@ -61,6 +63,10 @@ export function AssetsView({
     useAssetFilters(initialFilters);
   const [open, setOpen] = useState<Asset | null>(openAsset);
   const favourites = useFavourites(initialFavourites);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersId = useId();
+  const sidebar = filtersOpen && tab !== "palettes";
+  const grid = sidebar ? ASSET_GRID_BESIDE_FILTERS : ASSET_GRID;
 
   const packById = useMemo(
     () => new Map(packs.map((pack, index) => [pack.id, { pack, index }])),
@@ -144,6 +150,11 @@ export function AssetsView({
               packs={packs}
               kind={tab === "all"}
               pack={tab === "all"}
+              sidebar={{
+                id: filtersId,
+                open: sidebar,
+                onToggle: () => setFiltersOpen(!sidebar),
+              }}
             />
           </div>
         )}
@@ -163,72 +174,91 @@ export function AssetsView({
         </FormMessage>
       )}
 
-      {tab === "palettes" && <PaletteList />}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        {sidebar && (
+          <div className="w-full lg:order-last lg:w-72 lg:shrink-0 lg:self-stretch">
+            <AssetFiltersSidebar
+              id={filtersId}
+              filters={filters}
+              onChange={setFilters}
+              onClose={() => setFiltersOpen(false)}
+              tags={tags}
+              packs={packs}
+              kind={tab === "all"}
+              pack={tab === "all"}
+            />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          {tab === "palettes" && <PaletteList />}
 
-      {tab === "packs" &&
-        (shownPacks.length ? (
-          <ul className={ASSET_GRID}>
-            {shownPacks.map((pack) => (
-              <li key={pack.id}>
-                <PackCard
-                  pack={pack}
-                  tint={
-                    pack.background
-                      ? ""
-                      : assetTint(packById.get(pack.id)?.index ?? 0)
-                  }
-                  favourite={favourites.packs.has(pack.id)}
-                  onFavourite={(on) => favourites.pack(pack.id, on)}
-                />
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState
-            className="mt-12"
-            title={packs.length ? "No packs match" : "No packs yet"}
-            description={
-              packs.length
-                ? "Try another search or fewer filters."
-                : "The Pigxel team is drawing them. Check back soon."
-            }
-          />
-        ))}
-
-      {tab === "all" && (
-        <>
-          {!filtered && recent.length > 0 && (
-            <section aria-labelledby="assets-recent" className="mb-10">
-              <SectionHeader id="assets-recent" title="Recently used" />
-              <ul className={ASSET_GRID}>
-                {recent.slice(0, 6).map((asset) => (
-                  <AssetCardItem
-                    key={asset.id}
-                    asset={asset}
-                    packs={packById}
-                    favourite={favourites.assets.has(asset.id)}
-                    onFavourite={(on) => favourites.asset(asset.id, on)}
-                    onOpen={() => setOpen(asset)}
-                  />
+          {tab === "packs" &&
+            (shownPacks.length ? (
+              <ul className={grid}>
+                {shownPacks.map((pack) => (
+                  <li key={pack.id}>
+                    <PackCard
+                      pack={pack}
+                      tint={
+                        pack.background
+                          ? ""
+                          : assetTint(packById.get(pack.id)?.index ?? 0)
+                      }
+                      favourite={favourites.packs.has(pack.id)}
+                      onFavourite={(on) => favourites.pack(pack.id, on)}
+                    />
+                  </li>
                 ))}
               </ul>
-            </section>
+            ) : (
+              <EmptyState
+                className="mt-12"
+                title={packs.length ? "No packs match" : "No packs yet"}
+                description={
+                  packs.length
+                    ? "Try another search or fewer filters."
+                    : "The Pigxel team is drawing them. Check back soon."
+                }
+              />
+            ))}
+
+          {tab === "all" && (
+            <>
+              {!filtered && recent.length > 0 && (
+                <section aria-labelledby="assets-recent" className="mb-10">
+                  <SectionHeader id="assets-recent" title="Recently used" />
+                  <ul className={grid}>
+                    {recent.slice(0, 6).map((asset) => (
+                      <AssetCardItem
+                        key={asset.id}
+                        asset={asset}
+                        packs={packById}
+                        favourite={favourites.assets.has(asset.id)}
+                        onFavourite={(on) => favourites.asset(asset.id, on)}
+                        onOpen={() => setOpen(asset)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              )}
+              <AssetResults
+                title={
+                  filters.pack
+                    ? (packById.get(filters.pack)?.pack.name ?? "Assets")
+                    : "All assets"
+                }
+                grid={grid}
+                filters={filters}
+                firstPage={initialTab === "all" ? firstPage : null}
+                packs={packById}
+                favourites={favourites.assets}
+                onFavourite={favourites.asset}
+                onOpen={setOpen}
+              />
+            </>
           )}
-          <AssetResults
-            title={
-              filters.pack
-                ? (packById.get(filters.pack)?.pack.name ?? "Assets")
-                : "All assets"
-            }
-            filters={filters}
-            firstPage={initialTab === "all" ? firstPage : null}
-            packs={packById}
-            favourites={favourites.assets}
-            onFavourite={favourites.asset}
-            onOpen={setOpen}
-          />
-        </>
-      )}
+        </div>
+      </div>
 
       {open && (
         <AssetDialog
