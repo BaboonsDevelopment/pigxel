@@ -37,7 +37,7 @@ export function TrendingWorks({ works }: { works: PublicTile[] | null }) {
                 aria-label={`Open ${work.name} by @${work.author.username}`}
                 className="flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                <span className="relative block aspect-[16/10] overflow-hidden bg-checker xl:aspect-auto xl:min-h-0 xl:flex-1">
+                <span className="relative block aspect-[16/10] overflow-hidden bg-checker lg:aspect-auto lg:min-h-0 lg:flex-1">
                   {work.thumbnail ? (
                     <PixelImage
                       src={work.thumbnail}
