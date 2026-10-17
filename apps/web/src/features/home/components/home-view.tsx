@@ -29,7 +29,9 @@ export function HomeView({
   return (
     <div className="relative lg:h-full lg:[container-type:size]">
       <PixelBackdrop />
-      <Page className="relative flex max-w-[88rem] flex-col pb-6 lg:h-[820px] lg:w-[1290px] lg:max-w-none lg:[zoom:max(0.6,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,820px))))]">
+      {/* Scaled to fit the screen. A screen wider than the design widens the
+          layout (up to a cap) instead of leaving gaps at the sides. */}
+      <Page className="relative flex max-w-[88rem] flex-col pb-6 lg:h-[820px] lg:w-[min(1560px,max(1290px,calc(100cqw/var(--zoom))))] lg:max-w-none lg:[--zoom:max(0.6,min(tan(atan2(100cqw,1290px)),tan(atan2(100cqh,820px))))] lg:[zoom:var(--zoom)]">
         <section aria-labelledby="start-heading" className="shrink-0">
           <Heading as="h1" id="start-heading" className="mb-3">
             Start creating

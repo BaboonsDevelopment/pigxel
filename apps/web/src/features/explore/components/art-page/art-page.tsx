@@ -12,6 +12,7 @@ import { ArtDetails } from "./components/art-details";
 import { ArtPreview } from "./components/art-preview";
 import { ArtStrip } from "./components/art-strip";
 import { CommunityCard } from "./components/community-card";
+import { canvasSizeOf } from "../../constants";
 import { toPicture, type Picture } from "./helpers";
 
 export function ArtPage({
@@ -21,6 +22,7 @@ export function ArtPage({
   saved,
   comments,
   remixes,
+  sameTags,
   similar,
 }: {
   tile: PublicTile;
@@ -29,6 +31,9 @@ export function ArtPage({
   saved: boolean;
   comments: { comments: ArtComment[]; count: number };
   remixes: PublicTile[];
+  /** Works sharing its tags. */
+  sameTags: PublicTile[];
+  /** Works at its canvas size, besides those sharing its tags. */
   similar: PublicTile[];
 }) {
   const [file, setFile] = useState<string | null>(null);
@@ -86,7 +91,7 @@ export function ArtPage({
             onCountChange={setCommentCount}
           />
         </div>
-        {(remixes.length > 0 || similar.length > 0) && (
+        {(remixes.length > 0 || sameTags.length > 0 || similar.length > 0) && (
           <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-2 lg:self-start">
             {remixes.length > 0 && (
               <ArtStrip
@@ -94,11 +99,21 @@ export function ArtPage({
                 arts={remixes}
               />
             )}
+            {sameTags.length > 0 && (
+              <ArtStrip
+                title={`Tagged ${tile.tags
+                  .slice(0, 3)
+                  .map((tag) => `#${tag.toLowerCase()}`)
+                  .join(" ")}`}
+                arts={sameTags}
+                viewAll={`/explore?tag=${encodeURIComponent(tile.tags.join(","))}`}
+              />
+            )}
             {similar.length > 0 && (
               <ArtStrip
                 title="Similar artwork"
                 arts={similar}
-                viewAll={`/explore?tag=${encodeURIComponent(tile.tags.join(","))}`}
+                viewAll={similarHref(tile)}
               />
             )}
           </div>
@@ -106,4 +121,10 @@ export function ArtPage({
       </div>
     </div>
   );
+}
+
+/** Explore filtered to the art's canvas size, where "Similar artwork" comes from. */
+function similarHref(tile: Pick<PublicTile, "width" | "height">) {
+  const size = canvasSizeOf(tile.width, tile.height);
+  return size ? `/explore?size=${size.value}` : "/explore";
 }

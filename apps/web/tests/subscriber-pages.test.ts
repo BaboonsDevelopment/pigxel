@@ -26,7 +26,7 @@ beforeEach(() => vi.resetAllMocks());
 describe("pricing for subscribers", () => {
   it("shows prices and limits without JavaScript", () => {
     const html = pricing({});
-    expect(html).toContain("$10.00");
+    expect(html).toContain("$10");
     expect(html).toContain("2,000 AI tokens every month");
     expect(html).toContain("Premium assets and tutorials");
     expect(html).toContain("5 arts in Pigxel cloud");
@@ -45,17 +45,31 @@ describe("pricing for subscribers", () => {
     expect(pricing({ signedIn: true })).toContain(">Subscribe<");
   });
 
-  it("offers plan changes instead of a second subscription", () => {
+  it("opens subscribers on their own plan instead of a second subscription", () => {
     const html = pricing({
       signedIn: true,
       currentProductId: pro.productId.month,
     });
     expect(html).toContain("Your plan");
-    expect(html).toContain("Change plan");
-    expect(html).toContain(
-      `/settings/subscription?plan=${TIERS[0]!.productId.month}`,
-    );
     expect(html).not.toContain(">Subscribe<");
+  });
+});
+
+describe("plans outside checkout", () => {
+  it("shows Artist without letting anyone buy it yet", () => {
+    const html = pricing({ signedIn: true });
+    expect(html).toContain("No AI tools in your workspace");
+    expect(html).toContain("$5");
+    expect(html).toContain("Coming soon");
+    expect(html).not.toContain("Subscribe to Artist");
+  });
+
+  it("lets creators apply by email", () => {
+    const html = pricing({});
+    expect(html).toContain("Pro or Advanced, free while you create");
+    expect(html).toContain(
+      'href="mailto:support@pigxel.studio?subject=Creator%20plan',
+    );
   });
 });
 

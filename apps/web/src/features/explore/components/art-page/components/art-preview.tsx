@@ -172,7 +172,7 @@ export function ArtPreview({
                   aria-label={`Frame ${i + 1}`}
                   aria-current={i === frame}
                   onClick={() => showFrame(i)}
-                  className="block h-12 w-16 cursor-pointer overflow-hidden rounded-lg border-2 border-transparent bg-checker transition-colors hover:border-primary-soft aria-[current=true]:border-primary"
+                  className="block h-[72px] w-24 cursor-pointer overflow-hidden rounded-xl border-2 border-transparent bg-checker transition-colors hover:border-primary-soft aria-[current=true]:border-primary"
                 >
                   <FrameThumb pixels={f.pixels} />
                 </button>

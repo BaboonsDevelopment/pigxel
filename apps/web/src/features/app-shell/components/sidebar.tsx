@@ -78,20 +78,26 @@ export function Sidebar({
   return (
     <nav
       aria-label="Main"
-      className="flex h-full w-60 flex-col bg-linear-to-b from-sidebar to-sidebar-end text-foreground"
+      className="flex h-full w-60 flex-col short:w-52 bg-linear-to-b from-sidebar to-sidebar-end text-foreground"
     >
       <Link
         href="/home"
         onClick={onNavigate}
-        className="mx-5 mt-6 flex items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4"
+        className="mx-5 mt-6 flex items-center gap-2 rounded-lg short:mt-4 focus-visible:outline-2 focus-visible:outline-offset-4"
       >
-        <Image src={pig} alt="" width={56} priority className="h-auto" />
-        <span className="font-brand text-[32px] leading-none font-semibold tracking-tight text-foreground">
+        <Image
+          src={pig}
+          alt=""
+          width={56}
+          priority
+          className="h-auto short:w-10"
+        />
+        <span className="font-brand text-[32px] leading-none short:text-[26px] font-semibold tracking-tight text-foreground">
           Pigxel
         </span>
       </Link>
 
-      <ul className="mt-7 space-y-1 px-3">{MAIN.map(item)}</ul>
+      <ul className="mt-7 space-y-1 px-3 short:mt-4">{MAIN.map(item)}</ul>
 
       <SidebarScene />
 
@@ -115,7 +121,7 @@ function NavLink({
   onNavigate?: () => void;
 }) {
   const base =
-    "flex h-10 items-center gap-3 rounded-lg px-3 text-[15px] transition-colors";
+    "flex h-10 items-center gap-3 rounded-lg px-3 text-[15px] transition-colors short:h-9 short:text-sm";
   if (!item.href)
     return (
       <li>

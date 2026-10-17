@@ -57,14 +57,14 @@ export default async function Pricing({
                 tone="muted"
                 className="mt-2 lg:[@media(max-height:740px)]:hidden"
               >
-                Every drawing tool is free. Paid plans add the AI helper and
-                more room for your art.
+                Every drawing tool is free. Upgrade for more room, premium
+                assets and the AI helper.
               </Text>
             </div>
           }
         />
 
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t pt-4 text-[13px] text-muted-foreground lg:[@media(max-height:740px)]:mt-3 lg:[@media(max-height:740px)]:pt-3">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t pt-4 text-[13px] text-muted-foreground lg:[@media(max-height:740px)]:mt-3 lg:[@media(max-height:740px)]:pt-3">
           <ul aria-label="Billing" className="contents">
             {FACTS.map((fact) => (
               <li key={fact.text} className="inline-flex items-center gap-1.5">

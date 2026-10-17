@@ -15,16 +15,14 @@ export default function Loading() {
             <Skeleton className="h-11 w-64" />
             <Skeleton className="mt-3 h-4 w-96 max-w-full" />
           </div>
-          <Skeleton className="h-12 w-52 rounded-full" />
+          <Skeleton className="h-11 w-56 rounded-full" />
         </div>
-        <div className="flex flex-1 items-center pt-8 pb-2">
-          <div className="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:gap-5">
-            {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton key={i} className="h-[28rem] rounded-2xl" />
-            ))}
-          </div>
+        <div className="mt-10 grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:gap-5">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-[30rem] rounded-3xl" />
+          ))}
         </div>
-        <Skeleton className="mx-auto mt-4 h-4 w-[36rem] max-w-full" />
+        <Skeleton className="mx-auto mt-8 h-4 w-[36rem] max-w-full" />
       </Page>
     </PageTransition>
   );
