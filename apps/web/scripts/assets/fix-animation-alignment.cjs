@@ -27,12 +27,17 @@ function alignHorizontal(frames,maxShiftX,margin=1,mode='body'){
   const w=frames[0][0].length,h=frames[0].length,reference=frames[0];
   const rawShifts=frames.map((frame,index)=>{
     if(index===0)return 0;
+    let left=w,right=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(frame[y][x]!=='.'){
+      left=Math.min(left,x);right=Math.max(right,x);
+    }
     const zero=registrationScore(reference,frame,0,mode);
     let best={dx:0,score:zero};
     for(let dx=-maxShiftX;dx<=maxShiftX;dx++){
       if(!dx)continue;
+      if(left+dx<0||right+dx>=w)continue;
       const score=registrationScore(reference,frame,dx,mode);
-      if(score>best.score+Math.abs(zero)*.005&&
+      if(score>best.score+Math.abs(zero)*.03&&
         (score>best.score+.00001||Math.abs(dx)<Math.abs(best.dx)))best={dx,score};
     }
     return best.dx;
@@ -72,7 +77,49 @@ function alignHorizontal(frames,maxShiftX,margin=1,mode='body'){
   return {frames:aligned,shifts,edgeAdjusted:needsInset};
 }
 
-function cleanAndAlign(frames,{artifactMaxPixels=64,maxShift=8,maxShiftX,groundLock=false}={}){
+function bodyScore(reference,moving,dx,dy){
+  const h=reference.length,w=reference[0].length;
+  let score=0;
+  for(let y=Math.floor(h*.2);y<Math.ceil(h*.8);y++)for(let x=Math.floor(w*.2);x<Math.ceil(w*.8);x++){
+    const a=reference[y][x],xx=x-dx,yy=y-dy,b=xx>=0&&xx<w&&yy>=0&&yy<h?moving[yy][xx]:'.';
+    if(a==='.'&&b==='.')continue;
+    const weight=1-Math.abs(x-(w-1)/2)/w-Math.abs(y-(h-1)/2)/h;
+    if(a!=='.'&&b!=='.')score+=weight*(a===b?4:.25);
+    else score-=weight;
+  }
+  return score;
+}
+
+function alignBody(frames,maxShift){
+  const h=frames[0].length,w=frames[0][0].length,reference=frames[0];
+  const shifts=frames.map((frame,index)=>{
+    if(!index)return {dx:0,dy:0};
+    let left=w,top=h,right=-1,bottom=-1;
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(frame[y][x]!=='.'){
+      left=Math.min(left,x);right=Math.max(right,x);top=Math.min(top,y);bottom=Math.max(bottom,y);
+    }
+    const zero=bodyScore(reference,frame,0,0);let best={dx:0,dy:0,score:zero};
+    for(let dy=-maxShift;dy<=maxShift;dy++)for(let dx=-maxShift;dx<=maxShift;dx++){
+      if(!dx&&!dy)continue;
+      if(left+dx<0||right+dx>=w||top+dy<0||bottom+dy>=h)continue;
+      const score=bodyScore(reference,frame,dx,dy);
+      if(score>best.score+Math.abs(zero)*.01)best={dx,dy,score};
+    }
+    return {dx:best.dx,dy:best.dy};
+  });
+  const out=frames.map((frame,i)=>{
+    const result=Array.from({length:h},()=>Array(w).fill('.'));
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(frame[y][x]!=='.'){
+      const xx=x+shifts[i].dx,yy=y+shifts[i].dy;
+      if(xx<0||xx>=w||yy<0||yy>=h)throw Error(`Frame ${i+1}: body alignment clips pixels`);
+      result[yy][xx]=frame[y][x];
+    }
+    return result.map(r=>r.join(''));
+  });
+  return {frames:out,shifts};
+}
+
+function cleanAndAlign(frames,{artifactMaxPixels=64,maxShift=8,maxShiftX,groundLock=false,anchorMode='ground'}={}){
   if(!frames.length)return {frames,report:[]};
   const h=frames[0].length,w=frames[0][0].length;
   const parsed=frames.map((rows,index)=>{
@@ -99,6 +146,15 @@ function cleanAndAlign(frames,{artifactMaxPixels=64,maxShift=8,maxShiftX,groundL
     for(let p=0;p<pixels.length;p++)if(pixels[p]!=='.')bottom=Math.max(bottom,Math.floor(p/w));
     return {pixels,bottom,removed};
   });
+  if(anchorMode==='fixed'){
+    const cleaned=parsed.map(frame=>Array.from({length:h},(_,y)=>frame.pixels.slice(y*w,(y+1)*w).join('')));
+    return {frames:cleaned,report:parsed.map((frame,i)=>({frame:i+1,before:frame.bottom,after:frame.bottom,shift:0,shiftX:0,removed:frame.removed,edgeAdjusted:false}))};
+  }
+  if(anchorMode==='body'){
+    const cleaned=parsed.map(frame=>Array.from({length:h},(_,y)=>frame.pixels.slice(y*w,(y+1)*w).join('')));
+    const aligned=alignBody(cleaned,maxShift);
+    return {frames:aligned.frames,report:parsed.map((frame,i)=>({frame:i+1,before:frame.bottom,after:frame.bottom,shift:aligned.shifts[i].dy,shiftX:aligned.shifts[i].dx,removed:frame.removed,edgeAdjusted:false}))};
+  }
   const baseline=Math.max(...parsed.map(frame=>frame.bottom));
   const report=[];
   const verticallyAligned=parsed.map((frame,index)=>{
@@ -130,7 +186,7 @@ function fixPack(packDir,{apply=false}={}){
     let changed=false;
     for(const clip of asset.clips||[]){
       if(clip.kind!=='animation')continue;
-      const result=cleanAndAlign(clip.frames,{groundLock:id==='halloween-lantern-keeper'||id==='halloween-harvest-scarecrow'});
+      const result=cleanAndAlign(clip.frames,{groundLock:id==='halloween-lantern-keeper'||id==='halloween-harvest-scarecrow',anchorMode:clip.anchor==='body'||clip.anchor==='fixed'?clip.anchor:'ground'});
       clip.frames=result.frames;
       changed ||= result.report.some(r=>r.shift||r.shiftX||r.removed||r.edgeAdjusted);
       results.push({id,clip:clip.name,changed,report:result.report});
