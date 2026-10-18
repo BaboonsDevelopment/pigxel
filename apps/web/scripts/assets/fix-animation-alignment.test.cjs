@@ -21,3 +21,24 @@ test('generated poses keep their body on one x/y anchor without clipping or stra
     assert.equal(frame[y][x],result.frames[0][y][x]);
   assert.equal(cleanAndAlign(result.frames,{artifactMaxPixels:8,maxShift:4,maxShiftX:5}).report.some(r=>r.shift||r.shiftX||r.removed),false);
 });
+
+test('floating poses align by body even when the tail changes its lowest pixel',()=>{
+  function fish(dx,dy,tailY){
+    const grid=Array.from({length:32},()=>Array(32).fill('.'));
+    for(let y=11;y<=19;y++)for(let x=8;x<=19;x++)grid[y+dy][x+dx]=(x+y)%3?'a':'b';
+    for(let x=20;x<=25;x++)grid[tailY+dy][x+dx]='c';
+    return grid.map(r=>r.join(''));
+  }
+  const result=cleanAndAlign([fish(0,0,21),fish(2,1,27)],{anchorMode:'body',maxShift:4,artifactMaxPixels:0});
+  assert.equal(result.report[1].shift,-1);
+  assert.equal(result.report[1].shiftX,-2);
+  for(let y=11;y<=19;y++)for(let x=8;x<=19;x++)assert.equal(result.frames[1][y][x],result.frames[0][y][x]);
+  assert.equal(cleanAndAlign(result.frames,{anchorMode:'body',maxShift:4,artifactMaxPixels:0}).report.some(r=>r.shift||r.shiftX),false);
+});
+
+test('manually registered poses can preserve intended turns without accumulating shifts',()=>{
+  const frames=[pose(),pose(0,0,{wing:true})];
+  const result=cleanAndAlign(frames,{anchorMode:'fixed',artifactMaxPixels:8});
+  assert.deepEqual(result.frames,frames);
+  assert.equal(result.report.some(r=>r.shift||r.shiftX||r.removed),false);
+});

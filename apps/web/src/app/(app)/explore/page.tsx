@@ -6,7 +6,7 @@ import {
   listPublicTiles,
 } from "@/features/profile/server";
 import { findArtists } from "@/features/search/server";
-import { PAGE_SIZE, TAGS } from "@/features/explore/constants";
+import { PAGE_SIZE } from "@/features/explore/constants";
 import {
   artQuery,
   parseExploreParams,
@@ -34,7 +34,7 @@ export default async function Explore({ searchParams }: Props) {
       console.error(error);
       return null;
     }),
-    countPublicTilesByTag(days, TAGS, filter).catch((error: unknown) => {
+    countPublicTilesByTag(days, filter).catch((error: unknown) => {
       console.error(error);
       return null;
     }),

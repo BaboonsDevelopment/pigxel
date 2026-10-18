@@ -131,9 +131,10 @@ export function FolderCard({
             </ul>
             <Link
               href={href}
-              className="mt-1 flex items-center gap-2 border-t border-[#f6dbe4] px-4 py-2.5 text-xs transition-colors hover:bg-pastel-pink-soft"
+              className="mt-1 flex items-center gap-2 border-t border-[#f6dbe4] px-4 py-2.5 text-xs font-medium text-accent-pink transition-colors hover:bg-pastel-pink-soft"
             >
-              View all {folder.count} projects
+              View all {folder.count}{" "}
+              {folder.count === 1 ? "project" : "projects"}
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 12"
