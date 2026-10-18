@@ -16,7 +16,7 @@ export default function Tutorials() {
         title="Tutorials"
         description="Watch a short video, then practise in the editor with a guide that points at each tool and ticks steps off as you do them."
       />
-      <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 @min-[1480px]:grid-cols-4">
         {TUTORIALS.map((tutorial) => (
           <li key={tutorial.slug}>
             <Link

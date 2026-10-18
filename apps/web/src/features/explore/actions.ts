@@ -13,11 +13,11 @@ import {
   PAGE_SIZE,
   REPORT_DETAILS_MAX,
   REPORT_REASONS,
-  TAGS,
   type ExploreFilters,
   type ReportReason,
 } from "./constants";
 import { artQuery, isValidFilters } from "./filters";
+import { isArtTag, MAX_ART_TAGS } from "./art-tags";
 import { findArtists, type ArtistResult } from "@/features/search/server";
 import {
   COMMENT_COLUMNS,
@@ -60,7 +60,7 @@ export async function loadTagCounts(
 ): Promise<Record<string, number> | null> {
   const valid = await artFilter(filters);
   if (!valid) return null;
-  return countPublicTilesByTag(valid.days, TAGS, valid.filter);
+  return countPublicTilesByTag(valid.days, valid.filter);
 }
 
 export async function loadArtists(query: string): Promise<ArtistResult[]> {
@@ -230,7 +230,8 @@ async function saveArtDetails(
   if (
     !UUID.test(tileId) ||
     typeof allowRemix !== "boolean" ||
-    chosen.some((tag) => !(TAGS as readonly string[]).includes(tag))
+    chosen.length > MAX_ART_TAGS ||
+    !chosen.every(isArtTag)
   )
     return { error: "Invalid request." };
   if (text.length > DESCRIPTION_MAX)

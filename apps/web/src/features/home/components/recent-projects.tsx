@@ -97,7 +97,13 @@ function Row({
           {cloud.error}
         </FormMessage>
       )}
-      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <ul
+        className={cn(
+          "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 @min-[1480px]:grid-cols-6 @min-[1680px]:grid-cols-7",
+          // Four projects, then one more per extra column; New project stays.
+          "[&>li:nth-child(n+5):not(:last-child)]:hidden @min-[1480px]:[&>li:nth-child(5):not(:last-child)]:block @min-[1680px]:[&>li:nth-child(6):not(:last-child)]:block",
+        )}
+      >
         {projects.map((project) =>
           project.kind === "local" ? (
             <ProjectCard

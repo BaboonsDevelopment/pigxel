@@ -4,7 +4,8 @@ import { artQuery } from "@/features/explore/filters";
 import type { PublicTile } from "@/features/profile/profile";
 import { listPublicTiles } from "@/features/profile/server";
 
-export const TRENDING = 3;
+/** Loaded for Home; wider screens show the fourth. */
+export const TRENDING = 4;
 
 /**
  * The top of Explore as it opens (Popular, this week). A quiet week falls

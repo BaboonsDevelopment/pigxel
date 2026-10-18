@@ -14,17 +14,6 @@ export const MAX_TAGS = 5;
 
 export const PAGE_SIZE = 20;
 
-export const CATEGORIES = [
-  "All",
-  "Buildings",
-  "Characters",
-  "Fantasy",
-  "Environment",
-  "Icons",
-] as const;
-
-export const TAGS = CATEGORIES.filter((c) => c !== "All");
-
 export type CanvasSize = "any" | "16" | "32" | "64" | "128" | "256";
 
 type CanvasSizeOption = {

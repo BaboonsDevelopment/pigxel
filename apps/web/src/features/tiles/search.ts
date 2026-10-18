@@ -1,4 +1,5 @@
-import { CANVAS_SIZES, TAGS } from "@/features/explore/constants";
+import { ART_TAGS } from "@/features/explore/art-tags";
+import { CANVAS_SIZES } from "@/features/explore/constants";
 
 const SEARCH_MAX = 100;
 
@@ -14,7 +15,9 @@ export function searchMatch(query: string): string | null {
   const term = cleanSearch(query);
   if (!term) return null;
   const lower = term.toLowerCase();
-  const tags = TAGS.filter((tag) => tag.toLowerCase().includes(lower));
+  // Tags starting with the term; a cap keeps the request short.
+  const slug = lower.replace(/\s+/g, "-").replace(/^#/, "");
+  const tags = ART_TAGS.filter((tag) => tag.startsWith(slug)).slice(0, 20);
   return [
     `name.ilike.*${term}*`,
     `description.ilike.*${term}*`,

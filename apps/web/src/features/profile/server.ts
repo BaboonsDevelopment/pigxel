@@ -290,38 +290,40 @@ export async function listPublicTilesByIds(
   return ids.flatMap((id) => byId.get(id) ?? []);
 }
 
+/** Most matching arts read to count tags; past it the counts are estimates. */
+const TAG_COUNT_ROWS = 5000;
+
+/**
+ * How many public arts match the filters ("All"), and how many of them have
+ * each tag. One query reads the matches' tags, not one query per tag.
+ */
 export async function countPublicTilesByTag(
   days: number,
-  tags: readonly string[],
   filter: ArtFilter = {},
 ): Promise<Record<string, number>> {
   const supabase = await createClient();
   const followees = filter.followedBy
     ? await followeesOf(supabase, filter.followedBy)
     : null;
-  if (followees && !followees.length)
-    return Object.fromEntries(["All", ...tags].map((tag) => [tag, 0]));
-  const counts = await Promise.all(
-    [null, ...tags].map(async (tag) => {
-      let query = publicTiles(supabase, days, filter, true).select(
-        `id, author:profiles!tiles_user_id_profiles_fkey!inner(id)${filter.likedBy ? ", mine:tile_likes!inner(user_id)" : ""}`,
-      );
-      if (followees) query = query.in("user_id", followees);
-      if (filter.likedBy) query = query.eq("mine.user_id", filter.likedBy);
-      if (tag) query = query.contains("tags", [tag]);
-      if (filter.max)
-        query = query.lte("width", filter.max).lte("height", filter.max);
-      if (filter.min)
-        query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
-      if (filter.animated) query = query.gt("frame_count", 1);
-      if (filter.still) query = query.lte("frame_count", 1);
-      const { count, error } = await query;
-      if (error)
-        throw new Error(`Couldn’t count public arts: ${error.message}`);
-      return [tag ?? "All", count ?? 0] as const;
-    }),
+  if (followees && !followees.length) return { All: 0 };
+  let query = publicTiles(supabase, days, filter).select(
+    `tags, author:profiles!tiles_user_id_profiles_fkey!inner(id)${filter.likedBy ? ", mine:tile_likes!inner(user_id)" : ""}`,
   );
-  return Object.fromEntries(counts);
+  if (followees) query = query.in("user_id", followees);
+  if (filter.likedBy) query = query.eq("mine.user_id", filter.likedBy);
+  if (filter.max)
+    query = query.lte("width", filter.max).lte("height", filter.max);
+  if (filter.min)
+    query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
+  if (filter.animated) query = query.gt("frame_count", 1);
+  if (filter.still) query = query.lte("frame_count", 1);
+  const { data, count, error } = await query.range(0, TAG_COUNT_ROWS - 1);
+  if (error) throw new Error(`Couldn’t count public arts: ${error.message}`);
+  const rows = data as unknown as { tags: string[] | null }[];
+  const counts: Record<string, number> = { All: count ?? rows.length };
+  for (const row of rows)
+    for (const tag of row.tags ?? []) counts[tag] = (counts[tag] ?? 0) + 1;
+  return counts;
 }
 
 const downloadCounts = (ids: string[]) => totals("tile_downloads", ids);

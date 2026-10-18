@@ -26,7 +26,7 @@ export function TrendingWorks({ works }: { works: PublicTile[] | null }) {
         <ViewAllLink href="/explore" variant="pill" className="shrink-0" />
       </div>
       {works?.length ? (
-        <ul className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
+        <ul className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-3 @min-[1480px]:grid-cols-4 [&>li:nth-child(4)]:hidden @min-[1480px]:[&>li:nth-child(4)]:flex">
           {works.map((work) => (
             <li
               key={work.id}

@@ -8,7 +8,8 @@ import {
   InputGroupText,
 } from "@pigxel/ui/components/input";
 import { PixelImage } from "@/components/ui/pixel-image";
-import { MAX_TAGS, QUERY_MAX, TAGS } from "../../../constants";
+import { matchArtTags } from "../../../art-tags";
+import { MAX_TAGS, QUERY_MAX } from "../../../constants";
 import { CloseIcon, SearchIcon } from "./icons";
 import { useDismiss } from "./menu-button";
 
@@ -51,12 +52,7 @@ export function TagSearch({
   const typedTag = query.startsWith("#")
     ? query.slice(1).trim().toLowerCase()
     : null;
-  const matches =
-    typedTag === null || full
-      ? []
-      : TAGS.filter(
-          (t) => !tags.includes(t) && t.toLowerCase().includes(typedTag),
-        );
+  const matches = typedTag === null || full ? [] : matchArtTags(typedTag, tags);
 
   const add = (tag: string) => {
     if (full || tags.includes(tag)) return;

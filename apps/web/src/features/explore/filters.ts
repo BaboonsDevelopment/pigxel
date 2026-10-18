@@ -1,3 +1,4 @@
+import { isArtTag } from "./art-tags";
 import {
   ANIMATIONS,
   CANVAS_SIZES,
@@ -8,7 +9,6 @@ import {
   PERIODS,
   QUERY_MAX,
   SORTS,
-  TAGS,
   type ExploreFilters,
 } from "./constants";
 
@@ -29,7 +29,9 @@ export function parseExploreParams(
 ): ExploreFilters {
   const chosen = params.tag?.split(",") ?? [];
   return {
-    tags: TAGS.filter((t) => chosen.includes(t)).slice(0, MAX_TAGS),
+    tags: [...new Set(chosen.map((t) => t.trim().toLowerCase()))]
+      .filter(isArtTag)
+      .slice(0, MAX_TAGS),
     size:
       CANVAS_SIZES.find((s) => s.value === params.size)?.value ??
       NO_FILTERS.size,
@@ -71,7 +73,7 @@ export function isValidFilters(filters: ExploreFilters) {
     FEEDS.some((f) => f.value === filters.feed) &&
     Array.isArray(filters.tags) &&
     filters.tags.length <= MAX_TAGS &&
-    filters.tags.every((tag) => (TAGS as readonly string[]).includes(tag))
+    filters.tags.every(isArtTag)
   );
 }
 
