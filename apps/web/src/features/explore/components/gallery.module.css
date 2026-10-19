@@ -34,3 +34,17 @@
     row-gap: 28px;
   }
 }
+
+/*
+ * Card sizes people can pick on Explore. Medium is the grid above; large and
+ * small fit as many cards as their width allows.
+ */
+.grid[data-size="large"] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 28px 36px;
+}
+
+.grid[data-size="small"] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  gap: 16px;
+}

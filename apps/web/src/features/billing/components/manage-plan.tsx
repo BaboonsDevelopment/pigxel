@@ -14,7 +14,12 @@ import {
   previewPlanChange,
   type PlanPreview,
 } from "../actions";
-import { TIERS, type BillingCycle } from "../pricing";
+import {
+  BILLABLE_TIERS,
+  productIdFor,
+  type BillingMode,
+  type BillingCycle,
+} from "../pricing";
 import {
   canChangePlan,
   planOfProduct,
@@ -31,20 +36,23 @@ const labelOf = (productId: string) => {
   return plan ? `${plan.name}, ${billed(plan.cycle)}` : "";
 };
 
-const OPTIONS = TIERS.flatMap((tier) =>
-  (["month", "year"] as const).map((cycle) => tier.productId[cycle]),
-);
-
 export function ManagePlan({
+  billingMode,
   plan,
   periodEnd,
   chosen: initial,
 }: {
+  billingMode: BillingMode;
   plan: PaidPlan;
   periodEnd: string | null;
   /** A plan picked on the Pricing page, previewed straight away. */
   chosen?: string;
 }) {
+  const options = BILLABLE_TIERS.flatMap((tier) =>
+    (["month", "year"] as const).map((cycle) =>
+      productIdFor(tier, cycle, billingMode),
+    ),
+  ).filter(Boolean);
   const [pending, startTransition] = useTransition();
   const [preview, setPreview] = useState<PlanPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,17 +116,19 @@ export function ManagePlan({
           </Text>
           <fieldset className="mt-4 grid gap-2 sm:grid-cols-2">
             <legend className="sr-only">New plan</legend>
-            {OPTIONS.filter((id) => id !== plan.productId).map((id) => (
-              <ChoiceCard key={id} className="p-3">
-                <Radio
-                  name="new-plan"
-                  disabled={pending}
-                  checked={chosen?.productId === id}
-                  onChange={() => choose(id)}
-                />
-                <ChoiceText title={labelOf(id)} />
-              </ChoiceCard>
-            ))}
+            {options
+              .filter((id) => id !== plan.productId)
+              .map((id) => (
+                <ChoiceCard key={id} className="p-3">
+                  <Radio
+                    name="new-plan"
+                    disabled={pending}
+                    checked={chosen?.productId === id}
+                    onChange={() => choose(id)}
+                  />
+                  <ChoiceText title={labelOf(id)} />
+                </ChoiceCard>
+              ))}
           </fieldset>
           {chosen && (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">

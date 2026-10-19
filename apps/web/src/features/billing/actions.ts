@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/session";
 import { authUrl } from "@/lib/auth/config";
-import { creemApi, storeSubscription } from "./creem";
+import { creemApi, getBillingMode, storeSubscription } from "./creem";
 import { getCurrentPlan, hasAiAccess, setPendingProduct } from "./server";
 import {
   canChangePlan,
@@ -39,7 +39,7 @@ const failed = (what: string, error: unknown, detail = "") => {
 /** Sends the person to Creem's checkout for a plan, or to plan changes if they already pay. */
 export async function startCheckout(productId: string) {
   const user = await requireUser();
-  if (!planOfProduct(productId)) redirect("/pricing");
+  if (!planOfProduct(productId, getBillingMode())) redirect("/pricing");
   const plan = await getCurrentPlan(user.id);
   if (plan.name !== "Free")
     redirect(`${SUBSCRIPTION_PATH}?plan=${encodeURIComponent(productId)}`);
@@ -73,7 +73,12 @@ export async function previewPlanChange(
 ): Promise<PlanPreview> {
   const plan = await paidPlan();
   const change = planChange(plan.productId, productId);
-  if (!change || change === "same" || !canChangePlan(plan))
+  if (
+    !planOfProduct(productId, getBillingMode()) ||
+    !change ||
+    change === "same" ||
+    !canChangePlan(plan)
+  )
     return { error: "This plan can’t be changed right now." };
   return { change, productId };
 }
@@ -83,7 +88,11 @@ export async function changePlan(
 ): Promise<{ error?: string } | void> {
   const plan = await paidPlan();
   const change = planChange(plan.productId, productId);
-  if (!change || !canChangePlan(plan))
+  if (
+    !planOfProduct(productId, getBillingMode()) ||
+    !change ||
+    !canChangePlan(plan)
+  )
     return { error: "This plan can’t be changed right now." };
   if (change === "upgrade") {
     try {

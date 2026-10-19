@@ -11,6 +11,7 @@ import {
 import { requireUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
 import { planOfProduct } from "@/features/billing/subscription";
+import { getBillingMode } from "@/features/billing/creem";
 import { ManagePlan } from "@/features/billing/components/manage-plan";
 
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
@@ -49,7 +50,7 @@ export default async function SubscriptionSettings({
         </p>
         <Lead className="mt-3">
           {plan.name === "Free"
-            ? "Starter, Pro and Advanced plans are on the Pricing page."
+            ? "Artist and Pro plans are on the Pricing page."
             : plan.status === "past_due"
               ? "Your last payment didn’t go through. Creem will retry it; update your payment method below to fix it sooner."
               : plan.cancelsAt
@@ -70,6 +71,7 @@ export default async function SubscriptionSettings({
       </Card>
       {plan.name !== "Free" && (
         <ManagePlan
+          billingMode={getBillingMode()}
           plan={plan}
           periodEnd={periodEnd && day(periodEnd)}
           chosen={chosen && planOfProduct(chosen) ? chosen : undefined}

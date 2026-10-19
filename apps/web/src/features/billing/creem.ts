@@ -2,6 +2,13 @@ import "server-only";
 import { saveSubscription } from "./server";
 import { subscriptionRecord, type CreemSubscription } from "./subscription";
 
+import type { BillingMode } from "./pricing";
+
+export function getBillingMode(): BillingMode {
+  const key = process.env.CREEM_API_KEY;
+  return key && !key.startsWith("creem_test_") ? "live" : "test";
+}
+
 type Env = Partial<Record<string, string>>;
 
 /** Test keys (creem_test_…) talk to Creem's test API; live keys to the real one. */

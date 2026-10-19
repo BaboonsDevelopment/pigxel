@@ -160,7 +160,7 @@ function NewProjectCard({ userId }: { userId: string }) {
       userId={userId}
       className={cn(
         pixelifySans.className,
-        "group relative flex h-full min-h-32 w-full items-center justify-center gap-2.5 rounded-xl bg-background text-lg text-accent-pink transition-colors hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
+        "group relative flex aspect-square h-full w-full items-center justify-center gap-2.5 rounded-xl bg-background text-lg text-accent-pink transition-colors hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
       )}
     >
       {/* CSS dashes are too short at this width; the design has long ones. */}

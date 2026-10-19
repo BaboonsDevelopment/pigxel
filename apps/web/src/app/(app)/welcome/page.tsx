@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { Page } from "@pigxel/ui/components/page";
@@ -7,9 +8,10 @@ import { Heading, Text } from "@pigxel/ui/components/typography";
 import { getUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
 import { AwaitingPlan } from "@/features/billing/components/awaiting-plan";
+import mascot from "../../../../public/art/pigxel-mascot-sitting.png";
 
 export const metadata: Metadata = {
-  title: "Welcome · Pigxel",
+  title: "Thank you for purchasing · Pigxel",
   robots: { index: false },
 };
 
@@ -21,27 +23,51 @@ export default async function Welcome() {
   const paid = plan && plan.name !== "Free" ? plan : null;
   return (
     <PageTransition>
-      <Page width="narrow" className="py-24 text-center md:pt-24">
-        <Heading size="page" className="sm:text-5xl">
-          {paid ? `Welcome to ${paid.name}` : "Thanks for subscribing"}
-        </Heading>
-        {paid ? (
-          <Text size="md" tone="muted" className="mt-4">
-            Your plan is active, and Creem is emailing your receipt.
+      <Page
+        width="narrow"
+        className="flex min-h-full flex-col items-center justify-center py-12 text-center md:py-16"
+      >
+        <div className="relative mb-8 flex size-52 items-center justify-center sm:size-64">
+          <div
+            aria-hidden="true"
+            className="absolute inset-2 rounded-full bg-primary/10"
+          />
+          <Image
+            src={mascot}
+            alt="Pigxel’s smiling pig mascot"
+            priority
+            sizes="(min-width: 640px) 256px, 208px"
+            className="relative h-auto w-full"
+          />
+        </div>
+        <div className="max-w-lg">
+          <Heading size="page" className="text-balance sm:text-5xl">
+            Thank you for purchasing!
+          </Heading>
+          <Text size="md" tone="muted" className="mt-4 leading-relaxed">
+            You’re helping Pigxel grow. We can’t wait to see what you create.
           </Text>
-        ) : user ? (
-          <AwaitingPlan />
-        ) : (
-          <Text size="md" tone="muted" className="mt-4">
-            Log in to see your plan in Settings → Subscription.
-          </Text>
-        )}
-        <Link
-          href={paid ? "/home" : "/settings/subscription"}
-          className={buttonVariants({ size: "lg", className: "mt-8" })}
-        >
-          {paid ? "Start creating" : "View my plan"}
-        </Link>
+          {paid ? (
+            <Text tone="muted" className="mt-4 leading-relaxed">
+              Your {paid.name} plan is active. Creem will email your receipt.
+            </Text>
+          ) : user ? (
+            <AwaitingPlan />
+          ) : (
+            <Text tone="muted" className="mt-4 leading-relaxed">
+              Log in to see your plan in Settings → Subscription.
+            </Text>
+          )}
+          <Link
+            href="/home"
+            className={buttonVariants({
+              size: "lg",
+              className: "mt-8 w-full sm:w-auto",
+            })}
+          >
+            Go back to Pigxel
+          </Link>
+        </div>
       </Page>
     </PageTransition>
   );

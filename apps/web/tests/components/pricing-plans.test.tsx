@@ -5,11 +5,48 @@ import { renderWithUser } from "@test/render";
 vi.mock("@/features/billing/actions", () => ({ startCheckout: vi.fn() }));
 
 import { PricingPlans } from "@/features/billing/components/pricing-plans";
-import { TIERS } from "@/features/billing/pricing";
+import { ARTIST_PLAN, TIERS } from "@/features/billing/pricing";
 
 const [starter, pro, advanced] = TIERS;
 
 describe("the AI plan's token picker", () => {
+  it("uses live products for plan changes and enables Artist in live mode", () => {
+    renderWithUser(
+      <PricingPlans
+        heading={null}
+        signedIn
+        billingMode="live"
+        currentProductId={pro!.liveProductId.month}
+      />,
+    );
+    expect(screen.getByText("Your plan")).toBeTruthy();
+    expect(screen.queryByText("Coming soon")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Change plan" }).getAttribute("href"),
+    ).toBe(`/settings/subscription?plan=${ARTIST_PLAN.liveProductId.month}`);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    expect(
+      screen
+        .getAllByRole("link", { name: "Change plan" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain(`/settings/subscription?plan=${advanced!.liveProductId.month}`);
+  });
+
+  it("shows Artist subscribers their plan without selecting a Pro token level", () => {
+    renderWithUser(
+      <PricingPlans
+        heading={null}
+        signedIn
+        billingMode="live"
+        currentProductId={ARTIST_PLAN.liveProductId.year}
+      />,
+    );
+    expect(screen.getByText("Your plan")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Change plan" }).getAttribute("href"),
+    ).toBe(`/settings/subscription?plan=${pro!.liveProductId.year}`);
+  });
+
   it("prices and describes the amount people pick", () => {
     renderWithUser(<PricingPlans heading={null} signedIn />);
     expect(screen.getByText("2,000 AI tokens every month")).toBeTruthy();

@@ -17,6 +17,7 @@ import {
   SortAzIcon,
   StarIcon,
 } from "./components/icons";
+import { GridSizeToggle, type GridSize } from "./components/grid-size-toggle";
 import { MenuButton } from "./components/menu-button";
 import { TagSearch } from "./components/tag-search";
 
@@ -42,6 +43,8 @@ export function ExploreHeader({
   onQuerySubmit,
   searching,
   guest,
+  gridSize,
+  onGridSizeChange,
 }: {
   period: Period;
   onPeriodChange: (period: Period) => void;
@@ -57,6 +60,8 @@ export function ExploreHeader({
   onQuerySubmit: () => void;
   searching: boolean;
   guest: boolean;
+  gridSize: GridSize;
+  onGridSizeChange: (size: GridSize) => void;
 }) {
   return (
     <header className="relative mb-10 md:pt-4 lg:[zoom:clamp(0.7,tan(atan2(100vw,1920px)),1)]">
@@ -89,7 +94,7 @@ export function ExploreHeader({
         />
         <PublishButton guest={guest} />
       </div>
-      <div className="mt-[18px] flex flex-wrap items-center gap-[23px]">
+      <div className="mt-[18px] flex flex-wrap items-center gap-2.5">
         <MenuButton
           label="Sort"
           icon={SORT_ICONS[sort]}
@@ -110,6 +115,11 @@ export function ExploreHeader({
           value={filters}
           guest={guest}
           onApply={onFiltersApply}
+        />
+        <GridSizeToggle
+          value={gridSize}
+          onChange={onGridSizeChange}
+          className="ml-auto"
         />
       </div>
     </header>

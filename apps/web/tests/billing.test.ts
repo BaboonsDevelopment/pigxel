@@ -5,11 +5,19 @@ import {
   currentPlan,
   formatMoney,
   planChange,
+  planOfProduct,
   subscriptionRecord,
   type CreemSubscription,
   type SubscriptionRecord,
 } from "@/features/billing/subscription";
-import { aiAllowance, limitsOf, TIERS } from "@/features/billing/pricing";
+import {
+  aiAllowance,
+  ARTIST_PLAN,
+  BILLABLE_TIERS,
+  limitsOf,
+  productIdFor,
+  TIERS,
+} from "@/features/billing/pricing";
 
 vi.mock("server-only", () => ({}));
 const saveSubscription = vi.fn();
@@ -22,6 +30,43 @@ const pro = TIERS.find((tier) => tier.name === "Pro")!;
 const starter = TIERS.find((tier) => tier.name === "Starter")!;
 const advanced = TIERS.find((tier) => tier.name === "Advanced")!;
 const AT = "2026-10-01T12:00:00.000Z";
+
+describe("Creem product environments", () => {
+  it("recognizes every live product and rejects it in test mode", () => {
+    for (const tier of BILLABLE_TIERS)
+      for (const cycle of ["month", "year"] as const) {
+        const id = productIdFor(tier, cycle, "live");
+        expect(planOfProduct(id, "live")).toEqual({ name: tier.name, cycle });
+        expect(planOfProduct(id, "test")).toBeNull();
+      }
+    expect(planOfProduct("")).toBeNull();
+  });
+
+  it("keeps test checkouts on test products", () => {
+    for (const tier of TIERS)
+      for (const cycle of ["month", "year"] as const) {
+        const id = productIdFor(tier, cycle, "test");
+        expect(planOfProduct(id, "test")).toEqual({ name: tier.name, cycle });
+        expect(planOfProduct(id, "live")).toBeNull();
+      }
+    expect(productIdFor(ARTIST_PLAN, "month", "test")).toBe("");
+  });
+
+  it("selects the API and catalog mode from the server key", async () => {
+    const { getBillingMode, creemHost } =
+      await import("@/features/billing/creem");
+    try {
+      vi.stubEnv("CREEM_API_KEY", "creem_test_example");
+      expect(getBillingMode()).toBe("test");
+      expect(creemHost("creem_test_example")).toBe("https://test-api.creem.io");
+      vi.stubEnv("CREEM_API_KEY", "creem_example");
+      expect(getBillingMode()).toBe("live");
+      expect(creemHost("creem_example")).toBe("https://api.creem.io");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
 
 function subscription(
   overrides: Partial<CreemSubscription> = {},
@@ -95,6 +140,12 @@ describe("subscription record", () => {
 describe("plan limits", () => {
   it("gives each plan its cloud room and AI tokens", () => {
     expect(limitsOf("Free")).toEqual({ cloudTiles: 5, aiTokens: 0 });
+    expect(limitsOf("Artist")).toEqual({ cloudTiles: 75, aiTokens: 0 });
+    expect(aiAllowance("Artist")).toEqual({
+      tokens: 0,
+      since: null,
+      resetsAt: null,
+    });
     expect(limitsOf("Starter")).toEqual({ cloudTiles: 50, aiTokens: 1000 });
     expect(limitsOf("Pro")).toEqual({ cloudTiles: 100, aiTokens: 2000 });
     expect(limitsOf("Advanced")).toEqual({ cloudTiles: 200, aiTokens: 7000 });
@@ -161,6 +212,18 @@ describe("current plan", () => {
 });
 
 describe("plan changes", () => {
+  it("supports live Artist subscriptions and forbids changing environments", () => {
+    expect(
+      currentPlan([record({ productId: ARTIST_PLAN.liveProductId.year })]),
+    ).toMatchObject({ name: "Artist", cycle: "year" });
+    expect(
+      planChange(ARTIST_PLAN.liveProductId.month, pro.liveProductId.month),
+    ).toBe("upgrade");
+    expect(
+      planChange(pro.liveProductId.year, ARTIST_PLAN.liveProductId.month),
+    ).toBe("downgrade");
+    expect(planChange(pro.productId.month, pro.liveProductId.year)).toBeNull();
+  });
   it("treats a higher tier or yearly billing as an upgrade", () => {
     expect(planChange(starter.productId.month, pro.productId.month)).toBe(
       "upgrade",
