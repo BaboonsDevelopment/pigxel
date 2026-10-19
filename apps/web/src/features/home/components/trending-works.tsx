@@ -43,7 +43,7 @@ export function TrendingWorks({ works }: { works: PublicTile[] | null }) {
                       src={work.thumbnail}
                       alt=""
                       loading="lazy"
-                      className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none"
+                      className="absolute inset-0 size-full object-contain transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transition-none"
                     />
                   ) : null}
                 </span>
