@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@pigxel/ui/components/badge";
@@ -118,15 +119,9 @@ export function PackView({
 
   return (
     <div>
-      <nav
-        aria-label="Breadcrumb"
-        className="mb-4 text-sm text-muted-foreground"
-      >
-        <Link href="/assets" className="hover:text-foreground hover:underline">
-          Assets
-        </Link>{" "}
-        <span aria-hidden="true">/</span> {pack.name}
-      </nav>
+      <BackButton href="/assets" preferHistory={false} className="mb-5">
+        Back to Assets
+      </BackButton>
 
       <header className="mb-10 grid gap-6 border-b border-[#f0dde5] pb-8 sm:grid-cols-[16rem_minmax(0,1fr)]">
         <div

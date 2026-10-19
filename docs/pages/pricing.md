@@ -1,46 +1,37 @@
-# Pricing and welcome (`/pricing`, `/welcome`)
+# Pricing and purchase return (`/pricing`, `/welcome`)
 
-Plans, prices and checkout, and the page people land on after paying.
+The current implementation uses Creem. This replaces the former Paddle setup.
 
-**Who can open it:** everyone.
+## Plans and purchase
 
-## Pricing (`/pricing`)
+- Free: all drawing tools, five cloud projects, no AI tokens.
+- Artist: $5/month or $40/year, 75 cloud projects, no AI tokens, premium perks.
+- Pro: three token levels represented internally as Starter (1,000 tokens,
+  50 projects, $7/$50), Pro (2,000 tokens, 100 projects, $10/$75), and Advanced
+  (7,000 tokens, 200 projects, $20/$150). Prices are monthly/yearly USD, plus tax.
+- Creator remains an application/contact flow.
+- Test and live API keys select separate matching Creem product IDs. Archived
+  test products remain recognizable for existing subscriptions.
+- Guests sign up before checkout. Subscribers change their existing plan.
+- Creem returns to `/welcome`, showing the pig mascot and **Go back to Pigxel**.
+  The page reads the actual subscription and waits while confirmation arrives;
+  visiting the page does not grant membership. When `checkout_id` is present,
+  the waiting state verifies the completed checkout and its current subscription
+  through Creem’s server API, checks account ownership and billing environment,
+  then stores the verified state. This recovers initial activation if a local
+  webhook was missed; webhooks still keep subsequent billing events in sync.
 
-### Plans
+## Paid benefits
 
-- ✅ Four plans side by side: Free, Starter, Pro (recommended), Advanced.
-- ✅ Monthly or yearly, with yearly savings shown when the prices allow it.
-- ✅ Prices in the visitor's local currency and with tax, from Paddle; "Price unavailable" if Paddle can't be reached.
-- ✅ Facts: cancel anytime, refunds within 14 days, Paddle handles payments and VAT, your art stays yours; links to Terms, Privacy and Refunds.
+- Premium assets and tutorials, badge gifting, and hiring portfolios are
+  implemented. Badge gifting uses the sender's published artwork; recipients
+  opt into public display. Member settings live at `/settings/perks`.
+- Discord linking and role synchronization are implemented but external setup
+  remains pending, so Discord stays marked **Soon** on pricing.
+- Advanced has a priority support email entry point with account context.
+  Mailbox triage and response-time commitments are operational responsibilities.
+- Subscription settings shows actual cloud and AI usage. AI allowances reset
+  on the first day of each month in UTC. Failed usage reads remain unknown.
 
-### Buying
-
-- ✅ Guests see "Sign up to subscribe": sign up, then come back to Pricing.
-- ✅ Signed-in people without a plan: "Subscribe" opens Paddle checkout over the page.
-- ✅ Subscribers see "Your plan" on their current plan and "Change plan" on the others (opens [Subscription settings](settings.md) with that plan chosen). Nobody can buy a second subscription.
-
-### What each plan includes
-
-| Plan     | Advertised today                                                                               | Status                                    |
-| -------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Free     | Every drawing tool, layers and frames, palettes, exports, cloud or Drive, a few AI generations | ✅                                        |
-| Starter  | More AI every month, more cloud room, premium badge                                            | 🔨 Badge works; AI and storage limits ❓  |
-| Pro      | Many more AI generations and animations, much more room, early access                          | 🔨 Limits ❓; early access not defined ❓ |
-| Advanced | The most AI and room, priority support                                                         | 🔨 Limits ❓; priority support process ❓ |
-
-- ❓ **Plan limits:** AI credits per plan and month, cloud storage per plan, whether credits reset monthly (recommended) and whether unused credits carry over (recommended: no).
-- 📋 Add "Paid assets and packs" to the paid plans once [Assets](assets.md) supports it.
-- 📋 Credits are reserved before each AI call, so two calls at once can't overspend (built together with plan limits).
-
-## Welcome (`/welcome`)
-
-- ✅ Checks the real plan: "Welcome to Pro — your plan is active" once Paddle confirms.
-- ✅ While waiting for Paddle (usually a few seconds): "Finishing your subscription…", checking every 2 seconds for up to 30 seconds.
-- ✅ If Paddle hasn't confirmed by then: explains the plan will appear in Settings within minutes, and Paddle emails the receipt.
-- ✅ Guests are asked to log in to see their plan. Visiting this page never grants a plan.
-- ✅ Hidden from search engines.
-
-## Behind the scenes
-
-- ✅ Paddle webhook keeps subscriptions up to date (signed, ignores out-of-order events).
-- ✅ Downgrades are applied an hour or two before renewal by an hourly Supabase job.
+Apply the new migrations and complete the integration checks in
+[the production feature plan](../production-feature-plan.md) before deployment.

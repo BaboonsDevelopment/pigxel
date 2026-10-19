@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
@@ -32,6 +33,12 @@ import {
 import { ArtsToolbar } from "@/features/profile/components/arts-toolbar";
 import { readTab, tabHref, type ProfileTabId } from "@/features/profile/tabs";
 import { usernameError, usernameIn } from "@/features/profile/validation";
+
+import {
+  getHiringProfile,
+  listProfileBadges,
+} from "@/features/membership/server";
+import { ProfilePerks } from "@/features/membership/components/profile-perks";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +162,17 @@ export default async function ArtistProfilePage({
       showActivity ? getProfileActivity(profile.id) : null,
     ]);
 
+  const [badges, hiring] = await Promise.all([
+    listProfileBadges(profile.id).catch((error: unknown) => {
+      console.error(error);
+      return [];
+    }),
+    getHiringProfile(profile.id).catch((error: unknown) => {
+      console.error(error);
+      return { profile: null, portfolio: [] };
+    }),
+  ]);
+
   const count =
     content?.kind === "collections"
       ? collections.length
@@ -169,6 +187,7 @@ export default async function ArtistProfilePage({
 
   return (
     <Page className={PROFILE_PAGE}>
+      <BackButton href="/explore" className="mb-5" />
       {isOwner && profile.visibility === "private" && (
         <Notice className="mb-6">
           Your profile is private: only you can see it.{" "}
@@ -193,6 +212,15 @@ export default async function ArtistProfilePage({
         blocked={blocked}
         tabHref={(id) => tabHref(profile.username, id)}
         activity={activity}
+      />
+
+      <ProfilePerks
+        badges={badges}
+        hiring={hiring.profile}
+        portfolio={hiring.portfolio}
+        isOwner={isOwner}
+        username={profile.username}
+        guest={!user}
       />
 
       <ProfileTabs

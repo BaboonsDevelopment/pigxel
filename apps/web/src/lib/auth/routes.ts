@@ -27,6 +27,7 @@ const returnPaths = [
   "/tiles/edit",
   "/settings/account",
   "/settings/profile",
+  "/settings/perks",
   "/pricing",
   "/auth/update-password",
 ];
@@ -44,7 +45,14 @@ export function safeNext(next: string | null | undefined) {
   if (url.origin !== BASE) return HOME_PATH;
   if (/^\/u\/[a-z0-9_]{3,20}$/.test(url.pathname)) return url.pathname;
   if (/^\/share\/[0-9a-f-]{36}$/i.test(url.pathname)) return url.pathname;
+  if (/^\/feedback\/[1-9][0-9]{0,14}$/.test(url.pathname)) return url.pathname;
   if (!returnPaths.includes(url.pathname)) return HOME_PATH;
+  if (url.pathname === "/settings/perks") {
+    const gift = url.searchParams.get("gift");
+    return gift && /^[a-z0-9_]{3,20}$/.test(gift)
+      ? `/settings/perks?gift=${gift}`
+      : "/settings/perks";
+  }
   const id = url.searchParams.get("id");
   return url.pathname === "/tiles/edit" && id && /^[\w-]{1,64}$/.test(id)
     ? `/tiles/edit?id=${id}`

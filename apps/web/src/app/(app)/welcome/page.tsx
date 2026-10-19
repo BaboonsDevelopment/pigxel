@@ -17,7 +17,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function Welcome() {
+export default async function Welcome({
+  searchParams,
+}: {
+  searchParams?: Promise<{ checkout_id?: string | string[] }>;
+} = {}) {
+  const params = await searchParams;
+  const checkoutId =
+    typeof params?.checkout_id === "string" ? params.checkout_id : undefined;
   const user = await getUser();
   const plan = user ? await getCurrentPlan(user.id) : null;
   const paid = plan && plan.name !== "Free" ? plan : null;
@@ -52,7 +59,7 @@ export default async function Welcome() {
               Your {paid.name} plan is active. Creem will email your receipt.
             </Text>
           ) : user ? (
-            <AwaitingPlan />
+            <AwaitingPlan checkoutId={checkoutId} />
           ) : (
             <Text tone="muted" className="mt-4 leading-relaxed">
               Log in to see your plan in Settings → Subscription.

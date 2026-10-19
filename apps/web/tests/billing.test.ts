@@ -43,13 +43,31 @@ describe("Creem product environments", () => {
   });
 
   it("keeps test checkouts on test products", () => {
-    for (const tier of TIERS)
+    for (const tier of BILLABLE_TIERS)
       for (const cycle of ["month", "year"] as const) {
         const id = productIdFor(tier, cycle, "test");
         expect(planOfProduct(id, "test")).toEqual({ name: tier.name, cycle });
         expect(planOfProduct(id, "live")).toBeNull();
       }
-    expect(productIdFor(ARTIST_PLAN, "month", "test")).toBe("");
+    expect(productIdFor(ARTIST_PLAN, "month", "test")).toBe(
+      "prod_7cz5xB6ttRKCUnqCF1Gm2a",
+    );
+  });
+
+  it("recognizes subscriptions on archived products without allowing new checkouts", () => {
+    for (const tier of TIERS)
+      for (const cycle of ["month", "year"] as const) {
+        const id = tier.archivedTestProductId![cycle];
+        expect(planOfProduct(id)).toEqual({ name: tier.name, cycle });
+        expect(planOfProduct(id, "test")).toBeNull();
+        expect(currentPlan([record({ productId: id })])).toMatchObject({
+          name: tier.name,
+          cycle,
+        });
+      }
+    expect(
+      planChange(pro.archivedTestProductId!.month, pro.productId.year),
+    ).toBe("upgrade");
   });
 
   it("selects the API and catalog mode from the server key", async () => {

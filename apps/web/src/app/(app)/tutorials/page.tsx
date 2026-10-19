@@ -5,19 +5,25 @@ import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, PageHeader, Text } from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/layout/scaled-page";
+import { listTutorialVideos } from "@/features/tutorials/server";
 import { TUTORIALS } from "@/features/tutorials/tutorials";
 
 export const metadata: Metadata = { title: "Tutorials · Pigxel" };
 
-export default function Tutorials() {
+export default async function Tutorials() {
+  const videos = await listTutorialVideos();
+  const tutorials = TUTORIALS.map((tutorial) => ({
+    ...tutorial,
+    youtubeId: videos.get(tutorial.slug) ?? tutorial.youtubeId,
+  }));
   return (
     <ScaledPage>
       <PageHeader
         title="Tutorials"
-        description="Watch a short video, then practise in the editor with a guide that points at each tool and ticks steps off as you do them."
+        description="Learn by creating in the editor. Follow interactive guides that point at each tool and track your progress, with videos on selected lessons."
       />
       <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 @min-[1480px]:grid-cols-4">
-        {TUTORIALS.map((tutorial) => (
+        {tutorials.map((tutorial) => (
           <li key={tutorial.slug}>
             <Link
               href={`/tutorials/${tutorial.slug}`}
@@ -49,9 +55,11 @@ export default function Tutorials() {
                   {tutorial.summary}
                 </Text>
                 <span className="mt-auto flex flex-wrap gap-1.5 pt-4">
-                  <Badge tone="pink" size="md">
-                    {tutorial.youtubeId ? "▶ Video" : "Video soon"}
-                  </Badge>
+                  {tutorial.youtubeId && (
+                    <Badge tone="pink" size="md">
+                      ▶ Video
+                    </Badge>
+                  )}
                   <Badge tone="lavender" size="md">
                     Interactive guide · {tutorial.steps.length} steps
                   </Badge>

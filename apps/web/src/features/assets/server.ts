@@ -205,7 +205,7 @@ export async function listAssetPage(
     if (!premiumPacks.length) return { assets: [], count: 0 };
   }
 
-  const term = cleanSearch(filters.query);
+  const term = cleanSearch(filters.query.trim().replace(/^#/, ""));
   let matches: string | null = null;
   if (term) {
     const [packs, tags] = await Promise.all([

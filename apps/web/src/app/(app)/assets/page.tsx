@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Notice } from "@pigxel/ui/components/notice";
-import { ScaledPage } from "@/components/layout/scaled-page";
+import { Page } from "@pigxel/ui/components/page";
 import { AssetsView } from "@/features/assets/components/assets-view";
 import {
   readAssetView,
@@ -42,23 +42,25 @@ export default async function Assets({
     ]);
 
   return (
-    <ScaledPage>
-      {packs ? (
-        <AssetsView
-          tab={tab}
-          filters={filters}
-          packs={packs}
-          tags={tags}
-          favourites={favourites}
-          recent={recent}
-          firstPage={firstPage}
-          openAsset={openAsset}
-        />
-      ) : (
-        <Notice tone="error" className="mt-8">
-          Couldn’t load assets. Refresh the page to try again.
-        </Notice>
-      )}
-    </ScaledPage>
+    <div className="min-h-full bg-[#fff8fb]">
+      <Page className="max-w-[112rem] px-5 pt-8 pb-12 md:px-8 md:pt-10 xl:px-12">
+        {packs ? (
+          <AssetsView
+            tab={tab}
+            filters={filters}
+            packs={packs}
+            tags={tags}
+            favourites={favourites}
+            recent={recent}
+            firstPage={firstPage}
+            openAsset={openAsset}
+          />
+        ) : (
+          <Notice tone="error" className="mt-8">
+            Couldn’t load assets. Refresh the page to try again.
+          </Notice>
+        )}
+      </Page>
+    </div>
   );
 }

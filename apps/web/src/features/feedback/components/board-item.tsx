@@ -8,8 +8,15 @@ import {
   type FeedbackStatus,
 } from "../feedback";
 import { VoteButton } from "./vote-button";
+import { StatusControl } from "./status-control";
 
-export function BoardItem({ item }: { item: FeedbackItem }) {
+export function BoardItem({
+  item,
+  admin = false,
+}: {
+  item: FeedbackItem;
+  admin?: boolean;
+}) {
   return (
     <li id={`feedback-${item.id}`} className="flex gap-4 px-4 py-4">
       <VoteButton
@@ -21,7 +28,11 @@ export function BoardItem({ item }: { item: FeedbackItem }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-          <h3 className="min-w-0 font-semibold break-words">{item.title}</h3>
+          <h3 className="min-w-0 font-semibold break-words">
+            <Link href={`/feedback/${item.id}`} className="hover:underline">
+              {item.title}
+            </Link>
+          </h3>
           <StatusBadge status={item.status} />
         </div>
         <p className="mt-1 text-sm break-words whitespace-pre-line text-foreground/80">
@@ -40,6 +51,7 @@ export function BoardItem({ item }: { item: FeedbackItem }) {
             "a Pigxel artist"
           )}
         </Text>
+        {admin && <StatusControl id={item.id} status={item.status} />}
       </div>
     </li>
   );

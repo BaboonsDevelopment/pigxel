@@ -24,6 +24,6 @@ Where people report bugs and vote on feature requests.
 
 ## Planned and open
 
-- ❓ **Moderation:** how the team changes statuses (open → approved → in development → implemented). Options: an admin view on this page, or the Supabase dashboard.
-- ❓ A page per item with comments and status history.
-- ❓ Tell people when their item changes status (notification or email).
+- ✅ Admin-only status controls on the board and detail page, backed by a permission-checked database function.
+- ✅ `/feedback/[id]` shows an item and its status history. Comments are not included.
+- ✅ An in-app notification links the author to their item after a status change; repeating the current status creates no duplicate.

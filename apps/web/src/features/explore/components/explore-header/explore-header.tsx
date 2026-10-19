@@ -17,7 +17,10 @@ import {
   SortAzIcon,
   StarIcon,
 } from "./components/icons";
-import { GridSizeToggle, type GridSize } from "./components/grid-size-toggle";
+import {
+  GridSizeToggle,
+  type GridSize,
+} from "@/components/ui/grid-size-toggle";
 import { MenuButton } from "./components/menu-button";
 import { TagSearch } from "./components/tag-search";
 

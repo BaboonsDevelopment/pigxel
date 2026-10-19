@@ -13,9 +13,11 @@ export interface Tier {
   name: Exclude<PlanName, "Free">;
   description: string;
   features: string[];
-  /** Test-mode products; empty IDs mean the plan is unavailable in test mode. */
+  /** Active test-mode products. */
   productId: Record<BillingCycle, string>;
   liveProductId: Record<BillingCycle, string>;
+  /** Archived test products, retained only to recognize existing subscriptions. */
+  archivedTestProductId?: Record<BillingCycle, string>;
   /** In cents, before tax. Keep in step with the Creem products. */
   price: Record<BillingCycle, number>;
   limits: Limits;
@@ -69,8 +71,7 @@ const PREMIUM_PERKS = [
 /** Perks listed before they ship; the pricing page marks them "Soon". */
 export const UPCOMING_PERKS: ReadonlySet<string> = new Set([
   "Premium role on Discord",
-  "Gift custom badges to other users",
-  "Portfolio items on your hiring profile",
+  // Discord needs its application, bot and server role configured before launch.
 ]);
 
 const STARTER_EXTRAS = PREMIUM_PERKS;
@@ -87,6 +88,10 @@ export const TIERS: Tier[] = [
     features: paidFeatures("Free", STARTER, STARTER_EXTRAS),
     extras: STARTER_EXTRAS,
     productId: {
+      month: "prod_5V3LzYMCaPE6dEi8blqfVB",
+      year: "prod_3n05j5qGkHEBBdYhXsDWxl",
+    },
+    archivedTestProductId: {
       month: "prod_2GOqluekb0emjqMu1T2FNw",
       year: "prod_70SuiDz4RJE2qb2zhNVL6s",
     },
@@ -104,6 +109,10 @@ export const TIERS: Tier[] = [
     features: paidFeatures("Starter", PRO, PRO_EXTRAS),
     extras: PRO_EXTRAS,
     productId: {
+      month: "prod_6yKnUDGCpoco8J8hknnaBz",
+      year: "prod_5IEqFnZhvnAV2VgGU50tgX",
+    },
+    archivedTestProductId: {
       month: "prod_5MXjzA3GUp1uXc1n2WNUoD",
       year: "prod_2n6kFkVPfvfF3lIUKS6iHC",
     },
@@ -120,6 +129,10 @@ export const TIERS: Tier[] = [
     features: paidFeatures("Pro", ADVANCED, ADVANCED_EXTRAS),
     extras: ADVANCED_EXTRAS,
     productId: {
+      month: "prod_2mNswlGHMhpRXQzxQMqUsC",
+      year: "prod_6KGATulUC7LbYaPdluo1tq",
+    },
+    archivedTestProductId: {
       month: "prod_3iOeJD8GbTwrNeFMxZewrC",
       year: "prod_4WTkhxtFomX6vqXkOokXv5",
     },
@@ -135,7 +148,10 @@ export const TIERS: Tier[] = [
 export const ARTIST_PLAN: Tier = {
   name: "Artist",
   description: "Every perk, zero AI.",
-  productId: { month: "", year: "" },
+  productId: {
+    month: "prod_7cz5xB6ttRKCUnqCF1Gm2a",
+    year: "prod_1SRfxD9dHkj1gCRtR2Vz7M",
+  },
   liveProductId: {
     month: "prod_5xMylH1dqWTOqRAtfUZaeh",
     year: "prod_7PzKBMEhRRicye3hsYLM3",
@@ -175,6 +191,12 @@ export function productMode(productId: string): BillingMode | null {
       )
     )
       return mode;
+  if (
+    BILLABLE_TIERS.some((tier) =>
+      Object.values(tier.archivedTestProductId ?? {}).includes(productId),
+    )
+  )
+    return "test";
   return null;
 }
 

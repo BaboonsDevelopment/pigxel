@@ -27,6 +27,8 @@ export function AppShell({
   const pathname = usePathname();
   const isExplore = pathname === "/explore";
   const isProjects = pathname === "/tiles";
+  const isAssets = pathname === "/assets" || pathname.startsWith("/assets/");
+  const hasPageSearch = isExplore || isProjects || isAssets;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -72,7 +74,7 @@ export function AppShell({
         <header
           className={cn(
             "flex shrink-0 items-center gap-3 px-4 md:px-8",
-            isExplore || isProjects
+            hasPageSearch
               ? "h-12 md:absolute md:top-0 md:right-0 md:z-20"
               : "h-16 border-b border-border bg-sidebar md:border-0 md:bg-transparent",
           )}
@@ -94,8 +96,8 @@ export function AppShell({
           </Link>
           <div id="app-header-start" className="hidden min-w-0 md:flex" />
           <div className="ml-auto flex items-center gap-2.5">
-            {/* Explore and My projects have their own search box. */}
-            <span className={cn((isExplore || isProjects) && "hidden")}>
+            {/* Browsing pages provide their own search box. */}
+            <span className={cn(hasPageSearch && "hidden")}>
               <SearchButton userId={userId} />
             </span>
             <NotificationBell unread={unreadNotifications} />

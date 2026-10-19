@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
-import {
-  Heading,
-  Lead,
-  linkVariants,
-  Text,
-} from "@pigxel/ui/components/typography";
+import { Heading, Lead, Text } from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/layout/scaled-page";
 import { StartGuideButton } from "@/features/tutorials/components/start-guide-button";
 import { TutorialVideo } from "@/features/tutorials/components/tutorial-video";
 import { findAsset } from "@/features/assets/server";
-import { requireUser } from "@/lib/auth/session";
+import { listTutorialVideos } from "@/features/tutorials/server";
+import { TutorialVideoForm } from "@/features/tutorials/components/tutorial-video-form";
+import { isAdmin, requireUser } from "@/lib/auth/session";
 import { hasPremiumAccess } from "@/features/billing/server";
 import { findTutorial } from "@/features/tutorials/tutorials";
 
@@ -32,15 +30,15 @@ export default async function TutorialPage({ params }: Props) {
   if (!tutorial) notFound();
   const { practice } = tutorial;
   const user = await requireUser();
+  const videos = await listTutorialVideos();
+  const youtubeId = videos.get(tutorial.slug) ?? tutorial.youtubeId;
   const locked = !!tutorial.premium && !(await hasPremiumAccess(user));
   const asset =
     practice.asset && !locked ? await findAsset(practice.asset) : null;
 
   return (
     <ScaledPage>
-      <Link href="/tutorials" className={linkVariants({ variant: "accent" })}>
-        <span aria-hidden="true">←</span> All tutorials
-      </Link>
+      <BackButton href="/tutorials" className="mb-3" />
       <Heading size="page" className="mt-2">
         {tutorial.title}
       </Heading>
@@ -54,10 +52,25 @@ export default async function TutorialPage({ params }: Props) {
         )}
       </Text>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div
+        className={`mt-6 grid gap-6 ${youtubeId ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "max-w-3xl"}`}
+      >
         <div>
-          <TutorialVideo tutorial={tutorial} />
-          <Lead className="mt-4 max-w-prose">{tutorial.summary}</Lead>
+          {locked && youtubeId ? (
+            <div className="flex aspect-video items-center justify-center rounded-2xl border bg-pastel-lavender p-6 text-center">
+              <Link href="/pricing" className={buttonVariants()}>
+                Upgrade to watch this lesson
+              </Link>
+            </div>
+          ) : (
+            <TutorialVideo tutorial={{ ...tutorial, youtubeId }} />
+          )}
+          <Lead className={youtubeId ? "mt-4 max-w-prose" : "max-w-prose"}>
+            {tutorial.summary}
+          </Lead>
+          {isAdmin(user) && (
+            <TutorialVideoForm slug={tutorial.slug} youtubeId={youtubeId} />
+          )}
         </div>
 
         <section
@@ -75,7 +88,7 @@ export default async function TutorialPage({ params }: Props) {
               <div className="rounded-lg bg-white/70 p-4">
                 <p className="font-semibold">A premium tutorial</p>
                 <Text size="sm" tone="muted" className="mt-1">
-                  Starter, Pro and Advanced plans unlock every premium tutorial
+                  Artist and all Pro token levels unlock every premium tutorial
                   and asset, including the practice sprite for this one.
                 </Text>
                 <Link

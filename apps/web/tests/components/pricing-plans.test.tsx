@@ -10,6 +10,19 @@ import { ARTIST_PLAN, TIERS } from "@/features/billing/pricing";
 const [starter, pro, advanced] = TIERS;
 
 describe("the AI plan's token picker", () => {
+  it("enables local test checkout for Artist and Pro", () => {
+    renderWithUser(<PricingPlans heading={null} signedIn billingMode="test" />);
+    expect(screen.queryByText("Coming soon")).toBeNull();
+    expect(
+      screen.getByRole("button", {
+        name: "Subscribe to Artist, billed monthly",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Subscribe to Pro, billed monthly" }),
+    ).toBeTruthy();
+  });
+
   it("uses live products for plan changes and enables Artist in live mode", () => {
     renderWithUser(
       <PricingPlans
@@ -67,8 +80,10 @@ describe("the AI plan's token picker", () => {
     expect(screen.getByText("Your plan")).toBeTruthy();
     fireEvent.change(screen.getByRole("slider"), { target: { value: "0" } });
     expect(
-      screen.getByRole("link", { name: "Change plan" }).getAttribute("href"),
-    ).toBe(`/settings/subscription?plan=${starter!.productId.month}`);
+      screen
+        .getAllByRole("link", { name: "Change plan" })
+        .map((link) => link.getAttribute("href")),
+    ).toContain(`/settings/subscription?plan=${starter!.productId.month}`);
   });
 
   it("opens on the subscriber's own amount and billing period", () => {

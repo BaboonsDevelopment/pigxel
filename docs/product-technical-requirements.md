@@ -202,15 +202,15 @@ Source: [assets route](<../apps/web/src/app/(app)/assets/page.tsx>), [asset dial
 
 ### 3.11 PAGE-10 — Tutorials (`/tutorials`)
 
-**Behavior:** show tutorial illustrations, title, summary, level, minutes, video status, and interactive step count. Current lessons: Pixel art basics (8 min), Your first animation (16 min), and Build a tileset (32 min).
+**Behavior:** show tutorial illustrations, title, summary, level, minutes, an optional video badge, and interactive step count. Current lessons: Pixel art basics (8 min), Your first animation (16 min), and Build a tileset (32 min).
 
-**Requirements and acceptance:** every tutorial card links to its slug detail page; video availability follows actual `youtubeId` data; the current three tutorials must show “Video soon” because they have no configured video IDs.
+**Requirements and acceptance:** every tutorial card links to its slug detail page; video availability follows actual `youtubeId` data; lessons without video IDs show no video badge or coming-soon placeholder.
 
 Source: [tutorial catalog route](<../apps/web/src/app/(app)/tutorials/page.tsx>), [lesson definitions](../apps/web/src/lib/tutorials/tutorials.ts).
 
 ### 3.12 PAGE-11 — Tutorial detail (`/tutorials/[slug]`)
 
-**Behavior:** resolve a known lesson, show its video or placeholder, description, practice project dimensions, ordered steps, and Start guide button. Unknown slugs return not found. Practice launches a browser-kept document and appends `guide=<slug>` to the editor URL.
+**Behavior:** resolve a known lesson, show its optional video, description, practice project dimensions, ordered steps, and Start guide button. Unknown slugs return not found. Practice launches a browser-kept document and appends `guide=<slug>` to the editor URL.
 
 **Requirements and acceptance:** guides target the right tools/menus/panels, automatically complete observable actions, and allow progression through informational steps. Missing optional assets must be handled. Starting practice must not replace existing work.
 
@@ -644,7 +644,7 @@ Sources: [asset model](../apps/web/src/lib/assets/assets.ts), [publishing](../ap
 
 **FR-LEARN-02:** observe tool choice, colors, painted content, frame count/differences, onion/grid state, playback, export dialog, floating placement, and inserted assets. Guide steps point to relevant UI and tick off when the predicate is satisfied; some steps are instructional and have no automatic predicate.
 
-**Acceptance:** progression uses the active practice project's state; editor customization does not leave the coach unusable; closing a guide does not delete the practice drawing; unavailable video IDs render a placeholder.
+**Acceptance:** progression uses the active practice project's state; editor customization does not leave the coach unusable; closing a guide does not delete the practice drawing; unavailable video IDs render no player or placeholder.
 
 ### 8.4 Feedback lifecycle
 
@@ -900,7 +900,7 @@ This is a requirements backlog based on concrete implementation differences. Pri
 | GAP-03 | Subscription settings has no implemented cancel/change-plan/payment/invoice controls; legal copy describes cancellation from settings.                                                                                       | **Resolved October 4, 2026:** Settings → Subscription offers Netflix-style plan changes (upgrades now with a previewed prorated charge, downgrades at renewal), and Paddle's portal for payment method, invoices and cancelling, with “Keep my plan” to undo a cancellation. |
 | GAP-04 | Checkout can be initiated for guests without a user attribution object; subscription mapping requires a valid `customData.userId`.                                                                                           | **Resolved October 4, 2026:** checkout requires an account; guests are sent to sign up and back to Pricing, and every checkout carries the user ID. The webhook logs unattributed subscriptions with their IDs for manual linking.                                           |
 | GAP-05 | Profile includes `premium_since`, but inspected webhook storage resolves subscriptions without automatically updating that field.                                                                                            | **Resolved October 4, 2026:** a trigger on `subscriptions` sets `premium_since` when paid membership starts and clears it when none is left.                                                                                                                                 |
-| GAP-06 | All three tutorial entries omit `youtubeId`.                                                                                                                                                                                 | Add actual lesson videos or maintain explicitly labeled placeholders; interactive guides already exist.                                                                                                                                                                      |
+| GAP-06 | All three tutorial entries omit `youtubeId`.                                                                                                                                                                                 | Videos are optional; show only attached recordings and keep interactive guides available.                                                                                                                                                                                    |
 | GAP-07 | Legal metadata uses company/address/contact placeholders and `draft: true`; legal pages contain operational promises beyond the UI.                                                                                          | **Resolved:** the legal metadata now has real operator details and is no longer a draft.                                                                                                                                                                                     |
 | GAP-08 | README says six profile pins and older patch notes imply palette export in `.gpl`, `.hex`, and Paint.NET formats; current code/database limit pins to four and palette export to `.gpl`.                                     | **Resolved October 4, 2026:** the README says four pins, and the patch note says palettes import from .gpl, .hex or Paint.NET and save as .gpl.                                                                                                                              |
 | GAP-09 | README describes browser drafts as localStorage, while current code prefers IndexedDB with fallback/migration.                                                                                                               | **Resolved October 4, 2026:** the README describes IndexedDB drafts, the localStorage fallback and migration, and that clearing site data deletes drafts.                                                                                                                    |
@@ -938,3 +938,38 @@ The complete route inventory is derived from `apps/web/src/app/**/page.tsx`. The
 | Database and policies          | [migrations](../supabase/migrations/)                                                                                         |
 | Shared presentation            | [UI package](../packages/ui/src/), [theme](../packages/ui/src/styles/globals.css)                                             |
 | Automated checks               | [test suite](../apps/web/tests/)                                                                                              |
+
+## 16. Member feature implementation (October 19, 2026)
+
+This section supersedes older gap notes for the features listed below. The
+implementation and remaining external dependencies are tracked in
+[production-feature-plan.md](production-feature-plan.md).
+
+- **FR-MEMBER-01:** `/settings/subscription` shows owned, non-trashed cloud
+  projects used/remaining, plan limits, metered AI usage and UTC monthly reset.
+  Failed queries display unknown usage. Advanced support uses the existing
+  support mailbox with priority and account/subscription context.
+- **FR-MEMBER-02:** `/settings/perks` lets paid members gift a named badge made
+  from their approved published art to another artist. The database enforces
+  paid access, ownership, block relationships, no self-gifts, and a five-gift
+  rolling-day cap. Recipients alone control public display or removal; private
+  messages are never displayed publicly.
+- **FR-MEMBER-03:** Paid members manage hiring profiles and up to twelve
+  portfolio items, including editing existing entries and choosing their display order. Database policies enforce paid ownership for edits; the reorder RPC validates the complete owned item set. Contact/project links are HTTPS. Preview art belongs to the
+  member and is approved/published. Public reads require a public profile and
+  current paid entitlement; owners retain access to their stored data.
+- **FR-MEMBER-04:** Admins change feedback status through a database-authorized
+  function. `/feedback/[id]` shows the item and history. Status changes and the
+  author notification commit together; repeating the status is a no-op.
+- **FR-MEMBER-05:** Discord uses an identity-only OAuth flow with session-bound,
+  expiring state. Verified Discord IDs are written only server-side; OAuth
+  tokens are revoked/discarded. Subscription events attempt role synchronization
+  and a scheduled retry job reconciles roles and account-deletion cleanup.
+  Test products cannot grant roles in a live-key environment. Application/bot/
+  role configuration and a live integration check are pending external setup.
+- **FR-MEMBER-06:** Admins attach validated YouTube IDs to existing lessons.
+  Premium videos require the lesson entitlement and use the existing consent
+  player. Videos are optional: when absent, no player, placeholder or video badge appears. Interactive guides remain available without recordings.
+
+Database migrations are prepared, not applied to the hosted database by this
+work. Database integration tests require local Supabase and Docker.

@@ -13,6 +13,9 @@ import { getCurrentPlan } from "@/features/billing/server";
 import { planOfProduct } from "@/features/billing/subscription";
 import { getBillingMode } from "@/features/billing/creem";
 import { ManagePlan } from "@/features/billing/components/manage-plan";
+import { getSubscriptionUsage } from "@/features/billing/usage";
+import { SubscriptionUsage } from "@/features/billing/components/subscription-usage";
+import { SubscriptionSupport } from "@/features/billing/components/subscription-support";
 
 export const metadata: Metadata = { title: "Subscription · Pigxel" };
 export const dynamic = "force-dynamic";
@@ -27,7 +30,10 @@ export default async function SubscriptionSettings({
 }) {
   const { billing, plan: chosen } = await searchParams;
   const user = await requireUser();
-  const plan = await getCurrentPlan(user.id);
+  const [plan, usage] = await Promise.all([
+    getCurrentPlan(user.id),
+    getSubscriptionUsage(user.id),
+  ]);
   const periodEnd =
     plan.name === "Free" ? null : (plan.renewsAt ?? plan.cancelsAt);
   return (
@@ -69,6 +75,7 @@ export default async function SubscriptionSettings({
           </Link>
         </p>
       </Card>
+      <SubscriptionUsage plan={plan.name} usage={usage} />
       {plan.name !== "Free" && (
         <ManagePlan
           billingMode={getBillingMode()}
@@ -77,6 +84,21 @@ export default async function SubscriptionSettings({
           chosen={chosen && planOfProduct(chosen) ? chosen : undefined}
         />
       )}
+      <Card className="mt-6">
+        <SectionTitle>Your member perks</SectionTitle>
+        <Text tone="muted" className="mt-2">
+          {plan.name === "Free"
+            ? "Manage badges you’ve received, or explore the perks included with a paid plan."
+            : "Gift custom badges, manage your received gifts, and build your hiring portfolio."}
+        </Text>
+        <Link
+          href="/settings/perks"
+          className={`${textLinkClassName} mt-3 inline-block`}
+        >
+          Manage member perks →
+        </Link>
+      </Card>
+      <SubscriptionSupport plan={plan} email={user.email} />
     </section>
   );
 }
