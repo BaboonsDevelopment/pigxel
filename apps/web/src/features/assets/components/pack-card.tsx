@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { manrope } from "@/lib/fonts/manrope";
 import { PremiumBadge } from "@/features/billing/components/premium-badge";
 import { packViewUrl } from "../filters";
 import type { PackCard as Pack } from "../server";
@@ -23,7 +24,7 @@ export function PackCard({
   onFavourite: (on: boolean) => void;
 }) {
   return (
-    <div className="group relative">
+    <div className={cn(manrope.className, "group relative text-[#4a1f35]")}>
       <Link
         href={packViewUrl(pack.id)}
         className="block w-full rounded-2xl text-left focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -54,8 +55,8 @@ export function PackCard({
           ))}
           {pack.premium && <PremiumBadge className="absolute top-2 left-2" />}
         </span>
-        <span className="mt-2 flex items-center gap-2">
-          <span className="min-w-0 truncate text-sm font-semibold">
+        <span className="mt-2 flex items-center gap-2 px-3 pt-0.5">
+          <span className="min-w-0 truncate text-sm leading-tight font-medium">
             {pack.name}
           </span>
           {pack.size && (
@@ -64,7 +65,12 @@ export function PackCard({
             </Badge>
           )}
         </span>
-        <Text as="span" size="xs" tone="muted" className="block tabular-nums">
+        <Text
+          as="span"
+          size="xs"
+          tone="muted"
+          className="mt-1 block px-3 pb-3 tabular-nums"
+        >
           {pack.count} {pack.count === 1 ? "asset" : "assets"}
           {pack.animated > 0 && ` · ${pack.animated} animated`}
         </Text>

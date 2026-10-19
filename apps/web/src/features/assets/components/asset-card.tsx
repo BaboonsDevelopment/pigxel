@@ -3,6 +3,7 @@
 import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
+import { manrope } from "@/lib/fonts/manrope";
 import { PremiumBadge } from "@/features/billing/components/premium-badge";
 import { TilesBadge } from "@/features/tiles/components/tiles-badge";
 import type { Asset } from "../assets";
@@ -29,7 +30,7 @@ export function AssetCard({
 }) {
   const tile = asset.kind === "tile";
   return (
-    <div className="group relative">
+    <div className={cn(manrope.className, "group relative text-[#4a1f35]")}>
       <button
         type="button"
         onClick={onOpen}
@@ -60,14 +61,14 @@ export function AssetCard({
           )}
           {tile && <TilesBadge className="absolute bottom-2 left-2" />}
         </span>
-        <span className="mt-2 block truncate text-sm font-semibold">
+        <span className="mt-2 block truncate px-3 pt-0.5 text-sm leading-tight font-medium">
           {asset.name}
         </span>
         <Text
           as="span"
           size="xs"
           tone="muted"
-          className="block font-mono tabular-nums"
+          className="mt-1 block px-3 pb-3 tabular-nums"
         >
           {asset.width} × {asset.height}
           {asset.frames > 1 && ` · ${asset.frames} frames`}

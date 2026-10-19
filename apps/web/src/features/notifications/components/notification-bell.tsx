@@ -6,6 +6,10 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { openNotifications } from "../actions";
 import { ProfileAvatar } from "@/features/profile/components/profile-avatar";
 import type { ActivityKind, AppNotification } from "../server";
+import {
+  FEEDBACK_STATUSES,
+  type FeedbackStatus,
+} from "@/features/feedback/feedback";
 import { BellIcon } from "@/components/ui/icons";
 import { InviteNotification } from "./invite-notification";
 
@@ -116,7 +120,9 @@ export function NotificationBell({
                           item.unread && "bg-primary-soft/35",
                         )}
                       >
-                        {item.kind !== "art_rejected" ? (
+                        {item.kind !== "art_rejected" &&
+                        item.kind !== "feedback_status" &&
+                        item.kind !== "badge_gift" ? (
                           <ProfileAvatar
                             name={item.name}
                             url={item.avatarUrl}
@@ -124,24 +130,46 @@ export function NotificationBell({
                         ) : (
                           <span
                             aria-hidden="true"
-                            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive"
+                            className={cn(
+                              "flex size-9 shrink-0 items-center justify-center rounded-full",
+                              item.kind === "art_rejected"
+                                ? "bg-destructive/10 text-destructive"
+                                : "bg-pastel-lavender text-primary",
+                            )}
                           >
-                            <svg
-                              viewBox="0 0 16 16"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="1.6"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="size-4"
-                            >
-                              <path d="M8 2.5 14 13H2Z" />
-                              <path d="M8 6.5v3M8 11.3v.2" />
-                            </svg>
+                            {item.kind !== "art_rejected" ? (
+                              <BellIcon />
+                            ) : (
+                              <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="size-4"
+                              >
+                                <path d="M8 2.5 14 13H2Z" />
+                                <path d="M8 6.5v3M8 11.3v.2" />
+                              </svg>
+                            )}
                           </span>
                         )}
                         <span className="min-w-0 flex-1 text-sm">
-                          {item.kind === "follow" ? (
+                          {item.kind === "badge_gift" ? (
+                            <>
+                              You received the “{item.label}” badge. Choose
+                              whether to display it on your profile.
+                            </>
+                          ) : item.kind === "feedback_status" ? (
+                            <>
+                              Your feedback “{item.title}” is now{" "}
+                              {FEEDBACK_STATUSES[
+                                item.status as FeedbackStatus
+                              ] ?? item.status}
+                              .
+                            </>
+                          ) : item.kind === "follow" ? (
                             <>
                               <span className="font-semibold">{item.name}</span>{" "}
                               started following you
@@ -210,6 +238,8 @@ const ACTIVITY: Record<ActivityKind, string> = {
 };
 
 function hrefOf(item: Exclude<AppNotification, { kind: "share_invite" }>) {
+  if (item.kind === "badge_gift") return "/settings/perks";
+  if (item.kind === "feedback_status") return `/feedback/${item.feedbackId}`;
   if (item.kind === "share_role") return "/tiles?tab=shared";
   if (item.kind === "share_removed") return "/tiles";
   if (item.kind === "follow") return `/u/${item.username}`;

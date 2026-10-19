@@ -170,11 +170,13 @@ function TriggerContent({ active }: { active: number }) {
 
 /** Opens and closes the filters sidebar. */
 export function AssetFiltersToggle({
+  className,
   filters,
   open,
   onToggle,
   controls,
 }: {
+  className?: string;
   filters: AssetFilters;
   open: boolean;
   onToggle: () => void;
@@ -189,7 +191,7 @@ export function AssetFiltersToggle({
       aria-expanded={open}
       aria-controls={controls}
       onClick={onToggle}
-      className={TOOLBAR_TRIGGER}
+      className={className ?? TOOLBAR_TRIGGER}
     >
       <TriggerContent active={active} />
     </button>

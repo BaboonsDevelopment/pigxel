@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
@@ -8,7 +7,8 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionHeader } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { madimiOne } from "@/lib/fonts/madimi";
-import mascot from "../../../../public/art/pigxel-mascot-studying.png";
+import { GridSizeToggle, useGridSize } from "@/components/ui/grid-size-toggle";
+import styles from "./assets-grid.module.css";
 import type { Asset } from "../assets";
 import { assetTint } from "../constants";
 import {
@@ -22,8 +22,6 @@ import {
 } from "../filters";
 import type { AssetTag, PackCard as Pack } from "../server";
 import {
-  ASSET_GRID,
-  ASSET_GRID_BESIDE_FILTERS,
   AssetCardItem,
   AssetResults,
   AssetToolbar,
@@ -66,7 +64,8 @@ export function AssetsView({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersId = useId();
   const sidebar = filtersOpen && tab !== "palettes";
-  const grid = sidebar ? ASSET_GRID_BESIDE_FILTERS : ASSET_GRID;
+  const [gridSize, setGridSize] = useGridSize("pigxel.assets.grid");
+  const grid = cn(styles.grid, styles[gridSize]);
 
   const packById = useMemo(
     () => new Map(packs.map((pack, index) => [pack.id, { pack, index }])),
@@ -106,7 +105,7 @@ export function AssetsView({
 
   return (
     <div>
-      <header className="relative mb-8 border-b border-[#f0dde5] pb-4 md:pt-4">
+      <header className="relative mb-10 md:pt-4 lg:[zoom:clamp(0.7,tan(atan2(100vw,1920px)),1)]">
         <h1
           className={cn(
             madimiOne.className,
@@ -118,7 +117,7 @@ export function AssetsView({
         <div
           role="tablist"
           aria-label="View"
-          className="mt-2 inline-flex rounded-xl border border-[#e7c6d2] bg-background p-1"
+          className="mt-2.5 inline-flex max-w-full flex-wrap gap-0.5 rounded-lg border border-[#e7c6d2] bg-background p-0.5"
         >
           {ASSET_TABS.map((option) => (
             <button
@@ -127,15 +126,23 @@ export function AssetsView({
               role="tab"
               aria-selected={tab === option.value}
               onClick={() => setTab(option.value)}
-              className="h-8 cursor-pointer rounded-lg px-4 text-sm text-[#4a1f35] transition-colors hover:bg-muted aria-selected:bg-[#fde2ea] aria-selected:font-semibold"
+              className="h-8 cursor-pointer rounded-md px-4 text-sm text-[#4a2434] transition-colors hover:bg-muted aria-selected:bg-[#fde2ea] aria-selected:font-semibold"
             >
               {option.label}
             </button>
           ))}
         </div>
         {tab !== "palettes" && (
-          <div className="mt-3 lg:pr-[310px]">
+          <div className="mt-[18px]">
             <AssetToolbar
+              layout="browse"
+              controls={
+                <GridSizeToggle
+                  value={gridSize}
+                  onChange={setGridSize}
+                  className="ml-auto"
+                />
+              }
               key={tab}
               typed={typed}
               onTyped={setTyped}
@@ -158,14 +165,6 @@ export function AssetsView({
             />
           </div>
         )}
-        <Image
-          src={mascot}
-          alt=""
-          width={237}
-          height={158}
-          priority
-          className="pointer-events-none absolute right-12 bottom-0 hidden h-auto w-[250px] translate-y-[9%] lg:block"
-        />
       </header>
 
       {favourites.error && (

@@ -14,7 +14,9 @@ import { ScaledPage } from "@/components/layout/scaled-page";
 import { StartGuideButton } from "@/features/tutorials/components/start-guide-button";
 import { TutorialVideo } from "@/features/tutorials/components/tutorial-video";
 import { findAsset } from "@/features/assets/server";
-import { requireUser } from "@/lib/auth/session";
+import { listTutorialVideos } from "@/features/tutorials/server";
+import { TutorialVideoForm } from "@/features/tutorials/components/tutorial-video-form";
+import { isAdmin, requireUser } from "@/lib/auth/session";
 import { hasPremiumAccess } from "@/features/billing/server";
 import { findTutorial } from "@/features/tutorials/tutorials";
 
@@ -32,6 +34,8 @@ export default async function TutorialPage({ params }: Props) {
   if (!tutorial) notFound();
   const { practice } = tutorial;
   const user = await requireUser();
+  const videos = await listTutorialVideos();
+  const youtubeId = videos.get(tutorial.slug) ?? tutorial.youtubeId;
   const locked = !!tutorial.premium && !(await hasPremiumAccess(user));
   const asset =
     practice.asset && !locked ? await findAsset(practice.asset) : null;
@@ -56,7 +60,18 @@ export default async function TutorialPage({ params }: Props) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div>
-          <TutorialVideo tutorial={tutorial} />
+          {locked && youtubeId ? (
+            <div className="flex aspect-video items-center justify-center rounded-2xl border bg-pastel-lavender p-6 text-center">
+              <Link href="/pricing" className={buttonVariants()}>
+                Upgrade to watch this lesson
+              </Link>
+            </div>
+          ) : (
+            <TutorialVideo tutorial={{ ...tutorial, youtubeId }} />
+          )}
+          {isAdmin(user) && (
+            <TutorialVideoForm slug={tutorial.slug} youtubeId={youtubeId} />
+          )}
           <Lead className="mt-4 max-w-prose">{tutorial.summary}</Lead>
         </div>
 
@@ -75,7 +90,7 @@ export default async function TutorialPage({ params }: Props) {
               <div className="rounded-lg bg-white/70 p-4">
                 <p className="font-semibold">A premium tutorial</p>
                 <Text size="sm" tone="muted" className="mt-1">
-                  Starter, Pro and Advanced plans unlock every premium tutorial
+                  Artist and all Pro token levels unlock every premium tutorial
                   and asset, including the practice sprite for this one.
                 </Text>
                 <Link

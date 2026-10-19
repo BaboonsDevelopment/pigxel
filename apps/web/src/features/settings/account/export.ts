@@ -7,6 +7,11 @@ import { listFiles } from "./user-files";
 const TABLES: { name: string; table: string; by: string; columns?: string }[] =
   [
     { name: "profile", table: "profiles", by: "id" },
+    { name: "hiring_profile", table: "hiring_profiles", by: "user_id" },
+    { name: "portfolio", table: "hiring_portfolio_items", by: "user_id" },
+    { name: "received_badges", table: "profile_badges", by: "recipient_id" },
+    { name: "sent_badges", table: "profile_badges", by: "sender_id" },
+    { name: "discord_connection", table: "discord_connections", by: "user_id" },
     { name: "legal_acceptances", table: "legal_acceptances", by: "user_id" },
     { name: "tiles", table: "tiles", by: "user_id" },
     { name: "folders", table: "folders", by: "user_id" },

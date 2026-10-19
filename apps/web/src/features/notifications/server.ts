@@ -20,6 +20,13 @@ export type AppNotification = {
       avatarUrl: string | null;
     }
   | { kind: "art_rejected"; tileName: string }
+  | { kind: "badge_gift"; label: string }
+  | {
+      kind: "feedback_status";
+      feedbackId: number;
+      title: string;
+      status: string;
+    }
   | {
       kind: "share_invite";
       name: string;
@@ -53,10 +60,13 @@ type NotificationRow = {
   id: string;
   kind:
     | "art_rejected"
+    | "feedback_status"
+    | "badge_gift"
     | "share_invite"
     | "share_role"
     | "share_removed"
     | ActivityKind;
+  feedback_id: number | null;
   tile_id: string | null;
   tile_name: string;
   detail: string | null;
@@ -118,7 +128,7 @@ export async function listNotifications(
     supabase
       .from("notifications")
       .select(
-        `id, kind, tile_id, tile_name, detail, created_at, actor:actor_id(${PROFILE_COLUMNS})`,
+        `id, kind, tile_id, tile_name, detail, feedback_id, created_at, actor:actor_id(${PROFILE_COLUMNS})`,
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
@@ -154,6 +164,28 @@ export async function listNotifications(
       ago: timeAgo(Date.parse(row.created_at), now),
       unread: since !== null && row.created_at > since,
     };
+    if (row.kind === "badge_gift")
+      return [
+        {
+          at: row.created_at,
+          item: { ...base, kind: row.kind, label: row.tile_name },
+        },
+      ];
+    if (row.kind === "feedback_status")
+      return row.feedback_id
+        ? [
+            {
+              at: row.created_at,
+              item: {
+                ...base,
+                kind: row.kind,
+                feedbackId: row.feedback_id,
+                title: row.tile_name,
+                status: row.detail ?? "open",
+              },
+            },
+          ]
+        : [];
     if (row.kind === "art_rejected")
       return [
         {

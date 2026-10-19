@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 
 export type GridSize = "large" | "medium" | "small";
@@ -34,7 +35,7 @@ function GridIcon({ cells }: { cells: number }) {
   );
 }
 
-/** How big Explore's cards are: fewer large ones or more small ones. */
+/** Fewer large cards or more small cards, shared by browsing pages. */
 export function GridSizeToggle({
   value,
   onChange,
@@ -69,4 +70,36 @@ export function GridSizeToggle({
       ))}
     </div>
   );
+}
+
+/** Remember a page's preferred card size without changing the server render. */
+export function useGridSize(storageKey: string) {
+  const read = useCallback((): GridSize => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return isGridSize(saved) ? saved : "medium";
+    } catch {
+      return "medium";
+    }
+  }, [storageKey]);
+  const saved = useSyncExternalStore(
+    subscribeToStorage,
+    read,
+    () => "medium" as const,
+  );
+  const [picked, setPicked] = useState<GridSize | null>(null);
+  const change = (next: GridSize) => {
+    setPicked(next);
+    try {
+      localStorage.setItem(storageKey, next);
+    } catch {
+      // Still apply the selection when browser storage is unavailable.
+    }
+  };
+  return [picked ?? saved, change] as const;
+}
+
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
 }

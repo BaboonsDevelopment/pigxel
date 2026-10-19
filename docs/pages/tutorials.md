@@ -7,7 +7,7 @@ Lessons that teach pixel art in Pigxel, with a coach that guides you through the
 ## Tutorial list (`/tutorials`)
 
 - ✅ Cards with picture, title, summary, level, length and number of steps.
-- ✅ Three lessons: Pixel art basics (8 min), Your first animation (16 min), Build a tileset (32 min).
+- ✅ Five interactive lessons: Pixel art basics, Your first animation, Build a tileset, Shading and highlights, and Idle animation.
 - ✅ Shows "Video soon" when a lesson has no video.
 
 ## Lesson (`/tutorials/[slug]`)
@@ -20,7 +20,8 @@ Lessons that teach pixel art in Pigxel, with a coach that guides you through the
 
 ## Planned and open
 
-- 📋 Record and add the three lesson videos (none exist yet).
+- 📋 Record lesson videos; no recordings have been supplied yet.
+- ✅ Admins can attach or remove a YouTube lesson link on its detail page. Links are validated and stored in `tutorial_videos`; playback uses the existing consent-aware player. Premium video access follows the lesson entitlement.
 - ❓ More lessons, for example shading, dithering, tilemaps, the AI assistant, timelapse export.
-- ❓ Remember finished lessons and show progress.
+- ✅ Completed interactive guides are recorded and used when suggesting lessons.
 - ❓ Open the list and lesson pages to guests (good for search engines), keeping practice for accounts.

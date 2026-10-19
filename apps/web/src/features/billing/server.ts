@@ -12,6 +12,7 @@ import {
   type SubscriptionRecord,
 } from "./subscription";
 import { aiAllowance } from "./pricing";
+import { syncDiscordForUser } from "@/features/discord/server";
 
 type SubscriptionRow = {
   id: string;
@@ -69,6 +70,11 @@ export async function saveSubscription(record: SubscriptionRecord) {
     p_cancels_at: record.cancelsAt,
     p_event_at: record.eventAt,
   });
+  if (!error) {
+    await syncDiscordForUser(record.userId).catch((failure: unknown) => {
+      console.error("Discord role sync will be retried:", failure);
+    });
+  }
   return error;
 }
 

@@ -3,9 +3,10 @@
 import { refresh } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth/session";
+import { isAdmin, requireUser } from "@/lib/auth/session";
 import {
   FEEDBACK_KINDS,
+  FEEDBACK_STATUSES,
   OPEN_LIMIT,
   pageFrom,
   readFeedback,
@@ -14,6 +15,29 @@ import {
 import { countOwnOpen } from "./server";
 import { PATCH_NOTES } from "@/features/patch-notes/patch-notes";
 import { createClient } from "@/lib/supabase/server";
+
+export async function updateFeedbackStatus(
+  id: number,
+  status: string,
+): Promise<{ error?: string }> {
+  const user = await requireUser();
+  if (!isAdmin(user))
+    return { error: "Only the Pigxel team can change feedback status." };
+  if (
+    !Number.isSafeInteger(id) ||
+    id < 1 ||
+    !Object.hasOwn(FEEDBACK_STATUSES, status)
+  )
+    return { error: "Choose a valid feedback item and status." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_feedback_status", {
+    p_id: id,
+    p_status: status,
+  });
+  if (error) return { error: "Couldn’t update the status. Try again." };
+  refresh();
+  return {};
+}
 
 export type FeedbackFormState = {
   error?: string;

@@ -55,13 +55,13 @@ describe("pricing for subscribers", () => {
   });
 });
 
-describe("plans outside checkout", () => {
-  it("shows Artist without letting anyone buy it yet", () => {
+describe("additional plans", () => {
+  it("offers Artist checkout without AI tools", () => {
     const html = pricing({ signedIn: true });
     expect(html).toContain("No AI tools in your workspace");
     expect(html).toContain("$5");
-    expect(html).toContain("Coming soon");
-    expect(html).not.toContain("Subscribe to Artist");
+    expect(html).not.toContain("Coming soon");
+    expect(html).toContain("Subscribe to Artist");
   });
 
   it("lets creators apply by email", () => {
@@ -80,8 +80,9 @@ describe("welcome page", () => {
     mocks.user.mockResolvedValue({ id: "user-1" });
     mocks.plan.mockResolvedValue({ name: "Pro" });
     const html = await render();
-    expect(html).toContain("Welcome to Pro");
-    expect(html).toContain("Your plan is active");
+    expect(html).toContain("Thank you for purchasing!");
+    expect(html).toContain("Your Pro plan is active");
+    expect(html).toContain("Go back to Pigxel");
   });
 
   it("waits for Creem instead of claiming the payment went through", async () => {

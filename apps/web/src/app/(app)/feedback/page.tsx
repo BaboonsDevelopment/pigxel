@@ -24,6 +24,7 @@ import {
 } from "@/features/feedback/server";
 import { BoardItem } from "@/features/feedback/components/board-item";
 import { shownFrom } from "@/lib/utils/shown";
+import { getUser, isAdmin } from "@/lib/auth/session";
 
 const STEP = 50;
 
@@ -43,6 +44,7 @@ type Props = {
 
 export default async function Feedback({ searchParams }: Props) {
   const params = await searchParams;
+  const admin = isAdmin(await getUser());
   const query: BoardQuery = {
     kind: kindOf(params.kind),
     state: params.state === "closed" ? "closed" : "open",
@@ -172,7 +174,7 @@ export default async function Feedback({ searchParams }: Props) {
           <>
             <ul className="divide-y">
               {items.map((item) => (
-                <BoardItem key={item.id} item={item} />
+                <BoardItem key={item.id} item={item} admin={admin} />
               ))}
             </ul>
             {more && (

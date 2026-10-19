@@ -34,3 +34,13 @@ An artist's public page: who they are and the art they've published.
 - ❓ Followers and following lists.
 - ❓ Show timelapses on the profile.
 - ❓ Assets submitted by this artist, once community submissions exist ([assets.md](assets.md)).
+
+## Member profile features (October 19, 2026)
+
+- Received badges appear only after the recipient opts into displaying them.
+  Badge messages stay in Member perks settings, not on the public profile.
+- Paid artists can add a hiring headline, availability, contact link, and up to
+  twelve portfolio items through `/settings/perks`. Previews use their own
+  published artwork. Profiles retain the data after membership ends, but the
+  public hiring section requires an active paid plan and a public profile.
+- Database policies enforce ownership, paid access, and profile privacy.

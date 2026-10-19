@@ -105,7 +105,8 @@ export function planOfProduct(
       if (
         (mode ? [mode] : (["test", "live"] as const)).some(
           (candidate) => productIdFor(tier, cycle, candidate) === productId,
-        )
+        ) ||
+        (!mode && tier.archivedTestProductId?.[cycle] === productId)
       )
         return { name: tier.name, cycle };
   return null;

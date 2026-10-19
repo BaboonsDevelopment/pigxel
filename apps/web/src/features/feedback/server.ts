@@ -31,6 +31,7 @@ export type BoardQuery = {
   state: "open" | "closed";
   sort: "votes" | "newest";
   search: string;
+  id?: number;
 };
 
 /** Up to `limit` items; throws when the board can't be loaded. */
@@ -43,9 +44,15 @@ export async function listFeedback(
     .from("feedback")
     .select(
       `id, kind, title, description, status, votes, created_at, author:profiles(${PROFILE_COLUMNS}), my_vote:feedback_votes(user_id)`,
-    )
-    .eq("kind", query.kind)
-    .in("status", query.state === "open" ? ACTIVE_STATUSES : FINISHED_STATUSES);
+    );
+  if (query.id) request = request.eq("id", query.id);
+  else
+    request = request
+      .eq("kind", query.kind)
+      .in(
+        "status",
+        query.state === "open" ? ACTIVE_STATUSES : FINISHED_STATUSES,
+      );
   const pattern = titlePattern(query.search);
   if (pattern) request = request.ilike("title", pattern);
   if (query.sort === "votes")

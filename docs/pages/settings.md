@@ -1,6 +1,6 @@
 # Settings (`/settings/…`)
 
-Four tabs: Profile, Account, Subscription, Privacy. `/settings` opens Profile.
+Five tabs: Profile, Account, Subscription, Member perks, Privacy. `/settings` opens Profile.
 
 **Who can open it:** signed-in people.
 
@@ -18,22 +18,30 @@ Four tabs: Profile, Account, Subscription, Privacy. `/settings` opens Profile.
 - ✅ Sign-in methods: connect or disconnect Google and Apple; you can't remove your last way to sign in.
 - ✅ Google Drive: connect or disconnect (your Drive files stay in Drive).
 - ✅ Sign out.
-- 📋 **Delete account:** confirm, then delete tiles, files, profile and chats, and cancel any subscription. Required for the iOS app (App Store rules) and expected by privacy laws.
-- ❓ Download all my data (projects as `.pigxel` files).
+- ✅ **Delete account:** confirm, cancel billing, remove uploaded files, and delete the account and associated records. Discord role removal is queued for synchronization.
+- ✅ Download account data and project files as a ZIP.
 
 ## Subscription (`/settings/subscription`)
 
 Works like Netflix: upgrades start now, downgrades at the next billing date, cancel anytime.
 
 - ✅ Current plan, monthly or yearly, and when it renews or ends.
-- ✅ Past-due payments: explains that Paddle will retry, with a link to update the card.
+- ✅ Past-due payments: explains that Creem will retry, with a link to update the card.
 - ✅ **Change plan:** pick any other plan.
   - Upgrades switch right away; the exact charge for the rest of the period is shown before confirming.
   - Downgrades are kept until renewal ("Your plan switches to Starter on …"), with "Keep Pro" to undo.
-- ✅ **Billing (Paddle portal):** update payment method, invoices and receipts, cancel plan.
+- ✅ **Billing (Creem portal):** update payment method, invoices and receipts, cancel plan.
 - ✅ "Keep my plan" undoes a scheduled cancellation.
 - ✅ Links to Pricing and the Refund Policy; opens with a plan already chosen when coming from Pricing.
-- ❓ Show AI credits and storage used against the plan's limits, once limits are decided ([pricing.md](pricing.md)).
+- ✅ Cloud project usage and AI token usage, remaining allowance, and the monthly UTC reset date. Failed queries are shown as unavailable.
+- ✅ Support contact with account context; Advanced subscribers get a priority subject line.
+
+## Member perks (`/settings/perks`)
+
+- ✅ Any account can show, hide, or remove received badges. Gifts are private until displayed.
+- ✅ Paid members can gift their published artwork as a named custom badge, with a private message (up to five gifts per rolling day).
+- ✅ Paid members can maintain hiring contact details, availability, and up to twelve portfolio links with optional published-art previews.
+- ✅ Discord linking, role status, retry, and disconnect controls are implemented. External application/bot/role setup is still pending; see [Discord setup](../discord-setup.md).
 
 ## Privacy (`/settings/privacy`)
 

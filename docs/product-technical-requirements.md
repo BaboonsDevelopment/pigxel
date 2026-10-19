@@ -938,3 +938,40 @@ The complete route inventory is derived from `apps/web/src/app/**/page.tsx`. The
 | Database and policies          | [migrations](../supabase/migrations/)                                                                                         |
 | Shared presentation            | [UI package](../packages/ui/src/), [theme](../packages/ui/src/styles/globals.css)                                             |
 | Automated checks               | [test suite](../apps/web/tests/)                                                                                              |
+
+
+## 16. Member feature implementation (October 19, 2026)
+
+This section supersedes older gap notes for the features listed below. The
+implementation and remaining external dependencies are tracked in
+[production-feature-plan.md](production-feature-plan.md).
+
+- **FR-MEMBER-01:** `/settings/subscription` shows owned, non-trashed cloud
+  projects used/remaining, plan limits, metered AI usage and UTC monthly reset.
+  Failed queries display unknown usage. Advanced support uses the existing
+  support mailbox with priority and account/subscription context.
+- **FR-MEMBER-02:** `/settings/perks` lets paid members gift a named badge made
+  from their approved published art to another artist. The database enforces
+  paid access, ownership, block relationships, no self-gifts, and a five-gift
+  rolling-day cap. Recipients alone control public display or removal; private
+  messages are never displayed publicly.
+- **FR-MEMBER-03:** Paid members manage hiring profiles and up to twelve
+  portfolio items. Contact/project links are HTTPS. Preview art belongs to the
+  member and is approved/published. Public reads require a public profile and
+  current paid entitlement; owners retain access to their stored data.
+- **FR-MEMBER-04:** Admins change feedback status through a database-authorized
+  function. `/feedback/[id]` shows the item and history. Status changes and the
+  author notification commit together; repeating the status is a no-op.
+- **FR-MEMBER-05:** Discord uses an identity-only OAuth flow with session-bound,
+  expiring state. Verified Discord IDs are written only server-side; OAuth
+  tokens are revoked/discarded. Subscription events attempt role synchronization
+  and a scheduled retry job reconciles roles and account-deletion cleanup.
+  Test products cannot grant roles in a live-key environment. Application/bot/
+  role configuration and a live integration check are pending external setup.
+- **FR-MEMBER-06:** Admins attach validated YouTube IDs to existing lessons.
+  Premium videos require the lesson entitlement and use the existing consent
+  player. Interactive guides remain available when a video is absent. Actual
+  lesson recordings have not been provided.
+
+Database migrations are prepared, not applied to the hosted database by this
+work. Database integration tests require local Supabase and Docker.

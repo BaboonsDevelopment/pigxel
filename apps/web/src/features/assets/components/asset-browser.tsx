@@ -5,6 +5,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionHeader, Text } from "@pigxel/ui/components/typography";
+import {
+  MenuButton,
+  TRIGGER,
+} from "@/features/explore/components/explore-header/components/menu-button";
 import { scrollParent } from "@/lib/utils/scroll-parent";
 import { SortIcon } from "@/features/tiles/components/projects-view/components/toolbar-icons";
 import { ToolbarMenu } from "@/features/tiles/components/projects-view/components/toolbar-menu";
@@ -102,7 +106,11 @@ export function AssetToolbar({
   kind,
   pack,
   sidebar,
+  layout = "compact",
+  controls,
 }: {
+  layout?: "compact" | "browse";
+  controls?: ReactNode;
   typed: string;
   onTyped: (text: string) => void;
   placeholder: string;
@@ -116,7 +124,13 @@ export function AssetToolbar({
   sidebar?: { id: string; open: boolean; onToggle: () => void };
 }) {
   return (
-    <div className="flex items-center gap-[23px] max-lg:flex-wrap">
+    <div
+      className={
+        layout === "browse"
+          ? "flex flex-col gap-[18px]"
+          : "flex flex-wrap items-center gap-3"
+      }
+    >
       <label className="flex h-10 w-full min-w-0 items-center gap-2 rounded-xl border border-[#e7c6d2] bg-background px-3 text-[#4a1f35] transition-colors focus-within:border-[#8c3a57] sm:w-[426px] sm:shrink">
         <svg
           aria-hidden="true"
@@ -139,30 +153,50 @@ export function AssetToolbar({
           className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
         />
       </label>
-      <ToolbarMenu
-        label="Sort"
-        icon={<SortIcon />}
-        options={ASSET_SORTS}
-        value={filters.sort}
-        onChange={(sort) => onFilters({ ...filters, sort })}
-      />
-      {sidebar ? (
-        <AssetFiltersToggle
-          filters={filters}
-          open={sidebar.open}
-          onToggle={sidebar.onToggle}
-          controls={sidebar.id}
-        />
-      ) : (
-        <AssetFiltersMenu
-          filters={filters}
-          onChange={(next) => onFilters({ ...next, query: filters.query })}
-          tags={tags}
-          packs={packs}
-          kind={kind}
-          pack={pack}
-        />
-      )}
+      <div
+        className={
+          layout === "browse"
+            ? "flex flex-wrap items-center gap-2.5"
+            : "contents"
+        }
+      >
+        {layout === "browse" ? (
+          <MenuButton
+            label="Sort"
+            icon={<SortIcon />}
+            options={ASSET_SORTS}
+            value={filters.sort}
+            onChange={(sort) => onFilters({ ...filters, sort })}
+          />
+        ) : (
+          <ToolbarMenu
+            label="Sort"
+            icon={<SortIcon />}
+            options={ASSET_SORTS}
+            value={filters.sort}
+            onChange={(sort) => onFilters({ ...filters, sort })}
+          />
+        )}
+        {sidebar ? (
+          <AssetFiltersToggle
+            className={layout === "browse" ? TRIGGER : undefined}
+            filters={filters}
+            open={sidebar.open}
+            onToggle={sidebar.onToggle}
+            controls={sidebar.id}
+          />
+        ) : (
+          <AssetFiltersMenu
+            filters={filters}
+            onChange={(next) => onFilters({ ...next, query: filters.query })}
+            tags={tags}
+            packs={packs}
+            kind={kind}
+            pack={pack}
+          />
+        )}
+        {controls}
+      </div>
     </div>
   );
 }

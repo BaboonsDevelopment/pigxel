@@ -5,11 +5,17 @@ import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Heading, PageHeader, Text } from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/layout/scaled-page";
+import { listTutorialVideos } from "@/features/tutorials/server";
 import { TUTORIALS } from "@/features/tutorials/tutorials";
 
 export const metadata: Metadata = { title: "Tutorials · Pigxel" };
 
-export default function Tutorials() {
+export default async function Tutorials() {
+  const videos = await listTutorialVideos();
+  const tutorials = TUTORIALS.map((tutorial) => ({
+    ...tutorial,
+    youtubeId: videos.get(tutorial.slug) ?? tutorial.youtubeId,
+  }));
   return (
     <ScaledPage>
       <PageHeader
@@ -17,7 +23,7 @@ export default function Tutorials() {
         description="Watch a short video, then practise in the editor with a guide that points at each tool and ticks steps off as you do them."
       />
       <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 @min-[1480px]:grid-cols-4">
-        {TUTORIALS.map((tutorial) => (
+        {tutorials.map((tutorial) => (
           <li key={tutorial.slug}>
             <Link
               href={`/tutorials/${tutorial.slug}`}
