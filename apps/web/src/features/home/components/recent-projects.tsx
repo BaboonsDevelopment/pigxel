@@ -19,6 +19,7 @@ import { pixelifySans } from "@/lib/fonts/pixelify";
 import { NewProjectButton } from "./new-project-button";
 import { TilesBadge } from "@/features/tiles/components/tiles-badge";
 import { hasTilemap } from "@/lib/tilemap/tilemap";
+import styles from "./recent-projects.module.css";
 
 type Project =
   | {
@@ -97,13 +98,7 @@ function Row({
           {cloud.error}
         </FormMessage>
       )}
-      <ul
-        className={cn(
-          "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 @min-[1480px]:grid-cols-6 @min-[1680px]:grid-cols-7",
-          // Four projects, then one more per extra column; New project stays.
-          "[&>li:nth-child(n+5):not(:last-child)]:hidden @min-[1480px]:[&>li:nth-child(5):not(:last-child)]:block @min-[1680px]:[&>li:nth-child(6):not(:last-child)]:block",
-        )}
-      >
+      <ul className={styles.grid}>
         {projects.map((project) =>
           project.kind === "local" ? (
             <ProjectCard

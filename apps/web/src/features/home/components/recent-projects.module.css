@@ -1,0 +1,71 @@
+/*
+ * Recent projects fill one row: 5–7 columns as the Home layout widens. A tall
+ * screen gets a second row instead of empty space below. New project, the
+ * last item, always shows; projects past what fits are hidden.
+ *
+ * Rows    | 5 columns | 6 columns | 7 columns
+ * one     | 4         | 5         | 6
+ * two     | 9         | 11        | 13
+ *
+ * "home" is the Home page itself (see HomeView), measured in its own,
+ * unscaled pixels. A second row needs about 260px more than the 820px design.
+ */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.grid > li:nth-child(n + 5):not(:last-child) {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@container home (min-width: 1480px) {
+  .grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .grid > li:nth-child(5):not(:last-child) {
+    display: block;
+  }
+}
+
+@container home (min-width: 1680px) {
+  .grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .grid > li:nth-child(6):not(:last-child) {
+    display: block;
+  }
+}
+
+@container home (min-height: 1080px) {
+  .grid > li:nth-child(-n + 9):not(:last-child) {
+    display: block;
+  }
+}
+
+@container home (min-height: 1080px) and (min-width: 1480px) {
+  .grid > li:nth-child(-n + 11):not(:last-child) {
+    display: block;
+  }
+}
+
+@container home (min-height: 1080px) and (min-width: 1680px) {
+  .grid > li:nth-child(-n + 13):not(:last-child) {
+    display: block;
+  }
+}
