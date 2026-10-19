@@ -1,6 +1,6 @@
 export type BillingCycle = "month" | "year";
 
-export type PlanName = "Free" | "Starter" | "Pro" | "Advanced";
+export type PlanName = "Free" | "Artist" | "Starter" | "Pro" | "Advanced";
 
 export type Limits = {
   /** Arts kept in Pigxel cloud. Enforced by the database: keep in step with private.cloud_tile_limit. */
@@ -13,8 +13,9 @@ export interface Tier {
   name: Exclude<PlanName, "Free">;
   description: string;
   features: string[];
-  /** Creem products. These are the test-mode IDs; live mode has its own. */
+  /** Test-mode products; empty IDs mean the plan is unavailable in test mode. */
   productId: Record<BillingCycle, string>;
+  liveProductId: Record<BillingCycle, string>;
   /** In cents, before tax. Keep in step with the Creem products. */
   price: Record<BillingCycle, number>;
   limits: Limits;
@@ -89,6 +90,10 @@ export const TIERS: Tier[] = [
       month: "prod_2GOqluekb0emjqMu1T2FNw",
       year: "prod_70SuiDz4RJE2qb2zhNVL6s",
     },
+    liveProductId: {
+      month: "prod_6tIra4UhyYLAjYyc2SqtHE",
+      year: "prod_3mKcrBjgdDiAI1iv8xnjH9",
+    },
     price: { month: 700, year: 5000 },
   },
   {
@@ -102,6 +107,10 @@ export const TIERS: Tier[] = [
       month: "prod_5MXjzA3GUp1uXc1n2WNUoD",
       year: "prod_2n6kFkVPfvfF3lIUKS6iHC",
     },
+    liveProductId: {
+      month: "prod_6N8wjHaz91zaVyl1zQHcon",
+      year: "prod_4cnKc7tmMU568ty5jlGCRe",
+    },
     price: { month: 1000, year: 7500 },
   },
   {
@@ -114,18 +123,24 @@ export const TIERS: Tier[] = [
       month: "prod_3iOeJD8GbTwrNeFMxZewrC",
       year: "prod_4WTkhxtFomX6vqXkOokXv5",
     },
+    liveProductId: {
+      month: "prod_2BWgBUdM4kq33rtrK4FuXa",
+      year: "prod_6P7vgWwhRgpEeUsExdrpd0",
+    },
     price: { month: 2000, year: 15000 },
   },
 ];
 
-/**
- * Plans on the pricing page that can't be bought yet: Artist waits for its
- * Creem products, and Creator is granted by hand. Neither is in TIERS, which
- * drives checkout and plan changes.
- */
-export const ARTIST_PLAN = {
+/** Premium perks and cloud storage without AI tools. */
+export const ARTIST_PLAN: Tier = {
   name: "Artist",
   description: "Every perk, zero AI.",
+  productId: { month: "", year: "" },
+  liveProductId: {
+    month: "prod_5xMylH1dqWTOqRAtfUZaeh",
+    year: "prod_7PzKBMEhRRicye3hsYLM3",
+  },
+  extras: PREMIUM_PERKS,
   /** In cents, before tax. */
   price: { month: 500, year: 4000 } satisfies Record<BillingCycle, number>,
   limits: { cloudTiles: 75, aiTokens: 0 } satisfies Limits,
@@ -136,6 +151,32 @@ export const ARTIST_PLAN = {
     ...PREMIUM_PERKS,
   ],
 };
+
+export type BillingMode = "test" | "live";
+
+export const BILLABLE_TIERS: Tier[] = [ARTIST_PLAN, ...TIERS];
+
+export function productIdFor(
+  tier: Tier,
+  cycle: BillingCycle,
+  mode: BillingMode,
+) {
+  return (mode === "live" ? tier.liveProductId : tier.productId)[cycle];
+}
+
+export function productMode(productId: string): BillingMode | null {
+  if (!productId) return null;
+  for (const mode of ["test", "live"] as const)
+    if (
+      BILLABLE_TIERS.some((tier) =>
+        (["month", "year"] as const).some(
+          (cycle) => productIdFor(tier, cycle, mode) === productId,
+        ),
+      )
+    )
+      return mode;
+  return null;
+}
 
 /** The paid tiers, shown as one AI plan where people pick their tokens. */
 export const AI_PLAN = {
@@ -164,7 +205,9 @@ export const CREATOR_PLAN = {
 };
 
 export function limitsOf(plan: PlanName): Limits {
-  return TIERS.find((tier) => tier.name === plan)?.limits ?? FREE_LIMITS;
+  return (
+    BILLABLE_TIERS.find((tier) => tier.name === plan)?.limits ?? FREE_LIMITS
+  );
 }
 
 /**
@@ -173,7 +216,7 @@ export function limitsOf(plan: PlanName): Limits {
  */
 export function aiAllowance(plan: PlanName, now = new Date()) {
   const { aiTokens } = limitsOf(plan);
-  if (plan === "Free") return { tokens: aiTokens, since: null, resetsAt: null };
+  if (aiTokens === 0) return { tokens: aiTokens, since: null, resetsAt: null };
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const resetsAt = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),

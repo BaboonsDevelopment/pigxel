@@ -94,7 +94,8 @@ export function AppShell({
           </Link>
           <div id="app-header-start" className="hidden min-w-0 md:flex" />
           <div className="ml-auto flex items-center gap-2.5">
-            <span className={cn(isProjects && "hidden")}>
+            {/* Explore and My projects have their own search box. */}
+            <span className={cn((isExplore || isProjects) && "hidden")}>
               <SearchButton userId={userId} />
             </span>
             <NotificationBell unread={unreadNotifications} />

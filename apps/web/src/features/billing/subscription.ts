@@ -1,4 +1,11 @@
-import { TIERS, type BillingCycle, type Tier } from "./pricing";
+import {
+  BILLABLE_TIERS,
+  productIdFor,
+  productMode,
+  type BillingMode,
+  type BillingCycle,
+  type Tier,
+} from "./pricing";
 
 export type SubscriptionStatus =
   "active" | "trialing" | "past_due" | "paused" | "canceled" | "unpaid";
@@ -88,22 +95,31 @@ export type PlanChange = "upgrade" | "downgrade" | "same";
 
 const CYCLES: BillingCycle[] = ["month", "year"];
 
-export function planOfProduct(productId: string): PlanProduct | null {
-  for (const tier of TIERS)
+export function planOfProduct(
+  productId: string,
+  mode?: BillingMode,
+): PlanProduct | null {
+  if (!productId) return null;
+  for (const tier of BILLABLE_TIERS)
     for (const cycle of CYCLES)
-      if (tier.productId[cycle] === productId)
+      if (
+        (mode ? [mode] : (["test", "live"] as const)).some(
+          (candidate) => productIdFor(tier, cycle, candidate) === productId,
+        )
+      )
         return { name: tier.name, cycle };
   return null;
 }
 
 const rank = ({ name, cycle }: PlanProduct) =>
-  TIERS.findIndex((tier) => tier.name === name) * 2 + CYCLES.indexOf(cycle);
+  BILLABLE_TIERS.findIndex((tier) => tier.name === name) * 2 +
+  CYCLES.indexOf(cycle);
 
 /** A higher tier, or yearly billing on the same tier, is an upgrade. */
 export function planChange(from: string, to: string): PlanChange | null {
   const current = planOfProduct(from);
   const next = planOfProduct(to);
-  if (!current || !next) return null;
+  if (!current || !next || productMode(from) !== productMode(to)) return null;
   return from === to
     ? "same"
     : rank(next) > rank(current)

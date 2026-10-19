@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Page } from "@pigxel/ui/components/page";
 import { PageTransition } from "@/components/layout/page-transition";
 import { PricingPlans } from "@/features/billing/components/pricing-plans";
+import { getBillingMode } from "@/features/billing/creem";
 import { getUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
 import { LEGAL } from "@/features/legal/legal";
@@ -41,6 +42,7 @@ export default async function Pricing({
     <PageTransition>
       <Page className="flex min-h-full max-w-6xl flex-col pt-6 pb-5 md:pt-6 lg:[@media(max-height:820px)]:pt-3 lg:[@media(max-height:740px)]:pb-3">
         <PricingPlans
+          billingMode={getBillingMode()}
           signedIn={!!user}
           currentProductId={currentProductId}
           checkoutFailed={checkout === "error"}

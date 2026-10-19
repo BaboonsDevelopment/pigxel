@@ -3,6 +3,7 @@ import { TIERS } from "@/features/billing/pricing";
 import type { CurrentPlan } from "@/features/billing/subscription";
 
 const mocks = vi.hoisted(() => ({
+  mode: vi.fn(),
   plan: vi.fn(),
   setPending: vi.fn(),
   due: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock("@/features/billing/server", () => ({
   dueDowngrades: mocks.due,
 }));
 vi.mock("@/features/billing/creem", () => ({
+  getBillingMode: mocks.mode,
   creemApi: {
     createCheckout: mocks.checkout,
     portalLink: mocks.portal,
@@ -70,6 +72,7 @@ const paid = (
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.mode.mockReturnValue("test");
   vi.stubEnv("APP_URL", "https://www.pigxel.studio");
   mocks.plan.mockResolvedValue(paid());
   mocks.setPending.mockResolvedValue(null);
@@ -79,6 +82,26 @@ beforeEach(() => {
 });
 
 describe("checkout", () => {
+  it("rejects test products when configured for live payments", async () => {
+    mocks.mode.mockReturnValue("live");
+    mocks.plan.mockResolvedValue({ name: "Free" });
+    await expect(startCheckout(pro!.productId.month)).rejects.toThrow(
+      "REDIRECT:/pricing",
+    );
+    expect(mocks.checkout).not.toHaveBeenCalled();
+  });
+
+  it("starts live checkout with the live product ID", async () => {
+    mocks.mode.mockReturnValue("live");
+    mocks.plan.mockResolvedValue({ name: "Free" });
+    mocks.checkout.mockResolvedValue("https://creem.io/checkout/live");
+    await expect(startCheckout(pro!.liveProductId.month)).rejects.toThrow(
+      "REDIRECT:https://creem.io/checkout/live",
+    );
+    expect(mocks.checkout).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: pro!.liveProductId.month }),
+    );
+  });
   it("sends Free accounts to Creem with their account attached", async () => {
     mocks.plan.mockResolvedValue({ name: "Free" });
     mocks.checkout.mockResolvedValue("https://checkout.creem.io/ch_1");
@@ -114,6 +137,14 @@ describe("checkout", () => {
 });
 
 describe("changing plans", () => {
+  it("rejects preview and purchase of products from another environment", async () => {
+    expect(await previewPlanChange(pro!.liveProductId.year)).toHaveProperty(
+      "error",
+    );
+    expect(await changePlan(pro!.liveProductId.year)).toHaveProperty("error");
+    expect(mocks.switchProduct).not.toHaveBeenCalled();
+    expect(mocks.setPending).not.toHaveBeenCalled();
+  });
   it("upgrades right away with a prorated charge", async () => {
     await changePlan(pro!.productId.year);
     expect(mocks.switchProduct).toHaveBeenCalledWith(

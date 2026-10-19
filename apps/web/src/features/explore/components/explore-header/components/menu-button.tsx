@@ -5,7 +5,7 @@ import { cn } from "@pigxel/ui/lib/utils";
 import { CheckIcon, ChevronIcon } from "./icons";
 
 export const TRIGGER =
-  "flex h-10 min-w-[136px] cursor-pointer items-center gap-2.5 rounded-xl border border-[#e7c6d2] bg-background px-4 text-base text-[#4a2434] transition-colors hover:bg-muted aria-expanded:border-primary [&>svg:first-child]:size-5 [&>svg:last-child]:ml-auto";
+  "flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-[#e7c6d2] bg-background px-3 text-sm text-[#4a2434] transition-colors hover:bg-muted aria-expanded:border-primary [&>svg:first-child]:size-4 [&>svg:last-child]:ml-1 [&>svg:last-child]:size-3.5";
 
 export function useDismiss(open: boolean, close: () => void) {
   const root = useRef<HTMLDivElement>(null);

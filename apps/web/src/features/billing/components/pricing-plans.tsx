@@ -8,6 +8,8 @@ import { Notice } from "@pigxel/ui/components/notice";
 import { cn } from "@pigxel/ui/lib/utils";
 import {
   AI_PLAN,
+  productIdFor,
+  type BillingMode,
   aiFeatures,
   ARTIST_PLAN,
   CREATOR_PLAN,
@@ -63,6 +65,7 @@ const BUTTON_SOFT = buttonVariants({
 });
 
 type Props = {
+  billingMode?: BillingMode;
   signedIn?: boolean;
   /** The subscriber's current product; they change plans instead of buying another. */
   currentProductId?: string;
@@ -72,6 +75,7 @@ type Props = {
 };
 
 export function PricingPlans({
+  billingMode = "test",
   signedIn,
   currentProductId,
   checkoutFailed,
@@ -85,7 +89,8 @@ export function PricingPlans({
     return own >= 0 ? own : DEFAULT_LEVEL;
   });
   const tier = TIERS[level]!;
-  const productId = tier.productId[cycle];
+  const productId = productIdFor(tier, cycle, billingMode);
+  const artistProductId = productIdFor(ARTIST_PLAN, cycle, billingMode);
 
   return (
     <div className="flex flex-col">
@@ -162,9 +167,35 @@ export function PricingPlans({
           description={ARTIST_PLAN.description}
           price={<CyclePrice price={ARTIST_PLAN.price} cycle={cycle} />}
           action={
-            <Button className="w-full" size="lg" variant="secondary" disabled>
-              Coming soon
-            </Button>
+            !artistProductId ? (
+              <Button className="w-full" size="lg" variant="secondary" disabled>
+                Coming soon
+              </Button>
+            ) : currentProductId === artistProductId ? (
+              <Button className="w-full" size="lg" variant="secondary" disabled>
+                <CheckIcon /> Your plan
+              </Button>
+            ) : currentProductId ? (
+              <Link
+                href={`/settings/subscription?plan=${artistProductId}`}
+                className={BUTTON_SOFT}
+              >
+                Change plan
+              </Link>
+            ) : signedIn ? (
+              <form action={startCheckout.bind(null, artistProductId)}>
+                <SubscribeButton
+                  label={`Subscribe to Artist, billed ${cycle === "year" ? "yearly" : "monthly"}`}
+                />
+              </form>
+            ) : (
+              <Link
+                href={loginUrl("signup", "/pricing")}
+                className={BUTTON_SOFT}
+              >
+                Sign up to subscribe
+              </Link>
+            )
           }
           features={ARTIST_PLAN.features}
         />

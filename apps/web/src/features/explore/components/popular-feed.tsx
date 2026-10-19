@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { loadArtists, loadPopularTiles, loadTagCounts } from "../actions";
@@ -16,6 +22,10 @@ import { PopularCard } from "./popular-card/popular-card";
 import { searchWords } from "./popular-card/helpers";
 import { SignInBanner } from "./sign-in-banner";
 import styles from "./gallery.module.css";
+import {
+  isGridSize,
+  type GridSize,
+} from "./explore-header/components/grid-size-toggle";
 
 const PRELOAD = "1500px";
 const TYPING_PAUSE = 300;
@@ -178,12 +188,14 @@ export function PopularFeed({
     filters.size !== NO_FILTERS.size ||
     filters.animation !== NO_FILTERS.animation;
   const { sort } = filters;
+  const [gridSize, setGridSize] = useGridSize();
 
   return (
     <div className="xl:[container-type:inline-size]">
       <section
         aria-labelledby="popular-heading"
-        className={`${styles.gallery} xl:w-[1290px] xl:[zoom:max(0.8,tan(atan2(100cqw,1290px)))]`}
+        // Scaled down to fit, never up: wider screens get a wider grid.
+        className={`${styles.gallery} xl:w-[min(1840px,max(1290px,calc(100cqw/var(--zoom))))] xl:[--zoom:max(0.8,min(1,tan(atan2(100cqw,1290px))))] xl:[zoom:var(--zoom)]`}
       >
         <ExploreHeader
           period={filters.period}
@@ -203,6 +215,8 @@ export function PopularFeed({
           query={typed}
           onQueryChange={type}
           onQuerySubmit={() => applyFilters({ query: typed.trim() })}
+          gridSize={gridSize}
+          onGridSizeChange={setGridSize}
           searching={pending && typed.trim() !== ""}
           guest={guest}
         />
@@ -235,7 +249,7 @@ export function PopularFeed({
             </div>
           )}
           {tiles.length ? (
-            <ul className={styles.grid}>
+            <ul className={styles.grid} data-size={gridSize}>
               {tiles.map((tile, i) => (
                 <PopularCard
                   key={tile.id}
@@ -357,4 +371,40 @@ export function PopularFeed({
       </section>
     </div>
   );
+}
+
+const GRID_SIZE_KEY = "pigxel.explore.grid";
+
+/** The card size picked on Explore, remembered in this browser. */
+function useGridSize() {
+  const saved = useSyncExternalStore(
+    subscribeToStorage,
+    readGridSize,
+    () => "medium" as const,
+  );
+  const [picked, setPicked] = useState<GridSize | null>(null);
+  const change = (next: GridSize) => {
+    setPicked(next);
+    try {
+      localStorage.setItem(GRID_SIZE_KEY, next);
+    } catch {
+      // Not remembered, but still applied.
+    }
+  };
+  return [picked ?? saved, change] as const;
+}
+
+function readGridSize(): GridSize {
+  try {
+    const saved = localStorage.getItem(GRID_SIZE_KEY);
+    return isGridSize(saved) ? saved : "medium";
+  } catch {
+    // Storage can be blocked; the default size is fine.
+    return "medium";
+  }
+}
+
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
 }
