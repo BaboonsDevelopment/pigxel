@@ -6,9 +6,17 @@ Ready-made sprites, tiles and palettes to start a tile from or drop into one.
 
 ## Today
 
-- ✅ Four categories (Characters, Items, Nature, Tiles) plus Palettes, as tabs (`?type=`).
-- ✅ "All" shows a row per category with "See all"; a category page loads 240 at a time with "Show more".
-- ✅ Asset cards with an animated preview; details dialog with size, frames and colours.
+- ✅ Tabs ordered All assets, Packs, Palettes (`?tab=`), with the existing Packs default.
+- ✅ Soft pink page, outlined tabs, full-width search and a Filters control with its active count.
+- ✅ Spacious responsive gallery: Comfortable and Compact densities with distinct column counts at every breakpoint. Compact always fits one extra column with tighter gaps; phones use one large Comfortable card or two Compact cards per row. Larger previews, two-line names, and dimensions/counts below. Density is remembered per browser.
+- ✅ Sorting and the result count stay visible above the gallery.
+- ✅ Size, motion, tags, access, pack and favourites live in an overlay drawer. Changes are drafted, matching counts are previewed, and Show results applies the selection; closing or pressing Escape discards it. Opening filters never changes the grid width.
+- ✅ Applied filters have removable chips and Clear filters preserves search/sort. Tag suggestions appear while typing `#` when tags exist; a lone hash does not filter results or enter the URL. With no tags available, search simply prompts for names.
+- ✅ Native modal focus handling, keyboard navigation for tabs/density/tag suggestions, visible favourites on touch devices, and recoverable loading/pagination errors.
+- ✅ The navigation illustration is softened on Assets so the artwork has more emphasis.
+- ✅ All assets loads more as you scroll and can show recently used assets separately.
+- ✅ Asset cards with an animated preview; details dialog with size, frames and colours. “Back to Assets” closes the preview and navigates to Assets; Close dismisses the preview in place. Both stay above the preview on desktop/mobile.
+- ✅ Pack pages have a visible “Back to Assets” button that always navigates to Assets, regardless of the previous page.
 - ✅ Start a tile from an asset; copy it; download its PNG sheet or `.pigxel` file.
 - ✅ Palettes: 3 presets, download as `.gpl`, or load in the editor.
 - ✅ Admins: publish from the editor (File › Publish to Assets…), replace, remove.

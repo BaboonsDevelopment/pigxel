@@ -18,13 +18,18 @@ describe("subscription usage overview", () => {
     );
     expect(screen.getByText(/63 projects remaining/)).toBeTruthy();
     expect(screen.getByText(/doesn’t include AI tools/)).toBeTruthy();
+    expect(screen.getByText("Not included")).toBeVisible();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(1);
   });
   it("explains over-limit usage without suggesting existing work was deleted", () => {
     renderWithUser(
       <SubscriptionUsage plan="Free" usage={{ cloudProjects: 12, ai: null }} />,
     );
     expect(screen.getByText(/existing work is safe/)).toBeTruthy();
-    expect(screen.getByText(/Couldn’t load your AI usage/)).toBeTruthy();
+    expect(screen.getByText(/doesn’t include AI tools/)).toBeTruthy();
+    expect(
+      screen.queryByText(/Couldn’t load your AI usage/),
+    ).not.toBeInTheDocument();
   });
   it("labels unknown usage instead of rendering an empty meter", () => {
     renderWithUser(

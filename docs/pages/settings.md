@@ -48,3 +48,9 @@ Works like Netflix: upgrades start now, downgrades at the next billing date, can
 - ✅ Profile public or private. Private hides your profile and published arts from everyone else.
 - ✅ Arts stay private until you publish them, whatever this setting.
 - ❓ Hide the activity heatmap, or follower count, while staying public.
+
+Member perks portfolio entries can be edited in place and reordered with Move up / Move down.
+Permanent badge/project removal asks for confirmation; hiding a badge keeps the gift.
+Badge messages are private to the recipient's settings view, including API access.
+Subscription settings links directly to Member perks, and plans without AI show
+“Not included” rather than an empty token meter.

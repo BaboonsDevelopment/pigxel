@@ -70,6 +70,25 @@ describe("member perks permissions", () => {
     expect(
       (await guest().from("profile_badges").select("id").eq("id", id)).data,
     ).toEqual([{ id }]);
+    expect(
+      (await guest().from("profile_badges").select("message").eq("id", id))
+        .error,
+    ).toBeTruthy();
+    expect(
+      (
+        await sender.client
+          .from("profile_badges")
+          .select("message")
+          .eq("id", id)
+      ).error,
+    ).toBeTruthy();
+    expect((await guest().rpc("received_badge_messages")).error).toBeTruthy();
+    expect((await sender.client.rpc("received_badge_messages")).data).toEqual(
+      [],
+    );
+    expect(
+      (await recipient.client.rpc("received_badge_messages")).data,
+    ).toEqual([{ id, message: "Thanks!" }]);
     await recipient.client
       .from("profiles")
       .update({ visibility: "private" })
@@ -159,13 +178,11 @@ describe("member perks permissions", () => {
     const member = await signUp("discord");
     expect(
       (
-        await member.client
-          .from("discord_connections")
-          .insert({
-            user_id: member.user.id,
-            discord_user_id: "123456789012345678",
-            username: "spoofed",
-          })
+        await member.client.from("discord_connections").insert({
+          user_id: member.user.id,
+          discord_user_id: "123456789012345678",
+          username: "spoofed",
+        })
       ).error,
     ).toBeTruthy();
   });
@@ -214,5 +231,96 @@ describe("member perks permissions", () => {
       .eq("feedback_id", report.id)
       .throwOnError();
     expect(notifications).toEqual([{ kind: "feedback_status" }]);
+  });
+});
+
+describe("portfolio editing permissions", () => {
+  it("lets paid owners edit and reorder while rejecting foreign, duplicate and incomplete IDs", async () => {
+    const owner = await signUp("editor");
+    const other = await signUp("other");
+    await membership(owner.user.id);
+    await membership(other.user.id);
+    const { data: items } = await owner.client
+      .from("hiring_portfolio_items")
+      .insert([
+        { title: "First", url: "https://example.com/first" },
+        { title: "Second", url: "https://example.com/second" },
+      ])
+      .select("id")
+      .order("sort_order")
+      .throwOnError();
+    const first = items[0]!;
+    const second = items[1]!;
+    await owner.client
+      .from("hiring_portfolio_items")
+      .update({ title: "Updated" })
+      .eq("id", first.id)
+      .throwOnError();
+    expect(
+      (
+        await other.client
+          .from("hiring_portfolio_items")
+          .update({ title: "Stolen" })
+          .eq("id", first.id)
+          .select("id")
+      ).data,
+    ).toEqual([]);
+    expect(
+      (
+        await other.client.rpc("reorder_portfolio_items", {
+          p_ids: [first.id, second.id],
+        })
+      ).error,
+    ).toBeTruthy();
+    for (const ids of [[first.id], [first.id, first.id]])
+      expect(
+        (await owner.client.rpc("reorder_portfolio_items", { p_ids: ids }))
+          .error,
+      ).toBeTruthy();
+    await owner.client
+      .rpc("reorder_portfolio_items", { p_ids: [second.id, first.id] })
+      .throwOnError();
+    const { data: reordered } = await owner.client
+      .from("hiring_portfolio_items")
+      .select("id, title")
+      .order("sort_order")
+      .throwOnError();
+    expect(reordered).toEqual([
+      { id: second.id, title: "Second" },
+      { id: first.id, title: "Updated" },
+    ]);
+    expect(
+      (
+        await owner.client
+          .from("hiring_portfolio_items")
+          .update({ sort_order: 99 })
+          .eq("id", first.id)
+      ).error,
+    ).toBeTruthy();
+    await admin
+      .from("subscriptions")
+      .update({ status: "canceled" })
+      .eq("user_id", owner.user.id)
+      .throwOnError();
+    expect(
+      (
+        await owner.client
+          .from("hiring_portfolio_items")
+          .update({ title: "No longer paid" })
+          .eq("id", first.id)
+      ).error,
+    ).toBeTruthy();
+    expect(
+      (
+        await owner.client.rpc("reorder_portfolio_items", {
+          p_ids: [first.id, second.id],
+        })
+      ).error,
+    ).toBeTruthy();
+    await owner.client
+      .from("hiring_portfolio_items")
+      .delete()
+      .eq("id", first.id)
+      .throwOnError();
   });
 });

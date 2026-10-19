@@ -99,7 +99,9 @@ export function Sidebar({
 
       <ul className="mt-7 space-y-1 px-3 short:mt-4">{MAIN.map(item)}</ul>
 
-      <SidebarScene />
+      <SidebarScene
+        subdued={path === "/assets" || path.startsWith("/assets/")}
+      />
 
       <PatchNotesCard
         active={path === "/patch-notes"}

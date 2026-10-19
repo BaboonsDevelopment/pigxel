@@ -29,15 +29,16 @@ export class CreemError extends Error {
 
 async function call<T>(
   path: string,
-  body: Record<string, unknown>,
+  body?: Record<string, unknown>,
   env: Env = process.env,
 ): Promise<T> {
   const key = env.CREEM_API_KEY;
   if (!key) throw new Error("Set CREEM_API_KEY in apps/web/.env.local.");
   const response = await fetch(`${creemHost(key)}${path}`, {
-    method: "POST",
+    method: body ? "POST" : "GET",
     headers: { "x-api-key": key, "content-type": "application/json" },
-    body: JSON.stringify(body),
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
@@ -51,6 +52,17 @@ async function call<T>(
 }
 
 export const creemApi = {
+  retrieveCheckout(checkoutId: string) {
+    return call<CreemCheckout>(
+      `/v1/checkouts?checkout_id=${encodeURIComponent(checkoutId)}`,
+    );
+  },
+
+  retrieveSubscription(subscriptionId: string) {
+    return call<CreemSubscription>(
+      `/v1/subscriptions?subscription_id=${encodeURIComponent(subscriptionId)}`,
+    );
+  },
   async createCheckout(args: {
     productId: string;
     userId: string;
@@ -110,6 +122,15 @@ export const creemApi = {
       {},
     );
   },
+};
+
+export type CreemCheckout = {
+  id: string;
+  status: string;
+  mode: string;
+  product: string | { id: string };
+  subscription?: string | { id: string } | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 /** Stores what Creem returned right away, without waiting for the webhook. */

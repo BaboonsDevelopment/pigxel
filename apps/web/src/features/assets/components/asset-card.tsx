@@ -38,7 +38,7 @@ export function AssetCard({
       >
         <span
           className={cn(
-            "relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl transition group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none",
+            "relative flex aspect-square items-center justify-center overflow-hidden rounded-[14px] transition group-hover:-translate-y-0.5 group-hover:shadow-md motion-reduce:transition-none",
             tint,
           )}
           style={background ? { background } : undefined}
@@ -50,7 +50,7 @@ export function AssetCard({
               "transition-transform duration-300 ease-out motion-reduce:transition-none",
               tile
                 ? "w-full group-hover:scale-105"
-                : "w-3/5 group-hover:-translate-y-1 group-hover:-rotate-3",
+                : "w-[78%] group-hover:scale-105",
             )}
           />
           {premium && <PremiumBadge className="absolute top-2 left-2" />}
@@ -61,18 +61,30 @@ export function AssetCard({
           )}
           {tile && <TilesBadge className="absolute bottom-2 left-2" />}
         </span>
-        <span className="mt-2 block truncate px-3 pt-0.5 text-sm leading-tight font-medium">
-          {asset.name}
+        <span className="mt-3 block px-1">
+          <span
+            title={asset.name}
+            className="line-clamp-2 min-h-11 text-[15px] leading-[22px] font-semibold text-[#4a2434] [overflow-wrap:anywhere]"
+          >
+            {asset.name}
+          </span>
+          <Text
+            as="span"
+            size="xs"
+            tone="muted"
+            className="mt-1 block text-xs leading-5 text-[#806775] tabular-nums"
+          >
+            {asset.width}×{asset.height}
+            {asset.frames > 1 && ` · ${asset.frames} frames`}
+          </Text>
+          <span className="block text-xs leading-5 text-[#806775]">
+            {tile
+              ? "Seamless tile"
+              : asset.frames > 1
+                ? "Animated sprite"
+                : "Static sprite"}
+          </span>
         </span>
-        <Text
-          as="span"
-          size="xs"
-          tone="muted"
-          className="mt-1 block px-3 pb-3 tabular-nums"
-        >
-          {asset.width} × {asset.height}
-          {asset.frames > 1 && ` · ${asset.frames} frames`}
-        </Text>
       </button>
       <FavouriteButton
         on={favourite}
@@ -81,7 +93,7 @@ export function AssetCard({
         className={cn(
           "absolute top-2 right-2",
           !favourite &&
-            "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+            "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
         )}
       />
     </div>

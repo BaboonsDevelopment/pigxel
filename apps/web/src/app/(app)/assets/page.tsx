@@ -42,28 +42,24 @@ export default async function Assets({
     ]);
 
   return (
-    <div className="min-h-full bg-canvas bg-[url(/art/background-effect.png)] bg-top bg-repeat">
-      <Page className="max-w-[100rem] px-5 pt-3 pb-12 md:px-8 md:pt-2 xl:px-10">
-        <div className="xl:[container-type:inline-size]">
-          <div className="xl:w-[min(1840px,max(1290px,calc(100cqw/var(--zoom))))] xl:[--zoom:max(0.8,min(1,tan(atan2(100cqw,1290px))))] xl:[zoom:var(--zoom)]">
-            {packs ? (
-              <AssetsView
-                tab={tab}
-                filters={filters}
-                packs={packs}
-                tags={tags}
-                favourites={favourites}
-                recent={recent}
-                firstPage={firstPage}
-                openAsset={openAsset}
-              />
-            ) : (
-              <Notice tone="error" className="mt-8">
-                Couldn’t load assets. Refresh the page to try again.
-              </Notice>
-            )}
-          </div>
-        </div>
+    <div className="min-h-full bg-[#fff8fb]">
+      <Page className="max-w-[112rem] px-5 pt-8 pb-12 md:px-8 md:pt-10 xl:px-12">
+        {packs ? (
+          <AssetsView
+            tab={tab}
+            filters={filters}
+            packs={packs}
+            tags={tags}
+            favourites={favourites}
+            recent={recent}
+            firstPage={firstPage}
+            openAsset={openAsset}
+          />
+        ) : (
+          <Notice tone="error" className="mt-8">
+            Couldn’t load assets. Refresh the page to try again.
+          </Notice>
+        )}
       </Page>
     </div>
   );

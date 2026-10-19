@@ -1,15 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { Badge } from "@pigxel/ui/components/badge";
 import { cardVariants } from "@pigxel/ui/components/card";
-import {
-  Heading,
-  Lead,
-  linkVariants,
-  Text,
-} from "@pigxel/ui/components/typography";
+import { Heading, Lead, Text } from "@pigxel/ui/components/typography";
 import { ScaledPage } from "@/components/layout/scaled-page";
 import { StartGuideButton } from "@/features/tutorials/components/start-guide-button";
 import { TutorialVideo } from "@/features/tutorials/components/tutorial-video";
@@ -42,9 +38,7 @@ export default async function TutorialPage({ params }: Props) {
 
   return (
     <ScaledPage>
-      <Link href="/tutorials" className={linkVariants({ variant: "accent" })}>
-        <span aria-hidden="true">←</span> All tutorials
-      </Link>
+      <BackButton href="/tutorials" className="mb-3" />
       <Heading size="page" className="mt-2">
         {tutorial.title}
       </Heading>
@@ -58,7 +52,9 @@ export default async function TutorialPage({ params }: Props) {
         )}
       </Text>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div
+        className={`mt-6 grid gap-6 ${youtubeId ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "max-w-3xl"}`}
+      >
         <div>
           {locked && youtubeId ? (
             <div className="flex aspect-video items-center justify-center rounded-2xl border bg-pastel-lavender p-6 text-center">
@@ -69,10 +65,12 @@ export default async function TutorialPage({ params }: Props) {
           ) : (
             <TutorialVideo tutorial={{ ...tutorial, youtubeId }} />
           )}
+          <Lead className={youtubeId ? "mt-4 max-w-prose" : "max-w-prose"}>
+            {tutorial.summary}
+          </Lead>
           {isAdmin(user) && (
             <TutorialVideoForm slug={tutorial.slug} youtubeId={youtubeId} />
           )}
-          <Lead className="mt-4 max-w-prose">{tutorial.summary}</Lead>
         </div>
 
         <section

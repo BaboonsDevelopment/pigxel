@@ -23,6 +23,8 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), refresh: vi.fn() }));
 
 import {
   addPortfolioItem,
+  editPortfolioItem,
+  reorderPortfolioItems,
   giftBadge,
   saveHiringProfile,
   setBadgeVisible,
@@ -206,5 +208,55 @@ describe("lesson video URLs", () => {
       "https://youtube.com/watch?v=bad",
     ])
       expect(youtubeIdFrom(value)).toBeNull();
+  });
+});
+
+describe("portfolio editing and ordering", () => {
+  it("refuses edits and ordering on a free plan", async () => {
+    mocks.plan.mockResolvedValue({ name: "Free" });
+    expect(
+      await editPortfolioItem(
+        ID,
+        {},
+        form({ title: "Work", url: "https://example.com" }),
+      ),
+    ).toHaveProperty("error");
+    expect(await reorderPortfolioItems([ID])).toHaveProperty("error");
+    expect(supabase.callsTo("hiring_portfolio_items")).toHaveLength(0);
+    expect(supabase.callsTo("rpc:reorder_portfolio_items")).toHaveLength(0);
+  });
+  it("scopes edits to the signed-in owner and rejects missing rows", async () => {
+    supabase.respond("hiring_portfolio_items.update", { data: [{ id: ID }] });
+    expect(
+      await editPortfolioItem(
+        ID,
+        {},
+        form({ title: "Updated", url: "https://example.com" }),
+      ),
+    ).toHaveProperty("message");
+    expect(supabase.callsTo("hiring_portfolio_items.update")[0]).toMatchObject({
+      values: expect.objectContaining({ title: "Updated" }),
+      filters: expect.arrayContaining([
+        ["eq", "user_id", "member"],
+        ["eq", "id", ID],
+      ]),
+    });
+    supabase.respond("hiring_portfolio_items.update", { data: [] });
+    expect(
+      await editPortfolioItem(
+        ID,
+        {},
+        form({ title: "Updated", url: "https://example.com" }),
+      ),
+    ).toHaveProperty("error");
+  });
+  it("rejects duplicate and invalid order IDs before invoking the ownership-checked RPC", async () => {
+    for (const ids of [[], [ID, ID], ["invalid"], Array(13).fill(ID)])
+      expect(await reorderPortfolioItems(ids)).toHaveProperty("error");
+    expect(supabase.callsTo("rpc:reorder_portfolio_items")).toHaveLength(0);
+    expect(await reorderPortfolioItems([ID])).toHaveProperty("message");
+    expect(supabase.callsTo("rpc:reorder_portfolio_items")[0]).toMatchObject({
+      args: { p_ids: [ID] },
+    });
   });
 });

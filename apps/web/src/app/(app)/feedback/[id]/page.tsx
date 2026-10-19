@@ -1,11 +1,7 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { Page } from "@pigxel/ui/components/page";
-import {
-  Heading,
-  Text,
-  textLinkClassName,
-} from "@pigxel/ui/components/typography";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 import { requireUser, isAdmin } from "@/lib/auth/session";
 import { createClient } from "@/lib/supabase/server";
 import { listFeedback } from "@/features/feedback/server";
@@ -44,9 +40,7 @@ export default async function FeedbackDetail({
     .returns<{ id: number; status: FeedbackStatus; created_at: string }[]>();
   return (
     <Page width="narrow">
-      <Link href={`/feedback?kind=${item.kind}`} className={textLinkClassName}>
-        Back to feedback
-      </Link>
+      <BackButton href={`/feedback?kind=${item.kind}`} />
       <Heading size="page" className="mt-6">
         Feedback #{id}
       </Heading>

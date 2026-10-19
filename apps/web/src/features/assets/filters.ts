@@ -2,8 +2,8 @@ import { CANVAS_SIZES, type CanvasSize } from "@/features/explore/constants";
 
 /** The Assets page's views. */
 export const ASSET_TABS = [
-  { value: "packs", label: "Packs" },
   { value: "all", label: "All assets" },
+  { value: "packs", label: "Packs" },
   { value: "palettes", label: "Palettes" },
 ] as const;
 
@@ -104,7 +104,7 @@ export function readAssetView(params: AssetSearchParams): {
   asset: string | null;
 } {
   return {
-    tab: pick(ASSET_TABS, params.tab),
+    tab: ASSET_TABS.find((tab) => tab.value === params.tab)?.value ?? "packs",
     asset: params.asset && SLUG.test(params.asset) ? params.asset : null,
     filters: {
       query: (params.q ?? "").slice(0, QUERY_MAX),
@@ -201,7 +201,7 @@ export function filterPacks<Pack extends PackFacts>(
     tagNames,
   }: { favourites: ReadonlySet<string>; tagNames: ReadonlyMap<string, string> },
 ): Pack[] {
-  const term = filters.query.trim().toLowerCase();
+  const term = filters.query.trim().replace(/^#/, "").toLowerCase();
   const range = sizeRange(filters.size);
   const shown = packs.filter((pack) => {
     if (filters.favourites && !favourites.has(pack.id)) return false;

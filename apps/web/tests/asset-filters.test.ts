@@ -89,6 +89,9 @@ describe("the Assets page address", () => {
 });
 
 describe("filtering packs", () => {
+  it("accepts a hashtag in the browse search", () => {
+    expect(ids({ query: "#food" })).toEqual(["food-dishes"]);
+  });
   it("shows the newest first by default", () => {
     expect(ids({})).toEqual([
       "haunted-october",

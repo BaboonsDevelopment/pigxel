@@ -20,6 +20,7 @@ export type PortfolioItem = {
   title: string;
   description: string;
   url: string;
+  tile_id: string | null;
   art: { thumbnail: string | null } | null;
 };
 export type BadgeArt = { id: string; name: string };
@@ -48,7 +49,7 @@ export async function listProfileBadges(
   let request = supabase
     .from("profile_badges")
     .select(
-      "id, label, message, visible, sender:profiles!sender_id(username), art:tiles!tile_id(thumbnail)",
+      "id, label, visible, sender:profiles!sender_id(username), art:tiles!tile_id(thumbnail)",
     )
     .eq("recipient_id", userId);
   if (!own) request = request.eq("visible", true);
@@ -57,7 +58,16 @@ export async function listProfileBadges(
     .limit(100)
     .returns<Badge[]>();
   if (error) throw new Error("Couldn’t load profile badges.");
-  return data;
+  if (!own) return data.map((badge) => ({ ...badge, message: "" }));
+  const { data: messages, error: messageError } = await supabase.rpc(
+    "received_badge_messages",
+  );
+  if (messageError) throw new Error("Couldn’t load badge messages.");
+  const rows: { id: string; message: string }[] = Array.isArray(messages)
+    ? messages
+    : [];
+  const byId = new Map(rows.map((row) => [row.id, row.message]));
+  return data.map((badge) => ({ ...badge, message: byId.get(badge.id) ?? "" }));
 }
 
 export async function getHiringProfile(userId: string) {
@@ -70,8 +80,11 @@ export async function getHiringProfile(userId: string) {
       .maybeSingle<HiringProfile>(),
     supabase
       .from("hiring_portfolio_items")
-      .select("id, title, description, url, art:tiles!tile_id(thumbnail)")
+      .select(
+        "id, title, description, url, tile_id, art:tiles!tile_id(thumbnail)",
+      )
       .eq("user_id", userId)
+      .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false })
       .limit(12)
       .returns<PortfolioItem[]>(),

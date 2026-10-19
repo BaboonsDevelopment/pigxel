@@ -45,18 +45,30 @@ export function SubscriptionUsage({
         </Card>
         <Card>
           <Text tone="muted">Monthly AI tokens</Text>
-          <UsageMeter
-            used={usage.ai?.spent ?? null}
-            limit={limits.aiTokens}
-            label="AI tokens used"
-          />
+          {limits.aiTokens > 0 ? (
+            <UsageMeter
+              used={usage.ai?.spent ?? null}
+              limit={limits.aiTokens}
+              label="AI tokens used"
+            />
+          ) : (
+            <p className="mt-2 text-xl font-semibold">Not included</p>
+          )}
           <Text tone="muted" className="mt-2">
-            {!usage.ai
-              ? "Couldn’t load your AI usage. Refresh to try again."
-              : limits.aiTokens === 0
-                ? "Your plan doesn’t include AI tools. All drawing tools are included."
+            {limits.aiTokens === 0
+              ? "Your plan doesn’t include AI tools. All drawing tools are included."
+              : !usage.ai
+                ? "Couldn’t load your AI usage. Refresh to try again."
                 : `${number(usage.ai.left)} tokens remaining.${usage.ai.resetsAt ? ` Resets ${new Date(usage.ai.resetsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} (UTC).` : ""}`}
           </Text>
+          {limits.aiTokens === 0 && (
+            <Link
+              href="/pricing"
+              className={`${textLinkClassName} mt-3 inline-block text-sm`}
+            >
+              Explore plans with AI
+            </Link>
+          )}
         </Card>
       </div>
     </section>

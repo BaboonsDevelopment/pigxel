@@ -1,11 +1,23 @@
 "use client";
 
-import { useActionState, useState, useTransition, type ReactNode } from "react";
+import {
+  useActionState,
+  useId,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { Button } from "@pigxel/ui/components/button";
 import { Field, FormMessage } from "@pigxel/ui/components/field";
+import { Text } from "@pigxel/ui/components/typography";
 import { Input, Textarea } from "@pigxel/ui/components/input";
-import { giftBadge, saveHiringProfile, addPortfolioItem } from "../actions";
-import type { BadgeArt, HiringProfile } from "../server";
+import {
+  giftBadge,
+  saveHiringProfile,
+  addPortfolioItem,
+  editPortfolioItem,
+} from "../actions";
+import type { BadgeArt, HiringProfile, PortfolioItem } from "../server";
 import type { PerkState } from "../validation";
 
 function Result({ state }: { state: PerkState }) {
@@ -22,10 +34,12 @@ function ArtSelect({
   arts,
   id,
   optional = false,
+  selected = "",
 }: {
   arts: BadgeArt[];
   id: string;
   optional?: boolean;
+  selected?: string;
 }) {
   return (
     <Field
@@ -38,9 +52,14 @@ function ArtSelect({
         name="tileId"
         required={!optional}
         className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
-        defaultValue=""
+        defaultValue={selected}
       >
         <option value="">{optional ? "No preview" : "Choose artwork…"}</option>
+        {selected && !arts.some((art) => art.id === selected) && (
+          <option value={selected}>
+            Current preview (no longer published)
+          </option>
+        )}
         {arts.map((art) => (
           <option key={art.id} value={art.id}>
             {art.name}
@@ -163,36 +182,56 @@ export function HiringProfileForm({
   );
 }
 
-export function PortfolioItemForm({ arts }: { arts: BadgeArt[] }) {
+export function PortfolioItemForm({
+  arts,
+  item,
+}: {
+  arts: BadgeArt[];
+  item?: PortfolioItem;
+}) {
+  const prefix = useId();
   const [state, action, pending] = useActionState(
-    addPortfolioItem,
+    item ? editPortfolioItem.bind(null, item.id) : addPortfolioItem,
     {} as PerkState,
   );
   return (
     <form action={action} className="mt-4 space-y-4">
-      <Field label="Project title" htmlFor="portfolio-title">
-        <Input id="portfolio-title" name="title" maxLength={80} required />
+      <Field label="Project title" htmlFor={`${prefix}-title`}>
+        <Input
+          id={`${prefix}-title`}
+          name="title"
+          defaultValue={item?.title}
+          maxLength={80}
+          required
+        />
       </Field>
-      <Field label="Description (optional)" htmlFor="portfolio-description">
+      <Field label="Description (optional)" htmlFor={`${prefix}-description`}>
         <Textarea
-          id="portfolio-description"
+          id={`${prefix}-description`}
           name="description"
+          defaultValue={item?.description}
           maxLength={300}
         />
       </Field>
-      <Field label="Project link" htmlFor="portfolio-url">
+      <Field label="Project link" htmlFor={`${prefix}-url`}>
         <Input
-          id="portfolio-url"
+          id={`${prefix}-url`}
           name="url"
+          defaultValue={item?.url}
           maxLength={200}
           placeholder="https://your-site.com/project"
           required
         />
       </Field>
-      <ArtSelect arts={arts} id="portfolio-art" optional />
+      <ArtSelect
+        arts={arts}
+        id={`${prefix}-art`}
+        optional
+        selected={item?.tile_id ?? ""}
+      />
       <Result state={state} />
       <Button type="submit" disabled={pending}>
-        {pending ? "Adding…" : "Add portfolio item"}
+        {pending ? "Saving…" : item ? "Save changes" : "Add portfolio item"}
       </Button>
     </form>
   );
@@ -202,30 +241,59 @@ export function PerkActionButton({
   action,
   children,
   destructive = false,
+  confirmMessage,
+  disabled = false,
 }: {
   action: () => Promise<PerkState>;
   children: ReactNode;
   destructive?: boolean;
+  confirmMessage?: string;
+  disabled?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   return (
     <div>
       <Button
         size="sm"
         variant="secondary"
-        disabled={pending}
+        disabled={pending || disabled}
         className={destructive ? "text-destructive" : undefined}
-        onClick={() =>
+        onClick={() => {
+          if (confirmMessage && !confirming) {
+            setConfirming(true);
+            return;
+          }
           startTransition(async () => {
             setError(null);
-            const result = await action();
-            if (result.error) setError(result.error);
-          })
-        }
+            try {
+              const result = await action();
+              if (result.error) setError(result.error);
+              else setConfirming(false);
+            } catch {
+              setError("Couldn’t complete this action. Please try again.");
+            }
+          });
+        }}
       >
-        {children}
+        {pending ? "Saving…" : confirming ? "Confirm removal" : children}
       </Button>
+      {confirming && (
+        <div className="mt-2 max-w-xs space-y-2">
+          <Text size="sm" tone="muted">
+            {confirmMessage}
+          </Text>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={pending}
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
       {error && (
         <FormMessage tone="error" className="mt-2">
           {error}

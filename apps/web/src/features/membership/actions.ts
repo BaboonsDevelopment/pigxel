@@ -145,3 +145,53 @@ export async function removePortfolioItem(id: string): Promise<PerkState> {
   refreshPerks();
   return {};
 }
+
+export async function editPortfolioItem(
+  id: string,
+  _state: PerkState,
+  form: FormData,
+): Promise<PerkState> {
+  const user = await paidUser();
+  if (!user) return { error: "A paid plan is needed to edit portfolio work." };
+  if (!UUID.test(id)) return { error: "Unknown portfolio item." };
+  const result = readPortfolio(form);
+  if ("error" in result) return { error: result.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("hiring_portfolio_items")
+    .update(result.value)
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+  if (error || !data)
+    return {
+      error:
+        "Couldn’t save this item. Check the artwork preview and try again.",
+    };
+  refreshPerks();
+  return { message: "Portfolio item saved." };
+}
+
+export async function reorderPortfolioItems(ids: string[]): Promise<PerkState> {
+  if (!(await paidUser()))
+    return { error: "A paid plan is needed to reorder portfolio work." };
+  if (
+    !Array.isArray(ids) ||
+    !ids.length ||
+    ids.length > 12 ||
+    ids.some((id) => typeof id !== "string" || !UUID.test(id)) ||
+    new Set(ids).size !== ids.length
+  )
+    return { error: "Invalid portfolio order." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("reorder_portfolio_items", {
+    p_ids: ids,
+  });
+  if (error)
+    return {
+      error: "Couldn’t reorder your portfolio. Refresh the page and try again.",
+    };
+  refreshPerks();
+  return { message: "Portfolio order saved." };
+}

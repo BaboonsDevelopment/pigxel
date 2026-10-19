@@ -1,6 +1,18 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Dialog,
+  DialogHeader,
+  DialogBody,
+  DialogFooter,
+  useDialog,
+} from "@pigxel/ui/components/dialog";
+import { Button } from "@pigxel/ui/components/button";
+import { loadAssetPage } from "../actions";
+import { filterPacks } from "../filters";
+import type { PackCard } from "../server";
 import { cn } from "@pigxel/ui/lib/utils";
 import { CANVAS_SIZES } from "@/features/explore/constants";
 import { useDismiss } from "@/features/explore/components/explore-header/components/menu-button";
@@ -17,6 +29,7 @@ import {
 } from "@/features/tiles/components/projects-view/components/toolbar-menu";
 import {
   ACCESS,
+  ASSET_SORTS,
   activeFilters,
   KINDS,
   MOTIONS,
@@ -25,7 +38,7 @@ import {
 } from "../filters";
 
 const CHOICE =
-  "h-8 cursor-pointer rounded-lg border border-[#ecd3dd] bg-background px-2.5 text-xs text-[#4a1f35] tabular-nums transition-colors hover:bg-muted aria-checked:border-transparent aria-checked:bg-[#fde2ea] aria-pressed:border-transparent aria-pressed:bg-[#fde2ea]";
+  "h-8 cursor-pointer rounded-lg border border-[#ecd3dd] bg-background px-2.5 text-xs text-[#4a1f35] tabular-nums transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40 aria-checked:border-transparent aria-checked:bg-[#fde2ea] aria-pressed:border-transparent aria-pressed:bg-[#fde2ea]";
 
 const ANY_PACK = "any";
 
@@ -66,6 +79,7 @@ function AssetFilterFields({
                   key={tag.id}
                   type="button"
                   aria-pressed={on}
+                  disabled={!on && value.tags.length >= 10}
                   onClick={() =>
                     onPatch({
                       tags: on
@@ -159,7 +173,7 @@ function TriggerContent({ active }: { active: number }) {
       {active > 0 && (
         <span
           aria-hidden="true"
-          className="flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground tabular-nums"
+          className="flex size-5 items-center justify-center rounded-full bg-[#fde5ee] text-[11px] font-medium text-[#c54175] tabular-nums"
         >
           {active}
         </span>
@@ -194,6 +208,7 @@ export function AssetFiltersToggle({
       className={className ?? TOOLBAR_TRIGGER}
     >
       <TriggerContent active={active} />
+      <Chevron open={open} />
     </button>
   );
 }
@@ -237,6 +252,14 @@ export function AssetFiltersSidebar({
             <path d="m4 4 8 8M12 4l-8 8" />
           </svg>
         </button>
+      </div>
+      <div className="mb-4 border-b border-[#f0dde5] pb-4">
+        <FilterSelect
+          label="Sort by"
+          options={ASSET_SORTS}
+          value={filters.sort}
+          onChange={(sort) => onChange({ ...filters, sort })}
+        />
       </div>
       <AssetFilterFields
         value={filters}
@@ -324,5 +347,133 @@ export function AssetFiltersMenu({
         </div>
       )}
     </div>
+  );
+}
+
+/** Filters are drafted in a modal drawer; the gallery never loses width. */
+export function AssetFiltersDrawer({
+  id,
+  filters,
+  onApply,
+  onClose,
+  tags,
+  packs,
+  tab,
+  favourites,
+}: {
+  id: string;
+  filters: AssetFilters;
+  onApply: (value: AssetFilters) => void;
+  onClose: () => void;
+  tags: { id: string; name: string }[];
+  packs: PackCard[];
+  tab: "packs" | "all";
+  favourites: ReadonlySet<string>;
+}) {
+  const [draft, setDraft] = useState(filters);
+  const [countFilters, setCountFilters] = useState(filters);
+  useEffect(() => {
+    const timer = setTimeout(() => setCountFilters(draft), 300);
+    return () => clearTimeout(timer);
+  }, [draft]);
+  const count = useQuery({
+    queryKey: ["assets", "filter-count", countFilters],
+    queryFn: () => loadAssetPage(countFilters, 0),
+    select: (page) => page.count,
+    enabled: tab === "all",
+    staleTime: 60_000,
+    retry: false,
+  });
+  const packCount =
+    tab === "packs"
+      ? filterPacks(packs, draft, {
+          favourites,
+          tagNames: new Map(tags.map((tag) => [tag.id, tag.name])),
+        }).length
+      : null;
+  const pending =
+    tab === "all" &&
+    (count.isPending || JSON.stringify(draft) !== JSON.stringify(countFilters));
+  const matches =
+    tab === "packs"
+      ? packCount
+      : count.isSuccess && !pending
+        ? count.data
+        : null;
+  const noun = tab === "packs" ? "packs" : "assets";
+  return (
+    <Dialog
+      id={id}
+      portal
+      onClose={onClose}
+      aria-label="Filters"
+      className="fixed inset-y-0 right-0 m-0 ml-auto h-dvh max-h-dvh w-[min(26rem,100vw)] max-w-none rounded-none border-y-0 border-r-0 backdrop:bg-[#3b2a33]/20 sm:rounded-l-2xl"
+    >
+      <DialogHeader
+        title="Filters"
+        description={`Find the right ${noun} for your project.`}
+        className="border-b px-6 pt-6 pb-5 [&_button]:size-11"
+      />
+      <DialogBody className="px-6 py-5">
+        <AssetFilterFields
+          value={draft}
+          onPatch={(next) => setDraft((current) => ({ ...current, ...next }))}
+          tags={tags}
+          packs={packs}
+          kind={tab === "all"}
+          pack={tab === "all"}
+        />
+      </DialogBody>
+      <DrawerFooter
+        pending={pending}
+        matches={matches}
+        noun={noun}
+        onClear={() => setDraft(cleared(draft))}
+        onApply={() => onApply(draft)}
+      />
+    </Dialog>
+  );
+}
+
+function DrawerFooter({
+  pending,
+  matches,
+  noun,
+  onClear,
+  onApply,
+}: {
+  pending: boolean;
+  matches: number | null;
+  noun: string;
+  onClear: () => void;
+  onApply: () => void;
+}) {
+  const { close } = useDialog();
+  return (
+    <DialogFooter className="flex-col gap-3 bg-white px-6 py-5">
+      <p role="status" className="text-center text-sm text-[#806775]">
+        {pending
+          ? "Checking matches…"
+          : matches === null
+            ? "Choose filters, then apply them to your gallery."
+            : `${matches.toLocaleString()} ${matches === 1 ? noun.slice(0, -1) : noun} match`}
+      </p>
+      <div className="flex gap-3">
+        <Button variant="secondary" className="h-11 flex-1" onClick={onClear}>
+          Reset filters
+        </Button>
+        <Button
+          className="h-11 flex-1"
+          onClick={() => {
+            onApply();
+            close();
+          }}
+        >
+          {matches === null
+            ? "Apply filters"
+            : `Show ${matches.toLocaleString()} ${matches === 1 ? noun.slice(0, -1) : noun}`}
+        </Button>
+      </div>
+    </DialogFooter>
   );
 }

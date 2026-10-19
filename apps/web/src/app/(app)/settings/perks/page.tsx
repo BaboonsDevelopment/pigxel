@@ -16,6 +16,7 @@ import {
 import {
   removeBadge,
   removePortfolioItem,
+  reorderPortfolioItems,
   setBadgeVisible,
 } from "@/features/membership/actions";
 import {
@@ -61,9 +62,17 @@ export default async function MemberPerks({
           Messages are only shown here.
         </Text>
         {!badges.length ? (
-          <Text tone="muted" className="mt-4">
-            No badges received yet.
-          </Text>
+          <div className="mt-4 rounded-xl border border-dashed p-5">
+            <Text tone="muted">
+              No badges yet. Other artists can send you gifts from your profile.
+            </Text>
+            <Link
+              href="/profile"
+              className={`${textLinkClassName} mt-2 inline-block text-sm`}
+            >
+              View your profile →
+            </Link>
+          </div>
         ) : (
           <ul className="mt-4 space-y-4">
             {badges.map((badge) => (
@@ -80,9 +89,16 @@ export default async function MemberPerks({
                     <p className="font-medium">{badge.label}</p>
                     <Text tone="muted">
                       From{" "}
-                      {badge.sender
-                        ? `@${badge.sender.username}`
-                        : "a Pigxel artist"}{" "}
+                      {badge.sender ? (
+                        <Link
+                          href={`/u/${badge.sender.username}`}
+                          className={textLinkClassName}
+                        >
+                          @{badge.sender.username}
+                        </Link>
+                      ) : (
+                        "a Pigxel artist"
+                      )}{" "}
                       · {badge.visible ? "Displayed on profile" : "Private"}
                     </Text>
                   </div>
@@ -104,6 +120,7 @@ export default async function MemberPerks({
                   </PerkActionButton>
                   <PerkActionButton
                     action={removeBadge.bind(null, badge.id)}
+                    confirmMessage="Remove this gift permanently? You can hide it instead to keep it private."
                     destructive
                   >
                     Remove badge
@@ -128,36 +145,114 @@ export default async function MemberPerks({
               Show clients what you do and how to reach you. Your profile must
               be public for others to see this.
             </Text>
+            <Link
+              href="/profile"
+              className={`${textLinkClassName} mt-3 inline-block text-sm`}
+            >
+              Preview your profile →
+            </Link>
             <HiringProfileForm profile={hiring.profile} />
           </SettingsSection>
           <SettingsSection title="Portfolio work">
             <Text tone="muted" className="mt-2">
-              Add up to twelve projects to your hiring profile.
+              {hiring.portfolio.length} of 12 projects. Edit your work or use
+              the arrows to choose the order visitors see.
             </Text>
             <ul className="mt-4 space-y-3">
-              {hiring.portfolio.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                >
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={textLinkClassName}
-                  >
-                    {item.title}
-                  </a>
-                  <PerkActionButton
-                    action={removePortfolioItem.bind(null, item.id)}
-                    destructive
-                  >
-                    Remove
-                  </PerkActionButton>
-                </li>
-              ))}
+              {hiring.portfolio.map((item, index) => {
+                const move = (direction: number) => {
+                  const ids = hiring.portfolio.map((project) => project.id);
+                  const target = index + direction;
+                  if (target >= 0 && target < ids.length) {
+                    [ids[index], ids[target]] = [ids[target]!, ids[index]!];
+                  }
+                  return reorderPortfolioItems.bind(null, ids);
+                };
+                return (
+                  <li key={item.id} className="rounded-xl border p-4">
+                    <div className="flex items-start gap-3">
+                      {item.art?.thumbnail && (
+                        <PixelImage
+                          src={item.art.thumbnail}
+                          alt=""
+                          className="size-14 shrink-0 rounded-lg object-contain"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`${textLinkClassName} break-words`}
+                        >
+                          {item.title}
+                        </a>
+                        {item.description && (
+                          <Text
+                            tone="muted"
+                            className="mt-1 whitespace-pre-line break-words"
+                          >
+                            {item.description}
+                          </Text>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <PerkActionButton
+                        action={move(-1)}
+                        disabled={index === 0}
+                      >
+                        ↑ Move up<span className="sr-only">: {item.title}</span>
+                      </PerkActionButton>
+                      <PerkActionButton
+                        action={move(1)}
+                        disabled={index === hiring.portfolio.length - 1}
+                      >
+                        ↓ Move down
+                        <span className="sr-only">: {item.title}</span>
+                      </PerkActionButton>
+                      <PerkActionButton
+                        action={removePortfolioItem.bind(null, item.id)}
+                        confirmMessage="Remove this project from your portfolio? Your original artwork will stay in Pigxel."
+                        destructive
+                      >
+                        Remove<span className="sr-only">: {item.title}</span>
+                      </PerkActionButton>
+                    </div>
+                    <details className="mt-4 border-t pt-3">
+                      <summary className="cursor-pointer text-sm font-medium">
+                        Edit project
+                        <span className="sr-only">: {item.title}</span>
+                      </summary>
+                      <PortfolioItemForm arts={arts} item={item} />
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
-            {hiring.portfolio.length < 12 && <PortfolioItemForm arts={arts} />}
+            {!hiring.portfolio.length && (
+              <Text
+                tone="muted"
+                className="mt-4 rounded-xl border border-dashed p-5"
+              >
+                Show clients what you can make. Add your first project below.
+              </Text>
+            )}
+            {hiring.portfolio.length < 12 ? (
+              <details
+                className="mt-5 rounded-xl border p-4"
+                open={!hiring.portfolio.length}
+              >
+                <summary className="cursor-pointer text-sm font-medium">
+                  Add a project
+                </summary>
+                <PortfolioItemForm arts={arts} />
+              </details>
+            ) : (
+              <Text tone="muted" className="mt-4">
+                Your portfolio is full. Edit or remove a project to make room.
+              </Text>
+            )}
           </SettingsSection>
         </>
       )}

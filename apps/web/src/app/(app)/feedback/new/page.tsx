@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Page } from "@pigxel/ui/components/page";
-import { Heading, linkVariants, Text } from "@pigxel/ui/components/typography";
+import { Heading, Text } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
 import { kindOf, pageFrom } from "@/features/feedback/feedback";
 import { countOwnOpen } from "@/features/feedback/server";
@@ -21,9 +21,7 @@ export default async function NewFeedback({ searchParams }: Props) {
   const open = await countOwnOpen(user.id);
   return (
     <Page width="narrow">
-      <Link href="/feedback" className={linkVariants({ variant: "accent" })}>
-        <span aria-hidden="true">←</span> Feedback
-      </Link>
+      <BackButton href="/feedback" className="mb-3" />
       <Heading size="page" className="mt-2">
         Report a bug or request a feature
       </Heading>

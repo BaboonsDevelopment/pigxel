@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
@@ -85,6 +86,10 @@ export function CollectionView({
 
   return (
     <>
+      <BackButton
+        href={`/u/${encodeURIComponent(author.username)}?tab=collections`}
+        className="mb-5"
+      />
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">Collection</p>

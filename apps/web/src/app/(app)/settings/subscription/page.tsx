@@ -84,6 +84,20 @@ export default async function SubscriptionSettings({
           chosen={chosen && planOfProduct(chosen) ? chosen : undefined}
         />
       )}
+      <Card className="mt-6">
+        <SectionTitle>Your member perks</SectionTitle>
+        <Text tone="muted" className="mt-2">
+          {plan.name === "Free"
+            ? "Manage badges you’ve received, or explore the perks included with a paid plan."
+            : "Gift custom badges, manage your received gifts, and build your hiring portfolio."}
+        </Text>
+        <Link
+          href="/settings/perks"
+          className={`${textLinkClassName} mt-3 inline-block`}
+        >
+          Manage member perks →
+        </Link>
+      </Card>
       <SubscriptionSupport plan={plan} email={user.email} />
     </section>
   );

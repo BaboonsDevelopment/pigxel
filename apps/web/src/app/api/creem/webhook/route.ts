@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { saveSubscription } from "@/features/billing/server";
+import { confirmCreemCheckout } from "@/features/billing/checkout";
 import {
   subscriptionRecord,
   type CreemSubscription,
@@ -50,6 +51,23 @@ export async function POST(request: Request) {
     event = JSON.parse(body) as CreemEvent;
   } catch {
     return NextResponse.json({ error: "bad_body" }, { status: 400 });
+  }
+  if (event.eventType === "checkout.completed") {
+    const owner = event.object?.metadata?.userId;
+    if (typeof owner !== "string") {
+      console.warn("Creem checkout.completed without a Pigxel userId.");
+      return NextResponse.json({ ok: true });
+    }
+    try {
+      await confirmCreemCheckout(event.object.id, owner);
+    } catch (error) {
+      console.error("Couldn’t confirm the Creem checkout:", error);
+      return NextResponse.json(
+        { error: "checkout_confirmation_failed" },
+        { status: 500 },
+      );
+    }
+    return NextResponse.json({ ok: true });
   }
   if (!SUBSCRIPTION_EVENTS.has(event.eventType))
     return NextResponse.json({ ok: true });

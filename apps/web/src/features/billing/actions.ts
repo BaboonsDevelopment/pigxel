@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { authUrl } from "@/lib/auth/config";
 import { creemApi, getBillingMode, storeSubscription } from "./creem";
 import { getCurrentPlan, hasAiAccess, setPendingProduct } from "./server";
+import { confirmCreemCheckout } from "./checkout";
 import {
   canChangePlan,
   planChange,
@@ -15,6 +16,13 @@ import {
 } from "./subscription";
 
 const SUBSCRIPTION_PATH = "/settings/subscription";
+
+export async function confirmCheckout(checkoutId: string): Promise<boolean> {
+  const user = await requireUser();
+  const confirmed = await confirmCreemCheckout(checkoutId, user.id);
+  if (confirmed) revalidatePath("/", "layout");
+  return confirmed;
+}
 
 export type PlanPreview =
   | { change: Exclude<PlanChange, "same">; productId: string }

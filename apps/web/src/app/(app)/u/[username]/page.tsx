@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackButton } from "@/components/navigation/back-button";
 import { notFound } from "next/navigation";
 import { buttonVariants } from "@pigxel/ui/components/button";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
@@ -186,6 +187,7 @@ export default async function ArtistProfilePage({
 
   return (
     <Page className={PROFILE_PAGE}>
+      <BackButton href="/explore" className="mb-5" />
       {isOwner && profile.visibility === "private" && (
         <Notice className="mb-6">
           Your profile is private: only you can see it.{" "}

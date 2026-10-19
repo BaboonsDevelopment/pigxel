@@ -15,7 +15,11 @@ The current implementation uses Creem. This replaces the former Paddle setup.
 - Guests sign up before checkout. Subscribers change their existing plan.
 - Creem returns to `/welcome`, showing the pig mascot and **Go back to Pigxel**.
   The page reads the actual subscription and waits while confirmation arrives;
-  visiting the page does not grant membership.
+  visiting the page does not grant membership. When `checkout_id` is present,
+  the waiting state verifies the completed checkout and its current subscription
+  through Creem’s server API, checks account ownership and billing environment,
+  then stores the verified state. This recovers initial activation if a local
+  webhook was missed; webhooks still keep subsequent billing events in sync.
 
 ## Paid benefits
 

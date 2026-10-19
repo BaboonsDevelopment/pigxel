@@ -3,6 +3,7 @@ import { DM_Mono, Fredoka, Manrope } from "next/font/google";
 import "@pigxel/ui/styles/globals.css";
 import "./transitions.css";
 import { ConnectionWatch } from "@/components/layout/connection-watch";
+import { NavigationHistory } from "@/components/navigation/back-button";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { CookieBanner } from "@/features/legal/components/cookie-banner";
 import { madimiOne } from "@/lib/fonts/madimi";
@@ -38,7 +39,10 @@ export default function RootLayout({
       className={`${manrope.variable} ${madimiOne.variable} ${fredoka.variable} ${dmMono.variable}`}
     >
       <body className="min-h-screen" suppressHydrationWarning>
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          <NavigationHistory />
+          {children}
+        </QueryProvider>
         <ConnectionWatch />
         <CookieBanner />
       </body>

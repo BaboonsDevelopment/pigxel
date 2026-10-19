@@ -22,7 +22,13 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NOT_FOUND");
   },
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/u/pixel_pig",
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    refresh: vi.fn(),
+  }),
 }));
 vi.mock("@/lib/auth/session", () => ({ getUser: mocks.user }));
 vi.mock("@/features/collections/server", () => ({

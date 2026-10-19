@@ -14,21 +14,27 @@ export function StatusControl({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [savedStatus, setSavedStatus] = useState<FeedbackStatus | null>(null);
   return (
     <div className="mt-3">
       <label className="flex items-center gap-2 text-xs text-muted-foreground">
         Team status
         <select
           aria-label={`Status for feedback #${id}`}
-          value={status}
+          value={savedStatus ?? status}
           disabled={pending}
           className="h-8 rounded-lg border bg-background px-2 text-sm text-foreground"
           onChange={(event) => {
             const value = event.target.value;
             startTransition(async () => {
               setError(null);
-              const result = await updateFeedbackStatus(id, value);
-              if (result?.error) setError(result.error);
+              try {
+                const result = await updateFeedbackStatus(id, value);
+                if (result?.error) setError(result.error);
+                else setSavedStatus(value as FeedbackStatus);
+              } catch {
+                setError("Couldn’t update this status. Please try again.");
+              }
             });
           }}
         >
@@ -39,6 +45,13 @@ export function StatusControl({
           ))}
         </select>
       </label>
+      <span className="sr-only" role="status">
+        {pending
+          ? "Saving status…"
+          : savedStatus && !error
+            ? "Status saved."
+            : ""}
+      </span>
       {error && (
         <FormMessage tone="error" className="mt-2">
           {error}
