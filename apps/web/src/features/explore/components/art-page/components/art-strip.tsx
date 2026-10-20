@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
 import { PixelImage } from "@/components/ui/pixel-image";
 import type { PublicTile } from "@/features/profile/profile";
 import { madimiOne } from "@/lib/fonts/madimi";
+import { rememberArt } from "../../../art-cache";
 import { formatCount } from "../../popular-card/helpers";
 
 export function ArtStrip({
@@ -39,6 +42,7 @@ export function ArtStrip({
           <li key={art.id}>
             <Link
               href={`/explore/${art.id}`}
+              onClick={() => rememberArt(art)}
               className="group block overflow-hidden rounded-xl border bg-background transition-shadow hover:shadow-[0_6px_16px_-8px_rgb(59_42_51/0.35)]"
             >
               <span className="block aspect-[4/3] overflow-hidden bg-checker">

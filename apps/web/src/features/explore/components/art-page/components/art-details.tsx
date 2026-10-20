@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { FormMessage } from "@pigxel/ui/components/field";
+import { Skeleton } from "@pigxel/ui/components/skeleton";
 import { cn } from "@pigxel/ui/lib/utils";
 import { CloudError } from "@/lib/pigxel-file/cloud";
 import { editorUrl } from "@/lib/pigxel-file/open-tile";
@@ -49,13 +50,14 @@ const ACTION =
 
 const published = new Intl.DateTimeFormat("en", { dateStyle: "long" });
 
-function Stat({
+/** One of the art's counts; null shows a placeholder while it loads. */
+export function Stat({
   icon,
   value,
   label,
 }: {
   icon: ReactNode;
-  value: number;
+  value: number | null;
   label: string;
 }) {
   return (
@@ -63,7 +65,11 @@ function Stat({
       <span className="text-[#4a1f35] [&>svg]:size-5">{icon}</span>
       <span>
         <span className="block text-lg leading-tight font-semibold tabular-nums">
-          {formatCount(value)}
+          {value === null ? (
+            <Skeleton className="inline-block h-[1lh] w-7 align-top" />
+          ) : (
+            formatCount(value)
+          )}
         </span>
         <span className="block text-xs leading-tight text-muted-foreground">
           {label}
@@ -99,7 +105,26 @@ function Svg({
 const HEART =
   "M8 13.5S2.5 10.3 2.5 6.4A3 3 0 0 1 8 4.8a3 3 0 0 1 5.5 1.6c0 3.9-5.5 7.1-5.5 7.1Z";
 
-const RemixIcon = () => (
+export const LikesIcon = () => (
+  <Svg>
+    <path d={HEART} />
+  </Svg>
+);
+
+export const CommentsIcon = () => (
+  <Svg>
+    <path d="M13.5 7.5c0 2.8-2.5 5-5.5 5a6 6 0 0 1-2.4-.5L2.5 13l.9-2.6a4.7 4.7 0 0 1-.9-2.9c0-2.8 2.5-5 5.5-5s5.5 2.2 5.5 5Z" />
+  </Svg>
+);
+
+export const ViewsIcon = () => (
+  <Svg>
+    <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
+    <circle cx="8" cy="8" r="2" />
+  </Svg>
+);
+
+export const RemixIcon = () => (
   <Svg>
     <circle cx="4.5" cy="3.5" r="1.5" />
     <circle cx="11.5" cy="3.5" r="1.5" />
@@ -419,35 +444,10 @@ export function ArtDetails({
       )}
 
       <div className="mt-6 grid grid-cols-4 gap-3">
-        <Stat
-          icon={
-            <Svg>
-              <path d={HEART} />
-            </Svg>
-          }
-          value={like.count}
-          label="Likes"
-        />
-        <Stat
-          icon={
-            <Svg>
-              <path d="M13.5 7.5c0 2.8-2.5 5-5.5 5a6 6 0 0 1-2.4-.5L2.5 13l.9-2.6a4.7 4.7 0 0 1-.9-2.9c0-2.8 2.5-5 5.5-5s5.5 2.2 5.5 5Z" />
-            </Svg>
-          }
-          value={commentCount}
-          label="Comments"
-        />
+        <Stat icon={<LikesIcon />} value={like.count} label="Likes" />
+        <Stat icon={<CommentsIcon />} value={commentCount} label="Comments" />
         <Stat icon={<RemixIcon />} value={tile.remixes ?? 0} label="Remixes" />
-        <Stat
-          icon={
-            <Svg>
-              <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" />
-              <circle cx="8" cy="8" r="2" />
-            </Svg>
-          }
-          value={views}
-          label="Views"
-        />
+        <Stat icon={<ViewsIcon />} value={views} label="Views" />
       </div>
 
       <div

@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { ArtPage } from "@/features/explore/components/art-page/art-page";
+import { RelatedArts } from "@/features/explore/components/art-page/related-arts";
 import {
   getFollowStats,
   getOwnProfile,
   getPublicTile,
-  listRemixes,
-  listSameTagArts,
-  listSimilarArts,
 } from "@/features/profile/server";
 import { isTileSaved, listComments } from "@/features/explore/server";
 import { getUser } from "@/lib/auth/session";
@@ -40,27 +39,22 @@ export default async function ArtDetailPage({ params }: Props) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
   const user = await getUser();
-  const tile = await getPublicTile(id, user?.id ?? null);
+  const viewerId = user?.id ?? null;
+  // Everything that only needs the id loads alongside the art itself.
+  const [tile, profile, saved, comments] = await Promise.all([
+    getPublicTile(id, viewerId),
+    user ? getOwnProfile(user.id) : null,
+    user ? isTileSaved(user.id, id).catch(() => false) : false,
+    listComments(id).catch((error: unknown) => {
+      console.error(error);
+      return { comments: [], count: 0 };
+    }),
+  ]);
   if (!tile) notFound();
-  const [profile, follow, saved, comments, remixes, sameTags] =
-    await Promise.all([
-      user ? getOwnProfile(user.id) : null,
-      user && user.id !== tile.author.id
-        ? getFollowStats(tile.author.id, user.id).catch(() => null)
-        : null,
-      user ? isTileSaved(user.id, tile.id).catch(() => false) : false,
-      listComments(tile.id).catch((error: unknown) => {
-        console.error(error);
-        return { comments: [], count: 0 };
-      }),
-      listRemixes(tile.id).catch(() => []),
-      listSameTagArts(tile, user?.id ?? null).catch(() => []),
-    ]);
-  const similar = await listSimilarArts(
-    tile,
-    user?.id ?? null,
-    sameTags.map((art) => art.id),
-  ).catch(() => []);
+  const follow =
+    user && user.id !== tile.author.id
+      ? await getFollowStats(tile.author.id, user.id).catch(() => null)
+      : null;
   return (
     <ArtPage
       tile={tile}
@@ -76,9 +70,11 @@ export default async function ArtDetailPage({ params }: Props) {
       following={follow?.following ?? false}
       saved={saved}
       comments={comments}
-      remixes={remixes}
-      sameTags={sameTags}
-      similar={similar}
+      related={
+        <Suspense fallback={null}>
+          <RelatedArts tile={tile} viewerId={viewerId} />
+        </Suspense>
+      }
     />
   );
 }

@@ -18,6 +18,16 @@ import footerClouds from "../../../../public/art/footer/clouds.png";
 import footerPig from "../../../../public/art/footer/pig.png";
 import styles from "./landing.module.css";
 
+/**
+ * A scrolling strip's items: the set repeated LOOP_SETS times, twice over.
+ * The strip slides by half its length, so each half must be wider than the
+ * widest screen or the end shows empty space. Three sets is about 3,900px of
+ * icons and 4,800px of pictures. Keep the CSS durations in step (marquee).
+ */
+const LOOP_SETS = 3;
+const loop = <T,>(items: readonly T[]): T[] =>
+  Array.from({ length: LOOP_SETS * 2 }, () => items).flat();
+
 /** Footer sparkles: x and y in % of the scene, and size in px. */
 const SPARKS: [number, number, number][] = [
   [14, 22, 14],
@@ -237,7 +247,7 @@ export function Landing() {
           <p id="strip-heading">From the first doodle to finished game art</p>
           <div className={styles.marquee}>
             <ul className={styles.marqueeTrack}>
-              {[...MAKES, ...MAKES].map((item, index) => (
+              {loop(MAKES).map((item, index) => (
                 <li
                   key={index}
                   aria-hidden={index >= MAKES.length || undefined}
@@ -371,7 +381,7 @@ export function Landing() {
             </div>
             <div className={styles.ctaStrip} aria-hidden="true">
               <div className={styles.ctaStripTrack}>
-                {[...STRIP, ...STRIP].map((art, index) => (
+                {loop(STRIP).map((art, index) => (
                   <div
                     key={index}
                     className={styles.ctaThumb}

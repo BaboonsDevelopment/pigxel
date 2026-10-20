@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
 import { readPublishedTile } from "@/lib/pigxel-file/cloud";
 import { manrope } from "@/lib/fonts/manrope";
@@ -10,9 +10,7 @@ import { ArtNav } from "./components/art-nav";
 import { Breadcrumb } from "./components/breadcrumb";
 import { ArtDetails } from "./components/art-details";
 import { ArtPreview } from "./components/art-preview";
-import { ArtStrip } from "./components/art-strip";
 import { CommunityCard } from "./components/community-card";
-import { canvasSizeOf } from "../../constants";
 import { toPicture, type Picture } from "./helpers";
 
 export function ArtPage({
@@ -21,20 +19,15 @@ export function ArtPage({
   following,
   saved,
   comments,
-  remixes,
-  sameTags,
-  similar,
+  related,
 }: {
   tile: PublicTile;
   viewer: { id: string; name: string; avatarUrl: string | null } | null;
   following: boolean;
   saved: boolean;
   comments: { comments: ArtComment[]; count: number };
-  remixes: PublicTile[];
-  /** Works sharing its tags. */
-  sameTags: PublicTile[];
-  /** Works at its canvas size, besides those sharing its tags. */
-  similar: PublicTile[];
+  /** Remixes, Tagged and Similar strips, streamed in by the server. */
+  related: ReactNode;
 }) {
   const [file, setFile] = useState<string | null>(null);
   const [picture, setPicture] = useState<Picture | null>(null);
@@ -91,40 +84,10 @@ export function ArtPage({
             onCountChange={setCommentCount}
           />
         </div>
-        {(remixes.length > 0 || sameTags.length > 0 || similar.length > 0) && (
-          <div className="flex flex-col gap-8 lg:col-start-1 lg:row-start-2 lg:self-start">
-            {remixes.length > 0 && (
-              <ArtStrip
-                title={`Remixes (${tile.remixes ?? remixes.length})`}
-                arts={remixes}
-              />
-            )}
-            {sameTags.length > 0 && (
-              <ArtStrip
-                title={`Tagged ${tile.tags
-                  .slice(0, 3)
-                  .map((tag) => `#${tag.toLowerCase()}`)
-                  .join(" ")}`}
-                arts={sameTags}
-                viewAll={`/explore?tag=${encodeURIComponent(tile.tags.join(","))}`}
-              />
-            )}
-            {similar.length > 0 && (
-              <ArtStrip
-                title="Similar artwork"
-                arts={similar}
-                viewAll={similarHref(tile)}
-              />
-            )}
-          </div>
-        )}
+        <div className="lg:col-start-1 lg:row-start-2 lg:self-start">
+          {related}
+        </div>
       </div>
     </div>
   );
-}
-
-/** Explore filtered to the art's canvas size, where "Similar artwork" comes from. */
-function similarHref(tile: Pick<PublicTile, "width" | "height">) {
-  const size = canvasSizeOf(tile.width, tile.height);
-  return size ? `/explore?size=${size.value}` : "/explore";
 }

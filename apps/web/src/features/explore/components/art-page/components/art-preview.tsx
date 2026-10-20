@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
+import { PixelImage } from "@/components/ui/pixel-image";
 import type { PublicTile } from "@/features/profile/profile";
 import type { Picture } from "../helpers";
 
@@ -62,7 +63,8 @@ export function ArtPreview({
   const count = picture?.frames.length ?? 0;
   const animated = !!picture?.animated;
 
-  useEffect(() => {
+  // Drawn before paint, so the canvas never shows empty for a frame.
+  useLayoutEffect(() => {
     const shown = picture?.frames[frame];
     if (shown)
       canvas.current?.getContext("2d")?.putImageData(shown.pixels, 0, 0);
@@ -110,10 +112,18 @@ export function ArtPreview({
               height={picture.height}
               className="m-auto size-full object-contain [image-rendering:pixelated]"
             />
-          ) : (
+          ) : error || !tile.thumbnail ? (
             <span className="m-auto text-sm text-muted-foreground">
               {error ?? "Loading…"}
             </span>
+          ) : (
+            // The thumbnail stands in while the full art loads, as it did
+            // on the page shown before this one (art-page-shell).
+            <PixelImage
+              src={tile.thumbnail}
+              alt=""
+              className="m-auto size-full object-contain"
+            />
           )}
         </div>
         {animated && (
