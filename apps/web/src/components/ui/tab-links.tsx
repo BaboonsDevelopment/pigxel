@@ -30,18 +30,23 @@ export function TabLinks({
     width: number;
   } | null>(null);
   const index = tabs.findIndex((tab) => tab.active);
+  // Tabs are keyed by href, so a new href is a new element to measure.
+  const activeHref = tabs[index]?.href;
   const sliding = variant === "segmented";
 
   useLayoutEffect(() => {
     const tab = refs.current[index];
     if (!sliding || !tab) return setHighlight(null);
-    const measure = () =>
-      setHighlight({ left: tab.offsetLeft, width: tab.offsetWidth });
+    const measure = () => {
+      // A removed tab reports a zero size; its replacement measures itself.
+      if (tab.isConnected)
+        setHighlight({ left: tab.offsetLeft, width: tab.offsetWidth });
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(tab);
     return () => observer.disconnect();
-  }, [index, sliding]);
+  }, [index, activeHref, sliding]);
 
   return (
     <nav aria-label={label} className={tabListVariants({ variant, className })}>

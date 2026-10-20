@@ -2,7 +2,7 @@ import Image from "next/image";
 import landscape from "../../../../public/art/sidebar-landscape.webp";
 
 /** The landscape under the nav; short screens have no room for it. */
-export function SidebarScene({ subdued = false }: { subdued?: boolean }) {
+export function SidebarScene() {
   return (
     <div
       aria-hidden="true"
@@ -14,7 +14,7 @@ export function SidebarScene({ subdued = false }: { subdued?: boolean }) {
         fill
         sizes="240px"
         placeholder="blur"
-        className={`object-cover object-bottom short:hidden ${subdued ? "opacity-40 saturate-75" : ""}`}
+        className="object-cover object-bottom short:hidden"
       />
     </div>
   );

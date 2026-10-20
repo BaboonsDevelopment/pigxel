@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { buttonVariants } from "@pigxel/ui/components/button";
 import { cardVariants } from "@pigxel/ui/components/card";
 import { Input } from "@pigxel/ui/components/input";
 import { Page } from "@pigxel/ui/components/page";
-import {
-  linkVariants,
-  PageHeader,
-  Text,
-} from "@pigxel/ui/components/typography";
+import { linkVariants, Text } from "@pigxel/ui/components/typography";
 import { TabLinks } from "@/components/ui/tab-links";
 import {
   boardUrl,
@@ -23,6 +18,7 @@ import {
   type BoardQuery,
 } from "@/features/feedback/server";
 import { BoardItem } from "@/features/feedback/components/board-item";
+import { FeedbackHeader } from "@/features/feedback/components/feedback-header";
 import { shownFrom } from "@/lib/utils/shown";
 import { getUser, isAdmin } from "@/lib/auth/session";
 
@@ -69,32 +65,10 @@ export default async function Feedback({ searchParams }: Props) {
 
   return (
     <Page>
-      <PageHeader
-        title="Feedback"
-        description="Vote for what you’d like next, or tell us what’s broken. The team reads every report and moves it along as it’s looked at."
-        actions={
-          <div className="flex gap-2">
-            <Link
-              href={newUrl("bug")}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              Report a bug
-            </Link>
-            <Link href={newUrl("feature")} className={buttonVariants()}>
-              Request a feature
-            </Link>
-          </div>
-        }
-      />
-
-      <TabLinks
-        label="Kind"
-        className="mt-6"
-        tabs={(Object.keys(FEEDBACK_KINDS) as FeedbackKind[]).map((kind) => ({
-          href: link({ kind, state: "open", search: "" }),
-          label: FEEDBACK_KINDS[kind].label,
-          active: kind === query.kind,
-        }))}
+      <FeedbackHeader
+        active={query.kind}
+        from={from}
+        kindHref={(kind) => link({ kind, state: "open", search: "" })}
       />
 
       <section
