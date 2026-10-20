@@ -17,9 +17,9 @@ export const metadata: Metadata = {
 
 const FACTS: { text: string; href?: string }[] = [
   { text: "Cancel anytime" },
-  { text: `Refunds within ${LEGAL.refundDays} days`, href: "/refunds" },
   { text: "Creem handles payments and VAT" },
   { text: "Your art stays yours" },
+  { text: `Refunds within ${LEGAL.refundDays} days`, href: "/refunds" },
 ];
 
 const POLICIES = [
