@@ -44,10 +44,11 @@ configuration yet. Tutorial recordings are optional and are not a launch prerequ
 - [x] Test OAuth state/session failures, billing environment separation, role API errors, disconnect cleanup, and stale responses with mocked services.
 - [ ] Verify subscription expiry and bot permissions against the real Discord server.
 
-External setup: Discord application, bot, server, and premium role. Configure
-`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`,
-`DISCORD_GUILD_ID`, and `DISCORD_PREMIUM_ROLE_ID` outside Git. The bot needs
-permission to manage the premium role, and its own role must be higher.
+External setup: Discord application, bot, server, and the Artist, Pro and
+Creator roles. Configure `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
+`DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_ARTIST_ROLE_ID`,
+`DISCORD_PRO_ROLE_ID` and optionally `DISCORD_CREATOR_ROLE_ID` outside Git. The
+bot needs permission to manage roles, and its own role must be above Artist and Pro.
 
 ## 5. Tutorial videos
 

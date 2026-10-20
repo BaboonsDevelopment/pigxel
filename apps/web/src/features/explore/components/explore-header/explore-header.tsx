@@ -22,7 +22,7 @@ import {
   type GridSize,
 } from "@/components/ui/grid-size-toggle";
 import { MenuButton } from "./components/menu-button";
-import { TagSearch } from "./components/tag-search";
+import { TagChips, TagSearch, TrendingTags } from "./components/tag-search";
 
 const SORT_ICONS: Record<Sort, React.ReactNode> = {
   popular: <StarIcon />,
@@ -67,25 +67,27 @@ export function ExploreHeader({
   onGridSizeChange: (size: GridSize) => void;
 }) {
   return (
-    <header className="relative mb-10 md:pt-4 lg:[zoom:clamp(0.7,tan(atan2(100vw,1920px)),1)]">
-      <h1
-        id="popular-heading"
-        className={cn(
-          madimiOne.className,
-          "text-[48px] leading-[63px] tracking-[0.03em] text-[#4a2434]",
-        )}
-      >
-        Explore
-      </h1>
-      <Image
-        src={mascot}
-        alt=""
-        width={101}
-        height={86}
-        priority
-        className="pointer-events-none absolute top-[14px] left-[325px] hidden h-auto w-[101px] md:block"
-      />
-      <div className="mt-2.5 flex flex-wrap items-start justify-between gap-3">
+    <header className="relative mb-8 md:pt-2 lg:[zoom:clamp(0.7,tan(atan2(100vw,1920px)),1)]">
+      <div className="flex items-end gap-2">
+        <h1
+          id="popular-heading"
+          className={cn(
+            madimiOne.className,
+            "text-[48px] leading-[63px] tracking-[0.03em] text-[#4a2434]",
+          )}
+        >
+          Explore
+        </h1>
+        <Image
+          src={mascot}
+          alt=""
+          width={101}
+          height={86}
+          priority
+          className="pointer-events-none hidden h-auto w-[72px] md:block"
+        />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2.5">
         <TagSearch
           query={query}
           onQueryChange={onQueryChange}
@@ -95,9 +97,6 @@ export function ExploreHeader({
           tagCounts={tagCounts}
           onTagsChange={onTagsChange}
         />
-        <PublishButton guest={guest} />
-      </div>
-      <div className="mt-[18px] flex flex-wrap items-center gap-2.5">
         <MenuButton
           label="Sort"
           icon={SORT_ICONS[sort]}
@@ -119,6 +118,21 @@ export function ExploreHeader({
           guest={guest}
           onApply={onFiltersApply}
         />
+        <div className="ml-auto">
+          <PublishButton guest={guest} />
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {tags.length ? (
+          <TagChips tags={tags} onTagsChange={onTagsChange} />
+        ) : (
+          !query.trim() && (
+            <TrendingTags
+              tagCounts={tagCounts}
+              onPick={(tag) => onTagsChange([tag])}
+            />
+          )
+        )}
         <GridSizeToggle
           value={gridSize}
           onChange={onGridSizeChange}

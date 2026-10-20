@@ -7,9 +7,13 @@ export function tabListVariants({
   variant = "underline",
   className,
 }: { variant?: TabsVariant; className?: string } = {}) {
+  // Scrolls sideways on narrow screens, without a visible scrollbar. The
+  // underline's base line is an inset shadow so the active tab's border can
+  // cover it without spilling out (and scrolling) vertically.
   return cn(
+    "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
     variant === "underline"
-      ? "flex gap-1 overflow-x-auto border-b"
+      ? "flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-border)]"
       : "relative inline-flex max-w-full overflow-x-auto rounded-lg border bg-background shadow-sm",
     className,
   );
@@ -30,7 +34,7 @@ export function tabVariants({
 }) {
   if (variant === "underline")
     return cn(
-      "-mb-px border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+      "border-b-2 px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
       active
         ? "border-primary text-foreground"
         : "border-transparent text-muted-foreground hover:text-foreground",

@@ -5,13 +5,18 @@ export const SNOWFLAKE = /^[0-9]{17,20}$/;
 export const DISCORD_API = "https://discord.com/api/v10";
 export const DISCORD_STATE_COOKIE = "pigxel-discord-state";
 
+/** The Discord roles the bot hands out, one per person, by paid plan. */
+export type DiscordRole = "artist" | "pro";
+
 export function discordConfig() {
   const {
     DISCORD_CLIENT_ID: clientId,
     DISCORD_CLIENT_SECRET: clientSecret,
     DISCORD_BOT_TOKEN: botToken,
     DISCORD_GUILD_ID: guildId,
-    DISCORD_PREMIUM_ROLE_ID: roleId,
+    DISCORD_ARTIST_ROLE_ID: artist,
+    DISCORD_PRO_ROLE_ID: pro,
+    DISCORD_CREATOR_ROLE_ID: creator,
   } = process.env;
   return clientId &&
     SNOWFLAKE.test(clientId) &&
@@ -19,9 +24,23 @@ export function discordConfig() {
     botToken &&
     guildId &&
     SNOWFLAKE.test(guildId) &&
-    roleId &&
-    SNOWFLAKE.test(roleId)
-    ? { clientId, clientSecret, botToken, guildId, roleId }
+    artist &&
+    SNOWFLAKE.test(artist) &&
+    pro &&
+    SNOWFLAKE.test(pro) &&
+    artist !== pro
+    ? {
+        clientId,
+        clientSecret,
+        botToken,
+        guildId,
+        roles: { artist, pro } satisfies Record<DiscordRole, string>,
+        /**
+         * Optional. Creators are given their role by hand; the bot only reads
+         * it, and leaves Creators without an Artist or Pro role.
+         */
+        creatorRoleId: creator && SNOWFLAKE.test(creator) ? creator : null,
+      }
     : null;
 }
 export const discordCallbackUrl = () => authUrl("/auth/discord/callback");

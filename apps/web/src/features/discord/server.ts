@@ -2,7 +2,12 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { planOfProduct } from "@/features/billing/subscription";
-import { discordConfig, DISCORD_API, SNOWFLAKE } from "./config";
+import {
+  discordConfig,
+  DISCORD_API,
+  SNOWFLAKE,
+  type DiscordRole,
+} from "./config";
 
 export type DiscordConnection = {
   id: string;
@@ -11,6 +16,8 @@ export type DiscordConnection = {
   username: string;
   disconnect_requested: boolean;
   synced_premium: boolean;
+  /** The role last seen in Discord: one the bot gave, or a Creator's. */
+  synced_role?: DiscordRole | "creator" | null;
   last_error: string | null;
   last_synced_at: string | null;
   sync_version?: number;
@@ -27,8 +34,14 @@ export async function getDiscordConnection(userId: string) {
   return data;
 }
 
-/** Match the billing environment: sandbox subscriptions never grant live roles. */
-export async function discordPremiumFor(userId: string): Promise<boolean> {
+/**
+ * The role someone's paid plans earn: Pro for any AI plan (Starter, Pro or
+ * Advanced), else Artist. Match the billing environment: sandbox
+ * subscriptions never grant live roles.
+ */
+export async function discordRoleFor(
+  userId: string,
+): Promise<DiscordRole | null> {
   const mode = process.env.CREEM_API_KEY?.startsWith("creem_test_")
     ? "test"
     : "live";
@@ -39,8 +52,15 @@ export async function discordPremiumFor(userId: string): Promise<boolean> {
     .in("status", ["active", "trialing", "past_due"])
     .returns<{ product_id: string }[]>();
   if (error) throw new Error("Couldn’t check Discord role eligibility.");
-  return data.some((row) => planOfProduct(row.product_id, mode) !== null);
+  const plans = data.flatMap(
+    (row) => planOfProduct(row.product_id, mode)?.name ?? [],
+  );
+  if (plans.some((plan) => plan !== "Artist")) return "pro";
+  return plans.length ? "artist" : null;
 }
+
+const roleFailed = (status: number) =>
+  new Error(`Discord role update failed (${status}). Please retry.`);
 
 export async function syncDiscordConnection(connection: DiscordConnection) {
   const config = discordConfig();
@@ -48,24 +68,43 @@ export async function syncDiscordConnection(connection: DiscordConnection) {
     throw new Error("Discord is not configured.");
   const admin = createAdminClient();
   try {
-    const premium =
-      !!connection.user_id &&
-      !connection.disconnect_requested &&
-      (await discordPremiumFor(connection.user_id));
-    const response = await fetch(
-      `${DISCORD_API}/guilds/${config.guildId}/members/${connection.discord_user_id}/roles/${config.roleId}`,
-      {
-        method: premium ? "PUT" : "DELETE",
-        headers: { Authorization: `Bot ${config.botToken}` },
-        signal: AbortSignal.timeout(8_000),
-      },
-    );
-    if (!response.ok && !(response.status === 404 && !premium))
-      throw new Error(
-        response.status === 404
-          ? "Join the Pigxel Discord server, then retry."
-          : `Discord role update failed (${response.status}). Please retry.`,
-      );
+    const linked = !!connection.user_id && !connection.disconnect_requested;
+    const earned = linked ? await discordRoleFor(connection.user_id!) : null;
+    const headers = { Authorization: `Bot ${config.botToken}` };
+    const member = `${DISCORD_API}/guilds/${config.guildId}/members/${connection.discord_user_id}`;
+    // Read the member first, then change only the roles that differ.
+    const found = await fetch(member, {
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    });
+    let role: DiscordConnection["synced_role"] = null;
+    if (found.status === 404) {
+      // Not in the server: nothing to remove, but nowhere to add a role.
+      if (earned)
+        throw new Error("Join the Pigxel Discord server, then retry.");
+    } else {
+      if (!found.ok) throw roleFailed(found.status);
+      const { roles: has } = (await found.json()) as { roles: string[] };
+      // Creators' roles are given by hand; they hold no Artist or Pro role.
+      const creator =
+        linked && !!config.creatorRoleId && has.includes(config.creatorRoleId);
+      const wanted = creator ? null : earned;
+      for (const [name, id] of Object.entries(config.roles) as [
+        DiscordRole,
+        string,
+      ][]) {
+        const want = name === wanted;
+        if (want === has.includes(id)) continue;
+        const response = await fetch(`${member}/roles/${id}`, {
+          method: want ? "PUT" : "DELETE",
+          headers,
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!response.ok && !(response.status === 404 && !want))
+          throw roleFailed(response.status);
+      }
+      role = creator ? "creator" : wanted;
+    }
     const result =
       connection.disconnect_requested || !connection.user_id
         ? await admin
@@ -76,7 +115,8 @@ export async function syncDiscordConnection(connection: DiscordConnection) {
         : await admin
             .from("discord_connections")
             .update({
-              synced_premium: premium,
+              synced_premium: role === "artist" || role === "pro",
+              synced_role: role,
               last_synced_at: new Date().toISOString(),
               last_error: null,
             })
