@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { supabase } from "@test/supabase";
-import { TIERS } from "@/features/billing/pricing";
+import { ARTIST_PLAN, TIERS } from "@/features/billing/pricing";
 const mocks = vi.hoisted(() => ({ cookie: "", deleteCookie: vi.fn() }));
 vi.mock(
   "@/lib/supabase/server",
@@ -25,7 +25,7 @@ import {
   discordInviteUrl,
 } from "@/features/discord/config";
 import {
-  discordPremiumFor,
+  discordRoleFor,
   syncDiscordConnection,
   type DiscordConnection,
 } from "@/features/discord/server";
@@ -48,12 +48,39 @@ beforeEach(() => {
     DISCORD_CLIENT_SECRET: "test-client-secret",
     DISCORD_BOT_TOKEN: "test-bot-token",
     DISCORD_GUILD_ID: "223456789012345678",
-    DISCORD_PREMIUM_ROLE_ID: "323456789012345678",
+    DISCORD_ARTIST_ROLE_ID: "323456789012345678",
+    DISCORD_PRO_ROLE_ID: "423456789012345678",
+    DISCORD_CREATOR_ROLE_ID: "",
     CREEM_API_KEY: "creem_test_example",
   }))
     vi.stubEnv(key, value);
   mocks.cookie = "nonce:member";
 });
+
+const ARTIST = "323456789012345678";
+const PRO = "423456789012345678";
+const CREATOR = "523456789012345678";
+const MEMBER =
+  "https://discord.com/api/v10/guilds/223456789012345678/members/123456789012345678";
+
+/** Discord with the member holding `roles` (null: not in the server). */
+function discord(roles: string[] | null, status = 204) {
+  const fetcher = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(
+    async (url) =>
+      url !== MEMBER
+        ? new Response(null, { status })
+        : roles
+          ? Response.json({ roles })
+          : new Response(null, { status: 404 }),
+  );
+  vi.stubGlobal("fetch", fetcher);
+  return fetcher;
+}
+
+const changes = (fetcher: ReturnType<typeof discord>) =>
+  fetcher.mock.calls
+    .filter(([url]) => url !== MEMBER)
+    .map(([url, init]) => `${init?.method} ${url.slice(MEMBER.length)}`);
 
 describe("Discord roles", () => {
   it("does not grant live roles based on sandbox subscriptions", async () => {
@@ -61,50 +88,79 @@ describe("Discord roles", () => {
       data: [{ product_id: TIERS[0]!.productId.month }],
     });
     vi.stubEnv("CREEM_API_KEY", "creem_example");
-    expect(await discordPremiumFor("member")).toBe(false);
+    expect(await discordRoleFor("member")).toBeNull();
     vi.stubEnv("CREEM_API_KEY", "creem_test_example");
-    expect(await discordPremiumFor("member")).toBe(true);
+    expect(await discordRoleFor("member")).toBe("pro");
   });
 
-  it("adds only the configured premium role and records successful synchronization", async () => {
+  it("gives Artist for the Artist plan, and Pro over it for any AI plan", async () => {
+    supabase.respond("subscriptions", {
+      data: [{ product_id: ARTIST_PLAN.productId.month }],
+    });
+    expect(await discordRoleFor("member")).toBe("artist");
+    supabase.respond("subscriptions", {
+      data: [
+        { product_id: ARTIST_PLAN.productId.month },
+        { product_id: TIERS[2]!.productId.year },
+      ],
+    });
+    expect(await discordRoleFor("member")).toBe("pro");
+  });
+
+  it("swaps to the earned role and records it", async () => {
     supabase.respond("subscriptions", {
       data: [{ product_id: TIERS[0]!.productId.month }],
     });
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetcher);
+    const fetcher = discord([ARTIST]);
     await syncDiscordConnection(connection);
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://discord.com/api/v10/guilds/223456789012345678/members/123456789012345678/roles/323456789012345678",
-      expect.objectContaining({ method: "PUT" }),
-    );
+    expect(changes(fetcher)).toEqual([
+      `DELETE /roles/${ARTIST}`,
+      `PUT /roles/${PRO}`,
+    ]);
     expect(supabase.callsTo("discord_connections.update")[0]).toMatchObject({
       values: expect.objectContaining({
         synced_premium: true,
+        synced_role: "pro",
         last_error: null,
       }),
     });
   });
 
+  it("changes nothing when the member already has the right role", async () => {
+    supabase.respond("subscriptions", {
+      data: [{ product_id: TIERS[0]!.productId.month }],
+    });
+    const fetcher = discord([PRO, "999999999999999999"]);
+    await syncDiscordConnection(connection);
+    expect(changes(fetcher)).toEqual([]);
+  });
+
+  it("leaves Creators with only their hand-given role", async () => {
+    vi.stubEnv("DISCORD_CREATOR_ROLE_ID", CREATOR);
+    supabase.respond("subscriptions", {
+      data: [{ product_id: TIERS[0]!.productId.month }],
+    });
+    const fetcher = discord([CREATOR, PRO]);
+    await syncDiscordConnection(connection);
+    expect(changes(fetcher)).toEqual([`DELETE /roles/${PRO}`]);
+    expect(supabase.callsTo("discord_connections.update")[0]).toMatchObject({
+      values: expect.objectContaining({
+        synced_premium: false,
+        synced_role: "creator",
+      }),
+    });
+  });
+
   it("removes the role and cleans up connections after account deletion", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetcher);
+    vi.stubEnv("DISCORD_CREATOR_ROLE_ID", CREATOR);
+    const fetcher = discord([PRO, CREATOR]);
     await syncDiscordConnection({ ...connection, user_id: null });
-    expect(fetcher).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ method: "DELETE" }),
-    );
+    expect(changes(fetcher)).toEqual([`DELETE /roles/${PRO}`]);
     expect(supabase.callsTo("discord_connections.delete")).toHaveLength(1);
   });
 
   it("does not clear a newer pending role change with an older API response", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    );
+    discord([]);
     await syncDiscordConnection({ ...connection, sync_version: 7 });
     expect(supabase.callsTo("discord_connections.update")[0]).toMatchObject({
       filters: expect.arrayContaining([["eq", "sync_version", 7]]),
@@ -112,10 +168,7 @@ describe("Discord roles", () => {
   });
 
   it("keeps failed disconnections available for automatic retry", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 403 })),
-    );
+    discord([PRO], 403);
     await expect(
       syncDiscordConnection({ ...connection, disconnect_requested: true }),
     ).rejects.toThrow("Discord role update failed");
@@ -126,12 +179,19 @@ describe("Discord roles", () => {
   });
 
   it("treats removal for a user no longer in the server as complete", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 404 })),
-    );
+    discord(null);
     await syncDiscordConnection({ ...connection, disconnect_requested: true });
     expect(supabase.callsTo("discord_connections.delete")).toHaveLength(1);
+  });
+
+  it("asks members with a role to earn to join the server first", async () => {
+    supabase.respond("subscriptions", {
+      data: [{ product_id: ARTIST_PLAN.productId.month }],
+    });
+    discord(null);
+    await expect(syncDiscordConnection(connection)).rejects.toThrow(
+      "Join the Pigxel Discord server",
+    );
   });
 });
 

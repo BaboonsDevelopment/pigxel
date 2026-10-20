@@ -45,11 +45,12 @@ export function LikeButton({
         stroke="currentColor"
         strokeWidth={1.8}
         strokeLinejoin="round"
-        className="h-2 w-[8.5px]"
+        className="h-2.5 w-[10.5px]"
       >
         <path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10Z" />
       </svg>
-      {formatCount(state.count)}
+      {/* No "0": rows of zeros make the site look empty. */}
+      {state.count > 0 && formatCount(state.count)}
     </button>
   );
 }

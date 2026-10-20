@@ -19,7 +19,7 @@ export function PatchNotesCard({
       aria-current={active ? "page" : undefined}
       title="Patch notes"
       className={cn(
-        "mx-3 mb-3 flex items-center gap-3 rounded-xl border bg-white/70 p-2 shadow-sm transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2",
+        "mx-3 mb-3 flex items-center gap-3 rounded-xl border bg-white p-2 shadow-md transition-colors hover:bg-pastel-pink-soft focus-visible:outline-2 focus-visible:outline-offset-2",
         active && "border-primary/50 bg-white",
       )}
     >

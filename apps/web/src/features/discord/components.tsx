@@ -21,6 +21,8 @@ const MESSAGES: Record<string, string> = {
     "Disconnect your current Discord account before linking another.",
 };
 
+const ROLE_NAMES = { artist: "Artist", pro: "Pro", creator: "Creator" };
+
 export function DiscordPerk({
   connection,
   status,
@@ -36,8 +38,8 @@ export function DiscordPerk({
         <Notice className="mt-3">{MESSAGES[status]}</Notice>
       )}
       <Text tone="muted" className="mt-2">
-        Connect Discord to receive the premium role while your paid plan is
-        active.
+        Connect Discord to receive the Artist or Pro role while your paid plan
+        is active.
       </Text>
       {!configured ? (
         <Text tone="muted" className="mt-3">
@@ -51,9 +53,9 @@ export function DiscordPerk({
               ? "Disconnect pending."
               : connection.last_error
                 ? "Your role needs another attempt."
-                : connection.synced_premium
-                  ? "Your premium role is active."
-                  : "No premium role on your current plan."}
+                : connection.synced_role
+                  ? `Your ${ROLE_NAMES[connection.synced_role]} role is active.`
+                  : "No Discord role on your current plan."}
           </Text>
           {connection.last_error && (
             <Text tone="muted" className="mt-2">

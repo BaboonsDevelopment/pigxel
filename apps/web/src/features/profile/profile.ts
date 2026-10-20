@@ -108,6 +108,8 @@ export type PublicTile = ProfileTile & {
     username: string;
     tile: { id: string; name: string } | null;
   } | null;
+  /** Made by remixing another art, even one since deleted. */
+  isRemix?: boolean;
 };
 
 export const AVATAR_BUCKET = "avatars";

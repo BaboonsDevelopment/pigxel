@@ -97,6 +97,8 @@ export function artQuery(filters: ExploreFilters, userId: string | null) {
       animated: filters.animation === "animated",
       still: filters.animation === "still",
       query: filters.query.trim().slice(0, QUERY_MAX),
+      // Browsing hides unnamed arts; a search or your own likes still finds them.
+      named: !filters.query.trim() && !filters.mine,
     },
   };
 }

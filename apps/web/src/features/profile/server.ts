@@ -148,6 +148,8 @@ type PublicTileRow = TileRow & {
     Partial<Pick<ProfileRow, "bio">>;
   likes: { count: number }[];
   mine?: { user_id: string }[];
+  remix_of_tile?: string | null;
+  remix_of_user?: string | null;
 };
 
 type ArtFilter = {
@@ -159,6 +161,8 @@ type ArtFilter = {
   order?: "relevance" | "recent" | "az";
   likedBy?: string;
   followedBy?: string;
+  /** Leaves out arts still named "Untitled". */
+  named?: boolean;
 };
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -186,7 +190,7 @@ const publicTiles = (
 };
 
 const PUBLIC_TILE_COLUMNS =
-  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, tilemap, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
+  "id, user_id, name, width, height, thumbnail, visibility, review, pin_order, updated_at, tilemap, remix_of_tile, remix_of_user, author:profiles!tiles_user_id_profiles_fkey!inner(username, display_name, avatar_kind, avatar_path, provider_avatar_url), likes:tile_likes(count)";
 
 const ART_PAGE_COLUMNS = PUBLIC_TILE_COLUMNS.replace(
   "provider_avatar_url)",
@@ -229,6 +233,7 @@ export async function listPublicTiles(
     query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
   if (filter.animated) query = query.gt("frame_count", 1);
   if (filter.still) query = query.lte("frame_count", 1);
+  if (filter.named) query = query.not("name", "ilike", "untitled");
   const mine = filter.likedBy ?? viewerId;
   if (mine) query = query.eq("mine.user_id", mine);
   if (followees) query = query.in("user_id", followees);
@@ -317,6 +322,7 @@ export async function countPublicTilesByTag(
     query = query.or(`width.gte.${filter.min},height.gte.${filter.min}`);
   if (filter.animated) query = query.gt("frame_count", 1);
   if (filter.still) query = query.lte("frame_count", 1);
+  if (filter.named) query = query.not("name", "ilike", "untitled");
   const { data, count, error } = await query.range(0, TAG_COUNT_ROWS - 1);
   if (error) throw new Error(`Couldn’t count public arts: ${error.message}`);
   const rows = data as unknown as { tags: string[] | null }[];
@@ -353,6 +359,7 @@ const toPublicTile = (row: PublicTileRow): PublicTile => ({
   },
   likes: row.likes[0]?.count ?? 0,
   liked: Boolean(row.mine?.length),
+  isRemix: Boolean(row.remix_of_tile ?? row.remix_of_user),
   downloads: 0,
   tags: [],
   description: null,
