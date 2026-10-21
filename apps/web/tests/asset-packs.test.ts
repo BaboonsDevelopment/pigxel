@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { unzlibSync } from "fflate";
@@ -11,6 +17,7 @@ import { reviewState } from "../scripts/assets/lib/review";
 import {
   isPremium,
   loadPacks,
+  PACKS_DIR,
   parseAsset,
   updatePack,
   type PackSource,
@@ -187,7 +194,8 @@ describe("premium", () => {
   });
 });
 
-const packs = loadPacks();
+// Drawn packs are local and git-ignored; a fresh checkout has none to check.
+const packs = existsSync(PACKS_DIR) ? loadPacks() : [];
 const drawn = packs.flatMap((pack) =>
   pack.assets.map((source) => [source.key, source, pack] as const),
 );
