@@ -87,21 +87,54 @@ const supabase = createClient(url, key, {
 });
 const storage = supabase.storage.from(BUCKET);
 
-const { data: existing, error: listError } = await supabase
-  .from("assets")
-  .select(
-    "id, name, pack_id, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
-  )
-  .returns<Row[]>();
-if (listError) throw new Error(`Couldn’t read assets: ${listError.message}`);
+const CONNECTION_LIMIT = /too many connections|too many clients|remaining connection slots|connection pool/i;
+const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
+
+async function request<T extends { error: { message: string } | null }>(
+  label: string,
+  operation: () => PromiseLike<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const result = await operation();
+      if (!result.error) return result;
+      throw new Error(`${label}: ${result.error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!CONNECTION_LIMIT.test(message) || attempt >= RETRY_DELAYS_MS.length)
+        throw error;
+      const delay = RETRY_DELAYS_MS[attempt]!;
+      console.log(`${message}; retrying in ${delay / 1000}s`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+}
+
+const existing: Row[] = [];
+const PAGE_SIZE = 500;
+for (let offset = 0; ; offset += PAGE_SIZE) {
+  const { data } = await request("Couldn’t read assets", () =>
+    supabase
+      .from("assets")
+      .select(
+        "id, name, pack_id, kind, width, height, frame_count, frame_ms, colors, file_path, sheet_path, sort, premium",
+      )
+      .order("id")
+      .range(offset, offset + PAGE_SIZE - 1)
+      .returns<Row[]>(),
+  );
+  existing.push(...(data ?? []));
+  if ((data?.length ?? 0) < PAGE_SIZE) break;
+}
 const before = new Map(existing.map((row) => [row.id, row]));
 
-const { data: blockRows, error: blockError } = await supabase
-  .from("asset_packs")
-  .select("id, sort, premium")
-  .returns<{ id: string; sort: number; premium: boolean }[]>();
-if (blockError)
-  throw new Error(`Couldn’t read asset packs: ${blockError.message}`);
+const { data: blockRows } = await request("Couldn’t read asset packs", () =>
+  supabase
+    .from("asset_packs")
+    .select("id, sort, premium")
+    .returns<{ id: string; sort: number; premium: boolean }[]>(),
+);
+if (!blockRows) throw new Error("Couldn’t read asset packs.");
 const blockIds = new Set(blockRows.map((row) => row.id));
 // Premium is set per pack: everything imported into a premium pack is too.
 const premiumPacks = new Set(
@@ -124,22 +157,23 @@ for (const pack of manifest.packs) {
   if (values["dry-run"]) continue;
   // An existing pack keeps the name it has: admins rename packs on the
   // Assets page, and pack.json names may still carry their size.
-  const { error } = exists
-    ? await supabase
+  const packSort = nextSort;
+  const savePack = () => exists
+    ? supabase
         .from("asset_packs")
         .update({
           ...(pack.background && { background: pack.background }),
           updated_at: new Date().toISOString(),
         })
         .eq("id", pack.block)
-    : await supabase.from("asset_packs").insert({
+    : supabase.from("asset_packs").insert({
         id: pack.block,
         name: pack.name,
-        sort: nextSort++,
+        sort: packSort,
         ...(pack.background && { background: pack.background }),
       });
-  if (error)
-    throw new Error(`${pack.block}: couldn’t save the pack: ${error.message}`);
+  await request(`${pack.block}: couldn’t save the pack`, savePack);
+  if (!exists) nextSort++;
   blockIds.add(pack.block);
 }
 
@@ -148,7 +182,8 @@ const hashOf = (data: Uint8Array) =>
   createHash("sha256").update(data).digest("hex").slice(0, 16);
 
 const counts = { added: 0, updated: 0, unchanged: 0, removed: 0 };
-for (const asset of assets) {
+const IMPORT_BATCH_SIZE = 1;
+const importAsset = async (asset: ManifestAsset) => {
   const file = readFileSync(join(dir, asset.file));
   const sheet = readFileSync(join(dir, asset.sheet));
   const old = before.get(asset.id);
@@ -172,41 +207,48 @@ for (const asset of assets) {
   };
   if (old && JSON.stringify(old) === JSON.stringify(row)) {
     counts.unchanged++;
-    continue;
+    return;
   }
   const action = old ? "updated" : "added";
+  if (!values["dry-run"]) {
+    const options = { cacheControl: CACHE_SECONDS, upsert: true };
+    await request(`${asset.id}: couldn’t upload`, () =>
+      supabase.storage
+        .from(row.premium ? PREMIUM_BUCKET : BUCKET)
+        .upload(row.file_path, file, {
+          ...options,
+          contentType: PIGXEL_MIME_TYPE,
+        }),
+    );
+    await request(`${asset.id}: couldn’t upload`, () =>
+      storage.upload(row.sheet_path, sheet, {
+        ...options,
+        contentType: "image/png",
+      }),
+    );
+    await request(`${asset.id}: couldn’t save`, () =>
+      supabase
+        .from("assets")
+        .upsert({ ...row, updated_at: new Date().toISOString() }),
+    );
+
+    if (old && old.sheet_path !== row.sheet_path)
+      await storage.remove([old.sheet_path]);
+    if (old && (old.premium !== row.premium || old.file_path !== row.file_path))
+      await supabase.storage
+        .from(old.premium ? PREMIUM_BUCKET : BUCKET)
+        .remove([old.file_path]);
+  }
   counts[action]++;
   console.log(`${values["dry-run"] ? "Would be " : ""}${action}: ${asset.id}`);
-  if (values["dry-run"]) continue;
+};
 
-  const options = { cacheControl: CACHE_SECONDS, upsert: true };
-  const uploads = await Promise.all([
-    supabase.storage
-      .from(row.premium ? PREMIUM_BUCKET : BUCKET)
-      .upload(row.file_path, file, {
-        ...options,
-        contentType: PIGXEL_MIME_TYPE,
-      }),
-    storage.upload(row.sheet_path, sheet, {
-      ...options,
-      contentType: "image/png",
-    }),
-  ]);
-  const failed = uploads.find((upload) => upload.error);
-  if (failed?.error)
-    throw new Error(`${asset.id}: couldn’t upload: ${failed.error.message}`);
-
-  const { error } = await supabase
-    .from("assets")
-    .upsert({ ...row, updated_at: new Date().toISOString() });
-  if (error) throw new Error(`${asset.id}: couldn’t save: ${error.message}`);
-
-  if (old && old.sheet_path !== row.sheet_path)
-    await storage.remove([old.sheet_path]);
-  if (old && (old.premium !== row.premium || old.file_path !== row.file_path))
-    await supabase.storage
-      .from(old.premium ? PREMIUM_BUCKET : BUCKET)
-      .remove([old.file_path]);
+for (let index = 0; index < assets.length; index += IMPORT_BATCH_SIZE) {
+  await importAsset(assets[index]!);
+  console.log(
+    `Progress: ${Math.min(index + IMPORT_BATCH_SIZE, assets.length)}/${assets.length} checked; ` +
+      `${counts.added} added; ${counts.updated} updated; ${counts.unchanged} unchanged`,
+  );
 }
 
 if (values.prune) {

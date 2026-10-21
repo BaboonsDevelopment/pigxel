@@ -9,7 +9,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   try {
     const { pack, id } = await params;
     return new Response(stripPng(pack, id), {
-      headers: { "content-type": "image/png", "cache-control": "no-store" },
+      headers: { "content-type": "image/png", "cache-control": "private, max-age=31536000, immutable" },
     });
   } catch (e) {
     return failed(e);

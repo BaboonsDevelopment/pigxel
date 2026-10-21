@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EmptyState } from "@pigxel/ui/components/empty-state";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Page } from "@pigxel/ui/components/page";
-import { useReviewActions, useReviewSnapshot } from "../../use-asset-review";
+import { usePublishStatus, useReviewActions, useReviewSnapshot } from "../../use-asset-review";
+import { loadPreview, previewUrl } from "../../preview-loader";
 import { BlockSection } from "./components/block-section";
 import { ProductionManager } from "./components/production/production-manager";
 import { ReportList } from "./components/report-list";
@@ -12,10 +13,14 @@ import { ReviewHeader } from "./components/review-header";
 import { BACKGROUNDS, FILTERS, type Filter, type View } from "./constants";
 import { errorText, isPublishable, matchesFilter } from "./helpers";
 
+const BATCH_SIZE = 16;
+
 export function AssetReview({ view, filter }: { view: View; filter: Filter }) {
-  const snapshot = useReviewSnapshot();
+  const publishStatus = usePublishStatus();
+  const snapshot = useReviewSnapshot(!!publishStatus.data?.running);
   const { publish } = useReviewActions();
   const [backgroundId, setBackgroundId] = useState(BACKGROUNDS[0]!.id);
+  const [batch, setBatch] = useState({ filter, count: BATCH_SIZE });
   const [publishing, setPublishing] = useState(false);
   const [report, setReport] = useState<{ ok: boolean; text: string } | null>(
     null,
@@ -39,6 +44,37 @@ export function AssetReview({ view, filter }: { view: View; filter: Filter }) {
       tiles: block.tiles.filter((t) => matchesFilter(t, filter)),
     }))
     .filter(({ tiles }) => tiles.length > 0);
+  const shownCount = shown.reduce((count, { tiles }) => count + tiles.length, 0);
+  const visibleCount = batch.filter === filter ? batch.count : BATCH_SIZE;
+  const visible = shown.reduce<{ remaining: number; blocks: typeof shown }>(
+    (state, { block, tiles }) => {
+      const slice = tiles.slice(0, state.remaining);
+      return {
+        remaining: state.remaining - slice.length,
+        blocks: slice.length
+          ? [...state.blocks, { block, tiles: slice }]
+          : state.blocks,
+      };
+    },
+    { remaining: visibleCount, blocks: [] },
+  ).blocks;
+
+  useEffect(() => {
+    if (view !== "review" || visibleCount >= shownCount) return;
+    const timer = setTimeout(
+      () => setBatch({ filter, count: visibleCount + BATCH_SIZE }),
+      80,
+    );
+    return () => clearTimeout(timer);
+  }, [filter, view, visibleCount, shownCount]);
+
+  useEffect(() => {
+    if (view !== "review" || !snapshot.data) return;
+    for (const block of snapshot.data.blocks)
+      for (const tile of block.tiles)
+        if (matchesFilter(tile, filter) && tile.w)
+          void loadPreview(previewUrl(tile.pack, tile.id, tile.hash)).catch(() => {});
+  }, [snapshot.data, filter, view]);
 
   const runPublish = async () => {
     setPublishing(true);
@@ -61,10 +97,21 @@ export function AssetReview({ view, filter }: { view: View; filter: Filter }) {
         background={backgroundId}
         onBackground={setBackgroundId}
         publishable={tiles.filter(isPublishable).length}
-        publishing={publishing}
+        publishing={publishing || !!publishStatus.data?.running}
         onPublish={runPublish}
       />
       <div className="mb-6 flex flex-col gap-3 empty:hidden">
+        {publishStatus.data?.running && (
+          <Notice tone="info">
+            {publishStatus.data.phase === "building" ? "Preparing assets" : "Publishing assets"}
+            {publishStatus.data.total > 0 &&
+              ` · ${publishStatus.data.completed}/${publishStatus.data.total}`}
+            {publishStatus.data.message && ` · ${publishStatus.data.message}`}
+          </Notice>
+        )}
+        {!publishStatus.data?.running && publishStatus.data?.phase === "error" && !report && (
+          <Notice tone="error">{publishStatus.data.message}</Notice>
+        )}
         {report && (
           <Notice tone={report.ok ? "success" : "error"} className="relative">
             <pre className="overflow-x-auto pr-16 font-mono text-xs whitespace-pre-wrap">
@@ -93,15 +140,22 @@ export function AssetReview({ view, filter }: { view: View; filter: Filter }) {
       ) : snapshot.isPending ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : shown.length ? (
-        shown.map(({ block, tiles }) => (
-          <BlockSection
-            key={block.id}
-            block={block}
-            targets={targets}
-            tiles={tiles}
-            background={background}
-          />
-        ))
+        <>
+          {visible.map(({ block, tiles }) => (
+            <BlockSection
+              key={block.id}
+              block={block}
+              targets={targets}
+              tiles={tiles}
+              background={background}
+            />
+          ))}
+          {visibleCount < shownCount && (
+            <p className="mt-8 text-center text-xs text-muted-foreground">
+              Preparing {Math.min(visibleCount, shownCount)} of {shownCount} cards…
+            </p>
+          )}
+        </>
       ) : (
         <EmptyState
           title={filter === "todo" ? "Nothing to review" : "Nothing here"}

@@ -3,7 +3,6 @@ import { execFile } from "node:child_process";
 import { existsSync, rmSync, unlinkSync } from "node:fs";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAssetBackground } from "@/features/assets/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -17,11 +16,13 @@ import {
   readReviews,
   REVIEW_FILE,
   reviewState,
-  writeReviews,
+  updateReviews,
   type ReviewEntry,
 } from "../../../scripts/assets/lib/review.ts";
 import {
   isPremium,
+  loadAssetById,
+  loadPackById,
   loadPacks,
   PACKS_DIR,
   updatePack,
@@ -42,7 +43,7 @@ import type {
 } from "./types";
 
 const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const PUBLISH_TIMEOUT = 5 * 60 * 1000;
+const PUBLISH_TIMEOUT = 15 * 60 * 1000;
 
 // A deleted tile's stale pack entry does not make the remaining art invalid.
 const blockingPackIssues = (pack: PackSource) =>
@@ -114,11 +115,25 @@ export function failed(error: unknown) {
 
 async function production() {
   const supabase = createAdminClient();
-  const [assets, blocks] = await Promise.all([
-    supabase
-      .from("assets")
-      .select("id, updated_at")
-      .returns<{ id: string; updated_at: string | null }[]>(),
+  const assetPageSize = 500;
+  const [publishedAt, blocks] = await Promise.all([
+    (async () => {
+      const publishedAt = new Map<string, string | null>();
+      for (let offset = 0; ; offset += assetPageSize) {
+        const page = await supabase
+          .from("assets")
+          .select("id, updated_at")
+          .order("id")
+          .range(offset, offset + assetPageSize - 1)
+          .returns<{ id: string; updated_at: string | null }[]>();
+        if (page.error)
+          throw new Error(`Couldn’t read production: ${page.error.message}`);
+        for (const row of page.data ?? [])
+          publishedAt.set(row.id, row.updated_at);
+        if ((page.data?.length ?? 0) < assetPageSize) break;
+      }
+      return publishedAt;
+    })(),
     supabase
       .from("asset_packs")
       .select("id, name, background")
@@ -126,10 +141,10 @@ async function production() {
       .order("name")
       .returns<ReviewTarget[]>(),
   ]);
-  const error = assets.error ?? blocks.error;
-  if (error) throw new Error(`Couldn’t read production: ${error.message}`);
+  if (blocks.error)
+    throw new Error(`Couldn’t read production: ${blocks.error.message}`);
   return {
-    publishedAt: new Map(assets.data!.map((row) => [row.id, row.updated_at])),
+    publishedAt,
     blocks: blocks.data!,
   };
 }
@@ -199,7 +214,7 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
 function findPack(id: unknown) {
   const pack =
     typeof id === "string" && ID.test(id)
-      ? loadPacks(PACKS_DIR).find((p) => p.id === id)
+      ? loadPackById(id)
       : undefined;
   if (!pack) throw new ReviewError("No such block.", 404);
   return pack;
@@ -227,21 +242,21 @@ export function setReview(key: unknown, status: unknown, note: unknown) {
     throw new ReviewError("Fix its errors before approving it.");
   if (status === "fix" && !text)
     throw new ReviewError("Write what to fix in the comment.");
-  const reviews = readReviews(REVIEW_FILE);
-  reviews[source.key] = {
-    status: status as ReviewStatus,
-    note: text,
-    hash: source.hash,
-    at: new Date().toISOString(),
-  };
-  writeReviews(reviews, REVIEW_FILE);
+  updateReviews((reviews) => {
+    reviews[source.key] = {
+      status: status as ReviewStatus,
+      note: text,
+      hash: source.hash,
+      at: new Date().toISOString(),
+    };
+  }, REVIEW_FILE);
 }
 
 function deleteLocal(pack: PackSource, source: AssetSource) {
   unlinkSync(source.file);
-  const reviews = readReviews(REVIEW_FILE);
-  delete reviews[source.key];
-  writeReviews(reviews, REVIEW_FILE);
+  updateReviews((reviews) => {
+    delete reviews[source.key];
+  }, REVIEW_FILE);
   const dir = join(PACKS_DIR, pack.id);
   let remaining = 0;
   updatePack(
@@ -333,7 +348,7 @@ export function setTilePremium(key: unknown, premium: unknown) {
 }
 
 export function stripPng(packId: string, id: string) {
-  const def = findPack(packId).assets.find((a) => a.id === id)?.def;
+  const def = loadAssetById(packId, id)?.def;
   if (!def) throw new ReviewError("No such tile.", 404);
   const sheet = stripOf(def);
   return encodePng(sheet.w, sheet.h, sheet.data);
@@ -349,21 +364,61 @@ export async function removeFromProduction(id: string) {
   }
 }
 
-const run = promisify(execFile);
 let publishing = false;
+type PublishPhase = "idle" | "building" | "importing" | "done" | "error";
+type PublishStatus = {
+  running: boolean;
+  phase: PublishPhase;
+  completed: number;
+  total: number;
+  added: number;
+  updated: number;
+  unchanged: number;
+  message: string;
+};
+let publishStatus: PublishStatus = {
+  running: false,
+  phase: "idle",
+  completed: 0,
+  total: 0,
+  added: 0,
+  updated: 0,
+  unchanged: 0,
+  message: "",
+};
 
-async function script(name: string) {
+export const getPublishStatus = () => publishStatus;
+
+async function script(name: string, onLine: (line: string) => void) {
   try {
-    const { stdout, stderr } = await run(
-      process.execPath,
-      [join(ASSETS_DIR, name)],
-      { cwd: process.cwd(), env: process.env, timeout: PUBLISH_TIMEOUT },
-    );
-    return stdout + stderr;
+    return await new Promise<string>((resolve, reject) => {
+      let partial = "";
+      const child = execFile(
+        process.execPath,
+        [join(ASSETS_DIR, name)],
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          timeout: PUBLISH_TIMEOUT,
+          maxBuffer: 16 * 1024 * 1024,
+        },
+        (error, stdout, stderr) => {
+          if (partial.trim()) onLine(partial.trim());
+          if (error)
+            reject(new Error(`${stdout}\n${stderr || error.message}`));
+          else resolve(stdout + stderr);
+        },
+      );
+      child.stdout?.on("data", (chunk: Buffer) => {
+        partial += chunk.toString();
+        const lines = partial.split(/\r?\n/);
+        partial = lines.pop() ?? "";
+        for (const line of lines) if (line.trim()) onLine(line.trim());
+      });
+    });
   } catch (e) {
-    const out = e as { stdout?: string; stderr?: string; message?: string };
     throw new ReviewError(
-      `${name} failed:\n${out.stdout ?? ""}${out.stderr || out.message || ""}`,
+      `${name} failed:\n${e instanceof Error ? e.message : String(e)}`,
       500,
     );
   }
@@ -372,10 +427,45 @@ async function script(name: string) {
 export async function publishApproved() {
   if (publishing) throw new ReviewError("Already publishing.", 409);
   publishing = true;
+  publishStatus = {
+    running: true,
+    phase: "building",
+    completed: 0,
+    total: 0,
+    added: 0,
+    updated: 0,
+    unchanged: 0,
+    message: "Preparing approved assets…",
+  };
   try {
-    const built = await script("build.ts");
-    const imported = await script("import.ts");
+    const built = await script("build.ts", (line) => {
+      if (line.startsWith("Built ")) publishStatus = { ...publishStatus, message: line };
+    });
+    publishStatus = { ...publishStatus, phase: "importing", message: "Uploading assets…" };
+    const imported = await script("import.ts", (line) => {
+      const progress = /^Progress: (\d+)\/(\d+) checked; (\d+) added; (\d+) updated; (\d+) unchanged$/.exec(line);
+      publishStatus = progress
+        ? {
+            ...publishStatus,
+            completed: Number(progress[1]),
+            total: Number(progress[2]),
+            added: Number(progress[3]),
+            updated: Number(progress[4]),
+            unchanged: Number(progress[5]),
+            message: line,
+          }
+        : { ...publishStatus, message: line };
+    });
+    publishStatus = { ...publishStatus, running: false, phase: "done", message: "Publish complete." };
     return `${built}\n${imported}`.trim();
+  } catch (error) {
+    publishStatus = {
+      ...publishStatus,
+      running: false,
+      phase: "error",
+      message: error instanceof Error ? error.message.slice(-500) : String(error),
+    };
+    throw error;
   } finally {
     publishing = false;
   }
