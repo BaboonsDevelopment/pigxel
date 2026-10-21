@@ -10,7 +10,6 @@ import { decodeImage } from "./decode";
 import { imageToSprite } from "./quantize";
 import { cutOutBackground } from "./steps/cut-out-background";
 import { recoverPixelGrid } from "./steps/recover-pixel-grid";
-import { removeStrayPixels } from "./steps/remove-stray-pixels";
 import { paletteSize } from "./steps/shrink-to-tile";
 
 type Grid = { cols: number; rows: number };
@@ -169,35 +168,40 @@ export function posesToFrames(
     strip.h,
     w * present.length,
     h,
-    { colors: paletteSize({ w, h }), keepBackground: true, fit: "stretch" },
+    {
+      colors: paletteSize({ w, h }),
+      keepBackground: true,
+      fit: "stretch",
+      preserveThinFeatures: true,
+    },
   );
   const small: Bitmap = { rgba: buf, w: w * present.length, h };
 
   let next = 0;
   return poses.map((pose) => {
     if (!pose) return null;
-    const slot = removeStrayPixels(
-      cropBitmap(small, { x: next++ * w, y: 0, w, h }),
-    );
+    const slot = cropBitmap(small, { x: next++ * w, y: 0, w, h });
     const frame = blank(box.w, box.h);
     paste(frame, slot, Math.floor((box.w - w) / 2), box.h - h);
     return frame;
   });
 }
 
-function sheetCells(
+export function sheetCells(
   image: Bitmap,
   grid: Grid,
   count: number,
 ): (Bitmap | null)[] {
-  const w = Math.floor(image.w / grid.cols);
-  const h = Math.floor(image.h / grid.rows);
   return Array.from({ length: count }, (_, i) => {
+    const col = i % grid.cols;
+    const row = Math.floor(i / grid.cols);
+    const x = Math.round((col * image.w) / grid.cols);
+    const y = Math.round((row * image.h) / grid.rows);
     const cell = cropBitmap(image, {
-      x: (i % grid.cols) * w,
-      y: Math.floor(i / grid.cols) * h,
-      w,
-      h,
+      x,
+      y,
+      w: Math.round(((col + 1) * image.w) / grid.cols) - x,
+      h: Math.round(((row + 1) * image.h) / grid.rows) - y,
     });
     return opaqueBox(cell) ? cell : null;
   });
@@ -209,10 +213,13 @@ export async function sheetToFrames(
   count: number,
   box: Size,
   by: "poses" | "cells" = "poses",
+  keepBackground = false,
 ): Promise<(Bitmap | null)[]> {
   const target = Math.max(box.w * grid.cols, box.h * grid.rows);
   const decoded = await decodeImage(source, target);
-  const sheet = recoverPixelGrid(cutOutBackground(decoded));
+  const keyed = keepBackground ? decoded : cutOutBackground(decoded);
+  // Grid inference can shift cell boundaries; animation cells use the supplied grid.
+  const sheet = by === "cells" ? keyed : recoverPixelGrid(keyed);
   const parts =
     by === "cells"
       ? sheetCells(sheet, grid, count)

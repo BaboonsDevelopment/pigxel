@@ -1,5 +1,11 @@
 import type { Area } from "@/features/editor/pixel-canvas/constants";
-import { editTile, planEdit, redrawArea, redrawFrames } from "../../../actions";
+import {
+  editTile,
+  planEdit,
+  redrawArea,
+  redrawFrames,
+  reviewEdit,
+} from "../../../actions";
 import { sheetLayout } from "../../../helpers";
 import type { EditPlan, TileAction } from "../../../types";
 import { encodeTile } from "@/lib/edit/codec";
@@ -116,31 +122,69 @@ export async function edit(chat: Chat, action: TileAction) {
 
   const run = async () => {
     chat.setPending(true);
-    const made = await make(plan.value.instruction);
-    const step = steps.find((s) => s.frame === current) ?? steps[0]!;
-    const after = made.cels?.get(step.frame);
-    const again =
-      plan.value.mode === "ops" ||
-      (plan.value.mode === "redraw" && steps.length === 1);
-    const review =
-      after && again
-        ? await checkEdit(chat, {
-            request: action.request,
-            instruction: plan.value.instruction,
-            layerId,
-            frame: step.frame,
-            source: step.source,
-            target: step.target,
-            after,
-          })
-        : null;
-    const remade = review ? await make(review.instruction) : null;
-    chat.setPending(false);
-    return done(
-      remade?.cels
-        ? { ...remade, fixed: review!.problem || "the result looked wrong." }
-        : made,
-    );
+    try {
+      let made = await make(plan.value.instruction);
+      if (!made.cels) return false;
+      const step = steps.find((s) => s.frame === current) ?? steps[0]!;
+      const check = async (candidate: Made, instruction: string) => {
+        if (plan.value.mode === "move") return null;
+        if (steps.length > 1) {
+          const box = unionOf(steps.flatMap((s) => [s.source, s.target]))!;
+          const layout = sheetLayout(steps.length, box.w, box.h);
+          const result = await reviewEdit({
+            request: `${action.request}. These are animation sheets in reading order; preserve every frame's pose, direction and order.`,
+            instruction,
+            before: framesSheet(
+              steps.map((s) => canvas.readCel(layerId, s.frame)),
+              size,
+              box,
+              layout,
+            ),
+            after: framesSheet(
+              steps.map((s) => candidate.cels!.get(s.frame)!),
+              size,
+              box,
+              layout,
+            ),
+          }).catch(() => UNREACHABLE);
+          if (!result.ok) throw new Error(result.error);
+          return result.value.ok ? null : result.value;
+        }
+        return checkEdit(chat, {
+          request: action.request,
+          instruction,
+          layerId,
+          frame: step.frame,
+          source: step.source,
+          target: step.target,
+          after: candidate.cels!.get(step.frame)!,
+        });
+      };
+      const review = await check(made, plan.value.instruction);
+      if (review) {
+        const instruction = review.instruction || plan.value.instruction;
+        const remade = await make(instruction);
+        if (!remade.cels) return false;
+        const stillWrong = await check(remade, instruction);
+        if (stillWrong) {
+          chat.setError(
+            `${stillWrong.problem || "The edit did not pass the quality check."} The original drawing was kept.`,
+          );
+          return false;
+        }
+        made = { ...remade, fixed: review.problem };
+      }
+      return done(made);
+    } catch (error) {
+      chat.setError(
+        error instanceof Error
+          ? error.message
+          : "Couldn’t check the edit. The original drawing was kept.",
+      );
+      return false;
+    } finally {
+      chat.setPending(false);
+    }
   };
 
   if (
@@ -236,6 +280,7 @@ async function redraw(
         canvas.snapshotCel(layerId, step.frame, step.source, CHROMA_KEY_HEX),
         step.target.w,
         step.target.h,
+        chat.references,
       ).catch(() => UNREACHABLE),
     ),
   );

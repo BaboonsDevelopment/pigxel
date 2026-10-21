@@ -9,6 +9,7 @@ import {
 import type { SetItem, TileAction } from "../../../types";
 import { resizeNearest } from "@/lib/image/bitmap";
 import { sheetToFrames } from "@/lib/image/sheet";
+import { SCENE_PICTURE_STEPS } from "@/lib/image/pipeline";
 import {
   ASK_SELECT,
   UNREACHABLE,
@@ -32,6 +33,8 @@ export async function drawOnNewLayer(
   name: string,
   areas: Area[],
   replace = false,
+  composition: "sprite" | "scene" = "sprite",
+  style = "",
 ) {
   const { canvas } = chat;
   const largest = areas.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
@@ -41,9 +44,15 @@ export async function drawOnNewLayer(
     largest.w,
     largest.h,
     chat.references,
+    composition,
+    style,
   ).catch(() => UNREACHABLE);
   if (result.ok) {
-    const art = await toArt(result.value, largest);
+    const art = await toArt(
+      result.value,
+      largest,
+      composition === "scene" ? SCENE_PICTURE_STEPS : undefined,
+    );
     const size = canvas.size();
     const cel = areas.reduce(
       (pixels, area) =>
@@ -111,17 +120,38 @@ export async function generate(chat: Chat, action: TileAction) {
   const { request: subject, where = "", count = 1 } = action;
   const name = layerName(action);
   const size = canvas.size();
-  if (action.items && action.items.length > 1)
-    return drawSet(chat, action.items);
+  if (action.composition !== "scene" && action.items && action.items.length > 1)
+    return drawSet(chat, action.items, action.style);
   if (chat.selectArea) {
     chat.say(ASK_SELECT);
     const area = await canvas.selectArea();
-    if (area) await drawOnNewLayer(chat, subject, name, [area]);
+    if (area)
+      await drawOnNewLayer(
+        chat,
+        subject,
+        name,
+        [area],
+        false,
+        action.composition,
+        action.style,
+      );
     else chat.say("No area selected, so nothing was drawn.");
     return;
   }
   if (canvas.isEmpty() && count === 1 && !where) {
-    await drawOnNewLayer(chat, subject, name, [{ x: 0, y: 0, ...size }]);
+    await drawOnNewLayer(
+      chat,
+      subject,
+      name,
+      [{ x: 0, y: 0, ...size }],
+      false,
+      action.composition,
+      action.style,
+    );
+    return;
+  }
+  if (action.composition === "scene") {
+    await offerPlacements(chat, action);
     return;
   }
 
@@ -156,11 +186,19 @@ export async function generate(chat: Chat, action: TileAction) {
     canvas.writeCels(original.layerId, new Map([[frame, copied]]));
     chat.say(`Added ${plan.value.areas.length} more like it.`);
   } else {
-    await drawOnNewLayer(chat, subject, name, plan.value.areas);
+    await drawOnNewLayer(
+      chat,
+      subject,
+      name,
+      plan.value.areas,
+      false,
+      action.composition,
+      action.style,
+    );
   }
 }
 
-async function drawSet(chat: Chat, items: SetItem[]) {
+async function drawSet(chat: Chat, items: SetItem[], style = "") {
   const { canvas } = chat;
   const size = canvas.size();
   const region = (!canvas.isEmpty() && canvas.freeArea()) || {
@@ -182,6 +220,7 @@ async function drawSet(chat: Chat, items: SetItem[]) {
     subjects: items.map((item) => item.subject),
     cellW: cell.w,
     cellH: cell.h,
+    style,
   }).catch(() => UNREACHABLE);
   if (!result.ok) {
     chat.setError(result.error);

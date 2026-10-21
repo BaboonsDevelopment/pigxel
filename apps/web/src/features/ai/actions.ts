@@ -99,6 +99,8 @@ export async function sendMessage(
         name: route.name,
         frames: route.frames,
         items: route.items,
+        composition: route.composition,
+        style: route.style,
       },
     };
   });
@@ -109,6 +111,8 @@ export async function generateImage(
   width: number,
   height: number,
   references: string[] = [],
+  composition: "sprite" | "scene" = "sprite",
+  style = "",
 ): Promise<AiResult<string>> {
   await requireUser();
   const pictures = (Array.isArray(references) ? references : []).map((r) =>
@@ -125,7 +129,14 @@ export async function generateImage(
   }
   return attempt("generateImage", [subject], async () => {
     const { mimeType, base64 } = await getAiProvider().generate(
-      buildImagePrompt(subject, width, height, pictures.length > 0),
+      buildImagePrompt(
+        subject,
+        width,
+        height,
+        pictures.length > 0,
+        composition,
+        style,
+      ),
       closestAspectRatio(width, height),
       Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
       pictures.map((p) => ({ mimeType: p![1]!, base64: p![2]! })),
@@ -155,19 +166,33 @@ export async function redrawArea(
   picture: string,
   width: number,
   height: number,
+  references: string[] = [],
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
+  const refs = references.map((r) => IMAGE_DATA_URL.exec(r));
+  if (refs.length > MAX_REFERENCES || refs.some((r) => !r))
+    return { ok: false, error: "Those references cannot be used." };
   if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
     return { ok: false, error: "That area cannot be redrawn." };
   }
   return attempt("redrawArea", [request], async () => {
-    const { mimeType, base64 } = await getAiProvider().redraw(
-      buildRedrawPrompt(request, width, height),
-      { mimeType: "image/png", base64: png },
-      closestAspectRatio(width, height),
-      Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE,
-    );
+    const ai = getAiProvider();
+    const prompt = buildRedrawPrompt(request, width, height);
+    const reference = { mimeType: "image/png", base64: png };
+    const aspect = closestAspectRatio(width, height);
+    const small = Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE;
+    const { mimeType, base64 } = refs.length
+      ? await ai.generate(
+          `${prompt} The FIRST image is the artwork to edit. Additional images guide only the changes requested; keep the first image's composition.`,
+          aspect,
+          small,
+          [
+            reference,
+            ...refs.map((r) => ({ mimeType: r![1]!, base64: r![2]! })),
+          ],
+        )
+      : await ai.redraw(prompt, reference, aspect, small);
     return `data:${mimeType};base64,${base64}`;
   });
 }
@@ -390,8 +415,8 @@ export async function reviewEdit(args: {
   return attempt("reviewEdit", [args.request], () =>
     getAiProvider().reviewEdit(
       buildEditReviewPrompt(
-        args.request.slice(0, 1000),
-        String(args.instruction ?? "").slice(0, 1000),
+        args.request.slice(0, 6000),
+        String(args.instruction ?? "").slice(0, 3000),
       ),
       { mimeType: "image/png", base64: before },
       { mimeType: "image/png", base64: after },
@@ -400,6 +425,7 @@ export async function reviewEdit(args: {
 }
 
 export async function generateSet(args: {
+  style?: string;
   subjects: string[];
   cellW: number;
   cellH: number;
@@ -421,6 +447,7 @@ export async function generateSet(args: {
         cellW: args.cellW,
         cellH: args.cellH,
         layout,
+        style: args.style,
       }),
       layout.aspectRatio,
       false,
@@ -467,6 +494,7 @@ export async function redrawFrames(args: {
 }
 
 export async function animateSheet(args: {
+  style?: string;
   subject: string;
   poses: string[];
   sheet: string;
@@ -489,6 +517,7 @@ export async function animateSheet(args: {
     const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
     const { mimeType, base64 } = await getAiProvider().redraw(
       buildSheetAnimatePrompt({
+        style: args.style,
         subject: args.subject.slice(0, 1000),
         poses: args.poses.map((p) => p.slice(0, 500)),
         cellW: args.cellW,
@@ -504,6 +533,8 @@ export async function animateSheet(args: {
 }
 
 export async function generateSheet(args: {
+  style?: string;
+  composition?: "sprite" | "scene";
   subject: string;
   poses: string[];
   cellW: number;

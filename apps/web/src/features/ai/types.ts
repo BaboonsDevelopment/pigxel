@@ -1,4 +1,6 @@
 export type TileAction = {
+  composition?: "sprite" | "scene";
+  style?: string;
   kind: "generate" | "edit" | "animate" | "undo";
   request: string;
   where?: string;
@@ -21,6 +23,8 @@ export type AiResult<T> = { ok: true; value: T } | { ok: false; error: string };
 type Intent = TileAction["kind"] | "chat";
 
 export type Route = {
+  composition?: "sprite" | "scene";
+  style?: string;
   intent: Intent;
   subject: string;
   where: string;
@@ -72,6 +76,8 @@ export type PlacementReply = {
 };
 
 export type SheetTrack = {
+  composition?: "sprite" | "scene";
+  style?: string;
   name: string;
   subject: string;
   reuse: number | null;

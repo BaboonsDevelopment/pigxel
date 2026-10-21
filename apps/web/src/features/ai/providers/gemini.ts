@@ -138,6 +138,8 @@ export function createGeminiProvider(
           responseMimeType: "application/json",
           responseSchema: object({
             intent: { type: "STRING", enum: [...INTENTS] },
+            composition: { type: "STRING", enum: ["sprite", "scene"] },
+            style: STRING,
             subject: STRING,
             where: STRING,
             count: INTEGER,

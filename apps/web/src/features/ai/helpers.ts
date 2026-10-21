@@ -26,7 +26,32 @@ export function buildImagePrompt(
   width: number,
   height: number,
   withReferences = false,
+  composition: "sprite" | "scene" = "sprite",
+  style = "",
 ): string {
+  if (composition === "scene" || style.trim()) {
+    return [
+      composition === "scene"
+        ? `A complete edge-to-edge picture with its requested foreground, environment and background: ${subject}.`
+        : `One complete isolated subject: ${subject}.`,
+      `Compose for a ${width}x${height} pixel canvas; preserve readable silhouettes and important thin features such as strings and wires.`,
+      ...(style.trim()
+        ? [
+            `Requested visual style: ${style}. Follow this style throughout, including proportions, colours, outlines and shading.`,
+          ]
+        : IMAGE_STYLE_RULES.slice(0, 4)),
+      ...(withReferences
+        ? [
+            "Use the attached pictures as visual references, preserving their recognizable design and details while following the requested style and composition.",
+          ]
+        : []),
+      ...(composition === "scene"
+        ? [
+            "Paint the requested background across the entire canvas. No chroma key, transparent margins or checkerboard. No watermark or border.",
+          ]
+        : IMAGE_BACKGROUND_RULES),
+    ].join(" ");
+  }
   return [
     `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
     ...(withReferences ? [REFERENCE_RULES] : []),
@@ -112,11 +137,13 @@ export function buildRedrawPrompt(
   height: number,
 ): string {
   return [
-    `Redraw this pixel art sprite as a ${width}x${height} pixel sprite: ${instruction}.`,
+    `Edit the attached picture on its fixed ${width}x${height} canvas: ${instruction}.`,
     "Keep its design, colours, outline, proportions and pose exactly as they are",
-    "unless the instruction changes them. The subject fills the frame.",
-    IMAGE_STYLE_RULES[0],
-    ...IMAGE_BACKGROUND_RULES,
+    "unless the instruction changes them. Keep the original placement, scale and margins; do not zoom or reframe.",
+    "Apply material or skin recolouring to ALL requested areas, including their shadows and highlights. Preserve unrelated details, thin strings, weapons, face and background.",
+    "The requested style takes priority over the original style. Otherwise preserve the original style exactly.",
+    "Retain small recognizable details and keep the result readable at the target resolution.",
+    `Keep existing scenery and background. Only areas already ${CHROMA_KEY_HEX} stay flat ${CHROMA_KEY_HEX}, unless the edit explicitly adds a background there. No watermark or border.`,
   ].join(" ");
 }
 
@@ -196,6 +223,7 @@ export function sheetLayout(
 }
 
 export function buildSheetAnimatePrompt(args: {
+  style?: string;
   subject: string;
   poses: string[];
   cellW: number;
@@ -219,7 +247,9 @@ export function buildSheetAnimatePrompt(args: {
     "The copy in each cell is the strict reference for that frame: follow it as closely as possible — the very same character and everything around it, with the same design, proportions, size, place, framing, colours, palette, outline, shading and pixel size. Change only the pose the frame describes; it must look like the same drawing animated, not a new drawing.",
     "Keep the grid exactly: every frame fills its own cell as the copy does and never crosses into another cell.",
     "No grid lines, no numbers, no labels.",
-    IMAGE_STYLE_RULES[0],
+    args.style?.trim()
+      ? `Requested style override: ${args.style}. Apply this style consistently across all frames; it takes priority over matching the reference's rendering style.`
+      : "Preserve the reference's rendering style and pixel size exactly.",
     `Where the picture is ${CHROMA_KEY_HEX} magenta it stays the same flat magenta. No text, no watermark, no border.`,
   ]
     .filter(Boolean)
@@ -240,12 +270,13 @@ export function buildSheetRedrawPrompt(args: {
       ? "The remaining cells at the end of the last row are empty and stay empty."
       : "",
     `Redraw the whole sheet with this change: ${args.instruction}.`,
-    "First make the change in frame 1 (top left). Frame 1 is then the model sheet for the whole animation: in every other frame, redraw the subject so it is the very same character as in frame 1 — the same design, face, head, hair, clothes, accessories, colours, outline, size, proportions and the same side it is seen from — even where the frames differ from each other now.",
-    "Only the movement may differ between frames: each frame keeps its own pose (limbs, small motions) and its place in its cell; everything else matches frame 1 exactly, as one character animated, not several look-alikes.",
+    "Apply the requested change consistently to every frame, preserving the same character identity, materials and shading. A recolour must cover the entire requested material in every pose, not isolated pixels.",
+    "Each frame must KEEP its original pose, viewing direction, expression, camera, scale, placement and chronological position. Do not copy frame 1's pose or viewing direction over a turn or movement in later frames.",
+    "Preserve the original visual style unless a different style is explicitly requested; then follow that style consistently.",
     "Keep the grid exactly: every frame stays in its cell. Change nothing else the instruction does not ask for.",
     "No grid lines, no numbers, no labels.",
-    IMAGE_STYLE_RULES[0],
-    ...IMAGE_BACKGROUND_RULES,
+    "Preserve fine details at the target resolution.",
+    `Preserve existing background and scenery. Areas already flat ${CHROMA_KEY_HEX} stay that colour unless the request changes them.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -253,6 +284,7 @@ export function buildSheetRedrawPrompt(args: {
 
 export function buildSetPrompt(args: {
   subjects: string[];
+  style?: string;
   cellW: number;
   cellH: number;
   layout: SheetLayout;
@@ -273,7 +305,9 @@ export function buildSetPrompt(args: {
       ? "Leave the remaining cells at the end of the last row empty."
       : "",
     "No grid lines, no numbers, no labels.",
-    ...IMAGE_STYLE_RULES.slice(0, 4),
+    ...(args.style?.trim()
+      ? [`Requested visual style: ${args.style}. Follow it throughout.`]
+      : IMAGE_STYLE_RULES.slice(0, 4)),
     ...IMAGE_BACKGROUND_RULES,
   ]
     .filter(Boolean)
@@ -281,6 +315,8 @@ export function buildSetPrompt(args: {
 }
 
 export function buildSheetPrompt(args: {
+  style?: string;
+  composition?: "sprite" | "scene";
   subject: string;
   poses: string[];
   cellW: number;
@@ -307,8 +343,14 @@ export function buildSheetPrompt(args: {
       ? "Leave the remaining cells at the end of the last row empty."
       : "",
     "No grid lines, no numbers, no labels.",
-    ...IMAGE_STYLE_RULES.slice(0, 3),
-    ...IMAGE_BACKGROUND_RULES,
+    ...(args.style?.trim()
+      ? [`Requested visual style: ${args.style}. Follow it in every frame.`]
+      : IMAGE_STYLE_RULES.slice(0, 3)),
+    ...(args.composition === "scene"
+      ? [
+          "Every cell is a complete scene with its requested background painted edge to edge. Keep that environment fixed throughout the action; no chroma key or transparent margins.",
+        ]
+      : IMAGE_BACKGROUND_RULES),
   ]
     .filter(Boolean)
     .join(" ");
@@ -368,7 +410,7 @@ export function clampAnimationPlan(
     const poses = Array.from({ length: frameCount }, (_, i) =>
       String(t.poses?.[i] ?? "").trim(),
     );
-    if (!subject || !poses.some(Boolean) || !t.box) return [];
+    if (!subject || !poses.every(Boolean) || !t.box) return [];
     const reuse =
       Number.isInteger(t.reuse) && t.reuse >= 0 && t.reuse < layerCount
         ? t.reuse
