@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@pigxel/ui/components/badge";
 import { Button } from "@pigxel/ui/components/button";
 import { Textarea } from "@pigxel/ui/components/input";
 import { cn } from "@pigxel/ui/lib/utils";
 import { PixelImage } from "@/components/ui/pixel-image";
-import { MAX_NOTE, REVIEW_API } from "../../../constants";
+import { MAX_NOTE } from "../../../constants";
+import { loadPreview, previewUrl } from "../../../preview-loader";
 import type { ReviewState, ReviewStatus, ReviewTile } from "../../../types";
 import { useReviewActions } from "../../../use-asset-review";
 import {
@@ -46,7 +47,11 @@ export function TileCard({
 }) {
   const actions = useReviewActions();
   const [note, setNote] = useState(tile.note);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [imageRetry, setImageRetry] = useState(0);
   const [clipIndex, setClipIndex] = useState(0);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -55,17 +60,42 @@ export function TileCard({
   const isTile = tile.kind === "tile";
 
   useEffect(() => {
+    const element = previewRef.current;
+    if (!element) return;
+    if (!("IntersectionObserver" in window)) {
+      const timer = setTimeout(() => setInView(true), 0);
+      return () => clearTimeout(timer);
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInView(!!entry?.isIntersecting);
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     if (!tile.w) return;
     let live = true;
-    const img = new Image();
-    img.onload = () => {
-      if (live) setImage(img);
-    };
-    img.src = `${REVIEW_API}/strip/${tile.pack}/${tile.id}?v=${tile.hash}`;
+    const base = previewUrl(tile.pack, tile.id, tile.hash);
+    const url = imageRetry ? `${base}&retry=${imageRetry}` : base;
+    void loadPreview(url, inView).then(
+      (img) => {
+        if (live) {
+          setImage(img);
+          setImageError(false);
+        }
+      },
+      () => {
+        if (live) setImageError(true);
+      },
+    );
     return () => {
       live = false;
     };
-  }, [tile.pack, tile.id, tile.hash, tile.w]);
+  }, [tile.pack, tile.id, tile.hash, tile.w, inView, imageRetry]);
 
   const act = async (action: () => Promise<unknown>) => {
     setPending(true);
@@ -84,13 +114,14 @@ export function TileCard({
   return (
     <article className={cn(CARD, "flex flex-col", STATE_RINGS[tile.state])}>
       <div
+        ref={previewRef}
         className={cn(
           "relative flex aspect-square items-center justify-center overflow-hidden",
           !tint && background,
         )}
         style={tint ? { background: tint } : undefined}
       >
-        {image && (
+        {inView && image && (
           <SpriteCanvas
             image={image}
             w={tile.w}
@@ -100,6 +131,22 @@ export function TileCard({
             repeat={isTile ? TILE_REPEAT : 1}
             className={isTile ? "size-full" : "w-3/5"}
           />
+        )}
+        {inView && !image && (
+          imageError ? (
+            <button
+              type="button"
+              onClick={() => {
+                setImageError(false);
+                setImageRetry((retry) => retry + 1);
+              }}
+              className="text-xs text-destructive underline"
+            >
+              Retry preview
+            </button>
+          ) : (
+            <span className="text-xs text-muted-foreground">Loading preview…</span>
+          )
         )}
         <span className="pointer-events-none absolute top-2 left-2 flex flex-wrap gap-1">
           <Badge className={STATE_TONES[tile.state]}>
@@ -229,10 +276,10 @@ export function TileCard({
               type="button"
               size="sm"
               className="flex-1"
-              disabled={tile.blocked || pending}
+              disabled={tile.blocked || pending || tile.state === "approved"}
               onClick={() => decide("approved")}
             >
-              Approve
+              {tile.state === "approved" ? "Approved" : "Approve"}
             </Button>
             <Button
               type="button"
