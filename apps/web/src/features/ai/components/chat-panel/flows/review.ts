@@ -35,5 +35,7 @@ export async function checkEdit(
     ),
     after: tileSnapshot(canvasOf(args.after, size), area),
   }).catch(() => null);
-  return result?.ok && !result.value.ok ? result.value : null;
+  if (!result?.ok)
+    throw new Error("Couldn’t verify the edit. The original drawing was kept.");
+  return !result.value.ok ? result.value : null;
 }

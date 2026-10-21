@@ -7,8 +7,7 @@ import {
   objectMask,
 } from "@/lib/edit/objects";
 import { applyOps, parseOps } from "@/lib/edit/ops";
-import { mergeRedraw } from "@/lib/edit/redraw";
-import { cropBitmap, opaqueBox, type Bitmap } from "@/lib/image/bitmap";
+import { opaqueBox, type Bitmap } from "@/lib/image/bitmap";
 
 export const emptyCel = (size: Size): Uint8ClampedArray =>
   new Uint8ClampedArray(size.w * size.h * 4);
@@ -82,8 +81,9 @@ export function applyRedraw(
   keep: Area[],
 ): Uint8ClampedArray {
   const after = new Uint8ClampedArray(cel);
-  const current = cropBitmap({ rgba: cel, ...size }, area).rgba;
-  const merged = mergeRedraw(current, art.rgba);
+  // A requested recolour includes subtle shadow/highlight changes too. Restoring
+  // 'similar' old colours here produces patchy edits after a correct redraw.
+  const merged = art.rgba;
   for (let y = 0; y < area.h; y++) {
     const row = merged.subarray(y * area.w * 4, (y + 1) * area.w * 4);
     after.set(row, ((area.y + y) * size.w + area.x) * 4);

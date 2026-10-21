@@ -42,12 +42,21 @@ export function readRoute(text: string, latest: string): Route {
   const frames = Math.round(Number(route?.frames));
   return {
     intent,
+    ...(route?.composition === "scene"
+      ? { composition: "scene" as const }
+      : {}),
+    ...(typeof route?.style === "string" && route.style.trim()
+      ? { style: route.style.trim().slice(0, 500) }
+      : {}),
     subject: route?.subject || latest,
     where: route?.where ?? "",
     count: count >= 1 ? Math.min(count, MAX_COUNT) : 1,
     name: (route?.name ?? "").trim().slice(0, 40),
     frames: frames >= 1 ? frames : 0,
-    items: (Array.isArray(route?.items) ? route.items : [])
+    items: (route?.composition !== "scene" && Array.isArray(route?.items)
+      ? route.items
+      : []
+    )
       .map((item) => ({
         subject: String(item?.subject ?? "")
           .trim()
