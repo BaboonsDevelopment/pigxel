@@ -45,15 +45,16 @@ import type {
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { unionOf } from "@/lib/edit/raster";
 import { requireUser } from "@/lib/auth/session";
+import { MAX_PIGXEL_SIZE } from "@/lib/pigxel-file/format";
 import { createClient } from "@/lib/supabase/server";
 
-const MAX_GRID = 256;
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]{1,2000000})$/;
 const IMAGE_DATA_URL =
   /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/;
 const MAX_GRID_TEXT = 100_000;
 
-const validSize = (n: number) => Number.isInteger(n) && n > 0 && n <= MAX_GRID;
+const validSize = (n: number) =>
+  Number.isInteger(n) && n > 0 && n <= MAX_PIGXEL_SIZE;
 
 /** Runs an AI step after checking the balance and screening what the person typed. */
 async function attempt<T>(

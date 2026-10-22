@@ -1553,6 +1553,126 @@
     "hash": "ddab5e81a5a06818",
     "at": "2026-10-19T10:37:19.208Z"
   },
+  "cozy-farm-32/farm-beehive": {
+    "status": "approved",
+    "note": "",
+    "hash": "32de5a51fbf04867",
+    "at": "2026-10-22T11:02:08.861Z"
+  },
+  "cozy-farm-32/farm-carrot-bundle": {
+    "status": "approved",
+    "note": "",
+    "hash": "10bf3b8ff83a715e",
+    "at": "2026-10-22T11:02:10.426Z"
+  },
+  "cozy-farm-32/farm-chicken-coop": {
+    "status": "approved",
+    "note": "",
+    "hash": "8d695ac9d94f0d99",
+    "at": "2026-10-22T11:02:05.658Z"
+  },
+  "cozy-farm-32/farm-fence-gate": {
+    "status": "approved",
+    "note": "",
+    "hash": "c80744bcfd609c60",
+    "at": "2026-10-22T11:02:06.076Z"
+  },
+  "cozy-farm-32/farm-field-scarecrow": {
+    "status": "approved",
+    "note": "",
+    "hash": "b68261e947f0f732",
+    "at": "2026-10-22T11:02:08.481Z"
+  },
+  "cozy-farm-32/farm-harvest-crate": {
+    "status": "approved",
+    "note": "",
+    "hash": "fdfedf78c6dea3d9",
+    "at": "2026-10-22T11:02:07.729Z"
+  },
+  "cozy-farm-32/farm-hay-bale": {
+    "status": "approved",
+    "note": "",
+    "hash": "07d35e0ba6bcf165",
+    "at": "2026-10-22T11:02:06.487Z"
+  },
+  "cozy-farm-32/farm-pink-pig": {
+    "status": "approved",
+    "note": "",
+    "hash": "c3179f19cbc7376e",
+    "at": "2026-10-22T11:02:12.382Z"
+  },
+  "cozy-farm-32/farm-pumpkin": {
+    "status": "approved",
+    "note": "",
+    "hash": "52c6b88333ac742e",
+    "at": "2026-10-22T11:02:09.288Z"
+  },
+  "cozy-farm-32/farm-red-barn": {
+    "status": "approved",
+    "note": "",
+    "hash": "8fc0496aa0876677",
+    "at": "2026-10-22T11:02:04.033Z"
+  },
+  "cozy-farm-32/farm-seed-sack": {
+    "status": "approved",
+    "note": "",
+    "hash": "7cb74e396107f8aa",
+    "at": "2026-10-22T11:02:08.106Z"
+  },
+  "cozy-farm-32/farm-speckled-hen": {
+    "status": "approved",
+    "note": "",
+    "hash": "5d07c5de4164127a",
+    "at": "2026-10-22T11:02:11.595Z"
+  },
+  "cozy-farm-32/farm-spotted-cow": {
+    "status": "approved",
+    "note": "",
+    "hash": "335ae753c1bde5a5",
+    "at": "2026-10-22T11:02:12.033Z"
+  },
+  "cozy-farm-32/farm-stone-well": {
+    "status": "approved",
+    "note": "",
+    "hash": "f221b6cd7354f011",
+    "at": "2026-10-22T11:02:05.232Z"
+  },
+  "cozy-farm-32/farm-sunflower": {
+    "status": "approved",
+    "note": "",
+    "hash": "ee739f9a1cdd9288",
+    "at": "2026-10-22T11:02:11.198Z"
+  },
+  "cozy-farm-32/farm-tomato-plant": {
+    "status": "approved",
+    "note": "",
+    "hash": "f5f818cefa9c3ba5",
+    "at": "2026-10-22T11:02:09.708Z"
+  },
+  "cozy-farm-32/farm-watering-can": {
+    "status": "approved",
+    "note": "",
+    "hash": "874ad58672fac65f",
+    "at": "2026-10-22T11:02:06.903Z"
+  },
+  "cozy-farm-32/farm-wheelbarrow": {
+    "status": "approved",
+    "note": "",
+    "hash": "abc39f6669c0ca48",
+    "at": "2026-10-22T11:02:07.292Z"
+  },
+  "cozy-farm-32/farm-windmill": {
+    "status": "approved",
+    "note": "",
+    "hash": "4867d73f5741d5d4",
+    "at": "2026-10-22T11:02:04.794Z"
+  },
+  "cozy-farm-32/farm-woolly-sheep": {
+    "status": "approved",
+    "note": "",
+    "hash": "99391dda7688c440",
+    "at": "2026-10-22T11:02:12.772Z"
+  },
   "crystal-caverns-64/cavern-amethyst-geode": {
     "status": "approved",
     "note": "",
@@ -8117,6 +8237,102 @@
     "hash": "2483b46e646660b4",
     "at": "2026-10-19T10:31:44.403Z"
   },
+  "scary-halloween-64/cursed-witch-hat": {
+    "status": "approved",
+    "note": "",
+    "hash": "eb5a481d671ddeb5",
+    "at": "2026-10-22T11:02:14.269Z"
+  },
+  "scary-halloween-64/dread-autumn-broom": {
+    "status": "approved",
+    "note": "",
+    "hash": "dedbf4d2f1d8689b",
+    "at": "2026-10-22T11:02:15.305Z"
+  },
+  "scary-halloween-64/dread-bat-lantern": {
+    "status": "approved",
+    "note": "",
+    "hash": "29960e2ce887452a",
+    "at": "2026-10-22T11:02:15.971Z"
+  },
+  "scary-halloween-64/dread-candy-bucket": {
+    "status": "approved",
+    "note": "",
+    "hash": "e18a98b1793c696d",
+    "at": "2026-10-22T11:02:17.076Z"
+  },
+  "scary-halloween-64/dread-cat-bed": {
+    "status": "approved",
+    "note": "",
+    "hash": "fd4658f8a308cbd8",
+    "at": "2026-10-22T11:02:16.721Z"
+  },
+  "scary-halloween-64/dread-crystal-altar": {
+    "status": "approved",
+    "note": "",
+    "hash": "7f213fb758c4c160",
+    "at": "2026-10-22T11:02:14.999Z"
+  },
+  "scary-halloween-64/dread-flower-coffin": {
+    "status": "approved",
+    "note": "",
+    "hash": "fc5ba1930cf97292",
+    "at": "2026-10-22T11:02:17.399Z"
+  },
+  "scary-halloween-64/dread-garden-gate": {
+    "status": "approved",
+    "note": "",
+    "hash": "5bb6ba349766cdb7",
+    "at": "2026-10-22T11:02:20.111Z"
+  },
+  "scary-halloween-64/dread-moon-banner": {
+    "status": "approved",
+    "note": "",
+    "hash": "49e18640305e57e6",
+    "at": "2026-10-22T11:02:16.343Z"
+  },
+  "scary-halloween-64/dread-potion-shelf": {
+    "status": "approved",
+    "note": "",
+    "hash": "40fbe0c4b40e6b81",
+    "at": "2026-10-22T11:02:19.075Z"
+  },
+  "scary-halloween-64/dread-pumpkin-scarecrow": {
+    "status": "approved",
+    "note": "",
+    "hash": "965d288f16908fcf",
+    "at": "2026-10-22T11:02:19.728Z"
+  },
+  "scary-halloween-64/dread-raven-perch": {
+    "status": "approved",
+    "note": "",
+    "hash": "e0a21de93901fcd1",
+    "at": "2026-10-22T11:02:19.422Z"
+  },
+  "scary-halloween-64/dread-rose-mirror": {
+    "status": "approved",
+    "note": "",
+    "hash": "7c8fffc8b249dbab",
+    "at": "2026-10-22T11:02:15.652Z"
+  },
+  "scary-halloween-64/dread-skull-candles": {
+    "status": "approved",
+    "note": "",
+    "hash": "0eb606ae2475374b",
+    "at": "2026-10-22T11:02:17.773Z"
+  },
+  "scary-halloween-64/dread-spellbooks": {
+    "status": "approved",
+    "note": "",
+    "hash": "a18a3998a99874cd",
+    "at": "2026-10-22T11:02:14.652Z"
+  },
+  "scary-halloween-64/dread-thorn-arch": {
+    "status": "approved",
+    "note": "",
+    "hash": "908afba88df72e7a",
+    "at": "2026-10-22T11:02:13.908Z"
+  },
   "sea-port-64/port-anchor-chain": {
     "status": "approved",
     "note": "",
@@ -8716,6 +8932,102 @@
     "note": "",
     "hash": "a42545f093ebd919",
     "at": "2026-10-21T14:15:56.286Z"
+  },
+  "spooky-starter-64/spooky-autumn-broom": {
+    "status": "approved",
+    "note": "",
+    "hash": "f8c2e6e48b26cb9a",
+    "at": "2026-10-22T10:19:55.036Z"
+  },
+  "spooky-starter-64/spooky-bat-lantern": {
+    "status": "approved",
+    "note": "",
+    "hash": "0911ad5873d50919",
+    "at": "2026-10-22T10:19:56.024Z"
+  },
+  "spooky-starter-64/spooky-candy-bucket": {
+    "status": "approved",
+    "note": "",
+    "hash": "dd1c219ef3a1b521",
+    "at": "2026-10-22T10:19:57.170Z"
+  },
+  "spooky-starter-64/spooky-crystal-altar": {
+    "status": "approved",
+    "note": "",
+    "hash": "b7e6b6c28895f58f",
+    "at": "2026-10-22T10:19:53.933Z"
+  },
+  "spooky-starter-64/spooky-flower-coffin": {
+    "status": "approved",
+    "note": "",
+    "hash": "2231cdc2a4a363d4",
+    "at": "2026-10-22T10:19:57.537Z"
+  },
+  "spooky-starter-64/spooky-garden-gate": {
+    "status": "approved",
+    "note": "",
+    "hash": "a444a41afa07f896",
+    "at": "2026-10-22T10:19:59.683Z"
+  },
+  "spooky-starter-64/spooky-ivy-arch": {
+    "status": "approved",
+    "note": "",
+    "hash": "9f70caf32f0c505f",
+    "at": "2026-10-22T10:19:50.836Z"
+  },
+  "spooky-starter-64/spooky-moon-banner": {
+    "status": "approved",
+    "note": "",
+    "hash": "43a57f4598e1ef88",
+    "at": "2026-10-22T10:19:56.382Z"
+  },
+  "spooky-starter-64/spooky-potion-shelf": {
+    "status": "approved",
+    "note": "",
+    "hash": "7a8613297c9e75fa",
+    "at": "2026-10-22T10:19:58.656Z"
+  },
+  "spooky-starter-64/spooky-pumpkin-scarecrow": {
+    "status": "approved",
+    "note": "",
+    "hash": "bcaef6b21f1cb17b",
+    "at": "2026-10-22T10:19:59.366Z"
+  },
+  "spooky-starter-64/spooky-raven-perch": {
+    "status": "approved",
+    "note": "",
+    "hash": "c3a97631414f834a",
+    "at": "2026-10-22T10:19:58.983Z"
+  },
+  "spooky-starter-64/spooky-rose-mirror": {
+    "status": "approved",
+    "note": "",
+    "hash": "4dd7bf80a29632b0",
+    "at": "2026-10-22T10:19:55.497Z"
+  },
+  "spooky-starter-64/spooky-skull-candles": {
+    "status": "approved",
+    "note": "",
+    "hash": "6b774f592b8c8bb4",
+    "at": "2026-10-22T10:19:58.259Z"
+  },
+  "spooky-starter-64/spooky-sleepy-cat": {
+    "status": "approved",
+    "note": "",
+    "hash": "a889edb2de83b5aa",
+    "at": "2026-10-22T10:19:56.739Z"
+  },
+  "spooky-starter-64/spooky-spellbooks": {
+    "status": "approved",
+    "note": "",
+    "hash": "ed8136cedecacce2",
+    "at": "2026-10-22T10:19:53.481Z"
+  },
+  "spooky-starter-64/spooky-witch-stool": {
+    "status": "approved",
+    "note": "",
+    "hash": "f91344a275eb1851",
+    "at": "2026-10-22T10:19:52.554Z"
   },
   "steampunk-quarter-64/steamquarter-arc-lamp": {
     "status": "approved",

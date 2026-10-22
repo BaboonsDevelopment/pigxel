@@ -154,7 +154,7 @@ export function ChatComposer({
             e.preventDefault();
             void attach(files);
           }}
-          className="h-11 min-h-11 min-w-0 flex-1 resize-none py-2.5 text-sm"
+          className="h-11 min-h-11 min-w-0 flex-1 resize-none py-2.5 text-sm placeholder:truncate"
         />
         {onStop ? (
           <Button
