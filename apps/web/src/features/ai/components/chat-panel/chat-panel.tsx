@@ -271,6 +271,8 @@ export function ChatPanel({
       action.name || "Picture",
       [area],
       replace,
+      action.composition,
+      action.style,
     ).catch((error: unknown) => {
       ignoreStop(error);
       return false;

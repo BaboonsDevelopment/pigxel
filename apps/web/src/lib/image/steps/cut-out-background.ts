@@ -11,7 +11,6 @@ import {
 import {
   CHROMA_KEY,
   CHROMA_KEY_TOLERANCE,
-  EDGE_TRIM,
   FRINGE_MAGENTA,
   FRINGE_PASSES,
 } from "../constants";
@@ -32,6 +31,8 @@ function edgePixels(image: Bitmap): number[] {
 const isMagentaBlend = (image: Bitmap, i: number) => {
   const g = channel(image, i, 1);
   return (
+    // Dark red/purple details are foreground. Only trim bright key-colour spill.
+    Math.min(channel(image, i, 0), channel(image, i, 2)) >= 160 &&
     channel(image, i, 0) - g > FRINGE_MAGENTA &&
     channel(image, i, 2) - g > FRINGE_MAGENTA
   );
@@ -47,9 +48,6 @@ export function cutOutBackground(source: Bitmap): Bitmap {
   for (let pass = 0; pass < FRINGE_PASSES; pass++) {
     const blends = edgePixels(image).filter((i) => isMagentaBlend(image, i));
     blends.forEach((i) => clearPixel(image, i));
-  }
-  for (let pass = 0; pass < EDGE_TRIM; pass++) {
-    edgePixels(image).forEach((i) => clearPixel(image, i));
   }
   return image;
 }

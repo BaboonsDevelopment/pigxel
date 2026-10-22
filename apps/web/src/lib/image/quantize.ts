@@ -9,6 +9,7 @@ type QuantizeOpts = {
   keepBackground?: boolean;
   fit?: "contain" | "stretch";
   detail?: "sharp" | "smooth";
+  preserveThinFeatures?: boolean;
 };
 
 type Quantized = {
@@ -407,6 +408,10 @@ export function imageToSprite(
       counts.fill(0);
       let opaque = 0;
       let total = 0;
+      let minX = x1,
+        maxX = -1,
+        minY = y1,
+        maxY = -1;
 
       for (let sy = y0; sy < y1; sy++) {
         for (let sx = x0; sx < x1; sx++) {
@@ -414,6 +419,10 @@ export function imageToSprite(
           const p = (sy * sw + sx) * 4;
           if (px(source, p + 3) < 128) continue;
           opaque++;
+          minX = Math.min(minX, sx);
+          maxX = Math.max(maxX, sx);
+          minY = Math.min(minY, sy);
+          maxY = Math.max(maxY, sy);
           const bin =
             lut.get(BIN(px(source, p), px(source, p + 1), px(source, p + 2))) ??
             0;
@@ -421,7 +430,11 @@ export function imageToSprite(
         }
       }
 
-      if (total === 0 || opaque / total < 0.4) continue;
+      const thinFeature =
+        opts.preserveThinFeatures &&
+        opaque >= 2 &&
+        (maxX - minX + 1 >= x1 - x0 || maxY - minY + 1 >= y1 - y0);
+      if (total === 0 || (opaque / total < 0.4 && !thinFeature)) continue;
 
       let best = 0;
       for (let i = 1; i < counts.length; i++)

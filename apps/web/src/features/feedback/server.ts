@@ -9,7 +9,9 @@ import { createClient } from "@/lib/supabase/server";
 import {
   ACTIVE_STATUSES,
   FINISHED_STATUSES,
+  ROADMAP_STATUSES,
   titlePattern,
+  type RoadmapStatus,
   type FeedbackItem,
   type FeedbackKind,
 } from "./feedback";
@@ -34,17 +36,32 @@ export type BoardQuery = {
   id?: number;
 };
 
+// Voters also link feedback to profiles, so name the author's key.
+const FEEDBACK_COLUMNS = `id, kind, title, description, status, votes, created_at, author:profiles!feedback_user_id_fkey(${PROFILE_COLUMNS}), my_vote:feedback_votes(user_id)`;
+
+function toItem(row: FeedbackRow, now: number): FeedbackItem {
+  const author = row.author && toArtistProfile(row.author);
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    votes: row.votes,
+    createdAt: row.created_at,
+    ago: timeAgo(Date.parse(row.created_at), now),
+    author: author && { name: author.name, username: author.username },
+    voted: row.my_vote.length > 0,
+  };
+}
+
 /** Up to `limit` items; throws when the board can't be loaded. */
 export async function listFeedback(
   query: BoardQuery,
   limit: number,
 ): Promise<FeedbackItem[]> {
   const supabase = await createClient();
-  let request = supabase
-    .from("feedback")
-    .select(
-      `id, kind, title, description, status, votes, created_at, author:profiles(${PROFILE_COLUMNS}), my_vote:feedback_votes(user_id)`,
-    );
+  let request = supabase.from("feedback").select(FEEDBACK_COLUMNS);
   if (query.id) request = request.eq("id", query.id);
   else
     request = request
@@ -63,21 +80,34 @@ export async function listFeedback(
     .returns<FeedbackRow[]>();
   if (error) throw new Error(`Couldn’t load feedback: ${error.message}`);
   const now = Date.now();
-  return data.map((row) => {
-    const author = row.author && toArtistProfile(row.author);
-    return {
-      id: row.id,
-      kind: row.kind,
-      title: row.title,
-      description: row.description,
-      status: row.status,
-      votes: row.votes,
-      createdAt: row.created_at,
-      ago: timeAgo(Date.parse(row.created_at), now),
-      author: author && { name: author.name, username: author.username },
-      voted: row.my_vote.length > 0,
-    };
-  });
+  return data.map((row) => toItem(row, now));
+}
+
+/**
+ * Feature requests on the roadmap, most voted first, up to `limit` per
+ * status; throws when they can't be loaded.
+ */
+export async function listRoadmap(
+  limit: number,
+): Promise<Record<RoadmapStatus, FeedbackItem[]>> {
+  const supabase = await createClient();
+  const now = Date.now();
+  const columns = await Promise.all(
+    ROADMAP_STATUSES.map(async (status) => {
+      const { data, error } = await supabase
+        .from("feedback")
+        .select(FEEDBACK_COLUMNS)
+        .eq("kind", "feature")
+        .eq("status", status)
+        .order("votes", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit)
+        .returns<FeedbackRow[]>();
+      if (error) throw new Error(`Couldn’t load the roadmap: ${error.message}`);
+      return [status, data.map((row) => toItem(row, now))] as const;
+    }),
+  );
+  return Object.fromEntries(columns) as Record<RoadmapStatus, FeedbackItem[]>;
 }
 
 /** Null when the counts can't be loaded. */

@@ -5,7 +5,11 @@ import { imageToSprite } from "../quantize";
 export const paletteSize = ({ w, h }: Size) =>
   Math.max(MIN_PALETTE, Math.round(Math.sqrt(w * h) * PALETTE_PER_SIDE));
 
-export function shrinkToTile(image: Bitmap, target: Size): Bitmap {
+export function shrinkToTile(
+  image: Bitmap,
+  target: Size,
+  fit: "contain" | "stretch" = "contain",
+): Bitmap {
   const { buf } = imageToSprite(
     image.rgba,
     image.w,
@@ -15,6 +19,8 @@ export function shrinkToTile(image: Bitmap, target: Size): Bitmap {
     {
       colors: paletteSize(target),
       keepBackground: true,
+      preserveThinFeatures: true,
+      fit,
     },
   );
   return { rgba: buf, w: target.w, h: target.h };

@@ -1,12 +1,16 @@
 import type { AnimationSpec } from "@/features/editor/pixel-canvas/use-sprite";
-import { animateSheet, generateSheet, planAnimation } from "../../../actions";
+import {
+  animateSheet,
+  generateSheet,
+  planAnimation,
+  reviewEdit,
+} from "../../../actions";
 import { sheetLayout } from "../../../helpers";
 import type { AnimationPlan, SheetTrack, TileAction } from "../../../types";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import { unionOf } from "@/lib/edit/raster";
 import { sheetToFrames } from "@/lib/image/sheet";
 import {
-  FRAMES_PER_PICTURE,
   MIN_MOVING_SHARE,
   UNREACHABLE,
   type Chat,
@@ -48,13 +52,15 @@ export async function animate(chat: Chat, action: TileAction) {
       "I couldn’t work out what should move. Try describing the action.",
     );
 
+  track.composition = action.composition;
+  track.style = action.style;
+  if (track.reuse !== null && !layers[track.reuse]?.editable)
+    return chat.say("Unlock the layer before animating it.");
   const moving =
     track.reuse !== null ? movingLayer(chat, layers, track) : undefined;
   const reused =
     moving ?? (track.reuse !== null ? layers[track.reuse] : undefined);
-  const pictures = moving
-    ? inGroups(track.poses.filter(Boolean), FRAMES_PER_PICTURE).length
-    : 1;
+  const pictures = 1;
   chat.append({
     role: "assistant",
     content: [
@@ -87,6 +93,36 @@ async function draw(
     const drawn = moving
       ? await drawInPlace(chat, track, moving)
       : await drawSheet(chat, track, layers);
+    const size = canvas.size();
+    const area = moving
+      ? unionOf([moving.box ?? undefined, track.box])!
+      : track.box;
+    const frames = drawn.cels.filter((cel): cel is Uint8ClampedArray => !!cel);
+    if (frames.length !== plan.frameCount)
+      throw new StepError(
+        "The animation has missing frames. The original drawing was kept.",
+      );
+    const baseline = moving
+      ? canvas.readCel(moving.id, canvas.frameId())
+      : frames[0]!;
+    const layout = sheetLayout(plan.frameCount, area.w, area.h);
+    const checked = await reviewEdit({
+      request: `Check this animation of ${track.subject}. Both pictures are ${layout.cols} columns by ${layout.rows} rows in reading order. The first is a repeated design reference, the second is the final animation. Expected consecutive poses: ${track.poses.map((p, i) => `${i + 1}: ${p}`).join("; ")}.`,
+      instruction:
+        "Accept intentional pose changes matching the sequence. Reject unrelated or out-of-order poses, missing frames, character redesign, lost details, unrequested whole-body drift or scale changes. Ignore unused cells at the end.",
+      before: framesSheet(
+        frames.map(() => baseline),
+        size,
+        area,
+        layout,
+      ),
+      after: framesSheet(frames, size, area, layout),
+    }).catch(() => UNREACHABLE);
+    if (!checked.ok) throw new StepError(checked.error);
+    if (!checked.value.ok)
+      throw new StepError(
+        `${checked.value.problem || "The animation did not pass the consistency check."} The original drawing was kept. Try generating again.`,
+      );
     const spec: AnimationSpec = {
       name: plan.name,
       frameCount: plan.frameCount,
@@ -131,19 +167,13 @@ function movingLayer(
   const size = canvas.size();
   const frame = canvas.frameId();
   const least = Math.max(1, track.box.w * track.box.h * MIN_MOVING_SHARE);
+  const selected = track.reuse !== null ? layers[track.reuse] : undefined;
+  if (selected?.editable && selected.box) return selected;
   return layers.find(
     (layer) =>
       layer.editable &&
       !!layer.box &&
       opaqueIn(canvas.readCel(layer.id, frame), size, track.box) >= least,
-  );
-}
-
-function inGroups<T>(items: T[], most: number): T[][] {
-  const count = Math.ceil(items.length / most);
-  const size = Math.ceil(items.length / count);
-  return Array.from({ length: count }, (_, k) =>
-    items.slice(k * size, (k + 1) * size),
   );
 }
 
@@ -156,10 +186,12 @@ async function drawInPlace(
   const size = canvas.size();
   const area = unionOf([layer.box ?? undefined, track.box])!;
   const cel = canvas.readCel(layer.id, canvas.frameId());
-  const groups = inGroups(track.poses.filter(Boolean), FRAMES_PER_PICTURE);
+  // One reference sheet keeps the complete action and frame order in context.
+  const groups = [track.poses];
   const sheets = await Promise.all(
     groups.map(async (poses) => {
       const result = await animateSheet({
+        style: track.style,
         subject: track.subject,
         poses,
         sheet: framesSheet(
@@ -179,12 +211,13 @@ async function drawInPlace(
         poses.length,
         area,
         "cells",
+        track.composition === "scene",
       );
       return { image, frames };
     }),
   );
   const frames = sheets.flatMap((s) => s.frames);
-  if (!frames.some(Boolean))
+  if (frames.length !== track.poses.length || !frames.every(Boolean))
     throw new StepError(`Couldn’t cut "${track.name}" into frames. Try again.`);
   let next = 0;
   const cels = track.poses.map((pose) => {
@@ -217,6 +250,8 @@ async function drawSheet(
     cellW: track.box.w,
     cellH: track.box.h,
     reference,
+    style: track.style,
+    composition: track.composition,
   }).catch(() => UNREACHABLE);
   if (!result.ok) throw new StepError(result.error);
   const { image, layout } = result.value;
@@ -226,8 +261,9 @@ async function drawSheet(
     visible.length,
     track.box,
     "cells",
+    track.composition === "scene",
   );
-  if (!frames.some(Boolean))
+  if (frames.length !== track.poses.length || !frames.every(Boolean))
     throw new StepError(`Couldn’t cut "${track.name}" into frames. Try again.`);
   let next = 0;
   const cels = track.poses.map((pose) => {

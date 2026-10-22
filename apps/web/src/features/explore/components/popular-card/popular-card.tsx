@@ -1,5 +1,6 @@
 "use client";
 
+import { rememberArt } from "../../art-cache";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@pigxel/ui/lib/utils";
@@ -39,6 +40,7 @@ export function PopularCard({
     >
       <Link
         href={href}
+        onClick={() => rememberArt(tile)}
         aria-label={`Open ${tile.name}`}
         className="relative block w-full outline-none"
       >

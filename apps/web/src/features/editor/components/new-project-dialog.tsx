@@ -45,6 +45,8 @@ type FormProps = {
   ai?: boolean;
   /** Whether the plan includes AI, when the caller already knows. */
   aiAllowed?: boolean;
+  /** The folder the new project goes into. */
+  folder?: { id: string; name: string };
 };
 
 /**
@@ -62,7 +64,13 @@ export function NewProjectDialog({
   );
 }
 
-function NewProjectForm({ userId, from, ai = false, aiAllowed }: FormProps) {
+function NewProjectForm({
+  userId,
+  from,
+  ai = false,
+  aiAllowed,
+  folder,
+}: FormProps) {
   const router = useRouter();
   const { close } = useDialog();
   const [defaults] = useState(() => readNewTileDefaults(userId));
@@ -105,6 +113,7 @@ function NewProjectForm({ userId, from, ai = false, aiAllowed }: FormProps) {
       height: h,
       background: fill === "transparent" ? "transparent" : "white",
       fill: fill === "custom" ? custom : undefined,
+      folder,
       start: generate ? "ai" : undefined,
     });
     if ("error" in result) {

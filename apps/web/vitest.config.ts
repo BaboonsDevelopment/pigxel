@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
 import { sharedTestOptions } from "@pigxel/vitest-config/base";
+import { COVERAGE_THRESHOLDS } from "./coverage-thresholds";
 
 const path = (relative: string) =>
   fileURLToPath(new URL(relative, import.meta.url));
@@ -55,9 +56,7 @@ export default defineConfig({
       exclude: ["src/**/*.d.ts"],
       reporter: ["text-summary", "html", "lcov", "json-summary"],
       reportsDirectory: "coverage",
-      // Floors just under today's coverage, so it can only go up. Raise them
-      // as tests are added.
-      thresholds: { lines: 31, statements: 31, functions: 23, branches: 25 },
+      thresholds: COVERAGE_THRESHOLDS,
     },
   },
 });

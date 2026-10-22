@@ -71,6 +71,17 @@ export function NavigationHistory() {
   return null;
 }
 
+/** The in-app page this one was opened from in this tab, if one was seen. */
+export function usePreviousPage() {
+  const pathname = usePathname();
+  const navigation = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const known = navigation && pathOf(navigation.url) === pathname;
+  return {
+    previous: known ? localHref(navigation.previous ?? "") : null,
+    canGoBack: !!known && navigation.canGoBack,
+  };
+}
+
 /** A visible back control, or an in-place back action for modal details. */
 export function BackButton({
   href = "/home",
@@ -86,12 +97,8 @@ export function BackButton({
   className?: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const navigation = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
-  const previous =
-    preferHistory && navigation && pathOf(navigation.url) === pathname
-      ? localHref(navigation.previous ?? "")
-      : null;
+  const page = usePreviousPage();
+  const previous = preferHistory ? page.previous : null;
   const destination = previous ?? localHref(href) ?? "/home";
   const content = (
     <>
@@ -134,7 +141,7 @@ export function BackButton({
         )
           return;
         event.preventDefault();
-        if (previous && navigation?.canGoBack) router.back();
+        if (previous && page.canGoBack) router.back();
         else router.replace(destination);
       }}
     >

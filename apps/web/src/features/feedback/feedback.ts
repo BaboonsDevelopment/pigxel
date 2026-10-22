@@ -31,6 +31,14 @@ export const FINISHED_STATUSES: FeedbackStatus[] = [
   "closed",
 ];
 
+/** The roadmap's columns, in order: planned, being built, shipped. */
+export const ROADMAP_STATUSES = [
+  "approved",
+  "in_development",
+  "implemented",
+] as const satisfies readonly FeedbackStatus[];
+export type RoadmapStatus = (typeof ROADMAP_STATUSES)[number];
+
 export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 300;
 export const OPEN_LIMIT = 3;

@@ -2,7 +2,6 @@ import type { Bitmap, Size } from "./bitmap";
 import { cropToContent } from "./steps/crop-to-content";
 import { cutOutBackground } from "./steps/cut-out-background";
 import { recoverPixelGrid } from "./steps/recover-pixel-grid";
-import { removeStrayPixels } from "./steps/remove-stray-pixels";
 import { shrinkToTile } from "./steps/shrink-to-tile";
 
 export type Step = {
@@ -12,7 +11,7 @@ export type Step = {
 
 export const GENERATED_PICTURE_STEPS: Step[] = [
   {
-    rule: "Cut out the magenta background, its blended fringe and 1px of outline",
+    rule: "Cut out the magenta background without eroding the subject outline",
     apply: cutOutBackground,
   },
   {
@@ -21,21 +20,31 @@ export const GENERATED_PICTURE_STEPS: Step[] = [
   },
   {
     rule: "Recover the model's own pixel grid, one colour per cell",
-    apply: recoverPixelGrid,
+    apply: (image, target) => {
+      const recovered = recoverPixelGrid(image);
+      return recovered.w < target.w || recovered.h < target.h
+        ? image
+        : recovered;
+    },
   },
   {
     rule: "Shrink to the tile area with a palette sized to it",
     apply: shrinkToTile,
   },
-  {
-    rule: "Remove lone specks and pixels unlike all their neighbours",
-    apply: removeStrayPixels,
-  },
 ];
 
-export const REDRAWN_PICTURE_STEPS: Step[] = GENERATED_PICTURE_STEPS.filter(
-  (step) => step.apply !== cropToContent,
-);
+// Editing uses the exact reference canvas; grid inference must not reframe it.
+export const REDRAWN_PICTURE_STEPS: Step[] = [
+  GENERATED_PICTURE_STEPS[0]!,
+  { rule: "Keep the reference canvas and details", apply: shrinkToTile },
+];
+
+export const SCENE_PICTURE_STEPS: Step[] = [
+  {
+    rule: "Preserve the complete composition and its painted background",
+    apply: (image, target) => shrinkToTile(image, target, "stretch"),
+  },
+];
 
 export const runSteps = (image: Bitmap, target: Size, steps: Step[]) =>
   steps.reduce((current, step) => step.apply(current, target), image);

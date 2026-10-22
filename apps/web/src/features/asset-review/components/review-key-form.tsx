@@ -9,7 +9,7 @@ import { Page } from "@pigxel/ui/components/page";
 import { Heading } from "@pigxel/ui/components/typography";
 import { enterReviewKey } from "../use-asset-review";
 
-export function ReviewKeyForm() {
+export function ReviewKeyForm({ title = "Asset review" }: { title?: string }) {
   const router = useRouter();
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
@@ -35,7 +35,7 @@ export function ReviewKeyForm() {
         className="flex w-full max-w-sm flex-col gap-3 rounded-xl border bg-card p-6 shadow-[0_1px_2px_rgb(59_42_51/0.06)]"
       >
         <Heading as="h1" size="title">
-          Asset review
+          {title}
         </Heading>
         <Label htmlFor="review-key">Review key</Label>
         <Input

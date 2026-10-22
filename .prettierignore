@@ -3,4 +3,5 @@ node_modules
 .turbo
 pnpm-lock.yaml
 coverage
+.test-runs
 .vs

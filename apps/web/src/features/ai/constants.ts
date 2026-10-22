@@ -47,12 +47,22 @@ message; earlier messages are context, so short follow-ups like "and a dog too",
   character doing an action ("a monkey that throws a grenade", "make the cat
   walk", "animate the flag waving"), new or already drawn.
 - chat: a question, a greeting or anything else.
+Set composition to "scene" for a complete picture, environment, landscape,
+background or a subject in a setting; "sprite" for isolated objects.
+Default to sprite with no background unless the user requests a setting or background.
+Set style to the user's explicitly requested visual style, including a style
+established for the same artwork earlier in the conversation. Empty when unspecified.
+Preserve requests like chibi, cartoon, monochrome, watercolor or reference style;
+never replace them with the editor's default RPG style. Keep style in subject too.
+A full scene is ONE composition, never split its characters and scenery into items.
+For scenes, subject preserves ALL requested background, environment, lighting,
+composition and foreground details. Never discard the requested background.
 Set subject so it can be understood without the conversation:
 - generate: a short plain English description of ONE new thing only — what
   it is, its pose, its colours, its mood. Never include what is already drawn
   or where it goes (for "a big carrot above the beaver" it is just "a big
-  carrot"). Do not mention pixel art, resolution, outlines, palettes or the
-  background.
+  carrot"). Preserve any explicitly requested style, palette or outline.
+  For scenes include the entire setting.
 - edit: the full request in plain English, naming the thing to change instead
   of "it", "him" or "that".
 - animate: the full request in plain English: what moves and what happens,
@@ -73,9 +83,9 @@ For generate also set:
 For animate also set frames: the number of frames they asked for, 0 when
 they did not say.
 Otherwise leave where and name empty, items empty, count 1 and frames 0.
-A message ending in ${REFERENCES_NOTE} came with pictures to draw from
-("draw this", "in this style", "make him like this"): it is always generate,
-never edit, even when something is already drawn, and subject says what to
+A message ending in ${REFERENCES_NOTE} came with pictures to draw from.
+References do not override intent: changes to an existing drawing remain edit,
+and movement remains animate. For a NEW picture, subject says what to
 take from them ("the fox from the reference picture", "a knight in the style
 of the reference picture"). Wishes about how close to the reference it must
 be ("identical", "pixel for pixel", "exactly like this") are instructions for
@@ -138,12 +148,14 @@ export const EDIT_RESPONSE_RULES = [
 export const PLAN_RULES = `Decide how to carry out the edit.
 
 mode:
-- "ops" for small precise pixel changes that keep everything else: recolour,
-  add or fix an outline, erase a part, mirror, change a few pixels.
+- "ops" only for explicitly requested individual pixel corrections or exact
+  palette substitutions (e.g. replace every #112233 with #445566).
 - "move" when the object only changes position, same size, same look: its
   pixels are copied exactly.
-- "redraw" for anything that needs drawing: resize, add or remove a detail,
-  change a pose, expression, clothes or style, add detail.
+- "redraw" for visual edits: recolour skin, hair, clothes or a material across
+  the ENTIRE requested region with consistent shadows and highlights; resize,
+  add or remove a detail, change a pose, expression, clothes or style.
+  Use the current drawing as the strict image reference, not a few pixel patches.
 
 objects: the numbers of ALL objects that change, from OBJECTS. Things are
 often drawn in several pieces: an aura, magic effects, particles or a held
@@ -243,6 +255,10 @@ asked, and never a new look, size, framing or style.
 Keep everything inside the tile, where it fits the scene. Motion is smooth:
 neighbouring frames differ a little. A looping action (walk, idle, waving)
 ends where it can start again.
+Plan the entire chronological sequence together: anticipation, action and recovery.
+Never insert unrelated poses or reset to the initial pose halfway through.
+Keep a stable body/ground anchor in both axes unless translation is requested;
+do not simulate motion by scaling or shifting the whole drawing.
 
 summary: one or two short sentences for the user, in the language of the
 request, saying what the animation will show.`;

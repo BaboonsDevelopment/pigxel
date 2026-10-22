@@ -299,7 +299,10 @@ function Grid({
       )}
       <ul className={GRID}>
         {!search && !narrowed && !archived && (
-          <NewProjectCard folderId={folderId} />
+          <NewProjectCard
+            userId={userId}
+            folder={folders.find((f) => f.id === folderId)}
+          />
         )}
         {projects.map((project) => {
           const meta = `${project.width} × ${project.height} px · Edited ${editedAgo(project.at)}`;

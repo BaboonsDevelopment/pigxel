@@ -4,6 +4,9 @@
  * selection, a cursor, a live dot), like the blue of a design tool's UI.
  */
 .page {
+  /* Clicking and dragging around the page shouldn't highlight text. */
+  -webkit-user-select: none;
+  user-select: none;
   --display: var(--font-funnel-display), ui-sans-serif, system-ui, sans-serif;
   --sans: var(--font-funnel-sans), ui-sans-serif, system-ui, sans-serif;
   --pixel: var(--font-geist-pixel), ui-monospace, monospace;
@@ -912,7 +915,8 @@
   gap: 12px;
   width: max-content;
   padding: 4px 0;
-  animation: marquee 42s linear infinite;
+  /* 42s per set; the strip holds three sets per loop (see loop()). */
+  animation: marquee 126s linear infinite;
 }
 
 .marquee:hover .marqueeTrack {
@@ -1356,7 +1360,8 @@
   gap: 12px;
   width: max-content;
   padding-bottom: 28px;
-  animation: marquee 56s linear infinite reverse;
+  /* 56s per set; three sets per loop (see loop() in landing.tsx). */
+  animation: marquee 168s linear infinite reverse;
 }
 
 .ctaThumb {
