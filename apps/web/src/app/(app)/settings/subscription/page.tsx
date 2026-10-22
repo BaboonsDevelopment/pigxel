@@ -10,8 +10,6 @@ import {
 } from "@pigxel/ui/components/typography";
 import { requireUser } from "@/lib/auth/session";
 import { getCurrentPlan } from "@/features/billing/server";
-import { planOfProduct } from "@/features/billing/subscription";
-import { getBillingMode } from "@/features/billing/creem";
 import { ManagePlan } from "@/features/billing/components/manage-plan";
 import { getSubscriptionUsage } from "@/features/billing/usage";
 import { SubscriptionUsage } from "@/features/billing/components/subscription-usage";
@@ -26,9 +24,9 @@ const day = (iso: string) =>
 export default async function SubscriptionSettings({
   searchParams,
 }: {
-  searchParams: Promise<{ billing?: string; plan?: string }>;
+  searchParams: Promise<{ billing?: string }>;
 }) {
-  const { billing, plan: chosen } = await searchParams;
+  const { billing } = await searchParams;
   const user = await requireUser();
   const [plan, usage] = await Promise.all([
     getCurrentPlan(user.id),
@@ -77,12 +75,7 @@ export default async function SubscriptionSettings({
       </Card>
       <SubscriptionUsage plan={plan.name} usage={usage} />
       {plan.name !== "Free" && (
-        <ManagePlan
-          billingMode={getBillingMode()}
-          plan={plan}
-          periodEnd={periodEnd && day(periodEnd)}
-          chosen={chosen && planOfProduct(chosen) ? chosen : undefined}
-        />
+        <ManagePlan plan={plan} periodEnd={periodEnd && day(periodEnd)} />
       )}
       <Card className="mt-6">
         <SectionTitle>Your member perks</SectionTitle>

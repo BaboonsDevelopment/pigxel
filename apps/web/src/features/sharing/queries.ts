@@ -20,7 +20,7 @@ import {
 import type { LinkAccess, ProjectSharing, ShareRole } from "./sharing";
 import { showSuccess } from "@/components/ui/snackbar";
 
-export const sharingKey = (tileId: string) => ["sharing", tileId] as const;
+const sharingKey = (tileId: string) => ["sharing", tileId] as const;
 
 export function useProjectAccess(tileId: string | null) {
   return useQuery({

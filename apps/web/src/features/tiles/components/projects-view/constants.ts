@@ -43,11 +43,6 @@ export const NO_PROJECT_FILTERS: ProjectFilters = {
   published: "any",
 };
 
-export function filtersKey(filters: ProjectFilters, query = "") {
-  const { size, animated, storage, label, published } = filters;
-  return JSON.stringify([size, animated, storage, label, published, query]);
-}
-
 export const PROJECT_SORTS = [
   { value: "edited", label: "Last edited" },
   { value: "oldest", label: "Oldest edited" },

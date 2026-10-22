@@ -43,5 +43,3 @@ export const OPS = [
   },
   { syntax: "clear", doc: "erase everything in the area" },
 ] as const;
-
-export const REDRAW_KEEP_DISTANCE = 48;

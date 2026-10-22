@@ -20,7 +20,7 @@ export const PIG_COLORS = {
 /** Where the cursor is: a pixel of the art, or a control in the dock. */
 export type Target = { cell: [number, number] } | { ui: string };
 
-export type Waypoint = {
+type Waypoint = {
   at: number;
   target: Target;
   /** "glide" eases in and out like a hand moving; "line" is a steady stroke. */
@@ -39,7 +39,7 @@ export type Action =
   | { at: number; type: "color"; color: string }
   | { at: number; type: "press"; target: Target };
 
-export type DrawScript = {
+type DrawScript = {
   waypoints: Waypoint[];
   actions: Action[];
   duration: number;
@@ -52,7 +52,7 @@ const DOCK = 220;
 const PRESS = 140;
 const FILL_RING = 26;
 
-export const cellOf = (x: number, y: number) => y * SIZE + x;
+const cellOf = (x: number, y: number) => y * SIZE + x;
 export const mirrorOf = (cell: number) =>
   Math.floor(cell / SIZE) * SIZE + (SIZE - 1 - (cell % SIZE));
 

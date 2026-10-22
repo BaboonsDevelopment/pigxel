@@ -18,7 +18,7 @@ const PRODUCTION_KEY = ["asset-review", "production"];
 const REPORTS_KEY = ["asset-review", "reports"];
 const PUBLISH_KEY = ["asset-review", "publish"];
 
-export type PublishStatus = {
+type PublishStatus = {
   running: boolean;
   phase: "idle" | "building" | "importing" | "done" | "error";
   completed: number;
@@ -76,7 +76,7 @@ export function usePublishStatus() {
   });
 }
 
-export type PackDetails = {
+type PackDetails = {
   name?: string;
   description?: string | null;
   background?: string | null;
@@ -162,16 +162,18 @@ export function useReviewActions() {
     review: async (key: string, status: ReviewStatus, note: string) => {
       await call("/review", "POST", { key, status, note });
       await client.cancelQueries({ queryKey: SNAPSHOT_KEY, exact: true });
-      client.setQueryData<ReviewSnapshot>(SNAPSHOT_KEY, (snapshot) =>
-        snapshot && {
-          ...snapshot,
-          blocks: snapshot.blocks.map((block) => ({
-            ...block,
-            tiles: block.tiles.map((tile) =>
-              tile.key === key ? { ...tile, state: status, note } : tile,
-            ),
-          })),
-        },
+      client.setQueryData<ReviewSnapshot>(
+        SNAPSHOT_KEY,
+        (snapshot) =>
+          snapshot && {
+            ...snapshot,
+            blocks: snapshot.blocks.map((block) => ({
+              ...block,
+              tiles: block.tiles.map((tile) =>
+                tile.key === key ? { ...tile, state: status, note } : tile,
+              ),
+            })),
+          },
       );
     },
     renameBlock: after((id: string, name: string) =>
@@ -183,14 +185,16 @@ export function useReviewActions() {
     reject: async (key: string) => {
       await call("/reject", "POST", { key });
       await client.cancelQueries({ queryKey: SNAPSHOT_KEY, exact: true });
-      client.setQueryData<ReviewSnapshot>(SNAPSHOT_KEY, (snapshot) =>
-        snapshot && {
-          ...snapshot,
-          blocks: snapshot.blocks.map((block) => ({
-            ...block,
-            tiles: block.tiles.filter((tile) => tile.key !== key),
-          })),
-        },
+      client.setQueryData<ReviewSnapshot>(
+        SNAPSHOT_KEY,
+        (snapshot) =>
+          snapshot && {
+            ...snapshot,
+            blocks: snapshot.blocks.map((block) => ({
+              ...block,
+              tiles: block.tiles.filter((tile) => tile.key !== key),
+            })),
+          },
       );
     },
     setBlockBackground: after((id: string, background: string | null) =>
@@ -207,7 +211,8 @@ export function useReviewActions() {
         "/publish",
         "POST",
       );
-      if (result.inProgress) return "Publish is already running. Progress is shown above.";
+      if (result.inProgress)
+        return "Publish is already running. Progress is shown above.";
       void client.invalidateQueries({ queryKey: SNAPSHOT_KEY });
       return result.output ?? "Publish complete.";
     },

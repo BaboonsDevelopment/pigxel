@@ -118,7 +118,7 @@ describe("checkout", () => {
 
   it("offers a plan change to subscribers instead of a second subscription", async () => {
     await expect(startCheckout(starter!.productId.month)).rejects.toThrow(
-      `REDIRECT:/settings/subscription?plan=${starter!.productId.month}`,
+      "REDIRECT:/pricing",
     );
     expect(mocks.checkout).not.toHaveBeenCalled();
   });

@@ -21,6 +21,7 @@ import {
 } from "../pricing";
 import { loginUrl } from "@/lib/auth/routes";
 import { startCheckout } from "../actions";
+import { ChangePlanDialog } from "./change-plan-dialog";
 import { CREATOR_CONTACT, creatorEmailHref } from "../creator-contact";
 import { formatMoney, planOfProduct } from "../subscription";
 import { annualComparison } from "../pricing-comparison";
@@ -91,6 +92,8 @@ export function PricingPlans({
   const tier = TIERS[level]!;
   const productId = productIdFor(tier, cycle, billingMode);
   const artistProductId = productIdFor(ARTIST_PLAN, cycle, billingMode);
+  /** The plan a subscriber is confirming a switch to. */
+  const [changing, setChanging] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col">
@@ -176,12 +179,13 @@ export function PricingPlans({
                 <CheckIcon /> Your plan
               </Button>
             ) : currentProductId ? (
-              <Link
-                href={`/settings/subscription?plan=${artistProductId}`}
+              <button
+                type="button"
+                onClick={() => setChanging(artistProductId)}
                 className={BUTTON_SOFT}
               >
                 Change plan
-              </Link>
+              </button>
             ) : signedIn ? (
               <form action={startCheckout.bind(null, artistProductId)}>
                 <SubscribeButton
@@ -213,12 +217,13 @@ export function PricingPlans({
                 Your plan
               </Button>
             ) : currentProductId ? (
-              <Link
-                href={`/settings/subscription?plan=${productId}`}
+              <button
+                type="button"
+                onClick={() => setChanging(productId)}
                 className={BUTTON}
               >
                 Change plan
-              </Link>
+              </button>
             ) : signedIn ? (
               <form action={startCheckout.bind(null, productId)}>
                 <SubscribeButton
@@ -242,6 +247,12 @@ export function PricingPlans({
           features={CREATOR_PLAN.features}
         />
       </ul>
+      {changing && (
+        <ChangePlanDialog
+          productId={changing}
+          onClose={() => setChanging(null)}
+        />
+      )}
     </div>
   );
 }

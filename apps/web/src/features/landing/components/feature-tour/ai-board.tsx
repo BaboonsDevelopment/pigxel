@@ -6,7 +6,7 @@ import gardenNight from "../../../../../public/art/feature/garden-night.png";
 import { SendIcon, SparklesIcon } from "./icons";
 import styles from "./feature-tour.module.css";
 
-export const PROMPT = "Make it night, with fireflies";
+const PROMPT = "Make it night, with fireflies";
 
 /** When the redraw starts and how long it takes, in ms from the start. */
 const REDRAW_AT = 3300;

@@ -11,7 +11,7 @@ const SIZES: { value: GridSize; label: string; cells: number }[] = [
   { value: "small", label: "Small cards", cells: 4 },
 ];
 
-export const isGridSize = (value: unknown): value is GridSize =>
+const isGridSize = (value: unknown): value is GridSize =>
   SIZES.some((size) => size.value === value);
 
 /** A square of n×n cells, the size option's icon. */

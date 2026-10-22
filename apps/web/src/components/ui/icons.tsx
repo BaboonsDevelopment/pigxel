@@ -93,13 +93,6 @@ export const BellIcon = () => (
   </Icon>
 );
 
-export const UserIcon = () => (
-  <Icon className="size-4 shrink-0">
-    <circle cx="12" cy="8.5" r="3.5" />
-    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
-  </Icon>
-);
-
 export const SettingsIcon = () => (
   <Icon className="size-4 shrink-0">
     <circle cx="12" cy="12" r="3" />

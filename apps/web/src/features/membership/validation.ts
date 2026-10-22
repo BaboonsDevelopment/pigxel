@@ -7,7 +7,7 @@ import {
 export type PerkState = { error?: string; message?: string };
 export const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const formText = (form: FormData, name: string) => {
+const formText = (form: FormData, name: string) => {
   const value = form.get(name);
   return typeof value === "string" ? value.trim() : "";
 };

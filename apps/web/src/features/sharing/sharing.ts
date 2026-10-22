@@ -52,6 +52,6 @@ export type SharedProject = {
   owner: string | null;
 };
 
-export const SHARE_PATH = "/share";
+const SHARE_PATH = "/share";
 
 export const shareLinkPath = (token: string) => `${SHARE_PATH}/${token}`;
