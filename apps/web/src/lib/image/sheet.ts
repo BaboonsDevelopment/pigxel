@@ -9,8 +9,15 @@ import {
 import { decodeImage } from "./decode";
 import { imageToSprite } from "./quantize";
 import { cutOutBackground } from "./steps/cut-out-background";
+import { cutSheetBackground } from "./steps/cut-sheet-background";
+import { removeSheetDividers } from "./steps/remove-sheet-dividers";
+import { separateTouchingPoses } from "./steps/separate-touching-poses";
 import { recoverPixelGrid } from "./steps/recover-pixel-grid";
 import { paletteSize } from "./steps/shrink-to-tile";
+import {
+  registerAnimationFrames,
+  type AnimationAnchor,
+} from "./register-animation";
 
 type Grid = { cols: number; rows: number };
 
@@ -207,22 +214,180 @@ export function sheetCells(
   });
 }
 
+/** Assign whole silhouettes before cutting; an uneven gutter must never bisect a pose. */
+export function animationCells(
+  image: Bitmap,
+  grid: Grid,
+  count: number,
+): (Bitmap | null)[] {
+  const parts = components(image.rgba, image.w, image.h);
+  const expected = animationGridCells(image, parts, grid, count);
+  if (expected.every(Boolean)) return expected;
+  // Image models sometimes transpose the requested grid. Recover whole figures
+  // in reading order without another paid generation or a rigid crop fallback.
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    if (cols === grid.cols && rows === grid.rows) continue;
+    const recovered = animationGridCells(image, parts, { cols, rows }, count);
+    if (recovered.every(Boolean)) return recovered;
+  }
+  // Two sprites can touch at a single diagonal corner. Eight-neighbour object
+  // detection joins them, although neither silhouette needs to be cropped.
+  const separated = components(image.rgba, image.w, image.h, 4);
+  if (separated.length > parts.length) {
+    const grids = [
+      grid,
+      ...Array.from({ length: count }, (_, i) => ({
+        cols: i + 1,
+        rows: Math.ceil(count / (i + 1)),
+      })),
+    ];
+    for (const candidate of grids) {
+      const recovered = animationGridCells(image, separated, candidate, count);
+      if (recovered.every(Boolean)) return recovered;
+    }
+  }
+  // Wide outer margins and uneven row/column spacing need silhouette detection,
+  // not more guesses at equal cells. Keep the existing pose finder as a safe
+  // fallback and register the extracted poses together at the final resolution.
+  const detected = splitSheet(image, grid, count);
+  const sizes = detected.map(
+    (p) =>
+      p &&
+      components(p.rgba, p.w, p.h).reduce(
+        (n, c) => Math.max(n, c.members.length),
+        0,
+      ),
+  );
+  const largest = Math.max(0, ...sizes.map((n) => n ?? 0));
+  if (
+    detected.length === count &&
+    sizes.every((n) => n && n >= Math.max(MIN_PART, largest * 0.08))
+  )
+    return detected;
+  const separatedBodies = separateTouchingPoses(image, grid, count);
+  if (separatedBodies) {
+    const recovered = animationGridCells(image, separatedBodies, grid, count);
+    if (recovered.every(Boolean)) return recovered;
+  }
+  return expected;
+}
+
+function animationGridCells(
+  image: Bitmap,
+  parts: Component[],
+  grid: Grid,
+  count: number,
+): (Bitmap | null)[] {
+  const largestFigure = parts.reduce(
+    (n, p) => Math.max(n, p.members.length),
+    0,
+  );
+  const groups = byGrid(image, parts, grid, count).map((parts) => {
+    const largest = Math.max(0, ...parts.map((p) => p.members.length));
+    return parts.filter(
+      (p) =>
+        p.members.length > Math.max(2, largest * 0.005) ||
+        !(
+          p.box.x === 0 ||
+          p.box.y === 0 ||
+          p.box.x + p.box.w === image.w ||
+          p.box.y + p.box.h === image.h
+        ),
+    );
+  });
+  const cellW = Math.ceil(image.w / grid.cols),
+    cellH = Math.ceil(image.h / grid.rows);
+  const origins = groups.map((_, i) => ({
+    x: Math.round(((i % grid.cols) * image.w) / grid.cols),
+    y: Math.round((Math.floor(i / grid.cols) * image.h) / grid.rows),
+  }));
+  let left = 0,
+    top = 0,
+    right = cellW,
+    bottom = cellH;
+  for (const [i, parts] of groups.entries())
+    for (const part of parts) {
+      left = Math.min(left, part.box.x - origins[i]!.x);
+      top = Math.min(top, part.box.y - origins[i]!.y);
+      right = Math.max(right, part.box.x + part.box.w - origins[i]!.x);
+      bottom = Math.max(bottom, part.box.y + part.box.h - origins[i]!.y);
+    }
+  return groups.map((parts, i) => {
+    const main = [...parts].sort(
+      (a, b) => b.members.length - a.members.length,
+    )[0];
+    // Joined neighbouring figures and nearly empty cells need regeneration, not fabricated frames.
+    if (
+      !main ||
+      main.members.length < Math.max(MIN_PART, largestFigure * 0.08) ||
+      main.box.w > cellW * 1.5 ||
+      main.box.h > cellH * 1.5
+    )
+      return null;
+    const out = blank(right - left, bottom - top);
+    for (const part of parts)
+      for (const p of part.members) {
+        const x = (p % image.w) - origins[i]!.x - left;
+        const y = Math.floor(p / image.w) - origins[i]!.y - top;
+        out.rgba.set(
+          image.rgba.subarray(p * 4, p * 4 + 4),
+          (y * out.w + x) * 4,
+        );
+      }
+    return out;
+  });
+}
+
 export async function sheetToFrames(
   source: Blob,
   grid: Grid,
   count: number,
   box: Size,
-  by: "poses" | "cells" = "poses",
+  by: "poses" | "cells" | "animation" = "poses",
   keepBackground = false,
+  anchor: AnimationAnchor = "ground",
 ): Promise<(Bitmap | null)[]> {
   const target = Math.max(box.w * grid.cols, box.h * grid.rows);
   const decoded = await decodeImage(source, target);
+  return bitmapToFrames(decoded, grid, count, box, by, keepBackground, anchor);
+}
+
+/** Shared browser/server conversion so validation and the delivered frames agree. */
+export function bitmapToFrames(
+  decoded: Bitmap,
+  grid: Grid,
+  count: number,
+  box: Size,
+  by: "poses" | "cells" | "animation" = "poses",
+  keepBackground = false,
+  anchor: AnimationAnchor = "ground",
+): (Bitmap | null)[] {
   const keyed = keepBackground ? decoded : cutOutBackground(decoded);
   // Grid inference can shift cell boundaries; animation cells use the supplied grid.
-  const sheet = by === "cells" ? keyed : recoverPixelGrid(keyed);
-  const parts =
-    by === "cells"
-      ? sheetCells(sheet, grid, count)
-      : splitSheet(sheet, grid, count);
-  return posesToFrames(parts, box, by === "cells");
+  const sheet =
+    by === "animation" && !keepBackground
+      ? removeSheetDividers(keyed, grid, count)
+      : by !== "poses"
+        ? keyed
+        : recoverPixelGrid(keyed);
+  let parts =
+    by === "animation" && !keepBackground
+      ? animationCells(sheet, grid, count)
+      : by !== "poses"
+        ? sheetCells(sheet, grid, count)
+        : splitSheet(sheet, grid, count);
+  if (by === "animation" && !keepBackground && parts.some((p) => !p)) {
+    const recovered = cutSheetBackground(decoded);
+    if (recovered)
+      parts = animationCells(
+        removeSheetDividers(cutOutBackground(recovered), grid, count),
+        grid,
+        count,
+      );
+  }
+  const frames = posesToFrames(parts, box, by !== "poses");
+  return by === "animation" && !keepBackground
+    ? registerAnimationFrames(frames, anchor)
+    : frames;
 }

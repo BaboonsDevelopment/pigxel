@@ -38,6 +38,67 @@ beforeEach(() => {
 });
 
 describe("Gemini provider", () => {
+  it("sends attached reference pixels to the router rather than a text-only attachment note", async () => {
+    let body: unknown;
+    server.use(
+      http.post(endpoint("model-a"), async ({ request }) => {
+        body = await request.json();
+        return answer({
+          ...catRoute,
+          intent: "edit",
+          subject: "match the reference's three-quarter pose",
+          style: "very cute rounded pixel art",
+        });
+      }),
+    );
+    await ai.route([
+      {
+        role: "user",
+        content: "match this pose exactly",
+        references: ["data:image/png;base64,YWJj"],
+      },
+    ]);
+    expect(body).toMatchObject({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "match this pose exactly" },
+            { inlineData: { mimeType: "image/png", data: "YWJj" } },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("shows the edit planner both the current drawing and the user's reference, in order", async () => {
+    let body: unknown;
+    server.use(
+      http.post(endpoint("model-a"), async ({ request }) => {
+        body = await request.json();
+        return answer({
+          instruction: "match reference",
+          target: { x: 0, y: 0, w: 64, h: 64 },
+        });
+      }),
+    );
+    await ai.plan("match the reference", [
+      { mimeType: "image/png", base64: "current" },
+      { mimeType: "image/png", base64: "user-reference" },
+    ]);
+    expect(body).toMatchObject({
+      contents: [
+        {
+          parts: [
+            { text: "match the reference" },
+            { inlineData: { data: "current" } },
+            { inlineData: { data: "user-reference" } },
+          ],
+        },
+      ],
+    });
+  });
+
   it("asks the first model with the API key and reads its JSON reply", async () => {
     const requests: Request[] = [];
     server.use(

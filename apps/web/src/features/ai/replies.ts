@@ -2,7 +2,6 @@ import { MAX_SET_ITEMS } from "./constants";
 import { AiError } from "./errors";
 import type {
   AnimationReply,
-  EditReply,
   EditReview,
   PlacementReply,
   PlanReply,
@@ -81,15 +80,6 @@ export function readPlacement(text: string): PlacementReply {
   };
 }
 
-export function readEdit(text: string): EditReply {
-  const reply = parseJson<EditReply>(text);
-  if (!Array.isArray(reply?.ops)) throw unusable("edit");
-  return {
-    summary: reply.summary ?? "",
-    ops: reply.ops.filter((o) => typeof o === "string"),
-  };
-}
-
 export function readRect(text: string): Rect {
   const { x, y, w, h } = parseJson<Rect>(text) ?? {};
   if (x === undefined || y === undefined || !w || !h) throw unusable("area");
@@ -100,7 +90,6 @@ export function readPlan(text: string): PlanReply {
   const reply = parseJson<PlanReply>(text);
   if (!reply?.instruction || !reply.target) throw unusable("plan");
   return {
-    mode: reply.mode === "ops" || reply.mode === "move" ? reply.mode : "redraw",
     objects: (reply.objects ?? []).filter(Number.isInteger),
     keep: (reply.keep ?? []).filter(Number.isInteger),
     target: reply.target,

@@ -114,11 +114,24 @@ export function failed(error: unknown) {
 
 async function production() {
   const supabase = createAdminClient();
-  const [assets, blocks] = await Promise.all([
-    supabase
-      .from("assets")
-      .select("id, updated_at")
-      .returns<{ id: string; updated_at: string | null }[]>(),
+  const pageSize = 500;
+  const [publishedAt, blocks] = await Promise.all([
+    (async () => {
+      const publishedAt = new Map<string, string | null>();
+      for (let offset = 0; ; offset += pageSize) {
+        const page = await supabase
+          .from("assets")
+          .select("id, updated_at")
+          .order("id")
+          .range(offset, offset + pageSize - 1)
+          .returns<{ id: string; updated_at: string | null }[]>();
+        if (page.error)
+          throw new ReviewError(`Couldn’t read production: ${page.error.message}`, 503);
+        for (const row of page.data ?? []) publishedAt.set(row.id, row.updated_at);
+        if ((page.data?.length ?? 0) < pageSize) break;
+      }
+      return publishedAt;
+    })(),
     supabase
       .from("asset_packs")
       .select("id, name, background")
@@ -126,10 +139,10 @@ async function production() {
       .order("name")
       .returns<ReviewTarget[]>(),
   ]);
-  const error = assets.error ?? blocks.error;
-  if (error) throw new Error(`Couldn’t read production: ${error.message}`);
+  if (blocks.error)
+    throw new ReviewError(`Couldn’t read production: ${blocks.error.message}`, 503);
   return {
-    publishedAt: new Map(assets.data!.map((row) => [row.id, row.updated_at])),
+    publishedAt,
     blocks: blocks.data!,
   };
 }
@@ -163,14 +176,9 @@ function tileOf(
 }
 
 export async function reviewSnapshot(): Promise<ReviewSnapshot> {
-  let publishedAt = new Map<string, string | null>();
-  let targets: ReviewTarget[] = [];
-  let productionError: string | null = null;
-  try {
-    ({ publishedAt, blocks: targets } = await production());
-  } catch (e) {
-    productionError = e instanceof Error ? e.message : String(e);
-  }
+  // An incomplete production read must never turn published art into new work.
+  // Reject the refresh so the client keeps its last successful snapshot.
+  const { publishedAt, blocks: targets } = await production();
   const reviews = readReviews(REVIEW_FILE);
   const blocks = localPacks().map((pack) => ({
     id: pack.id,
@@ -193,7 +201,7 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
       })
       .map((source) => tileOf(pack, source, reviews[source.key])),
   }));
-  return { blocks, targets, productionError };
+  return { blocks, targets, productionError: null };
 }
 
 function findPack(id: unknown) {

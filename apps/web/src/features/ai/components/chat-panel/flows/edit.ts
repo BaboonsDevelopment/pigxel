@@ -1,14 +1,7 @@
 import type { Area } from "@/features/editor/pixel-canvas/constants";
-import {
-  editTile,
-  planEdit,
-  redrawArea,
-  redrawFrames,
-  reviewEdit,
-} from "../../../actions";
+import { planEdit, redrawArea, redrawFrames } from "../../../actions";
 import { sheetLayout } from "../../../helpers";
 import type { EditPlan, TileAction } from "../../../types";
-import { encodeTile } from "@/lib/edit/codec";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
@@ -21,20 +14,27 @@ import {
   UNREACHABLE,
   type Chat,
 } from "../constants";
-import {
-  applyEdit,
-  applyRedraw,
-  follow,
-  moveObject,
-  replaceObject,
-  samePixels,
-} from "../helpers";
-import { framesSheet, toArt } from "./pictures";
-import { checkEdit } from "./review";
+import { applyRedraw, follow, replaceObject, samePixels } from "../helpers";
+import { framesSheet, toArt, toReference } from "./pictures";
 
 type Cels = Map<string, Uint8ClampedArray>;
 
 type Step = { frame: string; source: Area; target: Area; keep: Area[] };
+
+const covers = (outer: Area, inner: Area) =>
+  inner.x >= outer.x &&
+  inner.y >= outer.y &&
+  inner.x + inner.w <= outer.x + outer.w &&
+  inner.y + inner.h <= outer.y + outer.h;
+
+async function originalOf(chat: Chat, layerId: string): Promise<string> {
+  const image = [...chat.messages]
+    .reverse()
+    .find((m) => m.layer === layerId)?.image;
+  if (!image) return "";
+  const blob = await (await fetch(image)).blob();
+  return (await toReference(blob).catch(() => null)) ?? "";
+}
 
 export async function edit(chat: Chat, action: TileAction) {
   const { canvas } = chat;
@@ -58,14 +58,16 @@ export async function edit(chat: Chat, action: TileAction) {
     layers: objects.map((o) => names.get(o.layerId) ?? ""),
     drawn: unionOf(layers.flatMap((l) => (l.box ? [l.box] : []))) ?? tile,
     selection,
+    references: chat.references,
+    style: action.style,
   }).catch(() => UNREACHABLE);
   chat.setPending(false);
   if (!plan.ok) return chat.setError(plan.error);
 
   const layerId =
     objects[plan.value.objects[0] ?? -1]?.layerId ?? canvas.activeLayer();
-  if (!layers.find((l) => l.id === layerId)?.editable)
-    return chat.say(NO_LAYER);
+  const layer = layers.find((l) => l.id === layerId);
+  if (!layer?.editable) return chat.say(NO_LAYER);
 
   const { source } = plan.value;
   let target = plan.value.target;
@@ -90,108 +92,41 @@ export async function edit(chat: Chat, action: TileAction) {
       keep: [],
     };
   });
-
-  const done = ({ cels, image, fixed }: Made) => {
-    if (!cels) return false;
-    const same = [...cels].every(([frame, cel]) =>
-      samePixels(cel, canvas.readCel(layerId, frame)),
-    );
-    if (same) {
-      chat.say(
-        "Nothing on the tile changed. Try saying exactly what to change.",
-      );
-      return false;
-    }
-    canvas.writeCels(layerId, cels);
-    const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
-    const content =
-      (plan.value.summary || "Done.") +
-      many +
-      (fixed ? `\nChecked and fixed: ${fixed}` : "");
-    chat.append({ role: "assistant", content, image });
-    return true;
-  };
-
-  const make = async (instruction: string): Promise<Made> => {
-    const edit = { ...plan.value, instruction };
-    if (edit.mode === "ops")
-      return { cels: await editPixels(chat, layerId, edit, steps) };
-    if (edit.mode === "move") return { cels: move(chat, layerId, steps) };
-    return (await redraw(chat, layerId, edit, steps)) ?? { cels: null };
-  };
+  const whole = !!layer.box && covers(source, layer.box);
 
   const run = async () => {
     chat.setPending(true);
     try {
-      let made = await make(plan.value.instruction);
-      if (!made.cels) return false;
-      const step = steps.find((s) => s.frame === current) ?? steps[0]!;
-      const check = async (candidate: Made, instruction: string) => {
-        if (plan.value.mode === "move") return null;
-        if (steps.length > 1) {
-          const box = unionOf(steps.flatMap((s) => [s.source, s.target]))!;
-          const layout = sheetLayout(steps.length, box.w, box.h);
-          const result = await reviewEdit({
-            request: `${action.request}. These are animation sheets in reading order; preserve every frame's pose, direction and order.`,
-            instruction,
-            before: framesSheet(
-              steps.map((s) => canvas.readCel(layerId, s.frame)),
-              size,
-              box,
-              layout,
-            ),
-            after: framesSheet(
-              steps.map((s) => candidate.cels!.get(s.frame)!),
-              size,
-              box,
-              layout,
-            ),
-          }).catch(() => UNREACHABLE);
-          if (!result.ok) throw new Error(result.error);
-          return result.value.ok ? null : result.value;
-        }
-        return checkEdit(chat, {
-          request: action.request,
-          instruction,
-          layerId,
-          frame: step.frame,
-          source: step.source,
-          target: step.target,
-          after: candidate.cels!.get(step.frame)!,
-        });
-      };
-      const review = await check(made, plan.value.instruction);
-      if (review) {
-        const instruction = review.instruction || plan.value.instruction;
-        const remade = await make(instruction);
-        if (!remade.cels) return false;
-        const stillWrong = await check(remade, instruction);
-        if (stillWrong) {
-          chat.setError(
-            `${stillWrong.problem || "The edit did not pass the quality check."} The original drawing was kept.`,
-          );
-          return false;
-        }
-        made = { ...remade, fixed: review.problem };
-      }
-      return done(made);
-    } catch (error) {
-      chat.setError(
-        error instanceof Error
-          ? error.message
-          : "Couldn’t check the edit. The original drawing was kept.",
+      const original = whole ? await originalOf(chat, layerId) : "";
+      const made = await redraw(chat, layerId, plan.value, steps, original);
+      if (!made) return false;
+      const same = [...made.cels].every(([frame, cel]) =>
+        samePixels(cel, canvas.readCel(layerId, frame)),
       );
+      if (same) {
+        chat.say(
+          "Nothing on the tile changed. Try saying exactly what to change.",
+        );
+        return false;
+      }
+      canvas.writeCels(layerId, made.cels);
+      const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
+      chat.append({
+        role: "assistant",
+        content: (plan.value.summary || "Done.") + many,
+        image: made.image,
+        ...(whole && steps.length === 1 && { layer: layerId }),
+      });
+      return true;
+    } catch {
+      chat.setError("Couldn’t redraw the picture. Try again.");
       return false;
     } finally {
       chat.setPending(false);
     }
   };
 
-  if (
-    plan.value.mode === "redraw" &&
-    steps.length > 1 &&
-    !redrawnTogether(steps)
-  ) {
+  if (steps.length > 1 && !redrawnTogether(steps)) {
     chat.append({
       role: "assistant",
       content: `This changes ${steps.length} frames of the layer "${names.get(layerId)}", one picture each.`,
@@ -205,61 +140,6 @@ export async function edit(chat: Chat, action: TileAction) {
   await run();
 }
 
-type Made = { cels: Cels | null; image?: string; fixed?: string };
-
-async function editPixels(
-  chat: Chat,
-  layerId: string,
-  plan: EditPlan,
-  steps: Step[],
-): Promise<Cels | null> {
-  const { canvas } = chat;
-  const size = canvas.size();
-  const cels: Cels = new Map();
-  let applied = 0;
-  for (const step of steps) {
-    const cel = canvas.readCel(layerId, step.frame);
-    const grid = encodeTile(cel, size.w, size.h, step.source);
-    const result = await editTile(plan.instruction, grid.text).catch(
-      () => UNREACHABLE,
-    );
-    if (!result.ok) {
-      chat.setError(result.error);
-      return null;
-    }
-    const edited = applyEdit(
-      cel,
-      size,
-      { ops: result.value.ops, palette: grid.palette },
-      step.source,
-      step.keep,
-    );
-    cels.set(step.frame, edited.cel);
-    applied += edited.applied;
-  }
-  if (!applied) {
-    chat.say("Nothing on the tile changed.");
-    return null;
-  }
-  return cels;
-}
-
-function move(chat: Chat, layerId: string, steps: Step[]): Cels {
-  const { canvas } = chat;
-  const size = canvas.size();
-  return new Map(
-    steps.map((step) => [
-      step.frame,
-      moveObject(
-        canvas.readCel(layerId, step.frame),
-        size,
-        step.source,
-        step.target,
-      ),
-    ]),
-  );
-}
-
 const redrawnTogether = (steps: Step[]) =>
   steps.length > 1 && steps.every((s) => sameRect(s.source, s.target));
 
@@ -268,11 +148,13 @@ async function redraw(
   layerId: string,
   plan: EditPlan,
   steps: Step[],
+  original: string,
 ): Promise<{ cels: Cels; image: string } | null> {
   if (redrawnTogether(steps))
-    return redrawFramesTogether(chat, layerId, plan, steps);
+    return redrawFramesTogether(chat, layerId, plan, steps, original);
   const { canvas } = chat;
   const size = canvas.size();
+  const current = canvas.frameId();
   const results = await Promise.all(
     steps.map((step) =>
       redrawArea(
@@ -281,6 +163,7 @@ async function redraw(
         step.target.w,
         step.target.h,
         chat.references,
+        step.frame === current ? original : "",
       ).catch(() => UNREACHABLE),
     ),
   );
@@ -311,6 +194,7 @@ async function redrawFramesTogether(
   layerId: string,
   plan: EditPlan,
   steps: Step[],
+  original: string,
 ): Promise<{ cels: Cels; image: string } | null> {
   const { canvas } = chat;
   const size = canvas.size();
@@ -327,6 +211,8 @@ async function redrawFramesTogether(
     count: steps.length,
     cellW: box.w,
     cellH: box.h,
+    references: chat.references,
+    original,
   }).catch(() => UNREACHABLE);
   if (!result.ok) {
     chat.setError(result.error);

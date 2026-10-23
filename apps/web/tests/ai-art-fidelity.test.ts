@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildImagePrompt,
+  buildRedrawReferences,
   buildSheetPrompt,
   buildSheetRedrawPrompt,
   clampAnimationPlan,
 } from "@/features/ai/helpers";
 import { readRoute } from "@/features/ai/replies";
+import { referencesForAction } from "@/features/ai/chat/references";
 import {
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
@@ -34,6 +36,58 @@ const alpha = (b: Bitmap, x: number, y: number) =>
   b.rgba[(y * b.w + x) * 4 + 3];
 
 describe("requested composition and style", () => {
+  it("does not impose RPG proportions or shading when matching an image without a named style", () => {
+    const prompt = buildImagePrompt(
+      "the corgi, identical to the attached example",
+      64,
+      64,
+      true,
+    );
+    expect(prompt).not.toContain("not cartoonish");
+    expect(prompt).not.toContain("not chibi");
+    expect(prompt).not.toContain("Rich hand-placed shading");
+    expect(prompt).toContain("pose, viewing angle, proportions");
+    expect(prompt).toContain(IMAGE_BACKGROUND_RULES[0]);
+  });
+  it("gives a newly requested pose and style priority over both previous renderings", () => {
+    const prompt = buildRedrawReferences("the current corgi", true, 1);
+    expect(prompt).toContain("lower priority than the latest request");
+    expect(prompt).toContain("overriding the current and original images");
+  });
+  it("keeps a reference for a follow-up edit but not an unrelated new subject", () => {
+    const messages = [
+      {
+        role: "user" as const,
+        content: "match this",
+        references: ["corgi-reference"],
+      },
+      { role: "assistant" as const, content: "done" },
+      { role: "user" as const, content: "use the same pose" },
+    ];
+    expect(
+      referencesForAction(messages, { kind: "edit", request: "same pose" }),
+    ).toEqual(["corgi-reference"]);
+    expect(
+      referencesForAction(messages, {
+        kind: "generate",
+        request: "a lighthouse",
+      }),
+    ).toEqual([]);
+    expect(
+      referencesForAction(
+        [
+          ...messages,
+          {
+            role: "user",
+            content: "a lighthouse",
+            action: { kind: "generate", request: "a lighthouse" },
+          },
+          { role: "user", content: "blue roof" },
+        ],
+        { kind: "edit", request: "blue roof" },
+      ),
+    ).toEqual([]);
+  });
   it("keeps the existing default sprite style and chroma-key background", () => {
     const prompt = buildImagePrompt("a fox", 64, 64);
     for (const rule of IMAGE_STYLE_RULES) expect(prompt).toContain(rule);

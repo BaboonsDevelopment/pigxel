@@ -59,9 +59,17 @@ describe("animation plan", () => {
     expect(mage!.poses).toHaveLength(3);
   });
   it("follows the frame count asked for and stays within limits", () => {
-    const plan = clampAnimationPlan(reply(), 64, 64, 0, 5);
+    const poses = [...sheet.poses, "the glow fades", "lowers the staff"];
+    const plan = clampAnimationPlan(
+      reply({ tracks: [{ ...sheet, poses }] }),
+      64,
+      64,
+      0,
+      5,
+    );
     expect(plan.frameCount).toBe(5);
-    expect(plan.tracks[0]).toMatchObject({ poses: [...sheet.poses, "", ""] });
+    expect(plan.tracks[0]).toMatchObject({ poses });
+    expect(clampAnimationPlan(reply(), 64, 64, 0, 5).tracks).toEqual([]);
     expect(
       clampAnimationPlan(reply({ frameCount: 99 }), 64, 64, 0, 0).frameCount,
     ).toBe(MAX_FRAMES);
