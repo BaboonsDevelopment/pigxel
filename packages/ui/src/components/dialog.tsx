@@ -46,6 +46,9 @@ export function Dialog({
   dismissible?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  // A drag that starts inside (e.g. selecting text) and ends on the backdrop
+  // still fires `click` on the dialog, so the press must start there too.
+  const pressedBackdrop = useRef(false);
   const titleId = useId();
 
   useEffect(() => {
@@ -63,8 +66,13 @@ export function Dialog({
         if (!dismissible) e.preventDefault();
         onCancel?.(e);
       }}
+      onPointerDown={(e) => {
+        pressedBackdrop.current = e.target === ref.current;
+      }}
       onClick={(e) => {
-        if (dismissible && e.target === ref.current) close();
+        const fromBackdrop = pressedBackdrop.current;
+        pressedBackdrop.current = false;
+        if (dismissible && fromBackdrop && e.target === ref.current) close();
       }}
       className={cn(
         "m-auto max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/40 open:flex",

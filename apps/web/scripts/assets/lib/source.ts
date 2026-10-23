@@ -385,6 +385,31 @@ function loadPack(dir: string, dirName: string): PackSource {
   };
 }
 
+/** Read one pack for review actions without parsing the entire catalog. */
+export function loadPackById(id: string, dir = PACKS_DIR): PackSource | null {
+  if (!ID.test(id)) return null;
+  const packDir = join(dir, id);
+  if (!existsSync(join(packDir, "pack.json"))) return null;
+  return loadPack(packDir, id);
+}
+
+/** Load a single listed asset for its preview without parsing other assets. */
+export function loadAssetById(
+  packId: string,
+  id: string,
+  dir = PACKS_DIR,
+): AssetSource | null {
+  if (!ID.test(packId) || !ID.test(id)) return null;
+  const packDir = join(dir, packId);
+  const packFile = join(packDir, "pack.json");
+  if (!existsSync(packFile) || !existsSync(join(packDir, `${id}.json`)))
+    return null;
+  const pack: unknown = JSON.parse(readAssetText(packFile));
+  if (!isObject(pack) || !Array.isArray(pack.assets) || !pack.assets.includes(id))
+    return null;
+  return loadAsset(packDir, packId, id);
+}
+
 /** Every pack under `dir`, with any problems found reading it. */
 export function loadPacks(dir = PACKS_DIR): PackSource[] {
   const packs = readdirSync(dir, { withFileTypes: true })

@@ -1,6 +1,6 @@
 import { clipToTile, type Slice } from "@/lib/slices/slices";
 
-export type Borders = {
+type Borders = {
   left: number;
   top: number;
   right: number;
@@ -14,8 +14,6 @@ export const ANCHORS: Anchor[] = [0, 0.5, 1].flatMap((y) =>
 );
 
 export const sameAnchor = (a: Anchor, b: Anchor) => a.x === b.x && a.y === b.y;
-
-export const NO_BORDERS: Borders = { left: 0, top: 0, right: 0, bottom: 0 };
 
 export function bordersFor(
   size: { w: number; h: number },

@@ -44,13 +44,16 @@ const failed = (what: string, error: unknown, detail = "") => {
   };
 };
 
-/** Sends the person to Creem's checkout for a plan, or to plan changes if they already pay. */
+/**
+ * Sends the person to Creem's checkout for a plan. People who already pay
+ * go back to Pricing, which changes their plan instead: a second checkout
+ * would start a second subscription.
+ */
 export async function startCheckout(productId: string) {
   const user = await requireUser();
   if (!planOfProduct(productId, getBillingMode())) redirect("/pricing");
   const plan = await getCurrentPlan(user.id);
-  if (plan.name !== "Free")
-    redirect(`${SUBSCRIPTION_PATH}?plan=${encodeURIComponent(productId)}`);
+  if (plan.name !== "Free") redirect("/pricing");
   let url: string | undefined;
   try {
     url = await creemApi.createCheckout({

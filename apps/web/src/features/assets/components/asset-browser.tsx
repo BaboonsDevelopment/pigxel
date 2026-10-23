@@ -21,8 +21,6 @@ import { AssetFiltersMenu, AssetFiltersToggle } from "./asset-filters-menu";
 export const ASSET_GRID =
   "grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 @min-[1480px]:grid-cols-7 @min-[1680px]:grid-cols-8";
 /** The same grid beside the filters sidebar, one column narrower. */
-export const ASSET_GRID_BESIDE_FILTERS =
-  "grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-5 @min-[1480px]:grid-cols-6 @min-[1680px]:grid-cols-7";
 const SEARCH_DELAY = 300;
 const PRELOAD = "1200px";
 
@@ -204,7 +202,7 @@ export function AssetToolbar({
 }
 
 /** Where each pack's cards draw their colour from. */
-export type PackLookup = ReadonlyMap<string, { pack: Pack; index: number }>;
+type PackLookup = ReadonlyMap<string, { pack: Pack; index: number }>;
 
 export function AssetCardItem({
   asset,

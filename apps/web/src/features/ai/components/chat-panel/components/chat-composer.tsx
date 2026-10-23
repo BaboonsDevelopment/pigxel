@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Button } from "@pigxel/ui/components/button";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Button, IconButton } from "@pigxel/ui/components/button";
 import { cn } from "@pigxel/ui/lib/utils";
 import { Checkbox } from "@pigxel/ui/components/choice";
 import { Textarea } from "@pigxel/ui/components/input";
@@ -35,7 +35,16 @@ export function ChatComposer({
   onStop,
 }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const [dragging, setDragging] = useState(false);
+
+  // Grow with the text, line by line; max-h caps it and then it scrolls.
+  useLayoutEffect(() => {
+    const el = textarea.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [draft]);
   const canSend = !pending && draft.trim().length > 0;
   const canAttach = references.length < MAX_REFERENCES;
 
@@ -111,30 +120,9 @@ export function ChatComposer({
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-2">
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => {
-            void attach([...(e.target.files ?? [])]);
-            e.target.value = "";
-          }}
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          size="lg"
-          title={`Attach pictures to draw from (up to ${MAX_REFERENCES})`}
-          disabled={!canAttach}
-          onClick={() => fileInput.current?.click()}
-          className="w-11 shrink-0 px-0 text-muted-foreground hover:text-foreground"
-        >
-          {ICONS.attach}
-        </Button>
+      <div className="rounded-xl border border-input bg-background transition-shadow focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
         <Textarea
+          ref={textarea}
           rows={1}
           aria-label="Message"
           autoFocus={autoFocus}
@@ -154,24 +142,72 @@ export function ChatComposer({
             e.preventDefault();
             void attach(files);
           }}
-          className="h-11 min-h-11 min-w-0 flex-1 resize-none py-2.5 text-sm"
+          className="block max-h-40 min-h-0 overflow-y-auto rounded-xl border-0 bg-transparent px-3 pt-2.5 pb-1 text-sm focus-visible:ring-0"
         />
-        {onStop ? (
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            title="Stop this request. Anything it hasn’t drawn yet won’t be added"
-            onClick={onStop}
-            className="shrink-0 px-4"
+        <div className="flex items-center justify-between px-1.5 pb-1.5">
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              void attach([...(e.target.files ?? [])]);
+              e.target.value = "";
+            }}
+          />
+          <IconButton
+            label={`Attach pictures to draw from (up to ${MAX_REFERENCES})`}
+            disabled={!canAttach}
+            onClick={() => fileInput.current?.click()}
+            className="disabled:pointer-events-none disabled:opacity-50"
           >
-            Stop
-          </Button>
-        ) : (
-          <Button size="lg" disabled={!canSend} className="shrink-0 px-4">
-            Send
-          </Button>
-        )}
+            {ICONS.attach}
+          </IconButton>
+          {onStop ? (
+            <IconButton
+              label="Stop this request. Anything it hasn’t drawn yet won’t be added"
+              variant="secondary"
+              round
+              onClick={onStop}
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16" className="size-3">
+                <rect
+                  x="3"
+                  y="3"
+                  width="10"
+                  height="10"
+                  rx="1.5"
+                  fill="currentColor"
+                />
+              </svg>
+            </IconButton>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send"
+              title="Send"
+              disabled={!canSend}
+              className="rounded-full"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="size-4"
+              >
+                <path
+                  d="M8 13V3M3.5 7.5 8 3l4.5 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
+          )}
+        </div>
       </div>
     </form>
   );

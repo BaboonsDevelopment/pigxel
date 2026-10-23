@@ -1867,6 +1867,10 @@ export function Editor({
             tab={prefs.tab}
             onTab={(tab) => setPrefs((p) => ({ ...p, tab }))}
             onClose={() => setPrefs((p) => ({ ...p, sidebar: false }))}
+            width={prefs.sidebarWidth}
+            onWidth={(sidebarWidth) =>
+              setPrefs((p) => ({ ...p, sidebarWidth }))
+            }
             content={sidebarContent}
           />
         )}

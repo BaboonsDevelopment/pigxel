@@ -2,7 +2,8 @@
  * How the editor is arranged. The layout itself is fixed: tools on the
  * left, the canvas with layers and timeline below it, and a sidebar on the
  * right. People choose only which tools show, whether the sidebar and the
- * timeline are open, which sidebar tab shows, and the timeline's height.
+ * timeline are open, which sidebar tab shows, the sidebar's width and the
+ * timeline's height.
  */
 export const SIDEBAR_TABS = ["palette", "tileset", "assistant"] as const;
 export type SidebarTab = (typeof SIDEBAR_TABS)[number];
@@ -14,6 +15,8 @@ export const SIDEBAR_LABELS: Record<SidebarTab, string> = {
 };
 
 export const TIMELINE_HEIGHT = { initial: 224, min: 96, max: 640 };
+/** The sidebar can't get narrower than the AI chat stays usable at. */
+export const SIDEBAR_WIDTH = { initial: 288, min: 288, max: 640 };
 
 export type EditorPrefs = {
   hiddenTools: string[];
@@ -21,6 +24,7 @@ export type EditorPrefs = {
   groupTools: Record<string, string>;
   sidebar: boolean;
   tab: SidebarTab;
+  sidebarWidth: number;
   timeline: boolean;
   timelineHeight: number;
 };
@@ -30,6 +34,7 @@ export const DEFAULT_PREFS: EditorPrefs = {
   groupTools: {},
   sidebar: true,
   tab: "palette",
+  sidebarWidth: SIDEBAR_WIDTH.initial,
   timeline: false,
   timelineHeight: TIMELINE_HEIGHT.initial,
 };
@@ -50,6 +55,7 @@ export function readPrefs(raw: unknown): EditorPrefs {
   ))
     if (typeof tool === "string") groupTools[group] = tool;
   const height = Number(v.timelineHeight);
+  const width = Number(v.sidebarWidth);
   return {
     hiddenTools: [...new Set(strings(v.hiddenTools))],
     groupTools,
@@ -57,6 +63,9 @@ export function readPrefs(raw: unknown): EditorPrefs {
     tab: SIDEBAR_TABS.includes(v.tab as SidebarTab)
       ? (v.tab as SidebarTab)
       : DEFAULT_PREFS.tab,
+    sidebarWidth: Number.isFinite(width)
+      ? Math.min(SIDEBAR_WIDTH.max, Math.max(SIDEBAR_WIDTH.min, width))
+      : DEFAULT_PREFS.sidebarWidth,
     timeline:
       typeof v.timeline === "boolean" ? v.timeline : DEFAULT_PREFS.timeline,
     timelineHeight: Number.isFinite(height)

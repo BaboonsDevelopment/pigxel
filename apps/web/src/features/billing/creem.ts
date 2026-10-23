@@ -18,7 +18,7 @@ export function creemHost(key: string) {
     : "https://api.creem.io";
 }
 
-export class CreemError extends Error {
+class CreemError extends Error {
   constructor(
     readonly status: number,
     message: string,
@@ -124,7 +124,7 @@ export const creemApi = {
   },
 };
 
-export type CreemCheckout = {
+type CreemCheckout = {
   id: string;
   status: string;
   mode: string;

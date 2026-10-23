@@ -1,15 +1,25 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { cn } from "@pigxel/ui/lib/utils";
-import { SIDEBAR_LABELS, type SidebarTab } from "../../editor-prefs";
+import {
+  SIDEBAR_LABELS,
+  SIDEBAR_WIDTH,
+  type SidebarTab,
+} from "../../editor-prefs";
+import { Splitter } from "../splitter";
 
-/** The right sidebar: one tab at a time, closed with the icon beside them. */
+/**
+ * The right sidebar: one tab at a time, closed with the icon beside them,
+ * at a width dragged from its left edge.
+ */
 export function EditorSidebar({
   tabs,
   tab,
   onTab,
   onClose,
+  width,
+  onWidth,
   content,
 }: {
   /** The tabs this file offers (Tileset only with a tilemap layer). */
@@ -17,14 +27,32 @@ export function EditorSidebar({
   tab: SidebarTab;
   onTab: (tab: SidebarTab) => void;
   onClose: () => void;
+  width: number;
+  onWidth: (width: number) => void;
   content: Record<SidebarTab, ReactNode>;
 }) {
   const shown = tabs.includes(tab) ? tab : tabs[0]!;
+  const start = useRef(width);
   return (
     <aside
       aria-label="Sidebar"
-      className="flex w-72 shrink-0 flex-col border-l bg-background"
+      className="relative flex shrink-0 flex-col border-l bg-background"
+      style={{ width }}
     >
+      <Splitter
+        axis="x"
+        onStart={() => {
+          start.current = width;
+          return (delta) =>
+            onWidth(
+              Math.min(
+                SIDEBAR_WIDTH.max,
+                Math.max(SIDEBAR_WIDTH.min, start.current - delta),
+              ),
+            );
+        }}
+        className="absolute inset-y-0 -left-1 z-10 w-2"
+      />
       <div className="flex h-11 shrink-0 items-center gap-1 border-b px-2">
         <div
           role="tablist"

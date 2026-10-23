@@ -12,7 +12,7 @@ import {
 } from "../filters";
 import { CANVAS_SIZES } from "@/features/explore/constants";
 
-export type GalleryDensity = "medium" | "small";
+type GalleryDensity = "medium" | "small";
 
 export function GalleryResultsBar({
   count,

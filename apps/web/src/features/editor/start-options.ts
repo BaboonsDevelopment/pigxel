@@ -5,7 +5,7 @@ import { MAX_TILE, MIN_TILE, type TileSize } from "@/lib/tilemap/tilemap";
  * Generate with AI prompt, or the tile size of a new tilemap. Kept per draft
  * in this tab's session storage, so nothing long ends up in the address bar.
  */
-export type StartOptions = { prompt?: string; tile?: TileSize };
+type StartOptions = { prompt?: string; tile?: TileSize };
 
 /** Longest prompt the AI helper reads (the moderation check's limit). */
 export const MAX_START_PROMPT = 4000;

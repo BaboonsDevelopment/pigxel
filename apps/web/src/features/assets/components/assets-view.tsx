@@ -48,6 +48,7 @@ export function AssetsView({
   recent,
   firstPage,
   openAsset,
+  premiumAccess,
 }: {
   tab: AssetTab;
   filters: AssetFilters;
@@ -57,6 +58,8 @@ export function AssetsView({
   recent: Asset[];
   firstPage: AssetPage | null;
   openAsset: Asset | null;
+  /** Can use premium packs: a paid plan, or an admin. */
+  premiumAccess: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState(initialTab);
@@ -269,6 +272,7 @@ export function AssetsView({
                       }
                       favourite={favourites.packs.has(pack.id)}
                       onFavourite={(on) => favourites.pack(pack.id, on)}
+                      premiumAccess={premiumAccess}
                     />
                   </li>
                 ))}

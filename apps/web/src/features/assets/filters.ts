@@ -186,12 +186,14 @@ export type PackFacts = {
   count: number;
   uses: number;
   createdAt: string;
+  pinnedAt: string | null;
 };
 
 /**
- * The packs the Packs tab shows for these filters, in order. Search matches
- * the name, id, description and tag names; filters about single assets
- * (sprite or tile) don't apply to packs.
+ * The packs the Packs tab shows for these filters, in order: pinned packs
+ * first, the most recently pinned leading, then the rest by the sort. Search
+ * matches the name, id, description and tag names; filters about single
+ * assets (sprite or tile) don't apply to packs.
  */
 export function filterPacks<Pack extends PackFacts>(
   packs: readonly Pack[],
@@ -222,13 +224,18 @@ export function filterPacks<Pack extends PackFacts>(
     ].some((text) => text.toLowerCase().includes(term));
   });
   const byName = (a: Pack, b: Pack) => a.name.localeCompare(b.name);
-  if (filters.sort === "az") return shown.sort(byName);
-  if (filters.sort === "za") return shown.sort((a, b) => byName(b, a));
-  if (filters.sort === "popular")
-    return shown.sort((a, b) => b.uses - a.uses || byName(a, b));
-  return shown.sort(
-    (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || byName(a, b),
-  );
+  const bySort =
+    filters.sort === "az"
+      ? byName
+      : filters.sort === "za"
+        ? (a: Pack, b: Pack) => byName(b, a)
+        : filters.sort === "popular"
+          ? (a: Pack, b: Pack) => b.uses - a.uses || byName(a, b)
+          : (a: Pack, b: Pack) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) || byName(a, b);
+  const pinned = (pack: Pack) =>
+    pack.pinnedAt ? Date.parse(pack.pinnedAt) : 0;
+  return shown.sort((a, b) => pinned(b) - pinned(a) || bySort(a, b));
 }
 
 /**

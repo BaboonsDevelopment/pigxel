@@ -39,6 +39,7 @@ export function NewProjectButton({
   userId,
   kind = "blank",
   aiAllowed,
+  folder,
   className,
   children,
 }: {
@@ -46,6 +47,8 @@ export function NewProjectButton({
   kind?: ProjectKind;
   /** Whether the plan includes AI; unknown makes the modal check. */
   aiAllowed?: boolean;
+  /** The folder a new project goes into. */
+  folder?: { id: string; name: string };
   className?: string;
   children: ReactNode;
 }) {
@@ -65,6 +68,7 @@ export function NewProjectButton({
         userId={userId}
         ai={kind === "ai"}
         aiAllowed={aiAllowed}
+        folder={folder}
         onClose={close}
       />
     );

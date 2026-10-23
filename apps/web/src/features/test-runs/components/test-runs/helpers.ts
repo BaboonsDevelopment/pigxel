@@ -44,7 +44,7 @@ export function suiteState(
   return last ? "crashed" : "never";
 }
 
-export type Failure = { file: string; test: TestCase | null; text: string };
+type Failure = { file: string; test: TestCase | null; text: string };
 
 /** Failed and flaky tests, plus files that broke before any test ran. */
 export function failuresOf(report: TestReport): Failure[] {

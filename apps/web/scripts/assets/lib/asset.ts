@@ -67,3 +67,14 @@ export const anim = (
   ms = 120,
   direction: Clip["direction"] = "forward",
 ): Clip => ({ name, kind: "animation", frames, ms, direction });
+
+/**
+ * A pack's name without a trailing size: "Pirate Crew · 64×64" and
+ * "Pirate Crew (32x32)" are "Pirate Crew". The Assets page shows sizes as a
+ * badge, so names never carry them.
+ */
+export function packName(name: string): string {
+  return name
+    .replace(/\s*(?:[·|,–—-]\s*)?\(?\s*\d+\s*(?:[x×]\s*\d+|px)\s*\)?\s*$/i, "")
+    .trim();
+}

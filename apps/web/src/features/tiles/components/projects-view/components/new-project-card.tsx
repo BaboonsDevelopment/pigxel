@@ -1,19 +1,22 @@
-import Link from "next/link";
 import { cn } from "@pigxel/ui/lib/utils";
+import { NewProjectButton } from "@/features/home/components/new-project-button";
 import { pixelifySans } from "@/lib/fonts/pixelify";
 
-export function NewProjectCard({ folderId }: { folderId?: string }) {
+export function NewProjectCard({
+  userId,
+  folder,
+}: {
+  userId: string;
+  folder?: { id: string; name: string };
+}) {
   return (
     <li>
-      <Link
-        href={
-          folderId
-            ? `/tiles/new?folder=${encodeURIComponent(folderId)}`
-            : "/tiles/new"
-        }
+      <NewProjectButton
+        userId={userId}
+        folder={folder}
         className={cn(
           pixelifySans.className,
-          "flex h-full min-h-40 items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-[#eba9c0] bg-background text-sm text-primary transition-colors hover:border-primary hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
+          "flex h-full min-h-40 w-full cursor-pointer items-center justify-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-[#eba9c0] bg-background text-sm text-primary transition-colors hover:border-primary hover:bg-pastel-pink-soft focus-visible:bg-pastel-pink-soft",
         )}
       >
         <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4">
@@ -25,7 +28,7 @@ export function NewProjectCard({ folderId }: { folderId?: string }) {
           />
         </svg>
         New project
-      </Link>
+      </NewProjectButton>
     </li>
   );
 }

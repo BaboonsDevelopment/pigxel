@@ -1,6 +1,6 @@
 import { MAX_PIGXEL_SIZE, type Background } from "@/lib/pigxel-file/format";
 
-export type NewTileDefaults = {
+type NewTileDefaults = {
   width: number;
   height: number;
   background: Background;

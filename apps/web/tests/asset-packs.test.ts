@@ -16,6 +16,8 @@ import { encodePng } from "../scripts/assets/lib/png";
 import { reviewState } from "../scripts/assets/lib/review";
 import {
   isPremium,
+  loadAssetById,
+  loadPackById,
   loadPacks,
   PACKS_DIR,
   parseAsset,
@@ -70,6 +72,19 @@ const rules = (json: unknown, pack = PACK) => {
 };
 
 describe("asset source", () => {
+  it("loads only listed art for a preview", () => {
+    const dir = mkdtempSync(join(tmpdir(), "pack-preview-"));
+    mkdirSync(join(dir, "kit"));
+    writeFileSync(join(dir, "kit", "pack.json"), JSON.stringify({ assets: ["blob"] }));
+    writeFileSync(join(dir, "kit", "blob.json"), JSON.stringify(asset()));
+    writeFileSync(join(dir, "kit", "hidden.json"), JSON.stringify(asset({ id: "hidden" })));
+    expect(loadAssetById("kit", "blob", dir)?.def?.name).toBe("Blob");
+    expect(loadPackById("kit", dir)?.assets.map((item) => item.id)).toContain("blob");
+    expect(loadAssetById("kit", "hidden", dir)).toBeNull();
+    expect(loadAssetById("../kit", "blob", dir)).toBeNull();
+    expect(loadPackById("../kit", dir)).toBeNull();
+  });
+
   it("parses a pixel grid into frames", () => {
     const { def, issues } = parseAsset(asset(), "blob");
     expect(issues).toEqual([]);

@@ -1,4 +1,4 @@
-export type PreviewBox = { x: number; y: number; w: number; h: number };
+type PreviewBox = { x: number; y: number; w: number; h: number };
 export const PREVIEW_MIN = { w: 160, h: 120 };
 const key = (userId: string) => `pigxel:preview-window:v1:${userId}`;
 const clamp = (value: number, min: number, max: number) =>

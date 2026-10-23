@@ -1,4 +1,4 @@
-export const ASSET_TINTS = [
+const ASSET_TINTS = [
   "bg-pastel-pink",
   "bg-pastel-peach",
   "bg-pastel-mint",

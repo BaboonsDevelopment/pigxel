@@ -34,18 +34,6 @@ export async function listAssets(
   };
 }
 
-export async function listAssetPacks(): Promise<AssetPack[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("asset_packs")
-    .select(ASSET_PACK_COLUMNS)
-    .order("sort")
-    .order("name")
-    .returns<AssetPackRow[]>();
-  if (error) throw new Error(`Couldn’t load asset packs: ${error.message}`);
-  return data.map(toAssetPack);
-}
-
 export async function findAsset(
   id: string | null | undefined,
 ): Promise<Asset | null> {
@@ -158,7 +146,7 @@ export async function listPackCards(): Promise<PackCard[]> {
     });
 }
 
-export const ASSET_PAGE_SIZE = 48;
+const ASSET_PAGE_SIZE = 48;
 
 /**
  * One page of the All assets grid. Filters that live in other tables (tags,

@@ -16,16 +16,27 @@ import type {
 const SNAPSHOT_KEY = ["asset-review"];
 const PRODUCTION_KEY = ["asset-review", "production"];
 const REPORTS_KEY = ["asset-review", "reports"];
+const PUBLISH_KEY = ["asset-review", "publish"];
+
+type PublishStatus = {
+  running: boolean;
+  phase: "idle" | "building" | "importing" | "done" | "error";
+  completed: number;
+  total: number;
+  message: string;
+};
 
 async function call<T>(
   path: string,
   method = "GET",
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(REVIEW_API + path, {
     method,
     headers: body ? { "content-type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
   if (response.status === 401) window.location.reload();
   const json = await response.json().catch(() => ({}));
@@ -42,11 +53,11 @@ export async function leaveReview() {
   window.location.reload();
 }
 
-export function useReviewSnapshot() {
+export function useReviewSnapshot(publishing = false) {
   return useQuery({
     queryKey: SNAPSHOT_KEY,
-    queryFn: () => call<ReviewSnapshot>(""),
-    refetchInterval: POLL_MS,
+    queryFn: ({ signal }) => call<ReviewSnapshot>("", "GET", undefined, signal),
+    refetchInterval: publishing ? 5000 : POLL_MS,
   });
 }
 
@@ -57,11 +68,20 @@ export function useProduction() {
   });
 }
 
-export type PackDetails = {
+export function usePublishStatus() {
+  return useQuery({
+    queryKey: PUBLISH_KEY,
+    queryFn: () => call<PublishStatus>("/publish"),
+    refetchInterval: 1000,
+  });
+}
+
+type PackDetails = {
   name?: string;
   description?: string | null;
   background?: string | null;
   premium?: boolean;
+  pinned?: boolean;
 };
 
 export function useProductionActions() {
@@ -140,16 +160,44 @@ export function useReviewActions() {
     };
 
   return {
-    review: after((key: string, status: ReviewStatus, note: string) =>
-      call("/review", "POST", { key, status, note }),
-    ),
+    review: async (key: string, status: ReviewStatus, note: string) => {
+      await call("/review", "POST", { key, status, note });
+      await client.cancelQueries({ queryKey: SNAPSHOT_KEY, exact: true });
+      client.setQueryData<ReviewSnapshot>(
+        SNAPSHOT_KEY,
+        (snapshot) =>
+          snapshot && {
+            ...snapshot,
+            blocks: snapshot.blocks.map((block) => ({
+              ...block,
+              tiles: block.tiles.map((tile) =>
+                tile.key === key ? { ...tile, state: status, note } : tile,
+              ),
+            })),
+          },
+      );
+    },
     renameBlock: after((id: string, name: string) =>
       call(`/blocks/${id}`, "PATCH", { name }),
     ),
     setBlockTarget: after((id: string, target: string | null) =>
       call(`/blocks/${id}`, "PATCH", { target }),
     ),
-    reject: after((key: string) => call("/reject", "POST", { key })),
+    reject: async (key: string) => {
+      await call("/reject", "POST", { key });
+      await client.cancelQueries({ queryKey: SNAPSHOT_KEY, exact: true });
+      client.setQueryData<ReviewSnapshot>(
+        SNAPSHOT_KEY,
+        (snapshot) =>
+          snapshot && {
+            ...snapshot,
+            blocks: snapshot.blocks.map((block) => ({
+              ...block,
+              tiles: block.tiles.filter((tile) => tile.key !== key),
+            })),
+          },
+      );
+    },
     setBlockBackground: after((id: string, background: string | null) =>
       call(`/blocks/${id}`, "PATCH", { background }),
     ),
@@ -160,9 +208,14 @@ export function useReviewActions() {
       call("/premium", "POST", { key, premium }),
     ),
     publish: async () => {
-      const { output } = await call<{ output: string }>("/publish", "POST");
-      await client.invalidateQueries({ queryKey: SNAPSHOT_KEY });
-      return output;
+      const result = await call<{ output?: string; inProgress?: boolean }>(
+        "/publish",
+        "POST",
+      );
+      if (result.inProgress)
+        return "Publish is already running. Progress is shown above.";
+      void client.invalidateQueries({ queryKey: SNAPSHOT_KEY });
+      return result.output ?? "Publish complete.";
     },
   };
 }

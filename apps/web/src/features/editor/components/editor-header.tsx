@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, type ReactNode, type RefObject } from "react";
+import { usePreviousPage } from "@/components/navigation/back-button";
 import { Button } from "@pigxel/ui/components/button";
 import {
   InputGroup,
@@ -67,6 +68,7 @@ export function EditorHeader({
   onRedo: () => void;
 }) {
   const framesInput = useRef<HTMLInputElement>(null);
+  const back = useBackPage();
 
   return (
     <header
@@ -74,9 +76,9 @@ export function EditorHeader({
       className="col-span-3 flex min-h-12 min-w-0 items-center gap-1 border-b bg-background px-3 py-2"
     >
       <Link
-        href="/tiles"
-        aria-label="My projects"
-        title="My projects"
+        href={back.href}
+        aria-label={back.label}
+        title={back.label}
         className="grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
       >
         <svg
@@ -355,4 +357,17 @@ function IconButton({
       </svg>
     </button>
   );
+}
+
+/**
+ * Back to Home or My projects, whichever the editor was opened from. A link,
+ * not history: switching files here adds entries, so "back" would land on the
+ * previous file.
+ */
+function useBackPage() {
+  const { previous } = usePreviousPage();
+  const path = previous?.split(/[?#]/, 1)[0];
+  if (path === "/home") return { href: previous!, label: "Home" };
+  if (path === "/tiles") return { href: previous!, label: "My projects" };
+  return { href: "/tiles", label: "My projects" };
 }

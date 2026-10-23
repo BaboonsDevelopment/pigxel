@@ -175,7 +175,7 @@ export async function withLoading<T>(
   }
 }
 
-export function Snackbar({
+function Snackbar({
   message,
   tone = "error",
   action,

@@ -24,6 +24,7 @@ const pack = {
   background: null,
   premium: false,
   createdAt: "2026-10-19",
+  pinnedAt: null,
   tags: ["fantasy"],
   uses: 0,
   longestSide: 64,
@@ -48,6 +49,7 @@ function view(tab: "packs" | "all" = "packs") {
         recent={[]}
         firstPage={tab === "all" ? { assets: [], count: 0 } : null}
         openAsset={null}
+        premiumAccess={false}
       />
     </QueryClientProvider>,
   );

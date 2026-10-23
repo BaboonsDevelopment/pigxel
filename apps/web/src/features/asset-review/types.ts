@@ -78,6 +78,8 @@ export type ProductionPack = {
   description: string | null;
   background: string | null;
   premium: boolean;
+  /** Shown first on the Packs tab, with a badge. */
+  pinned: boolean;
 };
 
 export type ProductionTag = { id: string; name: string };

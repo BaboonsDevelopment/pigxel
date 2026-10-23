@@ -6,14 +6,14 @@ import { hasAcceptedLegal, LEGAL, LEGAL_VERSION } from "./legal";
  * How someone agreed: email sign-up, Google or Apple, or email login. Each
  * page says that continuing means agreeing to the Terms and Privacy Policy.
  */
-export type AcceptanceSource = "signup" | "oauth" | "login";
+type AcceptanceSource = "signup" | "oauth" | "login";
 
 /**
  * Records that the signed-in person accepted the current Terms and Privacy
  * Policy (the Terms set the minimum age), then stamps their account so it
  * isn't recorded again for this version. Returns an error message, or null.
  */
-export async function recordAcceptance(
+async function recordAcceptance(
   supabase: SupabaseClient,
   source: AcceptanceSource,
 ): Promise<string | null> {
