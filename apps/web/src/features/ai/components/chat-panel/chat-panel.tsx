@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../actions";
+import { toPictures } from "../../pictures";
 import { REFERENCES_NOTE } from "../../constants";
 import { notifyAiSpent } from "../../spent-event";
 import { warnAboutTokens } from "../../token-warnings";
 import { loadChat, saveChat } from "../../chat/history";
 import { findPicture, forgetPictures, keepPicture } from "../../chat/pictures";
+import { referencesForAction } from "../../chat/references";
 import { confirmDialog } from "@/components/ui/confirm-dialog";
 import { showLoading } from "@/components/ui/snackbar";
 import { ChatComposer } from "./components/chat-composer";
@@ -15,7 +17,7 @@ import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
 import {
   ASK_FRAME,
-  UNREACHABLE,
+  unreachable,
   type CanvasBridge,
   type Chat,
   type ChatEntry,
@@ -81,11 +83,37 @@ export function ChatPanel({
       if (!active) return;
       if (saved) {
         const restored = await Promise.all(
-          saved.messages.map(async ({ role, content, picture }) => {
-            const image = picture ? await findPicture(picture) : null;
-            if (image && picture) kept.current.set(image, picture);
-            return { role, content, picture, image: image ?? undefined };
-          }),
+          saved.messages.map(
+            async ({
+              role,
+              content,
+              picture,
+              layer,
+              referencePictures,
+              action,
+            }) => {
+              const image = picture ? await findPicture(picture) : null;
+              if (image && picture) kept.current.set(image, picture);
+              const references = (
+                await Promise.all(
+                  (referencePictures ?? []).map(async (id) => {
+                    const reference = await findPicture(id);
+                    if (reference) kept.current.set(reference, id);
+                    return reference;
+                  }),
+                )
+              ).filter((reference): reference is string => !!reference);
+              return {
+                role,
+                content,
+                picture,
+                layer,
+                action,
+                references,
+                image: image ?? undefined,
+              };
+            },
+          ),
         );
         if (!active) return;
         setMessages(restored);
@@ -101,14 +129,42 @@ export function ChatPanel({
     if (!loaded) return;
     const timer = setTimeout(async () => {
       const saved = await Promise.all(
-        messages.map(async ({ role, content, image, picture }) => {
-          let id = picture ?? (image ? kept.current.get(image) : undefined);
-          if (!id && image) {
-            id = (await keepPicture(image)) ?? undefined;
-            if (id) kept.current.set(image, id);
-          }
-          return { role, content, ...(id && { picture: id }) };
-        }),
+        messages.map(
+          async ({
+            role,
+            content,
+            image,
+            picture,
+            layer,
+            references,
+            action,
+          }) => {
+            let id = picture ?? (image ? kept.current.get(image) : undefined);
+            if (!id && image) {
+              id = (await keepPicture(image)) ?? undefined;
+              if (id) kept.current.set(image, id);
+            }
+            const referencePictures = (
+              await Promise.all(
+                (references ?? []).map(async (reference) => {
+                  let key = kept.current.get(reference);
+                  if (!key) {
+                    key = (await keepPicture(reference)) ?? undefined;
+                    if (key) kept.current.set(reference, key);
+                  }
+                  return key;
+                }),
+              )
+            ).filter((key): key is string => !!key);
+            return {
+              role,
+              content,
+              action,
+              ...(id && { picture: id, layer }),
+              ...(referencePictures.length && { referencePictures }),
+            };
+          },
+        ),
       );
       await saveChat(tileId, { messages: saved }).catch(() => false);
     }, SAVE_DELAY);
@@ -169,9 +225,15 @@ export function ChatPanel({
     if (!confirmed) return;
     const pictures = [
       ...new Set(
-        messages.flatMap(({ picture, image }) => {
+        messages.flatMap(({ picture, image, references }) => {
           const id = picture ?? (image ? kept.current.get(image) : undefined);
-          return id ? [id] : [];
+          return [
+            ...(id ? [id] : []),
+            ...(references ?? []).flatMap((reference) => {
+              const key = kept.current.get(reference);
+              return key ? [key] : [];
+            }),
+          ];
         }),
       ),
     ];
@@ -207,12 +269,20 @@ export function ChatPanel({
     setPending(true);
     const token = ++runs.current;
     running.current.add(token);
+    const visualContext = [...conversation]
+      .reverse()
+      .find((message) => message.role === "user" && message.references?.length);
     const result = await sendMessage(
-      conversation.map(({ role, content, references }) => ({
-        role,
-        content: references?.length ? `${content} ${REFERENCES_NOTE}` : content,
+      conversation.map((message) => ({
+        role: message.role,
+        content: message.references?.length
+          ? `${message.content} ${REFERENCES_NOTE}`
+          : message.content,
+        ...(message === visualContext && {
+          references: toPictures(message.references),
+        }),
       })),
-    ).catch(() => UNREACHABLE);
+    ).catch(unreachable);
     if (stopped.current.has(token)) return;
     running.current.delete(token);
     setPending(false);
@@ -225,7 +295,17 @@ export function ChatPanel({
       return;
     }
     const { action } = result.value;
-    const chat = chatWith(conversation, attached, token);
+    const routedConversation = action
+      ? conversation.map((message, index) =>
+          index === conversation.length - 1 ? { ...message, action } : message,
+        )
+      : conversation;
+    if (action) change(conversation.length - 1, { action });
+    const chat = chatWith(
+      routedConversation,
+      action ? referencesForAction(routedConversation, action) : attached,
+      token,
+    );
     try {
       if (!action) append(result.value);
       else if (action.kind === "generate") await generate(chat, action);

@@ -6,13 +6,14 @@ import {
   planPlacement,
   suggestComposition,
 } from "../../../actions";
+import { toPictures } from "../../../pictures";
 import type { SetItem, TileAction } from "../../../types";
 import { resizeNearest } from "@/lib/image/bitmap";
 import { sheetToFrames } from "@/lib/image/sheet";
 import { SCENE_PICTURE_STEPS } from "@/lib/image/pipeline";
 import {
   ASK_SELECT,
-  UNREACHABLE,
+  unreachable,
   type Chat,
   type Placement,
 } from "../constants";
@@ -39,14 +40,14 @@ export async function drawOnNewLayer(
   const { canvas } = chat;
   const largest = areas.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
   chat.setPending(true);
-  const result = await generateImage(
+  const result = await generateImage({
     subject,
-    largest.w,
-    largest.h,
-    chat.references,
+    width: largest.w,
+    height: largest.h,
+    references: toPictures(chat.references),
     composition,
     style,
-  ).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   if (result.ok) {
     const art = await toArt(
       result.value,
@@ -59,7 +60,7 @@ export async function drawOnNewLayer(
         paint(pixels, size, resizeNearest(art, area.w, area.h).rgba, area),
       emptyCel(size),
     );
-    canvas.addLayer(name, cel, replace);
+    const layer = canvas.addLayer(name, cel, replace);
     const many = areas.length > 1 ? ` ×${areas.length}` : "";
     const hidden = replace
       ? " The other layers are hidden, not deleted: show them again in the timeline."
@@ -68,6 +69,7 @@ export async function drawOnNewLayer(
       role: "assistant",
       content: `Here is your picture: ${subject}${many}, on the layer "${name}".${hidden}`,
       image: result.value,
+      layer,
     });
   } else {
     chat.setError(result.error);
@@ -92,12 +94,12 @@ async function offerPlacements(chat: Chat, action: TileAction) {
       label: "Put it in free space",
       area: free,
     });
-  const composed = await suggestComposition(
-    action.request,
-    canvas.snapshot(),
-    size.w,
-    size.h,
-  ).catch(() => UNREACHABLE);
+  const composed = await suggestComposition({
+    subject: action.request,
+    tile: canvas.snapshot(),
+    width: size.w,
+    height: size.h,
+  }).catch(unreachable);
   if (composed.ok) {
     placements.push({
       kind: "compose",
@@ -168,7 +170,7 @@ export async function generate(chat: Chat, action: TileAction) {
     objects: objects.map((o) => o.area),
     layers: objects.map((o) => names.get(o.layerId) ?? ""),
     recent: chat.messages.map(({ role, content }) => ({ role, content })),
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   chat.setPending(false);
 
   const blocked =
@@ -221,7 +223,7 @@ async function drawSet(chat: Chat, items: SetItem[], style = "") {
     cellW: cell.w,
     cellH: cell.h,
     style,
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   if (!result.ok) {
     chat.setError(result.error);
     showSnackbar(GENERATE_FAILED);

@@ -66,6 +66,7 @@ export type ChatEntry = ChatMessage & {
   image?: string;
   references?: string[];
   picture?: string;
+  layer?: string;
   placements?: Placement[];
   button?: { label: string; run: () => Promise<boolean> };
 };
@@ -86,6 +87,12 @@ export const UNREACHABLE = {
   error: "Could not reach the server.",
 } as const;
 
+/** A call that threw shows as unreachable; the console keeps why. */
+export const unreachable = (error: unknown) => {
+  console.error("[ai] call failed:", error);
+  return UNREACHABLE;
+};
+
 export const ASK_SELECT =
   "Select the area on the tile you want to work on (Esc to cancel).";
 export const ASK_FRAME =
@@ -95,10 +102,11 @@ export const NO_LAYER =
 
 export const MAX_OVERLAP = 0.03;
 
-export const REFERENCE_SIDE = 512;
+export const REFERENCE_SIDE = 1024;
 export const REFERENCE_QUALITY = 0.9;
 
 export const FRAMES_SHEET_SIDE = 1024;
 
 export const MIN_MOVING_SHARE = 0.05;
+export const FRAMES_PER_PICTURE = 8;
 export const REVIEW_MARGIN = 4;

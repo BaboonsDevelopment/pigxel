@@ -52,8 +52,18 @@ background or a subject in a setting; "sprite" for isolated objects.
 Default to sprite with no background unless the user requests a setting or background.
 Set style to the user's explicitly requested visual style, including a style
 established for the same artwork earlier in the conversation. Empty when unspecified.
+Words such as "very cute", "cozy", "scary", "cartoon" and "simple flat colours"
+are visual direction too, not disposable mood words. Include them in style and
+expand them into compatible proportions, shape language, detail density and shading.
+For example a very cute corgi can have a large rounded head, short legs, a warm
+expression and simple warm colour clusters; do not turn it into a realistic RPG dog.
 Preserve requests like chibi, cartoon, monochrome, watercolor or reference style;
 never replace them with the editor's default RPG style. Keep style in subject too.
+Attached reference images are visible to you. Describe the actual pose, viewing
+angle, proportions and rendering the user asks to match. For "identical to this"
+the reference's pose and style replace earlier conflicting directions such as
+"front-facing"; the latest request wins. Do not invent a front view or keep an
+old pose when the latest reference shows a three-quarter pose.
 A full scene is ONE composition, never split its characters and scenery into items.
 For scenes, subject preserves ALL requested background, environment, lighting,
 composition and foreground details. Never discard the requested background.
@@ -105,9 +115,12 @@ export const IMAGE_BACKGROUND_RULES = [
 ];
 
 export const REFERENCE_RULES =
-  "Use the attached picture(s) as reference for what the subject looks like " +
-  "(design, shapes, colours, proportions), redrawn in the pixel art style " +
-  "below; copy nothing else from them (no background, no text).";
+  "Use the attached picture(s) as the visual authority for the requested design, " +
+  "pose, viewing angle, proportions, expression, palette, outline and shading. " +
+  "Match their rendering style unless the user explicitly requests a different one. " +
+  "When asked for an identical match, reproduce the reference as closely as the " +
+  "target resolution allows; do not substitute a generic RPG interpretation. " +
+  "Take only the aspects the user asks for; background handling follows the composition instructions.";
 
 export const IMAGE_STYLE_RULES = [
   "crisp hard-edged pixels, no anti-aliasing, no blur.",
@@ -131,31 +144,10 @@ export const ASPECT_RATIOS = [
   "21:9",
 ];
 
-export const EDIT_CRAFT_RULES = `Palette: 3-4 steps per material (outline darkest, shadow, base, highlight);
-shift hue too, shadows toward blue/purple, highlights toward yellow/orange.
-Outline: one pixel, continuous, in the darkest colour. Light: one direction,
-top-left unless asked otherwise. Keep one connected silhouette, no stray
-pixels. Never use rect or ellipse on organic shapes; use blit rows instead.`;
-
-export const EDIT_RESPONSE_RULES = [
-  "Spend as few operations as possible; never restate unchanged pixels.",
-  "Reuse the characters in COLORS; declare a new colour with pal only when needed.",
-  "When a REGION is present, every write must land inside it.",
-  "Stay inside SIZE. Check the rulers before writing coordinates.",
-  "Write summary as one short sentence in the language of the request.",
-];
-
-export const PLAN_RULES = `Decide how to carry out the edit.
-
-mode:
-- "ops" only for explicitly requested individual pixel corrections or exact
-  palette substitutions (e.g. replace every #112233 with #445566).
-- "move" when the object only changes position, same size, same look: its
-  pixels are copied exactly.
-- "redraw" for visual edits: recolour skin, hair, clothes or a material across
-  the ENTIRE requested region with consistent shadows and highlights; resize,
-  add or remove a detail, change a pose, expression, clothes or style.
-  Use the current drawing as the strict image reference, not a few pixel patches.
+export const PLAN_RULES = `Decide how to carry out the edit. Every edit is a redraw: an image model
+redraws what changes from the current drawing, the original picture it was
+made from and the user's reference pictures, and the result is put back on
+the tile.
 
 objects: the numbers of ALL objects that change, from OBJECTS. Things are
 often drawn in several pieces: an aura, magic effects, particles or a held
@@ -174,8 +166,16 @@ target: where the result goes, in tile pixels (x, y of the top-left, w, h).
   stands on something), staying inside the tile.
 - Another box to move it.
 
-instruction: a clear English instruction for the model that makes the change,
-naming exactly what changes and saying that everything else stays the same.
+instruction: a clear English instruction for the image model that makes the
+change, naming exactly what changes and how (recolour the ENTIRE requested
+material with its shadows and highlights; what to take from the reference
+pictures when the request uses them), and saying that everything else stays the same.
+The FIRST image is the current canvas. Any further images are the user's visual
+references, not extra objects to add. Inspect them before writing instruction.
+Describe the requested pose, viewing angle, proportions and style from those
+references explicitly. The latest request and its references override an older
+pose or style; "match this exactly" must not preserve a conflicting front view.
+Keep style and pose requirements in instruction, including "cute" or "cozy".
 
 summary: one short sentence for the user, in the language of the request,
 saying what was done.
@@ -239,6 +239,12 @@ tracks: exactly one track. There are two kinds of animation:
   only the moving parts and say how they differ from the picture now; one
   frame may be the picture as it is. Moving things follow a believable path
   with even spacing.
+- anchor: "ground" for planted idle actions (blink, yawn, head turn, seated
+  gestures): the support line and lower body stay fixed. "body" for hovering
+  creatures: register the central body, leaving wings and tails free to move.
+  "fixed" when the request intentionally moves the whole subject through the
+  frame (jump, fall, travel, projectile), or animates a complete scene. Do not
+  ground-lock intentional jumps or pull a projectile back to its launch point.
 - box: one rectangle in tile pixels, inside the tile.
   When animating what is drawn: around the parts that move and the room they
   move in; the whole drawing on that layer is redrawn with it anyway.

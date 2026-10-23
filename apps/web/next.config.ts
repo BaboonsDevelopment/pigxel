@@ -5,6 +5,12 @@ const config: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   transpilePackages: ["@pigxel/ui"],
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Redraws include the current picture, original, and up to three references.
+      bodySizeLimit: "12mb",
+    },
+  },
   serverExternalPackages: ["@tensorflow/tfjs", "nsfwjs"],
 };
 

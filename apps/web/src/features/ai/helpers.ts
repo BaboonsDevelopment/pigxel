@@ -1,10 +1,7 @@
-import { GRID, OPS } from "@/lib/edit/constants";
-import { CHROMA_KEY_HEX } from "@/lib/image/constants";
+import { ANIMATION_GUTTER_PX, CHROMA_KEY_HEX } from "@/lib/image/constants";
 import {
   ANIMATION_RULES,
   ASPECT_RATIOS,
-  EDIT_RESPONSE_RULES,
-  EDIT_CRAFT_RULES,
   EDIT_REVIEW_RULES,
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
@@ -29,7 +26,7 @@ export function buildImagePrompt(
   composition: "sprite" | "scene" = "sprite",
   style = "",
 ): string {
-  if (composition === "scene" || style.trim()) {
+  if (composition === "scene" || style.trim() || withReferences) {
     return [
       composition === "scene"
         ? `A complete edge-to-edge picture with its requested foreground, environment and background: ${subject}.`
@@ -39,12 +36,12 @@ export function buildImagePrompt(
         ? [
             `Requested visual style: ${style}. Follow this style throughout, including proportions, colours, outlines and shading.`,
           ]
-        : IMAGE_STYLE_RULES.slice(0, 4)),
-      ...(withReferences
-        ? [
-            "Use the attached pictures as visual references, preserving their recognizable design and details while following the requested style and composition.",
-          ]
-        : []),
+        : withReferences
+          ? [
+              "Preserve the reference's visual style, proportions and detail density; use clear pixel clusters readable at the target resolution.",
+            ]
+          : IMAGE_STYLE_RULES.slice(0, 4)),
+      ...(withReferences ? [REFERENCE_RULES] : []),
       ...(composition === "scene"
         ? [
             "Paint the requested background across the entire canvas. No chroma key, transparent margins or checkerboard. No watermark or border.",
@@ -101,36 +98,6 @@ export function clampRect(rect: Rect, width: number, height: number): Rect {
   };
 }
 
-export function buildEditSystemPrompt(): string {
-  const table = OPS.map((op) => `  ${op.syntax.padEnd(30)} ${op.doc}`).join(
-    "\n",
-  );
-  const rules = EDIT_RESPONSE_RULES.map((r, i) => `${i + 1}. ${r}`).join("\n");
-  return `You are a pixel-art assistant in a sprite editor. You read the tile as a character grid and reply with edit operations.
-
-# Reading the grid
-SIZE is the tile size; REGION, when present, is the only area you may change.
-Each character is one pixel and indexes COLORS; "${GRID.transparent}" is transparent.
-Coordinates are absolute: x grows right, y grows down, origin top-left. The
-rulers show absolute values, so read coordinates straight off them.
-
-# Replying
-Reply with {"summary": "...", "ops": ["...", "..."]}, one operation per string, applied in order:
-${table}
-In blit rows "${GRID.transparent}" writes transparent and "${GRID.keep}" keeps the existing pixel.
-Examples: pal 9 #e43b44 · px 9 12,8 13,8 · blit 4,2 ..99../.9999./_99__
-
-# Pixel-art craft
-${EDIT_CRAFT_RULES}
-
-# Rules
-${rules}`;
-}
-
-export function buildEditUserMessage(grid: string, request: string): string {
-  return `<tile>\n${grid}\n</tile>\n<request>${request}</request>`;
-}
-
 export function buildRedrawPrompt(
   instruction: string,
   width: number,
@@ -142,9 +109,28 @@ export function buildRedrawPrompt(
     "unless the instruction changes them. Keep the original placement, scale and margins; do not zoom or reframe.",
     "Apply material or skin recolouring to ALL requested areas, including their shadows and highlights. Preserve unrelated details, thin strings, weapons, face and background.",
     "The requested style takes priority over the original style. Otherwise preserve the original style exactly.",
+    "If the request matches a user reference, its requested pose, viewing angle, proportions and rendering replace conflicting features of the old drawing. Do not average the two designs or keep an old front view against a three-quarter reference. Fit the complete requested silhouette inside the canvas.",
     "Retain small recognizable details and keep the result readable at the target resolution.",
     `Keep existing scenery and background. Only areas already ${CHROMA_KEY_HEX} stay flat ${CHROMA_KEY_HEX}, unless the edit explicitly adds a background there. No watermark or border.`,
   ].join(" ");
+}
+
+export function buildRedrawReferences(
+  first: string,
+  original: boolean,
+  references: number,
+): string {
+  return [
+    `The FIRST image is ${first}, exactly as it is on screen now. It defines the editing canvas and only the features the user did not ask to change. It does not override a requested replacement pose or style.`,
+    original
+      ? "The SECOND image is the original picture this pixel art was made from. Use it to recover unchanged details; it has lower priority than the latest request and the user's reference pictures."
+      : "",
+    references
+      ? `The ${original ? "remaining" : "other"} images are reference pictures attached by the user. They are the authority for the requested changes, including pose, camera angle, proportions, expression and rendering style. Match those aspects as exactly as possible, overriding the current and original images where they conflict. Do not merely add an accessory while preserving a conflicting old design.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
@@ -223,6 +209,7 @@ export function sheetLayout(
 }
 
 export function buildSheetAnimatePrompt(args: {
+  composition?: "sprite" | "scene";
   style?: string;
   subject: string;
   poses: string[];
@@ -245,15 +232,27 @@ export function buildSheetAnimatePrompt(args: {
     "Redraw the whole sheet as frames of one animation, one frame per cell:",
     frames,
     "The copy in each cell is the strict reference for that frame: follow it as closely as possible — the very same character and everything around it, with the same design, proportions, size, place, framing, colours, palette, outline, shading and pixel size. Change only the pose the frame describes; it must look like the same drawing animated, not a new drawing.",
-    "Keep the grid exactly: every frame fills its own cell as the copy does and never crosses into another cell.",
+    "Keep the grid exactly: every frame stays in its own cell and never crosses into another cell.",
+    args.composition !== "scene"
+      ? animationSpacingRules()
+      : "Keep each complete scene and its existing background painted edge to edge in its cell.",
+    args.composition !== "scene"
+      ? "Use one shared scale for the whole sequence. Leave clear gutters and enough empty room in EVERY cell for the largest pose, raised ears, hands and tail. No part may touch a cell edge or spill into another row. For planted idle actions hold the same lower-body position and support line; animate the requested parts, never translate or stretch the whole figure."
+      : "Keep one shared scale and fixed camera throughout. Preserve the complete background edge to edge in every cell; animate only the requested action.",
     "No grid lines, no numbers, no labels.",
     args.style?.trim()
       ? `Requested style override: ${args.style}. Apply this style consistently across all frames; it takes priority over matching the reference's rendering style.`
       : "Preserve the reference's rendering style and pixel size exactly.",
-    `Where the picture is ${CHROMA_KEY_HEX} magenta it stays the same flat magenta. No text, no watermark, no border.`,
+    args.composition !== "scene"
+      ? `Where the picture is ${CHROMA_KEY_HEX} magenta it stays the same flat magenta. No text, no watermark, no border.`
+      : "Preserve the existing background and scenery; no chroma-key gutters inside the scenes.",
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function animationSpacingRules() {
+  return `MANDATORY FRAME SPACING: leave at least ${ANIMATION_GUTTER_PX} pixels of uninterrupted flat ${CHROMA_KEY_HEX} magenta between every pair of neighbouring silhouettes, horizontally AND vertically, measured at the generated source-sheet resolution. Reserve at least ${Math.ceil(ANIMATION_GUTTER_PX / 2)} source-image pixels of blank margin on EVERY side INSIDE each cell. Keep all poses, ears, tails, flames, shadows and particles inside that padded interior, including the largest pose in the animation. If necessary reduce ALL poses by one common scale. Keep the same body anchor and scale throughout. The gutters must contain NO artwork, stray pixels, separator lines, borders or shadows. Do not enlarge the subject to fill the reserved margins. These are source-sheet spacing pixels, not extra padding to add to the final native-size tile.`;
 }
 
 export function buildSheetRedrawPrompt(args: {
@@ -337,7 +336,11 @@ export function buildSheetPrompt(args: {
     args.fromReference
       ? `Every frame shows the subject of the attached picture (${args.subject}) with exactly its design, colours, outline and proportions.`
       : `Every frame shows the same subject: ${args.subject}.`,
-    `Each cell is the same ${args.cellW}x${args.cellH} pixel scene seen by one fixed camera: the subject keeps its size, colours, design and place in every frame, and only what moves changes. Everything a frame shows stays inside its cell, never crossing into another cell, with a little empty space at the cell edges.`,
+    `Each cell is the same ${args.cellW}x${args.cellH} pixel scene seen by one fixed camera: the subject keeps its size, colours, design and place in every frame, and only what moves changes. Everything a frame shows stays inside its cell, never crossing into another cell.`,
+    args.composition !== "scene"
+      ? "Reserve a clear gutter on every side for the largest pose in the sequence, including raised ears and limbs. Keep one common scale and a stable body anchor for planted actions; no whole-body sliding or vertical bobbing unless the requested action requires it."
+      : "Keep the full scene and its background painted to every cell edge with no blank margins. Use one common scale and a fixed camera.",
+    args.composition !== "scene" ? animationSpacingRules() : "",
     frames,
     args.poses.length < cols * rows
       ? "Leave the remaining cells at the end of the last row empty."
@@ -345,7 +348,9 @@ export function buildSheetPrompt(args: {
     "No grid lines, no numbers, no labels.",
     ...(args.style?.trim()
       ? [`Requested visual style: ${args.style}. Follow it in every frame.`]
-      : IMAGE_STYLE_RULES.slice(0, 3)),
+      : args.fromReference
+        ? [REFERENCE_RULES]
+        : IMAGE_STYLE_RULES.slice(0, 3)),
     ...(args.composition === "scene"
       ? [
           "Every cell is a complete scene with its requested background painted edge to edge. Keep that environment fixed throughout the action; no chroma key or transparent margins.",
@@ -420,6 +425,8 @@ export function clampAnimationPlan(
         name: String(t.name || "Animation").slice(0, 40),
         subject,
         reuse,
+        anchor:
+          t.anchor === "body" || t.anchor === "fixed" ? t.anchor : "ground",
         box: clampRect(t.box, width, height),
         poses,
       },

@@ -7,6 +7,7 @@ export function components(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
+  connectivity: 4 | 8 = 8,
 ): Component[] {
   const seen = new Uint8Array(width * height);
   const out: Component[] = [];
@@ -27,6 +28,7 @@ export function components(
       y1 = Math.max(y1, y);
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
+          if (connectivity === 4 && dx !== 0 && dy !== 0) continue;
           const nx = x + dx;
           const ny = y + dy;
           if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;

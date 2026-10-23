@@ -127,7 +127,10 @@ async function production() {
           .range(offset, offset + assetPageSize - 1)
           .returns<{ id: string; updated_at: string | null }[]>();
         if (page.error)
-          throw new Error(`Couldn’t read production: ${page.error.message}`);
+          throw new ReviewError(
+            `Couldn’t read production: ${page.error.message}`,
+            503,
+          );
         for (const row of page.data ?? [])
           publishedAt.set(row.id, row.updated_at);
         if ((page.data?.length ?? 0) < assetPageSize) break;
@@ -142,7 +145,10 @@ async function production() {
       .returns<ReviewTarget[]>(),
   ]);
   if (blocks.error)
-    throw new Error(`Couldn’t read production: ${blocks.error.message}`);
+    throw new ReviewError(
+      `Couldn’t read production: ${blocks.error.message}`,
+      503,
+    );
   return {
     publishedAt,
     blocks: blocks.data!,
@@ -178,14 +184,9 @@ function tileOf(
 }
 
 export async function reviewSnapshot(): Promise<ReviewSnapshot> {
-  let publishedAt = new Map<string, string | null>();
-  let targets: ReviewTarget[] = [];
-  let productionError: string | null = null;
-  try {
-    ({ publishedAt, blocks: targets } = await production());
-  } catch (e) {
-    productionError = e instanceof Error ? e.message : String(e);
-  }
+  // An incomplete production read must never turn published art into new work.
+  // Reject the refresh so the client keeps its last successful snapshot.
+  const { publishedAt, blocks: targets } = await production();
   const reviews = readReviews(REVIEW_FILE);
   const blocks = localPacks().map((pack) => ({
     id: pack.id,
@@ -208,7 +209,7 @@ export async function reviewSnapshot(): Promise<ReviewSnapshot> {
       })
       .map((source) => tileOf(pack, source, reviews[source.key])),
   }));
-  return { blocks, targets, productionError };
+  return { blocks, targets, productionError: null };
 }
 
 function findPack(id: unknown) {

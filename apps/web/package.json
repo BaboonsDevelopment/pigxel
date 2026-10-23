@@ -33,7 +33,8 @@
     "nsfwjs": "4.4.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "sharp": "0.35.5"
   },
   "devDependencies": {
     "@pigxel/eslint-config": "workspace:*",

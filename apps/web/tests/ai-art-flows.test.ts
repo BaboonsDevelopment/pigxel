@@ -5,20 +5,17 @@ import * as actions from "@/features/ai/actions";
 import {
   framesSheet,
   toArt,
+  toReference,
 } from "@/features/ai/components/chat-panel/flows/pictures";
-import { checkEdit } from "@/features/ai/components/chat-panel/flows/review";
-import { sheetToFrames } from "@/lib/image/sheet";
 import type {
   Chat,
   ChatEntry,
 } from "@/features/ai/components/chat-panel/constants";
 
 vi.mock("@/features/ai/actions", () => ({
-  animateSheet: vi.fn(),
-  generateSheet: vi.fn(),
+  generateAnimation: vi.fn(),
   planAnimation: vi.fn(),
   reviewEdit: vi.fn(),
-  editTile: vi.fn(),
   planEdit: vi.fn(),
   redrawArea: vi.fn(),
   redrawFrames: vi.fn(),
@@ -26,11 +23,8 @@ vi.mock("@/features/ai/actions", () => ({
 vi.mock("@/features/ai/components/chat-panel/flows/pictures", () => ({
   framesSheet: vi.fn(),
   toArt: vi.fn(),
+  toReference: vi.fn(),
 }));
-vi.mock("@/features/ai/components/chat-panel/flows/review", () => ({
-  checkEdit: vi.fn(),
-}));
-vi.mock("@/lib/image/sheet", () => ({ sheetToFrames: vi.fn() }));
 
 const size = { w: 4, h: 4 };
 const area = { x: 0, y: 0, ...size };
@@ -99,13 +93,13 @@ beforeEach(() => {
       ],
     },
   });
-  vi.mocked(actions.animateSheet).mockResolvedValue({
+  vi.mocked(actions.generateAnimation).mockResolvedValue({
     ok: true,
-    value: { image: "sheet", layout: { cols: 5, rows: 2, aspectRatio: "5:2" } },
+    value: {
+      image: "sheet",
+      frames: poses.map(() => Buffer.from(character).toString("base64")),
+    },
   });
-  vi.mocked(sheetToFrames).mockResolvedValue(
-    poses.map(() => ({ ...size, rgba: character })),
-  );
   vi.mocked(actions.reviewEdit).mockResolvedValue({
     ok: true,
     value: { ok: true, problem: "", instruction: "" },
@@ -113,7 +107,6 @@ beforeEach(() => {
   vi.mocked(actions.planEdit).mockResolvedValue({
     ok: true,
     value: {
-      mode: "redraw",
       source: area,
       target: area,
       objects: [0],
@@ -143,9 +136,14 @@ describe("animation safeguards", () => {
   it("uses the selected character layer and one complete chronological sheet", async () => {
     const c = chat();
     expect(await draw(c)).toBe(true);
-    expect(actions.animateSheet).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(actions.animateSheet).mock.calls[0]![0].poses).toEqual(
-      poses,
+    expect(actions.generateAnimation).toHaveBeenCalledTimes(1);
+    expect(actions.generateAnimation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        poses,
+        sheet: "reference-sheet",
+        cellW: 4,
+        cellH: 4,
+      }),
     );
     expect(
       vi
@@ -158,21 +156,50 @@ describe("animation safeguards", () => {
   });
   it("does not insert a random fallback when a frame is missing", async () => {
     const c = chat();
-    vi.mocked(sheetToFrames).mockResolvedValue(
-      poses.map((_, i) => (i === 4 ? null : { ...size, rgba: character })),
-    );
+    vi.mocked(actions.generateAnimation).mockResolvedValue({
+      ok: true,
+      value: {
+        image: "sheet",
+        frames: poses
+          .slice(1)
+          .map(() => Buffer.from(character).toString("base64")),
+      },
+    });
     expect(await draw(c)).toBe(false);
     expect(c.canvas.addAnimation).not.toHaveBeenCalled();
   });
-  it("does not apply an animation rejected for inconsistent poses", async () => {
+  it("preserves intentional travel rather than ground-locking it", async () => {
     const c = chat();
-    vi.mocked(actions.reviewEdit).mockResolvedValue({
+    vi.mocked(actions.planAnimation).mockResolvedValue({
       ok: true,
       value: {
-        ok: false,
-        problem: "Frame 5 is a different creature",
-        instruction: "keep the same creature",
+        name: "Jump",
+        frameCount: 10,
+        duration: 100,
+        summary: "Jump",
+        tracks: [
+          {
+            name: "Character",
+            subject: "jump",
+            reuse: 1,
+            box: area,
+            poses,
+            anchor: "fixed",
+          },
+        ],
       },
+    });
+    expect(await draw(c)).toBe(true);
+    expect(actions.generateAnimation).toHaveBeenCalledWith(
+      expect.objectContaining({ anchor: "fixed" }),
+    );
+  });
+  it("does not apply an animation rejected for inconsistent poses", async () => {
+    const c = chat();
+    vi.mocked(actions.generateAnimation).mockResolvedValue({
+      ok: false,
+      error:
+        "Frame 5 is a different creature. No tokens were charged for this generation.",
     });
     expect(await draw(c)).toBe(false);
     expect(c.canvas.addAnimation).not.toHaveBeenCalled();
@@ -180,40 +207,61 @@ describe("animation safeguards", () => {
   });
 });
 
-describe("edit safeguards", () => {
-  it("keeps the original if both the edit and retry fail review", async () => {
+describe("edit by redraw", () => {
+  it("applies the redraw without a review step", async () => {
     const c = chat();
-    vi.mocked(checkEdit).mockResolvedValue({
-      ok: false,
-      problem: "lost the face",
-      instruction: "preserve the face",
-    });
     await edit(c, { kind: "edit", request: "make skin blue" });
-    expect(actions.redrawArea).toHaveBeenCalledTimes(2);
-    expect(checkEdit).toHaveBeenCalledTimes(2);
-    expect(c.canvas.writeCels).not.toHaveBeenCalled();
-    expect(c.setPending).toHaveBeenLastCalledWith(false);
-  });
-  it("applies the verified retry including subtle material changes", async () => {
-    const c = chat();
-    c.references = ["external-reference"];
-    vi.mocked(checkEdit)
-      .mockResolvedValueOnce({
-        ok: false,
-        problem: "incomplete colour change",
-        instruction: "recolour every skin shade",
-      })
-      .mockResolvedValueOnce(null);
-    await edit(c, { kind: "edit", request: "make skin blue" });
+    expect(actions.redrawArea).toHaveBeenCalledTimes(1);
+    expect(actions.reviewEdit).not.toHaveBeenCalled();
     expect(c.canvas.writeCels).toHaveBeenCalledTimes(1);
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      expect.any(String),
-      "reference",
-      4,
-      4,
-      ["external-reference"],
-    );
     const cels = vi.mocked(c.canvas.writeCels).mock.calls[0]![1];
     expect(cels.get("frame")).toEqual(solid(110));
+    expect(c.setPending).toHaveBeenLastCalledWith(false);
+  });
+  it("sends the screen, the layer's original picture and the user's references", async () => {
+    const c = chat();
+    c.references = ["external-reference"];
+    c.messages = [
+      { role: "assistant", content: "old", image: "older", layer: "character" },
+      { role: "assistant", content: "other", image: "x", layer: "background" },
+      {
+        role: "assistant",
+        content: "new",
+        image: "latest",
+        layer: "character",
+      },
+    ];
+    vi.mocked(toReference).mockResolvedValue("original-reference");
+    await edit(c, { kind: "edit", request: "make skin blue" });
+    expect(fetch).toHaveBeenCalledWith("latest");
+    expect(actions.planEdit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        references: [{ dataUrl: "external-reference" }],
+      }),
+    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [{ dataUrl: "external-reference" }],
+      original: "original-reference",
+    });
+    expect(c.append).toHaveBeenLastCalledWith(
+      expect.objectContaining({ image: "redrawn", layer: "character" }),
+    );
+  });
+  it("sends no original when the layer has no picture in the chat", async () => {
+    const c = chat();
+    await edit(c, { kind: "edit", request: "make skin blue" });
+    expect(toReference).not.toHaveBeenCalled();
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [],
+      original: "",
+    });
   });
 });

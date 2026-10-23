@@ -1,3 +1,5 @@
+import type { Picture } from "./pictures";
+
 export type TileAction = {
   composition?: "sprite" | "scene";
   style?: string;
@@ -15,7 +17,13 @@ export type SetItem = { subject: string; name: string };
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  references?: string[];
   action?: TileAction;
+};
+
+/** A chat message as sent to sendMessage: its references wrapped. */
+export type SentMessage = Omit<ChatMessage, "references"> & {
+  references?: Picture[];
 };
 
 export type AiResult<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -38,10 +46,7 @@ export type GeneratedImage = { mimeType: string; base64: string };
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
-export type EditReply = { summary: string; ops: string[] };
-
 export type EditPlan = {
-  mode: "ops" | "move" | "redraw";
   source: Rect;
   target: Rect;
   objects: number[];
@@ -52,7 +57,6 @@ export type EditPlan = {
 };
 
 export type PlanReply = {
-  mode: EditPlan["mode"];
   objects: number[];
   keep: number[];
   target: Rect;
@@ -76,6 +80,7 @@ export type PlacementReply = {
 };
 
 export type SheetTrack = {
+  anchor?: "ground" | "body" | "fixed";
   composition?: "sprite" | "scene";
   style?: string;
   name: string;
@@ -101,6 +106,7 @@ export type AnimationReply = {
   duration: number;
   summary: string;
   tracks: {
+    anchor?: "ground" | "body" | "fixed";
     name: string;
     subject: string;
     reuse: number;
@@ -112,7 +118,6 @@ export type AnimationReply = {
 export interface AiProvider {
   route(messages: ChatMessage[]): Promise<Route>;
   chat(messages: ChatMessage[]): Promise<string>;
-  edit(system: string, user: string): Promise<EditReply>;
   generate(
     prompt: string,
     aspectRatio: string,
@@ -127,7 +132,10 @@ export interface AiProvider {
   ): Promise<GeneratedImage>;
   compose(prompt: string, tile: GeneratedImage): Promise<Rect>;
   place(prompt: string, tile: GeneratedImage): Promise<PlacementReply>;
-  plan(prompt: string, tile: GeneratedImage): Promise<PlanReply>;
+  plan(
+    prompt: string,
+    pictures: GeneratedImage | GeneratedImage[],
+  ): Promise<PlanReply>;
   animate(prompt: string, tile: GeneratedImage): Promise<AnimationReply>;
   reviewEdit(
     prompt: string,

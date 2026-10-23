@@ -8,6 +8,7 @@ type AiErrorCode =
   | "paid_only"
   | "blocked"
   | "moderation"
+  | "animation_invalid"
   | "failed";
 
 export class AiError extends Error {
@@ -33,6 +34,8 @@ const USER_MESSAGES: Record<AiErrorCode, string> = {
     "This request goes against our content rules, so the AI won’t draw it. Try describing something else.",
   moderation: "The AI is unavailable right now. Try again in a minute.",
   failed: "Something went wrong with the AI. Try again.",
+  animation_invalid:
+    "The generated sheet could not be turned into a complete, consistent animation. Your drawing was kept. No tokens were charged for this generation. Try again.",
 };
 
 export function toUserMessage(e: unknown): string {
