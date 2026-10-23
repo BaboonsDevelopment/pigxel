@@ -275,6 +275,12 @@ describe("edit by redraw", () => {
   });
   it("fills the scene canvas even when the returned image is portrait-shaped and the planner protected the old connected picture", async () => {
     const c = chat();
+    c.messages = [
+      {
+        role: "user",
+        content: "extend the floor into the black bottom corners",
+      },
+    ];
     vi.mocked(actions.planEdit).mockResolvedValue({
       ok: true,
       value: {
@@ -283,7 +289,7 @@ describe("edit by redraw", () => {
         objects: [0],
         keep: [area],
         instruction: "fill the entire background",
-        summary: "Filled background",
+        summary: "Removed all black borders and completely filled the canvas",
         question: "",
       },
     });
@@ -303,7 +309,18 @@ describe("edit by redraw", () => {
       composition: "scene",
     });
     expect(actions.planEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ composition: "scene", width: 4, height: 4 }),
+      expect.objectContaining({
+        composition: "scene",
+        width: 4,
+        height: 4,
+        recent: [
+          {
+            role: "user",
+            content: "extend the floor into the black bottom corners",
+            action: undefined,
+          },
+        ],
+      }),
     );
     expect(actions.redrawArea).toHaveBeenCalledWith({
       request: "fill the entire background",
@@ -322,8 +339,12 @@ describe("edit by redraw", () => {
     expect(pixels).not.toEqual(character);
     expect(c.say).not.toHaveBeenCalled();
     expect(c.append).toHaveBeenLastCalledWith(
-      expect.objectContaining({ image: "redrawn" }),
+      expect.objectContaining({
+        image: "redrawn",
+        content: "Here is the redrawn scene.",
+      }),
     );
+    expect(actions.reviewEdit).not.toHaveBeenCalled();
   });
   it("limits a scene repair to an explicit selection without restoring the connected old scene over it", async () => {
     const c = chat();

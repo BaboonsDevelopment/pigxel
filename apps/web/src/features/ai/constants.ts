@@ -54,6 +54,12 @@ Adding, filling, extending or fixing the background of existing artwork is an
 edit with composition "scene", even when the foreground began as an isolated sprite.
 Complaints that the background is missing on the canvas are requests to repair
 that scene, not to preserve the current empty margins.
+Camera/view is separate from art style. For a new picture with no requested or
+referenced camera angle, use a conventional straight-on 2D view. Do not invent
+an isometric, top-down, dollhouse or cutaway view just because the subject is a
+room, building or game environment. Include any user-requested or referenced
+view in subject and preserve it. For edits, preserve the current view unless
+the latest request explicitly changes it.
 Set style to the user's explicitly requested visual style, including a style
 established for the same artwork earlier in the conversation. Empty when unspecified.
 Words such as "very cute", "cozy", "scary", "cartoon" and "simple flat colours"
@@ -126,6 +132,18 @@ export const REFERENCE_RULES =
   "target resolution allows; do not substitute a generic RPG interpretation. " +
   "Take only the aspects the user asks for; background handling follows the composition instructions.";
 
+export const IMAGE_VIEW_RULES =
+  "Follow the camera angle explicitly requested by the user or shown in the reference. " +
+  "If neither specifies a camera angle, use a conventional straight-on 2D view. " +
+  "Do not invent an isometric, top-down, dollhouse or cutaway view merely because the subject is a room, building or game environment. " +
+  "An explicitly requested or referenced view takes priority over this default.";
+
+export const SCENE_BACKGROUND_RULES =
+  "Paint the requested environment across the entire canvas, including all four corners. " +
+  "A complete scene is not an isolated diorama sitting on a plain backdrop: extend its walls, floor, landscape or other surroundings to the frame edges. " +
+  "Do not leave an external black/solid-colour void, vignette, floating base, transparent margins, chroma key or checkerboard unless the user explicitly requests one. " +
+  "Preserve intentional dark objects, lighting and shadows within the scene. No watermark or decorative border.";
+
 export const IMAGE_STYLE_RULES = [
   "crisp hard-edged pixels, no anti-aliasing, no blur.",
   "Polished fantasy game sprite in the style of classic 16-bit and 32-bit RPGs: natural proportions and a clear, readable silhouette; not cartoonish, not chibi, not a vector or flat illustration.",
@@ -182,7 +200,9 @@ pose or style; "match this exactly" must not preserve a conflicting front view.
 Keep style and pose requirements in instruction, including "cute" or "cozy".
 
 summary: one short sentence for the user, in the language of the request,
-saying what was done.
+introducing the requested redraw. This is a plan made before the image exists:
+do not claim that borders were removed, details preserved or the request
+successfully completed based only on the intended instruction.
 
 question: one or two short sentences for the user, in the language of the
 request, used when the target differs from the object: say what you are

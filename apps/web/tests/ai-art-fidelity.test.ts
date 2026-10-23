@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildImagePrompt,
+  buildRedrawPrompt,
+  buildEditContext,
   buildRedrawReferences,
   buildSheetPrompt,
   buildSheetRedrawPrompt,
@@ -118,6 +120,81 @@ describe("requested composition and style", () => {
     expect(prompt).toContain("edge-to-edge");
     expect(prompt).not.toContain(IMAGE_BACKGROUND_RULES[0]);
     expect(prompt).not.toContain("no scenery");
+  });
+  it("uses a straight-on 2D default for a room without inventing a diorama camera or empty outside backdrop", () => {
+    const prompt = buildImagePrompt(
+      "a cozy bedroom filling the whole tile",
+      128,
+      128,
+      false,
+      "scene",
+    );
+    expect(prompt).toContain("neither specifies a camera angle");
+    expect(prompt).toContain("conventional straight-on 2D view");
+    expect(prompt).toContain("Do not invent an isometric");
+    expect(prompt).toContain("including all four corners");
+    expect(prompt).toContain("extend its walls, floor");
+  });
+  it("lets an explicit or referenced isometric view override the default", () => {
+    const prompt = buildImagePrompt(
+      "an isometric bedroom",
+      128,
+      128,
+      true,
+      "scene",
+      "isometric pixel art",
+    );
+    expect(prompt).toContain("Requested visual style: isometric pixel art");
+    expect(prompt).toContain(
+      "An explicitly requested or referenced view takes priority over this default",
+    );
+    expect(prompt).toContain("reference");
+  });
+  it("allows a scene edit to replace black outer margins while preserving the existing view and interior objects", () => {
+    const prompt = buildRedrawPrompt(
+      "remove black outside areas and fill the whole tile",
+      128,
+      128,
+      "scene",
+    );
+    expect(prompt).toContain(
+      "old outer margins and plain backdrop must change",
+    );
+    expect(prompt).toContain("continuation of the actual scene");
+    expect(prompt).toContain("Keep the existing camera angle");
+    expect(prompt).not.toContain(
+      "Keep the original placement, scale and margins",
+    );
+    expect(prompt).toContain(
+      "Preserve intentional dark objects, lighting and shadows",
+    );
+    expect(prompt).not.toContain("Fit the complete requested silhouette");
+    expect(prompt).toContain("floor into the lower outside corners");
+  });
+  it("keeps the actual user's floor-extension constraints for a short follow-up, without treating success captions as instructions", () => {
+    const context = buildEditContext([
+      { role: "user", content: "make an old unrelated scene black" },
+      {
+        role: "user",
+        content: "draw a cozy bedroom",
+        action: { kind: "generate", request: "bedroom" },
+      },
+      {
+        role: "user",
+        content: "fill the whole tile without black outside areas",
+      },
+      { role: "assistant", content: "All black borders were removed" },
+      {
+        role: "user",
+        content: "but why you dont fix that in a floor, make there also",
+      },
+    ]);
+    expect(context).toContain(
+      "fill the whole tile without black outside areas",
+    );
+    expect(context).toContain("make there also");
+    expect(context).not.toContain("All black borders were removed");
+    expect(context).not.toContain("old unrelated");
   });
   it("keeps a complete scene together even if the router lists separate items", () => {
     const route = readRoute(

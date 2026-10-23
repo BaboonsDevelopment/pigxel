@@ -16,6 +16,7 @@ import {
   buildAnimationPrompt,
   buildComposePrompt,
   buildEditReviewPrompt,
+  buildEditContext,
   buildImagePrompt,
   buildPlacementPrompt,
   buildPlanPrompt,
@@ -263,6 +264,7 @@ export async function planEdit(args: {
   references?: Picture[];
   style?: string;
   composition?: "sprite" | "scene";
+  recent?: ChatMessage[];
 }): Promise<AiResult<EditPlan>> {
   await requireUser();
   const { request, width, height } = args;
@@ -286,6 +288,7 @@ export async function planEdit(args: {
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
   return attempt("planEdit", [request], async () => {
+    const context = buildEditContext(args.recent);
     const reply = await getAiProvider().plan(
       buildPlanPrompt({
         request: args.style?.trim()
@@ -297,6 +300,7 @@ export async function planEdit(args: {
         layers: args.layers,
         selection: args.selection,
         composition: args.composition,
+        context,
       }),
       [{ mimeType: "image/png", base64: png! }, ...references],
     );
@@ -324,7 +328,16 @@ export async function planEdit(args: {
       source,
       target: scene || keep.length ? source : placed,
       keep,
-      instruction: `${reply.instruction}\nUser request (do not discard its constraints): ${request}${args.style?.trim() ? `\nRequested visual style: ${args.style}` : ""}`,
+      instruction: [
+        context
+          ? `Earlier user instructions for this artwork (context only; the latest request overrides conflicting older instructions):\n${context}`
+          : "",
+        reply.instruction,
+        `User request (do not discard its constraints): ${request}`,
+        args.style?.trim() ? `Requested visual style: ${args.style}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       summary: reply.summary,
       question: reply.question,
     };

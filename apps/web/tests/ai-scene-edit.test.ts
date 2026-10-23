@@ -60,6 +60,44 @@ describe("scene edit canvas", () => {
       value: { source: selection, target: selection, keep: [] },
     });
   });
+  it("passes the unresolved raw background request through planning and into the redraw instruction", async () => {
+    const request = "make there also";
+    const earlier =
+      "extend the floor into the black lower corners; fill the whole tile";
+    const result = await planEdit({
+      ...args,
+      request,
+      composition: "scene",
+      recent: [
+        { role: "user", content: earlier },
+        { role: "assistant", content: "All borders have been removed" },
+        { role: "user", content: request },
+      ],
+    });
+    expect(provider.plan).toHaveBeenCalledWith(
+      expect.stringContaining(earlier),
+      expect.any(Array),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.instruction).toContain(earlier);
+    expect(result.value.instruction).not.toContain(
+      "All borders have been removed",
+    );
+    await redrawArea({
+      request: result.value.instruction,
+      picture: args.tile,
+      width: 64,
+      height: 64,
+      composition: "scene",
+    });
+    expect(provider.redraw).toHaveBeenCalledWith(
+      expect.stringContaining(earlier),
+      expect.any(Object),
+      "1:1",
+      true,
+    );
+  });
   it("preserves wrapped user references and the original while redrawing a complete scene", async () => {
     const reference = "data:image/png;base64,ZGVm";
     const original = "data:image/png;base64,Z2hp";

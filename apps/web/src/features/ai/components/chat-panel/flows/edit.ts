@@ -71,6 +71,11 @@ export async function edit(chat: Chat, action: TileAction) {
     references: toPictures(chat.references),
     style: action.style,
     composition: action.composition,
+    recent: chat.messages.map(({ role, content, action: previousAction }) => ({
+      role,
+      content,
+      action: previousAction,
+    })),
   }).catch(unreachable);
   chat.setPending(false);
   if (!plan.ok) return chat.setError(plan.error);
@@ -131,7 +136,10 @@ export async function edit(chat: Chat, action: TileAction) {
       const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
       chat.append({
         role: "assistant",
-        content: (plan.value.summary || "Done.") + many,
+        content:
+          (action.composition === "scene"
+            ? "Here is the redrawn scene."
+            : plan.value.summary || "Done.") + many,
         image: made.image,
         ...(whole && steps.length === 1 && { layer: layerId }),
       });
