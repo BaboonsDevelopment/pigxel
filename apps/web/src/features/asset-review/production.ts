@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { assetFileUrl, assetIdFor } from "@/features/assets/assets";
 import { isAssetBackground } from "@/features/assets/constants";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { packName } from "../../../scripts/assets/lib/asset.ts";
 import { BUCKET, PREMIUM_BUCKET } from "../../../scripts/assets/lib/remote.ts";
 import { ReviewError } from "./server";
 import type {
@@ -23,6 +24,8 @@ const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const NAME_MAX = 40;
 const DESCRIPTION_MAX = 400;
 const MAX_BATCH = 500;
+/** Under the API's row cap (max_rows), so a catalog read comes in pages. */
+const ASSET_PAGE_SIZE = 500;
 
 type PackRow = {
   id: string;
@@ -30,6 +33,7 @@ type PackRow = {
   description: string | null;
   background: string | null;
   premium: boolean;
+  pinned_at: string | null;
 };
 
 type AssetRow = {
@@ -78,6 +82,10 @@ function tagIds(ids: unknown) {
   return [...new Set(ids as string[])];
 }
 
+/** A pack name, without a size: the Assets page shows that as a badge. */
+const cleanPackName = (value: unknown) =>
+  cleanName(typeof value === "string" ? packName(value) : value, "pack");
+
 function cleanName(value: unknown, what: string) {
   const name = typeof value === "string" ? value.trim() : "";
   if (!name || name.length > NAME_MAX)
@@ -103,19 +111,11 @@ export async function productionCatalog(): Promise<ProductionCatalog> {
   const [packs, assets, tags] = await Promise.all([
     supabase
       .from("asset_packs")
-      .select("id, name, description, background, premium")
+      .select("id, name, description, background, premium, pinned_at")
       .order("sort")
       .order("name")
       .returns<PackRow[]>(),
-    supabase
-      .from("assets")
-      .select(
-        "id, name, pack_id, kind, width, height, frame_count, frame_ms, premium, sheet_path, asset_tag_links(tag_id)",
-      )
-      .order("pack_id")
-      .order("sort")
-      .order("name")
-      .returns<AssetRow[]>(),
+    allAssets(supabase),
     supabase
       .from("asset_tags")
       .select("id, name")
@@ -132,6 +132,7 @@ export async function productionCatalog(): Promise<ProductionCatalog> {
       description: row.description,
       background: row.background,
       premium: row.premium,
+      pinned: row.pinned_at !== null,
     })),
     assets: assets.data!.map((row): ProductionAsset => ({
       id: row.id,
@@ -150,12 +151,33 @@ export async function productionCatalog(): Promise<ProductionCatalog> {
   };
 }
 
+/** Every asset, by pack and place, read in pages past the API's row cap. */
+async function allAssets(supabase: SupabaseClient) {
+  const rows: AssetRow[] = [];
+  for (let from = 0; ; from += ASSET_PAGE_SIZE) {
+    const page = await supabase
+      .from("assets")
+      .select(
+        "id, name, pack_id, kind, width, height, frame_count, frame_ms, premium, sheet_path, asset_tag_links(tag_id)",
+      )
+      .order("pack_id")
+      .order("sort")
+      .order("name")
+      .order("id")
+      .range(from, from + ASSET_PAGE_SIZE - 1)
+      .returns<AssetRow[]>();
+    if (page.error) return { data: null, error: page.error };
+    rows.push(...page.data);
+    if (page.data.length < ASSET_PAGE_SIZE) return { data: rows, error: null };
+  }
+}
+
 /** Adds an empty pack at the end; it shows on the Assets page once it has assets. */
 export async function createPack(details: {
   name?: unknown;
   description?: unknown;
 }): Promise<ProductionPack> {
-  const name = cleanName(details.name, "pack");
+  const name = cleanPackName(details.name);
   const description = cleanDescription(details.description);
   const id = assetIdFor(name);
   if (!id) throw new ReviewError("Use some letters or numbers in the name.");
@@ -176,11 +198,19 @@ export async function createPack(details: {
   if (error?.code === "23505")
     throw new ReviewError(`There's already a pack called “${id}”.`, 409);
   if (error) fail("Couldn’t add the pack.", error);
-  return { id, name, description, background: null, premium: false };
+  return {
+    id,
+    name,
+    description,
+    background: null,
+    premium: false,
+    pinned: false,
+  };
 }
 
 /**
- * Changes a pack's name, description, colour or premium. Premium moves each
+ * Changes a pack's name, description, colour, pin or premium. Pinning stamps
+ * when, so the latest pin leads the Packs tab. Premium moves each
  * asset's .pigxel file to the private bucket (or back) before the pack
  * changes, so a failure part-way can simply be retried.
  */
@@ -191,17 +221,23 @@ export async function updatePack(
     description?: unknown;
     background?: unknown;
     premium?: unknown;
+    pinned?: unknown;
   },
 ) {
   const pack = packId(id);
   const patch: Record<string, unknown> = {};
-  if (details.name !== undefined) patch.name = cleanName(details.name, "pack");
+  if (details.name !== undefined) patch.name = cleanPackName(details.name);
   if (details.description !== undefined)
     patch.description = cleanDescription(details.description);
   if (details.background !== undefined) {
     if (details.background !== null && !isAssetBackground(details.background))
       throw new ReviewError("Pick one of the background colours.");
     patch.background = details.background;
+  }
+  if (details.pinned !== undefined) {
+    if (typeof details.pinned !== "boolean")
+      throw new ReviewError("pinned must be true or false.");
+    patch.pinned_at = details.pinned ? new Date().toISOString() : null;
   }
   if (details.premium !== undefined && typeof details.premium !== "boolean")
     throw new ReviewError("premium must be true or false.");

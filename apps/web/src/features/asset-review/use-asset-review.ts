@@ -81,6 +81,7 @@ type PackDetails = {
   description?: string | null;
   background?: string | null;
   premium?: boolean;
+  pinned?: boolean;
 };
 
 export function useProductionActions() {

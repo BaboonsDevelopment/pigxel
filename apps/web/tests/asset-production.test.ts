@@ -10,6 +10,7 @@ import {
   createPack,
   deletePack,
   moveAssets,
+  productionCatalog,
   tagAssets,
   updatePack,
 } from "@/features/asset-review/production";
@@ -23,6 +24,33 @@ const storageOps = (bucket: string) =>
     .map((call) => (call.kind === "storage" ? [call.op, ...call.args] : []));
 
 describe("managing assets in production", () => {
+  it("reads every asset, past the API's 1000-row cap", async () => {
+    const rows = Array.from({ length: 1200 }, (_, i) => ({
+      id: `a${i}`,
+      name: `A${i}`,
+      pack_id: i < 1100 ? "early" : "late",
+      kind: "sprite",
+      width: 64,
+      height: 64,
+      frame_count: 1,
+      frame_ms: 100,
+      premium: false,
+      sheet_path: `a${i}/sheet.png`,
+      asset_tag_links: [],
+    }));
+    supabase.respond("asset_packs", { data: [] });
+    supabase.respond("asset_tags", { data: [] });
+    supabase.respond("assets", (call) => {
+      const [, from, to] =
+        call.kind === "query" ? call.filters.find(([m]) => m === "range")! : [];
+      return { data: rows.slice(from as number, (to as number) + 1) };
+    });
+    const { assets } = await productionCatalog();
+    expect(assets).toHaveLength(1200);
+    expect(assets.filter((a) => a.packId === "late")).toHaveLength(100);
+    expect(supabase.callsTo("assets")).toHaveLength(3);
+  });
+
   it("adds a pack after the last one, its id taken from its name", async () => {
     supabase.respond("asset_packs.select", { data: [{ sort: 7 }] });
     const pack = await createPack({ name: "  Crystal Caverns " });
@@ -184,6 +212,39 @@ describe("managing assets in production", () => {
       values: { premium: true },
       filters: [["eq", "id", "vault"]],
     });
+  });
+
+  it("stamps a pin and clears it", async () => {
+    supabase.respond("asset_packs.update", { data: [{ id: "vault" }] });
+    await updatePack("vault", { pinned: true });
+    expect(supabase.callsTo("asset_packs.update")[0]).toMatchObject({
+      values: { pinned_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) },
+      filters: [["eq", "id", "vault"]],
+    });
+    expect(supabase.callsTo("assets")).toEqual([]);
+    await updatePack("vault", { pinned: false });
+    expect(supabase.callsTo("asset_packs.update")[1]).toMatchObject({
+      values: { pinned_at: null },
+      filters: [["eq", "id", "vault"]],
+    });
+  });
+
+  it("keeps sizes out of pack names", async () => {
+    supabase.respond("asset_packs.update", { data: [{ id: "vault" }] });
+    await updatePack("vault", { name: "Vault · 64×64" });
+    expect(supabase.callsTo("asset_packs.update")[0]).toMatchObject({
+      values: { name: "Vault" },
+    });
+    await expect(updatePack("vault", { name: "64×64" })).rejects.toThrow(
+      /Give the pack a name/,
+    );
+  });
+
+  it("rejects a pin that isn't true or false", async () => {
+    await expect(updatePack("vault", { pinned: "yes" })).rejects.toThrow(
+      /pinned must be/,
+    );
+    expect(supabase.callsTo("asset_packs")).toEqual([]);
   });
 
   it("rejects a colour outside the palette", async () => {

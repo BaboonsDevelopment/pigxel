@@ -11,7 +11,7 @@ import {
 } from "@pigxel/ui/components/button";
 import { Dialog, useDialog } from "@pigxel/ui/components/dialog";
 import { Heading, Text } from "@pigxel/ui/components/typography";
-import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { PremiumCrown } from "@/features/billing/components/premium-crown";
 import { UpgradeDialog } from "@/features/billing/components/upgrade-dialog";
 import { downloadBlob } from "@/lib/utils/download";
 import { useModifierLabel } from "@/lib/utils/use-modifier-label";
@@ -130,7 +130,12 @@ function AssetDetails({
             repeat={asset.kind === "tile"}
             className="max-h-full w-full"
           />
-          {pack.premium && <PremiumBadge className="absolute top-3 left-3" />}
+          {pack.premium && (
+            <PremiumCrown
+              locked={locked}
+              className="absolute right-3 bottom-3"
+            />
+          )}
         </div>
         <div className="flex flex-col gap-4 p-5">
           <div className="flex items-start justify-between gap-3">

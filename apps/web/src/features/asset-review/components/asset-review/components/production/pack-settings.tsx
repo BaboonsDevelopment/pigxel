@@ -11,7 +11,7 @@ import { SwatchPicker } from "../swatch-picker";
 
 const LABEL = "mb-1.5 block text-xs font-semibold";
 
-/** A pack's name, description, colour and premium. Keyed by pack id. */
+/** A pack's name, description, colour, pin and premium. Keyed by pack id. */
 export function PackSettings({
   pack,
   count,
@@ -23,13 +23,15 @@ export function PackSettings({
   const [name, setName] = useState(pack.name);
   const [description, setDescription] = useState(pack.description ?? "");
   const [premium, setPremium] = useState(pack.premium);
+  const [pinned, setPinned] = useState(pack.pinned);
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<{ text: string; error?: boolean }>();
 
   const dirty =
     name.trim() !== pack.name ||
     description.trim() !== (pack.description ?? "") ||
-    premium !== pack.premium;
+    premium !== pack.premium ||
+    pinned !== pack.pinned;
 
   const run = async (action: () => Promise<unknown>, done: string) => {
     setPending(true);
@@ -51,6 +53,7 @@ export function PackSettings({
           name,
           description,
           ...(premium !== pack.premium && { premium }),
+          ...(pinned !== pack.pinned && { pinned }),
         }),
       "Saved.",
     );
@@ -78,6 +81,11 @@ export function PackSettings({
               className="h-9 text-sm"
             />
           </label>
+          <FilterSwitch
+            label="Pinned: first on the Packs page, with a badge"
+            on={pinned}
+            onChange={setPinned}
+          />
           <div className="grid gap-1.5">
             <FilterSwitch
               label="Premium: only paid plans can use it"

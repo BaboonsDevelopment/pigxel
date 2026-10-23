@@ -25,3 +25,29 @@
     animation: none;
   }
 }
+
+/* A gold crown that glows softly where premium is open, and sits grey and
+   still where it isn't. */
+.crown {
+  color: #ffc857;
+  filter: drop-shadow(0 0 2px #ffc857) drop-shadow(0 0 5px #ef7a3c);
+  animation: glow 2.4s ease-in-out infinite alternate;
+}
+
+.crown.locked {
+  color: #c9c1c6;
+  filter: none;
+  animation: none;
+}
+
+@keyframes glow {
+  to {
+    filter: drop-shadow(0 0 3px #ffc857) drop-shadow(0 0 9px #ef7a3c);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crown {
+    animation: none;
+  }
+}
