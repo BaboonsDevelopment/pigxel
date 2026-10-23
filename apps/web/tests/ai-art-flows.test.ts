@@ -11,6 +11,12 @@ import type {
   Chat,
   ChatEntry,
 } from "@/features/ai/components/chat-panel/constants";
+import {
+  REDRAWN_PICTURE_STEPS,
+  SCENE_PICTURE_STEPS,
+  runSteps,
+} from "@/lib/image/pipeline";
+import { sheetToFrames } from "@/lib/image/sheet";
 
 vi.mock("@/features/ai/actions", () => ({
   generateAnimation: vi.fn(),
@@ -25,6 +31,7 @@ vi.mock("@/features/ai/components/chat-panel/flows/pictures", () => ({
   toArt: vi.fn(),
   toReference: vi.fn(),
 }));
+vi.mock("@/lib/image/sheet", () => ({ sheetToFrames: vi.fn() }));
 
 const size = { w: 4, h: 4 };
 const area = { x: 0, y: 0, ...size };
@@ -246,6 +253,7 @@ describe("edit by redraw", () => {
       height: 4,
       references: [{ dataUrl: "external-reference" }],
       original: "original-reference",
+      composition: "sprite",
     });
     expect(c.append).toHaveBeenLastCalledWith(
       expect.objectContaining({ image: "redrawn", layer: "character" }),
@@ -262,6 +270,167 @@ describe("edit by redraw", () => {
       height: 4,
       references: [],
       original: "",
+      composition: "sprite",
     });
+  });
+  it("fills the scene canvas even when the returned image is portrait-shaped and the planner protected the old connected picture", async () => {
+    const c = chat();
+    c.messages = [
+      {
+        role: "user",
+        content: "extend the floor into the black bottom corners",
+      },
+    ];
+    vi.mocked(actions.planEdit).mockResolvedValue({
+      ok: true,
+      value: {
+        source: area,
+        target: area,
+        objects: [0],
+        keep: [area],
+        instruction: "fill the entire background",
+        summary: "Removed all black borders and completely filled the canvas",
+        question: "",
+      },
+    });
+    const portrait = {
+      w: 2,
+      h: 4,
+      rgba: new Uint8ClampedArray(
+        Array.from({ length: 8 }, () => [50, 120, 80, 255]).flat(),
+      ),
+    };
+    vi.mocked(toArt).mockImplementation(async (_, target, steps) =>
+      runSteps(portrait, target, steps!),
+    );
+    await edit(c, {
+      kind: "edit",
+      request: "fix the missing background",
+      composition: "scene",
+    });
+    expect(actions.planEdit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        composition: "scene",
+        width: 4,
+        height: 4,
+        recent: [
+          {
+            role: "user",
+            content: "extend the floor into the black bottom corners",
+            action: undefined,
+          },
+        ],
+      }),
+    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "fill the entire background",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [],
+      original: "",
+      composition: "scene",
+    });
+    expect(toArt).toHaveBeenCalledWith("redrawn", area, SCENE_PICTURE_STEPS);
+    const pixels = vi
+      .mocked(c.canvas.writeCels)
+      .mock.calls[0]![1].get("frame")!;
+    for (let i = 3; i < pixels.length; i += 4) expect(pixels[i]).toBe(255);
+    expect(pixels).not.toEqual(character);
+    expect(c.say).not.toHaveBeenCalled();
+    expect(c.append).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        image: "redrawn",
+        content: "Here is the redrawn scene.",
+      }),
+    );
+    expect(actions.reviewEdit).not.toHaveBeenCalled();
+  });
+  it("limits a scene repair to an explicit selection without restoring the connected old scene over it", async () => {
+    const c = chat();
+    const selected = { x: 1, y: 1, w: 2, h: 2 };
+    c.selectArea = true;
+    vi.mocked(c.canvas.selectArea).mockResolvedValue(selected);
+    vi.mocked(actions.planEdit).mockResolvedValue({
+      ok: true,
+      value: {
+        source: selected,
+        target: selected,
+        objects: [0],
+        keep: [area],
+        instruction: "fill the background",
+        summary: "Filled",
+        question: "",
+      },
+    });
+    vi.mocked(toArt).mockResolvedValue({
+      w: 2,
+      h: 2,
+      rgba: solid(110).slice(0, 16),
+    });
+    await edit(c, {
+      kind: "edit",
+      request: "fill the background here",
+      composition: "scene",
+    });
+    const pixels = vi
+      .mocked(c.canvas.writeCels)
+      .mock.calls[0]![1].get("frame")!;
+    for (let y = 0; y < 4; y++)
+      for (let x = 0; x < 4; x++)
+        expect(pixels[(y * 4 + x) * 4]).toBe(
+          x >= 1 && x < 3 && y >= 1 && y < 3 ? 110 : 100,
+        );
+  });
+  it("continues to use sprite background removal for ordinary material edits", async () => {
+    const c = chat();
+    await edit(c, { kind: "edit", request: "make skin blue" });
+    expect(toArt).toHaveBeenCalledWith("redrawn", area, REDRAWN_PICTURE_STEPS);
+  });
+  it("uses one complete canvas for every scene frame and retains backgrounds while cutting the sheet", async () => {
+    const c = chat();
+    const narrow = new Uint8ClampedArray(character);
+    for (let y = 0; y < size.h; y++) {
+      narrow.fill(0, y * size.w * 4, (y * size.w + 1) * 4);
+      narrow.fill(0, (y * size.w + 3) * 4, (y * size.w + 4) * 4);
+    }
+    c.canvas.framesOf = () => ["frame", "other-frame"];
+    c.canvas.readCel = () => narrow;
+    vi.mocked(actions.redrawFrames).mockResolvedValue({
+      ok: true,
+      value: {
+        image: "scene-sheet",
+        layout: { cols: 2, rows: 1, aspectRatio: "2:1" },
+      },
+    });
+    vi.mocked(sheetToFrames).mockResolvedValue([
+      { ...size, rgba: solid(110) },
+      { ...size, rgba: solid(120) },
+    ]);
+    await edit(c, {
+      kind: "edit",
+      request: "fill the background in all frames",
+      composition: "scene",
+    });
+    expect(actions.redrawFrames).toHaveBeenCalledWith(
+      expect.objectContaining({
+        count: 2,
+        cellW: 4,
+        cellH: 4,
+        composition: "scene",
+      }),
+    );
+    expect(sheetToFrames).toHaveBeenCalledWith(
+      expect.any(Blob),
+      expect.any(Object),
+      2,
+      area,
+      "cells",
+      true,
+    );
+    const cels = vi.mocked(c.canvas.writeCels).mock.calls[0]![1];
+    expect(cels.get("frame")).toEqual(solid(110));
+    expect(cels.get("other-frame")).toEqual(solid(120));
+    expect(c.say).not.toHaveBeenCalled();
   });
 });

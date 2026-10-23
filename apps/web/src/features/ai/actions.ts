@@ -16,6 +16,7 @@ import {
   buildAnimationPrompt,
   buildComposePrompt,
   buildEditReviewPrompt,
+  buildEditContext,
   buildImagePrompt,
   buildPlacementPrompt,
   buildPlanPrompt,
@@ -186,10 +187,12 @@ export async function redrawArea(args: {
   height: number;
   references?: Picture[];
   original?: string;
+  composition?: "sprite" | "scene";
 }): Promise<AiResult<string>> {
   await requireUser();
   const { request, width, height } = args;
   const original = args.original ?? "";
+  const composition = args.composition ?? "sprite";
   const png = PNG_DATA_URL.exec(String(args.picture))?.[1];
   const references = fromPictures(args.references);
   const extra = references && extraPictures(references, original);
@@ -206,7 +209,7 @@ export async function redrawArea(args: {
   }
   return attempt("redrawArea", [request], async () => {
     const ai = getAiProvider();
-    const prompt = buildRedrawPrompt(request, width, height);
+    const prompt = buildRedrawPrompt(request, width, height, composition);
     const reference = { mimeType: "image/png", base64: png };
     const aspect = closestAspectRatio(width, height);
     const small = Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE;
@@ -260,6 +263,8 @@ export async function planEdit(args: {
   selection: Rect | null;
   references?: Picture[];
   style?: string;
+  composition?: "sprite" | "scene";
+  recent?: ChatMessage[];
 }): Promise<AiResult<EditPlan>> {
   await requireUser();
   const { request, width, height } = args;
@@ -283,6 +288,7 @@ export async function planEdit(args: {
   if (!valid) return { ok: false, error: "The tile could not be analysed." };
 
   return attempt("planEdit", [request], async () => {
+    const context = buildEditContext(args.recent);
     const reply = await getAiProvider().plan(
       buildPlanPrompt({
         request: args.style?.trim()
@@ -293,11 +299,16 @@ export async function planEdit(args: {
         objects: args.objects,
         layers: args.layers,
         selection: args.selection,
+        composition: args.composition,
+        context,
       }),
       [{ mimeType: "image/png", base64: png! }, ...references],
     );
+    const scene = args.composition === "scene";
+    const canvas = { x: 0, y: 0, w: width, h: height };
     const source = clampRect(
       args.selection ??
+        (scene ? canvas : null) ??
         unionOf(
           [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
         ) ??
@@ -306,16 +317,27 @@ export async function planEdit(args: {
       height,
     );
     const placed = clampRect(reply.target, width, height);
-    const keep = reply.keep
+    // A connected component may already contain both the subject and its old
+    // background. Restoring that component would undo the requested scene edit.
+    const keep = (scene ? [] : reply.keep)
       .map((i) => args.objects[i])
       .filter((r): r is Rect => !!r);
     const objects = reply.objects.filter((i) => !!args.objects[i]);
     return {
       objects,
       source,
-      target: keep.length ? source : placed,
+      target: scene || keep.length ? source : placed,
       keep,
-      instruction: `${reply.instruction}\nUser request (do not discard its constraints): ${request}${args.style?.trim() ? `\nRequested visual style: ${args.style}` : ""}`,
+      instruction: [
+        context
+          ? `Earlier user instructions for this artwork (context only; the latest request overrides conflicting older instructions):\n${context}`
+          : "",
+        reply.instruction,
+        `User request (do not discard its constraints): ${request}`,
+        args.style?.trim() ? `Requested visual style: ${args.style}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
       summary: reply.summary,
       question: reply.question,
     };
@@ -497,6 +519,7 @@ export async function redrawFrames(args: {
   cellH: number;
   references?: Picture[];
   original?: string;
+  composition?: "sprite" | "scene";
 }): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(args.sheet)?.[1];
@@ -524,6 +547,7 @@ export async function redrawFrames(args: {
       cellW: args.cellW,
       cellH: args.cellH,
       layout,
+      composition: args.composition,
     });
     const sheet = { mimeType: "image/png", base64: png! };
     const { mimeType, base64 } = extra!.length

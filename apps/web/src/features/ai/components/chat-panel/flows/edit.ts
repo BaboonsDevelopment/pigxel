@@ -6,7 +6,10 @@ import type { EditPlan, TileAction } from "../../../types";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
 import { paintedBounds, sameRect, unionOf } from "@/lib/edit/raster";
 import { CHROMA_KEY_HEX } from "@/lib/image/constants";
-import { REDRAWN_PICTURE_STEPS } from "@/lib/image/pipeline";
+import {
+  REDRAWN_PICTURE_STEPS,
+  SCENE_PICTURE_STEPS,
+} from "@/lib/image/pipeline";
 import { sheetToFrames } from "@/lib/image/sheet";
 import {
   ASK_FRAME,
@@ -15,7 +18,13 @@ import {
   unreachable,
   type Chat,
 } from "../constants";
-import { applyRedraw, follow, replaceObject, samePixels } from "../helpers";
+import {
+  applyRedraw,
+  follow,
+  replaceArea,
+  replaceObject,
+  samePixels,
+} from "../helpers";
 import { framesSheet, toArt, toReference } from "./pictures";
 
 type Cels = Map<string, Uint8ClampedArray>;
@@ -61,6 +70,12 @@ export async function edit(chat: Chat, action: TileAction) {
     selection,
     references: toPictures(chat.references),
     style: action.style,
+    composition: action.composition,
+    recent: chat.messages.map(({ role, content, action: previousAction }) => ({
+      role,
+      content,
+      action: previousAction,
+    })),
   }).catch(unreachable);
   chat.setPending(false);
   if (!plan.ok) return chat.setError(plan.error);
@@ -82,7 +97,7 @@ export async function edit(chat: Chat, action: TileAction) {
   const current = canvas.frameId();
   const frames = canvas.framesOf(layerId);
   const steps: Step[] = (frames.length ? frames : [current]).map((frame) => {
-    if (frame === current)
+    if (frame === current || action.composition === "scene")
       return { frame, source, target, keep: plan.value.keep };
     const cel = canvas.readCel(layerId, frame);
     const drawn = paintedBounds(cel, size.w, tile, EDIT_MARGIN);
@@ -99,7 +114,14 @@ export async function edit(chat: Chat, action: TileAction) {
     chat.setPending(true);
     try {
       const original = whole ? await originalOf(chat, layerId) : "";
-      const made = await redraw(chat, layerId, plan.value, steps, original);
+      const made = await redraw(
+        chat,
+        layerId,
+        plan.value,
+        steps,
+        original,
+        action.composition,
+      );
       if (!made) return false;
       const same = [...made.cels].every(([frame, cel]) =>
         samePixels(cel, canvas.readCel(layerId, frame)),
@@ -114,8 +136,12 @@ export async function edit(chat: Chat, action: TileAction) {
       const many = steps.length > 1 ? ` (${steps.length} frames)` : "";
       chat.append({
         role: "assistant",
-        content: (plan.value.summary || "Done.") + many,
+        content:
+          (action.composition === "scene"
+            ? "Here is the redrawn scene."
+            : plan.value.summary || "Done.") + many,
         image: made.image,
+        composition: action.composition ?? "sprite",
         ...(whole && steps.length === 1 && { layer: layerId }),
       });
       return true;
@@ -150,9 +176,17 @@ async function redraw(
   plan: EditPlan,
   steps: Step[],
   original: string,
+  composition: "sprite" | "scene" = "sprite",
 ): Promise<{ cels: Cels; image: string } | null> {
   if (redrawnTogether(steps))
-    return redrawFramesTogether(chat, layerId, plan, steps, original);
+    return redrawFramesTogether(
+      chat,
+      layerId,
+      plan,
+      steps,
+      original,
+      composition,
+    );
   const { canvas } = chat;
   const size = canvas.size();
   const current = canvas.frameId();
@@ -170,6 +204,7 @@ async function redraw(
         height: step.target.h,
         references: toPictures(chat.references),
         original: step.frame === current ? original : "",
+        composition,
       }).catch(unreachable),
     ),
   );
@@ -183,13 +218,19 @@ async function redraw(
   }
   const cels: Cels = new Map();
   for (const [i, step] of steps.entries()) {
-    const art = await toArt(pictures[i]!, step.target, REDRAWN_PICTURE_STEPS);
+    const art = await toArt(
+      pictures[i]!,
+      step.target,
+      composition === "scene" ? SCENE_PICTURE_STEPS : REDRAWN_PICTURE_STEPS,
+    );
     const cel = canvas.readCel(layerId, step.frame);
     cels.set(
       step.frame,
-      sameRect(step.source, step.target)
-        ? applyRedraw(cel, size, art, step.target, step.keep)
-        : replaceObject(cel, size, art, step.source, step.target),
+      composition === "scene"
+        ? replaceArea(cel, size, art, step.target)
+        : sameRect(step.source, step.target)
+          ? applyRedraw(cel, size, art, step.target, step.keep)
+          : replaceObject(cel, size, art, step.source, step.target),
     );
   }
   return { cels, image: pictures[0]! };
@@ -201,6 +242,7 @@ async function redrawFramesTogether(
   plan: EditPlan,
   steps: Step[],
   original: string,
+  composition: "sprite" | "scene",
 ): Promise<{ cels: Cels; image: string } | null> {
   const { canvas } = chat;
   const size = canvas.size();
@@ -219,6 +261,7 @@ async function redrawFramesTogether(
     cellH: box.h,
     references: toPictures(chat.references),
     original,
+    composition,
   }).catch(unreachable);
   if (!result.ok) {
     chat.setError(result.error);
@@ -231,6 +274,7 @@ async function redrawFramesTogether(
     steps.length,
     box,
     "cells",
+    composition === "scene",
   );
   if (!frames.every(Boolean)) {
     chat.setError("Couldn’t cut the redrawn frames apart. Try again.");
@@ -240,7 +284,9 @@ async function redrawFramesTogether(
   for (const [i, step] of steps.entries())
     cels.set(
       step.frame,
-      applyRedraw(before[i]!, size, frames[i]!, box, step.keep),
+      composition === "scene"
+        ? replaceArea(before[i]!, size, frames[i]!, box)
+        : applyRedraw(before[i]!, size, frames[i]!, box, step.keep),
     );
   return { cels, image };
 }

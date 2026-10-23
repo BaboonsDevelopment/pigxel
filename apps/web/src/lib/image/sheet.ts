@@ -363,7 +363,10 @@ export function bitmapToFrames(
   keepBackground = false,
   anchor: AnimationAnchor = "ground",
 ): (Bitmap | null)[] {
-  const keyed = keepBackground ? decoded : cutOutBackground(decoded);
+  const sheetTarget = { w: box.w * grid.cols, h: box.h * grid.rows };
+  const keyed = keepBackground
+    ? decoded
+    : cutOutBackground(decoded, sheetTarget);
   // Grid inference can shift cell boundaries; animation cells use the supplied grid.
   const sheet =
     by === "animation" && !keepBackground
@@ -381,7 +384,11 @@ export function bitmapToFrames(
     const recovered = cutSheetBackground(decoded);
     if (recovered)
       parts = animationCells(
-        removeSheetDividers(cutOutBackground(recovered), grid, count),
+        removeSheetDividers(
+          cutOutBackground(recovered, sheetTarget),
+          grid,
+          count,
+        ),
         grid,
         count,
       );

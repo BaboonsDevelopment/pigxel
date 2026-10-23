@@ -3,9 +3,7 @@ import type { RGB } from "./quantize";
 export const CHROMA_KEY: RGB = { r: 255, g: 0, b: 255 };
 export const CHROMA_KEY_HEX = "#FF00FF";
 export const ANIMATION_GUTTER_PX = 15;
-export const CHROMA_KEY_TOLERANCE = 120;
-export const FRINGE_MAGENTA = 40;
-export const FRINGE_PASSES = 2;
+export const CHROMA_KEY_TOLERANCE = 48;
 
 export const GRID_SAME_COLOR = 32;
 export const MIN_GRID_CELL = 4;

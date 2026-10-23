@@ -1,7 +1,7 @@
 import type { Area } from "@/features/editor/pixel-canvas/constants";
 import type { ChatEntry, Placement } from "../constants";
 import { buttonVariants } from "@pigxel/ui/components/button";
-import { PixelImage } from "@/components/ui/pixel-image";
+import { GeneratedPicture } from "./generated-picture";
 
 type Props = {
   messages: ChatEntry[];
@@ -85,10 +85,16 @@ export function ChatMessages({
             </button>
           )}
           {message.image && (
-            <PixelImage
-              src={message.image}
-              alt="Generated picture"
-              className="mt-2 w-full rounded-md"
+            <GeneratedPicture
+              source={message.image}
+              composition={
+                message.composition ??
+                messages
+                  .slice(0, i)
+                  .reverse()
+                  .find((entry) => entry.role === "user" && entry.action)
+                  ?.action?.composition
+              }
             />
           )}
         </li>

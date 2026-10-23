@@ -63,6 +63,7 @@ export type Placement = {
 };
 
 export type ChatEntry = ChatMessage & {
+  composition?: "sprite" | "scene";
   image?: string;
   references?: string[];
   picture?: string;
