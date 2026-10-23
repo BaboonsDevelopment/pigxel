@@ -87,6 +87,12 @@ export const UNREACHABLE = {
   error: "Could not reach the server.",
 } as const;
 
+/** A call that threw shows as unreachable; the console keeps why. */
+export const unreachable = (error: unknown) => {
+  console.error("[ai] call failed:", error);
+  return UNREACHABLE;
+};
+
 export const ASK_SELECT =
   "Select the area on the tile you want to work on (Esc to cancel).";
 export const ASK_FRAME =
@@ -104,4 +110,3 @@ export const FRAMES_SHEET_SIDE = 1024;
 export const MIN_MOVING_SHARE = 0.05;
 export const FRAMES_PER_PICTURE = 8;
 export const REVIEW_MARGIN = 4;
-

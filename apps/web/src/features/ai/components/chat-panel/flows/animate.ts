@@ -6,7 +6,7 @@ import { CHROMA_KEY_HEX } from "@/lib/image/constants";
 import { unionOf } from "@/lib/edit/raster";
 import {
   MIN_MOVING_SHARE,
-  UNREACHABLE,
+  unreachable,
   type Chat,
   type LayerInfo,
 } from "../constants";
@@ -36,7 +36,7 @@ export async function animate(chat: Chat, action: TileAction) {
     objects: objects.map((o) => o.area),
     objectLayers: objects.map((o) => names.get(o.layerId) ?? ""),
     frames: action.frames ?? 0,
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   chat.setPending(false);
   if (!plan.ok) return chat.setError(plan.error);
   const { frameCount, duration } = plan.value;
@@ -222,7 +222,7 @@ async function requestFrames(
     style: track.style,
     composition: track.composition,
     anchor: track.anchor,
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   if (!result.ok) throw new StepError(result.error);
   const frames = result.value.frames.map((bytes) => ({
     w: area.w,

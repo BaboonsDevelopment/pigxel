@@ -31,6 +31,7 @@ import {
 } from "./helpers";
 import { getAiProvider } from "./provider";
 import { renderAnimation, type AnimationInput } from "./animation";
+import { fromPictures, type Picture } from "./pictures";
 import { billOnSuccess } from "./usage";
 import type {
   AiResult,
@@ -41,6 +42,7 @@ import type {
   GeneratedImage,
   PlacementPlan,
   Rect,
+  SentMessage,
 } from "./types";
 import { MAX_OBJECTS } from "@/lib/edit/constants";
 import { unionOf } from "@/lib/edit/raster";
@@ -89,9 +91,19 @@ async function attempt<T>(
 }
 
 export async function sendMessage(
-  messages: ChatMessage[],
+  sent: SentMessage[],
 ): Promise<AiResult<ChatMessage>> {
   await requireUser();
+  const messages: ChatMessage[] = [];
+  for (const message of Array.isArray(sent) ? sent : []) {
+    const references = fromPictures(message.references);
+    if (!references)
+      return { ok: false, error: "Those references cannot be used." };
+    messages.push({
+      ...message,
+      references: references.length ? references : undefined,
+    });
+  }
   const typed =
     [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
   return attempt("sendMessage", [typed], async () => {
@@ -124,19 +136,23 @@ export async function sendMessage(
   });
 }
 
-export async function generateImage(
-  subject: string,
-  width: number,
-  height: number,
-  references: string[] = [],
-  composition: "sprite" | "scene" = "sprite",
-  style = "",
-): Promise<AiResult<string>> {
+export async function generateImage(args: {
+  subject: string;
+  width: number;
+  height: number;
+  references?: Picture[];
+  composition?: "sprite" | "scene";
+  style?: string;
+}): Promise<AiResult<string>> {
   await requireUser();
-  const pictures = (Array.isArray(references) ? references : []).map((r) =>
-    IMAGE_DATA_URL.exec(String(r)),
-  );
+  const { subject, width, height } = args;
+  const composition = args.composition ?? "sprite";
+  const style = args.style ?? "";
+  const references = fromPictures(args.references);
+  const pictures = (references ?? []).map((r) => IMAGE_DATA_URL.exec(r));
   if (
+    !references ||
+    typeof subject !== "string" ||
     !subject.trim() ||
     !validSize(width) ||
     !validSize(height) ||
@@ -163,19 +179,29 @@ export async function generateImage(
   });
 }
 
-export async function redrawArea(
-  request: string,
-  picture: string,
-  width: number,
-  height: number,
-  references: string[] = [],
-  original = "",
-): Promise<AiResult<string>> {
+export async function redrawArea(args: {
+  request: string;
+  picture: string;
+  width: number;
+  height: number;
+  references?: Picture[];
+  original?: string;
+}): Promise<AiResult<string>> {
   await requireUser();
-  const png = PNG_DATA_URL.exec(picture)?.[1];
-  const extra = extraPictures(references, original);
-  if (!extra) return { ok: false, error: "Those references cannot be used." };
-  if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
+  const { request, width, height } = args;
+  const original = args.original ?? "";
+  const png = PNG_DATA_URL.exec(String(args.picture))?.[1];
+  const references = fromPictures(args.references);
+  const extra = references && extraPictures(references, original);
+  if (!references || !extra)
+    return { ok: false, error: "Those references cannot be used." };
+  if (
+    typeof request !== "string" ||
+    !request.trim() ||
+    !png ||
+    !validSize(width) ||
+    !validSize(height)
+  ) {
     return { ok: false, error: "That area cannot be redrawn." };
   }
   return attempt("redrawArea", [request], async () => {
@@ -196,15 +222,22 @@ export async function redrawArea(
   });
 }
 
-export async function suggestComposition(
-  subject: string,
-  tile: string,
-  width: number,
-  height: number,
-): Promise<AiResult<Rect>> {
+export async function suggestComposition(args: {
+  subject: string;
+  tile: string;
+  width: number;
+  height: number;
+}): Promise<AiResult<Rect>> {
   await requireUser();
-  const png = PNG_DATA_URL.exec(tile)?.[1];
-  if (!subject.trim() || !png || !validSize(width) || !validSize(height)) {
+  const { subject, width, height } = args;
+  const png = PNG_DATA_URL.exec(String(args.tile))?.[1];
+  if (
+    typeof subject !== "string" ||
+    !subject.trim() ||
+    !png ||
+    !validSize(width) ||
+    !validSize(height)
+  ) {
     return { ok: false, error: "The tile could not be analysed." };
   }
   return attempt("suggestComposition", [subject], async () => {
@@ -225,13 +258,14 @@ export async function planEdit(args: {
   layers: string[];
   drawn: Rect;
   selection: Rect | null;
-  references?: string[];
+  references?: Picture[];
   style?: string;
 }): Promise<AiResult<EditPlan>> {
   await requireUser();
   const { request, width, height } = args;
   const png = PNG_DATA_URL.exec(args.tile)?.[1];
-  const references = extraPictures(args.references ?? [], "");
+  const sent = fromPictures(args.references);
+  const references = sent && extraPictures(sent, "");
   if (!references)
     return { ok: false, error: "Those references cannot be used." };
   const rects = [
@@ -461,14 +495,15 @@ export async function redrawFrames(args: {
   count: number;
   cellW: number;
   cellH: number;
-  references?: string[];
+  references?: Picture[];
   original?: string;
 }): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(args.sheet)?.[1];
-  const references = args.references ?? [];
+  const sent = fromPictures(args.references);
+  const references = sent ?? [];
   const original = args.original ?? "";
-  const extra = extraPictures(references, original);
+  const extra = sent && extraPictures(references, original);
   const valid =
     extra &&
     typeof args.instruction === "string" &&

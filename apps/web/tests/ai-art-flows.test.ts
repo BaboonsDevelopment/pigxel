@@ -235,16 +235,18 @@ describe("edit by redraw", () => {
     await edit(c, { kind: "edit", request: "make skin blue" });
     expect(fetch).toHaveBeenCalledWith("latest");
     expect(actions.planEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ references: ["external-reference"] }),
+      expect.objectContaining({
+        references: [{ dataUrl: "external-reference" }],
+      }),
     );
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      "recolour skin",
-      "reference",
-      4,
-      4,
-      ["external-reference"],
-      "original-reference",
-    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [{ dataUrl: "external-reference" }],
+      original: "original-reference",
+    });
     expect(c.append).toHaveBeenLastCalledWith(
       expect.objectContaining({ image: "redrawn", layer: "character" }),
     );
@@ -253,13 +255,13 @@ describe("edit by redraw", () => {
     const c = chat();
     await edit(c, { kind: "edit", request: "make skin blue" });
     expect(toReference).not.toHaveBeenCalled();
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      "recolour skin",
-      "reference",
-      4,
-      4,
-      [],
-      "",
-    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [],
+      original: "",
+    });
   });
 });

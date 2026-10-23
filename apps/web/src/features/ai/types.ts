@@ -1,3 +1,5 @@
+import type { Picture } from "./pictures";
+
 export type TileAction = {
   composition?: "sprite" | "scene";
   style?: string;
@@ -17,6 +19,11 @@ export type ChatMessage = {
   content: string;
   references?: string[];
   action?: TileAction;
+};
+
+/** A chat message as sent to sendMessage: its references wrapped. */
+export type SentMessage = Omit<ChatMessage, "references"> & {
+  references?: Picture[];
 };
 
 export type AiResult<T> = { ok: true; value: T } | { ok: false; error: string };
