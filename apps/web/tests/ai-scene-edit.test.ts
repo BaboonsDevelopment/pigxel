@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { planEdit, redrawArea } from "@/features/ai/actions";
+import { toPictures } from "@/features/ai/pictures";
 import type { AiProvider, PlanReply } from "@/features/ai/types";
 
 vi.mock("@/lib/auth/session", () => ({
@@ -24,6 +25,7 @@ const reply: PlanReply = {
 const provider = {
   plan: vi.fn(async () => reply),
   redraw: vi.fn(async () => ({ mimeType: "image/png", base64: "YWJj" })),
+  generate: vi.fn(async () => ({ mimeType: "image/png", base64: "YWJj" })),
 } as unknown as AiProvider;
 const args = {
   request: "background should be like Mona Lisa",
@@ -58,6 +60,40 @@ describe("scene edit canvas", () => {
       value: { source: selection, target: selection, keep: [] },
     });
   });
+  it("preserves wrapped user references and the original while redrawing a complete scene", async () => {
+    const reference = "data:image/png;base64,ZGVm";
+    const original = "data:image/png;base64,Z2hp";
+    const references = toPictures([reference]);
+    const plan = await planEdit({ ...args, references, composition: "scene" });
+    expect(plan).toMatchObject({
+      ok: true,
+      value: { source: tile, target: tile },
+    });
+    expect(provider.plan).toHaveBeenCalledWith(expect.any(String), [
+      { mimeType: "image/png", base64: "YWJj" },
+      { mimeType: "image/png", base64: "ZGVm" },
+    ]);
+    const result = await redrawArea({
+      request: args.request,
+      picture: args.tile,
+      width: 64,
+      height: 64,
+      references,
+      original,
+      composition: "scene",
+    });
+    expect(result.ok).toBe(true);
+    expect(provider.generate).toHaveBeenCalledWith(
+      expect.stringContaining("across the ENTIRE canvas"),
+      "1:1",
+      true,
+      [
+        { mimeType: "image/png", base64: "YWJj" },
+        { mimeType: "image/png", base64: "Z2hp" },
+        { mimeType: "image/png", base64: "ZGVm" },
+      ],
+    );
+  });
   it("keeps object bounds and protection for ordinary sprite edits", async () => {
     const result = await planEdit(args);
     expect(result).toMatchObject({
@@ -66,15 +102,13 @@ describe("scene edit canvas", () => {
     });
   });
   it("passes canvas dimensions, aspect ratio and full-background instructions to the image model", async () => {
-    const result = await redrawArea(
-      args.request,
-      args.tile,
-      64,
-      64,
-      [],
-      "",
-      "scene",
-    );
+    const result = await redrawArea({
+      request: args.request,
+      picture: args.tile,
+      width: 64,
+      height: 64,
+      composition: "scene",
+    });
     expect(result.ok).toBe(true);
     expect(provider.redraw).toHaveBeenCalledWith(
       expect.stringContaining("fixed 64x64 canvas"),

@@ -1,5 +1,6 @@
 import type { Area } from "@/features/editor/pixel-canvas/constants";
 import { planEdit, redrawArea, redrawFrames } from "../../../actions";
+import { toPictures } from "../../../pictures";
 import { sheetLayout } from "../../../helpers";
 import type { EditPlan, TileAction } from "../../../types";
 import { EDIT_MARGIN } from "@/lib/edit/constants";
@@ -14,7 +15,7 @@ import {
   ASK_FRAME,
   ASK_SELECT,
   NO_LAYER,
-  UNREACHABLE,
+  unreachable,
   type Chat,
 } from "../constants";
 import {
@@ -67,10 +68,10 @@ export async function edit(chat: Chat, action: TileAction) {
     layers: objects.map((o) => names.get(o.layerId) ?? ""),
     drawn: unionOf(layers.flatMap((l) => (l.box ? [l.box] : []))) ?? tile,
     selection,
-    references: chat.references,
+    references: toPictures(chat.references),
     style: action.style,
     composition: action.composition,
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   chat.setPending(false);
   if (!plan.ok) return chat.setError(plan.error);
 
@@ -182,15 +183,20 @@ async function redraw(
   const current = canvas.frameId();
   const results = await Promise.all(
     steps.map((step) =>
-      redrawArea(
-        plan.instruction,
-        canvas.snapshotCel(layerId, step.frame, step.source, CHROMA_KEY_HEX),
-        step.target.w,
-        step.target.h,
-        chat.references,
-        step.frame === current ? original : "",
+      redrawArea({
+        request: plan.instruction,
+        picture: canvas.snapshotCel(
+          layerId,
+          step.frame,
+          step.source,
+          CHROMA_KEY_HEX,
+        ),
+        width: step.target.w,
+        height: step.target.h,
+        references: toPictures(chat.references),
+        original: step.frame === current ? original : "",
         composition,
-      ).catch(() => UNREACHABLE),
+      }).catch(unreachable),
     ),
   );
   const pictures: string[] = [];
@@ -244,10 +250,10 @@ async function redrawFramesTogether(
     count: steps.length,
     cellW: box.w,
     cellH: box.h,
-    references: chat.references,
+    references: toPictures(chat.references),
     original,
     composition,
-  }).catch(() => UNREACHABLE);
+  }).catch(unreachable);
   if (!result.ok) {
     chat.setError(result.error);
     return null;

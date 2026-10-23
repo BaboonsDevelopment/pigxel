@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../actions";
+import { toPictures } from "../../pictures";
 import { REFERENCES_NOTE } from "../../constants";
 import { notifyAiSpent } from "../../spent-event";
 import { warnAboutTokens } from "../../token-warnings";
@@ -16,7 +17,7 @@ import { ChatMessages } from "./components/chat-messages";
 import { ChatWelcome } from "./components/chat-welcome";
 import {
   ASK_FRAME,
-  UNREACHABLE,
+  unreachable,
   type CanvasBridge,
   type Chat,
   type ChatEntry,
@@ -277,9 +278,11 @@ export function ChatPanel({
         content: message.references?.length
           ? `${message.content} ${REFERENCES_NOTE}`
           : message.content,
-        ...(message === visualContext && { references: message.references }),
+        ...(message === visualContext && {
+          references: toPictures(message.references),
+        }),
       })),
-    ).catch(() => UNREACHABLE);
+    ).catch(unreachable);
     if (stopped.current.has(token)) return;
     running.current.delete(token);
     setPending(false);

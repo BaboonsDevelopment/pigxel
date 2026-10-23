@@ -18,18 +18,21 @@ const showOffline = () =>
     action: { label: "Retry", onClick: () => void retry() },
   });
 
+// Supabase's root answers 404, which the console logs on every check; its
+// storage version needs no key and answers 200.
+const PING_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+  ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/version`
+  : null;
+
 async function reachable() {
   if (!navigator.onLine) return false;
   try {
-    await fetch(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || window.location.origin,
-      {
-        method: "HEAD",
-        mode: "no-cors",
-        cache: "no-store",
-        signal: AbortSignal.timeout(CHECK_TIMEOUT),
-      },
-    );
+    await fetch(PING_URL ?? window.location.origin, {
+      method: "HEAD",
+      mode: "no-cors",
+      cache: "no-store",
+      signal: AbortSignal.timeout(CHECK_TIMEOUT),
+    });
     return true;
   } catch {
     return false;

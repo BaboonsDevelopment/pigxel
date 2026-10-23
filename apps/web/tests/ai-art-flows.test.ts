@@ -242,17 +242,19 @@ describe("edit by redraw", () => {
     await edit(c, { kind: "edit", request: "make skin blue" });
     expect(fetch).toHaveBeenCalledWith("latest");
     expect(actions.planEdit).toHaveBeenCalledWith(
-      expect.objectContaining({ references: ["external-reference"] }),
+      expect.objectContaining({
+        references: [{ dataUrl: "external-reference" }],
+      }),
     );
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      "recolour skin",
-      "reference",
-      4,
-      4,
-      ["external-reference"],
-      "original-reference",
-      "sprite",
-    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [{ dataUrl: "external-reference" }],
+      original: "original-reference",
+      composition: "sprite",
+    });
     expect(c.append).toHaveBeenLastCalledWith(
       expect.objectContaining({ image: "redrawn", layer: "character" }),
     );
@@ -261,15 +263,15 @@ describe("edit by redraw", () => {
     const c = chat();
     await edit(c, { kind: "edit", request: "make skin blue" });
     expect(toReference).not.toHaveBeenCalled();
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      "recolour skin",
-      "reference",
-      4,
-      4,
-      [],
-      "",
-      "sprite",
-    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "recolour skin",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [],
+      original: "",
+      composition: "sprite",
+    });
   });
   it("fills the scene canvas even when the returned image is portrait-shaped and the planner protected the old connected picture", async () => {
     const c = chat();
@@ -303,15 +305,15 @@ describe("edit by redraw", () => {
     expect(actions.planEdit).toHaveBeenCalledWith(
       expect.objectContaining({ composition: "scene", width: 4, height: 4 }),
     );
-    expect(actions.redrawArea).toHaveBeenCalledWith(
-      "fill the entire background",
-      "reference",
-      4,
-      4,
-      [],
-      "",
-      "scene",
-    );
+    expect(actions.redrawArea).toHaveBeenCalledWith({
+      request: "fill the entire background",
+      picture: "reference",
+      width: 4,
+      height: 4,
+      references: [],
+      original: "",
+      composition: "scene",
+    });
     expect(toArt).toHaveBeenCalledWith("redrawn", area, SCENE_PICTURE_STEPS);
     const pixels = vi
       .mocked(c.canvas.writeCels)
