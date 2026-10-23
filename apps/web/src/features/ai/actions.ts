@@ -6,6 +6,7 @@ import {
   MAX_REFERENCES,
   MAX_SET_ITEMS,
   PLACEMENT_HISTORY,
+  REFERENCES_NOTE,
   SMALL_IMAGE_MAX_SIDE,
 } from "./constants";
 import { creditBalance, creditsOf } from "./credits";
@@ -15,15 +16,12 @@ import {
   buildAnimationPrompt,
   buildComposePrompt,
   buildEditReviewPrompt,
-  buildEditSystemPrompt,
-  buildEditUserMessage,
   buildImagePrompt,
   buildPlacementPrompt,
   buildPlanPrompt,
   buildRedrawPrompt,
+  buildRedrawReferences,
   buildSetPrompt,
-  buildSheetAnimatePrompt,
-  buildSheetPrompt,
   buildSheetRedrawPrompt,
   clampAnimationPlan,
   clampRect,
@@ -32,13 +30,15 @@ import {
   type SheetLayout,
 } from "./helpers";
 import { getAiProvider } from "./provider";
+import { renderAnimation, type AnimationInput } from "./animation";
+import { billOnSuccess } from "./usage";
 import type {
   AiResult,
   AnimationPlan,
   ChatMessage,
   EditPlan,
-  EditReply,
   EditReview,
+  GeneratedImage,
   PlacementPlan,
   Rect,
 } from "./types";
@@ -51,10 +51,22 @@ import { createClient } from "@/lib/supabase/server";
 const PNG_DATA_URL = /^data:image\/png;base64,([A-Za-z0-9+/=]{1,2000000})$/;
 const IMAGE_DATA_URL =
   /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/;
-const MAX_GRID_TEXT = 100_000;
 
 const validSize = (n: number) =>
   Number.isInteger(n) && n > 0 && n <= MAX_PIGXEL_SIZE;
+
+function extraPictures(
+  references: string[],
+  original: string,
+): GeneratedImage[] | null {
+  if (!Array.isArray(references) || references.length > MAX_REFERENCES)
+    return null;
+  const parsed = [...(original ? [original] : []), ...references].map((r) =>
+    IMAGE_DATA_URL.exec(String(r)),
+  );
+  if (parsed.some((p) => !p)) return null;
+  return parsed.map((p) => ({ mimeType: p![1]!, base64: p![2]! }));
+}
 
 /** Runs an AI step after checking the balance and screening what the person typed. */
 async function attempt<T>(
@@ -85,6 +97,8 @@ export async function sendMessage(
   return attempt("sendMessage", [typed], async () => {
     const ai = getAiProvider();
     const recent = messages.slice(-MAX_HISTORY);
+    if (recent.some((m) => m.references && !extraPictures(m.references, "")))
+      throw new AiError("failed", "Those references cannot be used.");
     const route = await ai.route(recent);
     if (route.intent === "chat") {
       return { role: "assistant", content: await ai.chat(recent) };
@@ -94,7 +108,10 @@ export async function sendMessage(
       content: `${route.intent}: ${route.subject}`,
       action: {
         kind: route.intent,
-        request: route.subject,
+        request: [
+          route.subject,
+          `User's latest request: ${typed.replace(REFERENCES_NOTE, "").trim()}`,
+        ].join("\n"),
         where: route.where,
         count: route.count,
         name: route.name,
@@ -146,34 +163,18 @@ export async function generateImage(
   });
 }
 
-export async function editTile(
-  request: string,
-  grid: string,
-): Promise<AiResult<EditReply>> {
-  await requireUser();
-  if (!request.trim() || !grid || grid.length > MAX_GRID_TEXT) {
-    return { ok: false, error: "That area is too big to edit this way." };
-  }
-  return attempt("editTile", [request], () =>
-    getAiProvider().edit(
-      buildEditSystemPrompt(),
-      buildEditUserMessage(grid, request),
-    ),
-  );
-}
-
 export async function redrawArea(
   request: string,
   picture: string,
   width: number,
   height: number,
   references: string[] = [],
+  original = "",
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
-  const refs = references.map((r) => IMAGE_DATA_URL.exec(r));
-  if (refs.length > MAX_REFERENCES || refs.some((r) => !r))
-    return { ok: false, error: "Those references cannot be used." };
+  const extra = extraPictures(references, original);
+  if (!extra) return { ok: false, error: "Those references cannot be used." };
   if (!request.trim() || !png || !validSize(width) || !validSize(height)) {
     return { ok: false, error: "That area cannot be redrawn." };
   }
@@ -183,15 +184,12 @@ export async function redrawArea(
     const reference = { mimeType: "image/png", base64: png };
     const aspect = closestAspectRatio(width, height);
     const small = Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE;
-    const { mimeType, base64 } = refs.length
+    const { mimeType, base64 } = extra.length
       ? await ai.generate(
-          `${prompt} The FIRST image is the artwork to edit. Additional images guide only the changes requested; keep the first image's composition.`,
+          `${prompt} ${buildRedrawReferences("the pixel art to edit", !!original, references.length)}`,
           aspect,
           small,
-          [
-            reference,
-            ...refs.map((r) => ({ mimeType: r![1]!, base64: r![2]! })),
-          ],
+          [reference, ...extra],
         )
       : await ai.redraw(prompt, reference, aspect, small);
     return `data:${mimeType};base64,${base64}`;
@@ -227,10 +225,15 @@ export async function planEdit(args: {
   layers: string[];
   drawn: Rect;
   selection: Rect | null;
+  references?: string[];
+  style?: string;
 }): Promise<AiResult<EditPlan>> {
   await requireUser();
   const { request, width, height } = args;
   const png = PNG_DATA_URL.exec(args.tile)?.[1];
+  const references = extraPictures(args.references ?? [], "");
+  if (!references)
+    return { ok: false, error: "Those references cannot be used." };
   const rects = [
     args.drawn,
     ...args.objects,
@@ -248,14 +251,16 @@ export async function planEdit(args: {
   return attempt("planEdit", [request], async () => {
     const reply = await getAiProvider().plan(
       buildPlanPrompt({
-        request,
+        request: args.style?.trim()
+          ? `${request}\nRequested visual style: ${args.style}`
+          : request,
         width,
         height,
         objects: args.objects,
         layers: args.layers,
         selection: args.selection,
       }),
-      { mimeType: "image/png", base64: png! },
+      [{ mimeType: "image/png", base64: png! }, ...references],
     );
     const source = clampRect(
       args.selection ??
@@ -267,23 +272,16 @@ export async function planEdit(args: {
       height,
     );
     const placed = clampRect(reply.target, width, height);
-    const target =
-      reply.mode === "ops"
-        ? source
-        : reply.mode === "move"
-          ? clampRect({ ...placed, w: source.w, h: source.h }, width, height)
-          : placed;
     const keep = reply.keep
       .map((i) => args.objects[i])
       .filter((r): r is Rect => !!r);
     const objects = reply.objects.filter((i) => !!args.objects[i]);
     return {
-      mode: reply.mode,
       objects,
       source,
-      target: keep.length ? source : target,
+      target: keep.length ? source : placed,
       keep,
-      instruction: reply.instruction,
+      instruction: `${reply.instruction}\nUser request (do not discard its constraints): ${request}${args.style?.trim() ? `\nRequested visual style: ${args.style}` : ""}`,
       summary: reply.summary,
       question: reply.question,
     };
@@ -463,10 +461,16 @@ export async function redrawFrames(args: {
   count: number;
   cellW: number;
   cellH: number;
+  references?: string[];
+  original?: string;
 }): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(args.sheet)?.[1];
+  const references = args.references ?? [];
+  const original = args.original ?? "";
+  const extra = extraPictures(references, original);
   const valid =
+    extra &&
     typeof args.instruction === "string" &&
     args.instruction.trim() &&
     png &&
@@ -478,102 +482,48 @@ export async function redrawFrames(args: {
   if (!valid) return { ok: false, error: "Those frames cannot be redrawn." };
   return attempt("redrawFrames", [args.instruction], async () => {
     const layout = sheetLayout(args.count, args.cellW, args.cellH);
-    const { mimeType, base64 } = await getAiProvider().redraw(
-      buildSheetRedrawPrompt({
-        instruction: args.instruction.slice(0, 1000),
-        count: args.count,
-        cellW: args.cellW,
-        cellH: args.cellH,
-        layout,
-      }),
-      { mimeType: "image/png", base64: png! },
-      layout.aspectRatio,
-      false,
-    );
+    const ai = getAiProvider();
+    const prompt = buildSheetRedrawPrompt({
+      instruction: args.instruction.slice(0, 1000),
+      count: args.count,
+      cellW: args.cellW,
+      cellH: args.cellH,
+      layout,
+    });
+    const sheet = { mimeType: "image/png", base64: png! };
+    const { mimeType, base64 } = extra!.length
+      ? await ai.generate(
+          `${prompt} ${buildRedrawReferences("the sprite sheet to edit", !!original, references.length)}`,
+          layout.aspectRatio,
+          false,
+          [sheet, ...extra!],
+        )
+      : await ai.redraw(prompt, sheet, layout.aspectRatio, false);
     return { image: `data:${mimeType};base64,${base64}`, layout };
   });
 }
 
-export async function animateSheet(args: {
-  style?: string;
-  subject: string;
-  poses: string[];
-  sheet: string;
-  cellW: number;
-  cellH: number;
-}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
+export async function generateAnimation(
+  args: AnimationInput,
+): Promise<AiResult<{ image: string; frames: string[] }>> {
   await requireUser();
-  const png = PNG_DATA_URL.exec(args.sheet)?.[1];
   const valid =
     typeof args.subject === "string" &&
-    png &&
-    Array.isArray(args.poses) &&
-    args.poses.length >= 1 &&
-    args.poses.length <= MAX_FRAMES &&
-    args.poses.every((p) => typeof p === "string" && p.trim()) &&
-    validSize(args.cellW) &&
-    validSize(args.cellH);
-  if (!valid) return { ok: false, error: "That animation cannot be drawn." };
-  return attempt("animateSheet", [args.subject, ...args.poses], async () => {
-    const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
-    const { mimeType, base64 } = await getAiProvider().redraw(
-      buildSheetAnimatePrompt({
-        style: args.style,
-        subject: args.subject.slice(0, 1000),
-        poses: args.poses.map((p) => p.slice(0, 500)),
-        cellW: args.cellW,
-        cellH: args.cellH,
-        layout,
-      }),
-      { mimeType: "image/png", base64: png! },
-      layout.aspectRatio,
-      false,
-    );
-    return { image: `data:${mimeType};base64,${base64}`, layout };
-  });
-}
-
-export async function generateSheet(args: {
-  style?: string;
-  composition?: "sprite" | "scene";
-  subject: string;
-  poses: string[];
-  cellW: number;
-  cellH: number;
-  reference: string | null;
-}): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
-  await requireUser();
-  const reference = args.reference
-    ? PNG_DATA_URL.exec(args.reference)?.[1]
-    : null;
-  const valid =
     args.subject.trim() &&
-    args.poses.length >= 1 &&
+    Array.isArray(args.poses) &&
+    args.poses.length >= 2 &&
     args.poses.length <= MAX_FRAMES &&
     args.poses.every((p) => typeof p === "string" && p.trim()) &&
     validSize(args.cellW) &&
     validSize(args.cellH) &&
-    reference !== undefined;
+    (args.sheet === null || PNG_DATA_URL.test(args.sheet)) &&
+    (args.reference === null || PNG_DATA_URL.test(args.reference)) &&
+    (!args.anchor || ["ground", "body", "fixed"].includes(args.anchor)) &&
+    (!args.composition || ["sprite", "scene"].includes(args.composition));
   if (!valid) return { ok: false, error: "That animation cannot be drawn." };
-
-  return attempt("generateSheet", [args.subject, ...args.poses], async () => {
-    const ai = getAiProvider();
-    const layout = sheetLayout(args.poses.length, args.cellW, args.cellH);
-    const prompt = buildSheetPrompt({
-      ...args,
-      layout,
-      fromReference: !!reference,
-    });
-    const { mimeType, base64 } = reference
-      ? await ai.redraw(
-          prompt,
-          { mimeType: "image/png", base64: reference },
-          layout.aspectRatio,
-          false,
-        )
-      : await ai.generate(prompt, layout.aspectRatio, false);
-    return { image: `data:${mimeType};base64,${base64}`, layout };
-  });
+  return attempt("generateAnimation", [args.subject, ...args.poses], () =>
+    billOnSuccess(() => renderAnimation(getAiProvider(), args)),
+  );
 }
 
 export type UsageRow = { step: string; credits: number; at: string };

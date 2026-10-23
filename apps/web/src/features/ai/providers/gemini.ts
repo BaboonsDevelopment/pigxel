@@ -16,7 +16,6 @@ import { fetchWithin, tryModels } from "../fallback";
 import {
   INTENTS,
   readAnimation,
-  readEdit,
   readEditReview,
   readPlacement,
   readPlan,
@@ -163,21 +162,6 @@ export function createGeminiProvider(
       return textOf(parts);
     },
 
-    async edit(system, user) {
-      const parts = await request("edit", models.text, {
-        contents: [{ role: "user", parts: [{ text: user }] }],
-        systemInstruction: { parts: [{ text: system }] },
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: object({
-            summary: STRING,
-            ops: { type: "ARRAY", items: STRING },
-          }),
-        },
-      });
-      return readEdit(textOf(parts));
-    },
-
     generate: (prompt, aspectRatio, small = true, references = []) =>
       draw(
         "generate",
@@ -229,7 +213,6 @@ export function createGeminiProvider(
         prompt,
         tile,
         object({
-          mode: { type: "STRING", enum: ["ops", "move", "redraw"] },
           objects: { type: "ARRAY", items: INTEGER },
           keep: { type: "ARRAY", items: INTEGER },
           target: RECT,
@@ -257,6 +240,7 @@ export function createGeminiProvider(
               name: STRING,
               subject: STRING,
               reuse: INTEGER,
+              anchor: { type: "STRING", enum: ["ground", "body", "fixed"] },
               box: RECT,
               poses: { type: "ARRAY", items: STRING },
             }),
@@ -311,5 +295,18 @@ function firstImage(parts: GeminiPart[]): GeneratedImage {
 const toContents = (messages: ChatMessage[]): GeminiContent[] =>
   messages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
+    parts: [
+      { text: m.content },
+      ...(m.role === "user" ? (m.references ?? []) : []).flatMap(
+        (reference) => {
+          const parsed =
+            /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]{1,2000000})$/.exec(
+              reference,
+            );
+          return parsed
+            ? [{ inlineData: { mimeType: parsed[1]!, data: parsed[2]! } }]
+            : [];
+        },
+      ),
+    ],
   }));

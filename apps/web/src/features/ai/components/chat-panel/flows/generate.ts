@@ -59,7 +59,7 @@ export async function drawOnNewLayer(
         paint(pixels, size, resizeNearest(art, area.w, area.h).rgba, area),
       emptyCel(size),
     );
-    canvas.addLayer(name, cel, replace);
+    const layer = canvas.addLayer(name, cel, replace);
     const many = areas.length > 1 ? ` ×${areas.length}` : "";
     const hidden = replace
       ? " The other layers are hidden, not deleted: show them again in the timeline."
@@ -68,6 +68,7 @@ export async function drawOnNewLayer(
       role: "assistant",
       content: `Here is your picture: ${subject}${many}, on the layer "${name}".${hidden}`,
       image: result.value,
+      layer,
     });
   } else {
     chat.setError(result.error);

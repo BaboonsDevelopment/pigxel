@@ -11,16 +11,25 @@ import {
   REFERENCE_SIDE,
 } from "../constants";
 
-export async function toReference(file: File): Promise<string | null> {
+export async function toReference(file: Blob): Promise<string | null> {
   const image = await createImageBitmap(file).catch(() => null);
   if (!image) return null;
   const k = Math.min(1, REFERENCE_SIDE / Math.max(image.width, image.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(image.width * k));
   canvas.height = Math.max(1, Math.round(image.height * k));
-  canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    image.close();
+    return null;
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   image.close();
-  return canvas.toDataURL("image/webp", REFERENCE_QUALITY);
+  const lossless = canvas.toDataURL("image/png");
+  return lossless.length <= 2_000_000
+    ? lossless
+    : canvas.toDataURL("image/webp", REFERENCE_QUALITY);
 }
 
 export async function toArt(

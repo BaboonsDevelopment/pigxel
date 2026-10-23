@@ -1,10 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import type { TileAction } from "../types";
 
 type SavedMessage = {
   role: "user" | "assistant";
   content: string;
   picture?: string;
+  layer?: string;
+  referencePictures?: string[];
+  action?: TileAction;
 };
 
 type SavedChat = { messages: SavedMessage[] };

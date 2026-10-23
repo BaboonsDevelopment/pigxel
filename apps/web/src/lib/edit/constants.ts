@@ -1,13 +1,10 @@
-export const GRID = {
-  transparent: ".",
-  keep: "_",
-  alphabet: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-} as const;
-
 export const MIN_OBJECT_PIXELS = 6;
 export const MAX_OBJECTS = 24;
 
 export const EDIT_MARGIN = 2;
+
+export const REDRAW_KEEP_DISTANCE = 48;
+
 export const MAX_POINTS_PER_OP = 4096;
 
 export const OPS = [
@@ -43,3 +40,4 @@ export const OPS = [
   },
   { syntax: "clear", doc: "erase everything in the area" },
 ] as const;
+
