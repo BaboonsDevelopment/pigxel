@@ -27,21 +27,35 @@ export function PackSidebar({
   const counts = new Map<string, number>();
   for (const asset of assets)
     counts.set(asset.packId, (counts.get(asset.packId) ?? 0) + 1);
+  // The same box finds packs here and assets in the grid.
+  const query = search.trim().toLowerCase();
+  const shown = query
+    ? packs.filter((pack) =>
+        [pack.name, pack.id, pack.description ?? ""].some((text) =>
+          text.toLowerCase().includes(query),
+        ),
+      )
+    : packs;
 
   return (
     <aside className="grid content-start gap-4 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
       <Input
         type="search"
-        aria-label="Search all assets"
-        placeholder="Search all assets"
+        aria-label="Search packs and assets"
+        placeholder="Search packs and assets"
         value={search}
         onChange={(e) => onSearch(e.target.value)}
         className="h-9 text-sm"
       />
       <NewPack onCreated={onPick} />
       <nav aria-label="Packs">
+        {query && !shown.length && (
+          <p className="px-3 py-2 text-sm text-muted-foreground">
+            No packs match
+          </p>
+        )}
         <ul className="grid gap-0.5">
-          {packs.map((pack) => (
+          {shown.map((pack) => (
             <li key={pack.id}>
               <button
                 type="button"
@@ -62,6 +76,7 @@ export function PackSidebar({
                   }
                 />
                 <span className="min-w-0 flex-1 truncate">{pack.name}</span>
+                {pack.pinned && <Badge tone="accent">Pinned</Badge>}
                 {pack.premium && <Badge tone="primary">Premium</Badge>}
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {counts.get(pack.id) ?? 0}

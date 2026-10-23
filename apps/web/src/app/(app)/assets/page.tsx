@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Notice } from "@pigxel/ui/components/notice";
 import { Page } from "@pigxel/ui/components/page";
 import { AssetsView } from "@/features/assets/components/assets-view";
+import { hasPremiumAccess } from "@/features/billing/server";
 import {
   readAssetView,
   type AssetSearchParams,
@@ -26,7 +27,7 @@ export default async function Assets({
 }) {
   const [params, user] = await Promise.all([searchParams, requireUser()]);
   const { tab, filters, asset } = readAssetView(params);
-  const [packs, tags, favourites, recent, firstPage, openAsset] =
+  const [packs, tags, favourites, recent, firstPage, openAsset, premiumAccess] =
     await Promise.all([
       listPackCards().catch((error: unknown) => {
         console.error(error);
@@ -39,6 +40,7 @@ export default async function Assets({
         ? listAssetPage(user.id, filters, 0).catch(() => null)
         : null,
       findAsset(asset),
+      hasPremiumAccess(user).catch(() => false),
     ]);
 
   return (
@@ -54,6 +56,7 @@ export default async function Assets({
             recent={recent}
             firstPage={firstPage}
             openAsset={openAsset}
+            premiumAccess={premiumAccess}
           />
         ) : (
           <Notice tone="error" className="mt-8">

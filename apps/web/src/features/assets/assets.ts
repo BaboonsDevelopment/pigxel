@@ -13,10 +13,12 @@ export type AssetPack = {
   /** Paid plans only: every asset in it is premium. */
   premium: boolean;
   createdAt: string;
+  /** When the team pinned it to the top of the Packs tab; null when not. */
+  pinnedAt: string | null;
 };
 
 export const ASSET_PACK_COLUMNS =
-  "id, name, background, description, premium, created_at, assets(count)";
+  "id, name, background, description, premium, created_at, pinned_at, assets(count)";
 
 export type AssetPackRow = {
   id: string;
@@ -25,6 +27,7 @@ export type AssetPackRow = {
   description: string | null;
   premium: boolean;
   created_at: string;
+  pinned_at: string | null;
   assets: { count: number }[];
 };
 
@@ -36,6 +39,7 @@ export const toAssetPack = (row: AssetPackRow): AssetPack => ({
   description: row.description,
   premium: row.premium,
   createdAt: row.created_at,
+  pinnedAt: row.pinned_at,
 });
 
 export const ASSET_BUCKET = "assets";

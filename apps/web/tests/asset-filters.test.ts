@@ -21,6 +21,7 @@ const pack = (id: string, facts: Partial<PackFacts> = {}): PackFacts => ({
   count: 10,
   uses: 0,
   createdAt: "2026-10-01T00:00:00Z",
+  pinnedAt: null,
   ...facts,
 });
 
@@ -136,6 +137,31 @@ describe("filtering packs", () => {
         { ...none, favourites: new Set(["food-dishes"]) },
       ),
     ).toEqual(["food-dishes"]);
+  });
+
+  it("puts pinned packs first, the latest pin leading, under any sort", () => {
+    const pinned = [
+      ...packs,
+      pack("zombie-town", { pinnedAt: "2026-10-20T00:00:00Z" }),
+      pack("apple-farm", { pinnedAt: "2026-10-22T00:00:00Z" }),
+    ];
+    const order = (filters: Partial<typeof NO_ASSET_FILTERS>) =>
+      filterPacks(pinned, { ...NO_ASSET_FILTERS, ...filters }, none).map(
+        (p) => p.id,
+      );
+    expect(order({})).toEqual([
+      "apple-farm",
+      "zombie-town",
+      "haunted-october",
+      "dungeon-heroes",
+      "food-dishes",
+    ]);
+    expect(order({ sort: "az" }).slice(0, 3)).toEqual([
+      "apple-farm",
+      "zombie-town",
+      "dungeon-heroes",
+    ]);
+    expect(order({ query: "zombie" })).toEqual(["zombie-town"]);
   });
 });
 

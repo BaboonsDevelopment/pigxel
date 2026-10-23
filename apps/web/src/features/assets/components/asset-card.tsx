@@ -4,9 +4,9 @@ import { Badge } from "@pigxel/ui/components/badge";
 import { Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { manrope } from "@/lib/fonts/manrope";
-import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { PremiumCrown } from "@/features/billing/components/premium-crown";
 import { TilesBadge } from "@/features/tiles/components/tiles-badge";
-import type { Asset } from "../assets";
+import { isLocked, type Asset } from "../assets";
 import { AssetImage } from "./asset-image";
 import { FavouriteButton } from "./favourite-button";
 
@@ -53,11 +53,11 @@ export function AssetCard({
                 : "w-[78%] group-hover:scale-105",
             )}
           />
-          {premium && <PremiumBadge className="absolute top-2 left-2" />}
-          {asset.frames > 1 && (
-            <Badge tone="overlay" className="absolute bottom-2 right-2">
-              Animated
-            </Badge>
+          {(premium || asset.frames > 1) && (
+            <span className="absolute right-2.5 bottom-2.5 flex items-center gap-1">
+              {asset.frames > 1 && <Badge tone="overlay">Animated</Badge>}
+              {premium && <PremiumCrown locked={isLocked(asset)} />}
+            </span>
           )}
           {tile && <TilesBadge className="absolute bottom-2 left-2" />}
         </span>

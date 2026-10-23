@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { createClient } from "@supabase/supabase-js";
-import type { AssetKind } from "./lib/asset.ts";
+import { packName, type AssetKind } from "./lib/asset.ts";
 import { BUCKET, PREMIUM_BUCKET, removeAsset } from "./lib/remote.ts";
 
 const PIGXEL_MIME_TYPE = "application/vnd.pigxel+json";
@@ -87,7 +87,8 @@ const supabase = createClient(url, key, {
 });
 const storage = supabase.storage.from(BUCKET);
 
-const CONNECTION_LIMIT = /too many connections|too many clients|remaining connection slots|connection pool/i;
+const CONNECTION_LIMIT =
+  /too many connections|too many clients|remaining connection slots|connection pool/i;
 const RETRY_DELAYS_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
 async function request<T extends { error: { message: string } | null }>(
@@ -156,22 +157,24 @@ for (const pack of manifest.packs) {
   );
   if (values["dry-run"]) continue;
   // An existing pack keeps the name it has: admins rename packs on the
-  // Assets page, and pack.json names may still carry their size.
+  // Assets page. pack.json names may still carry their size, which a new
+  // pack drops.
   const packSort = nextSort;
-  const savePack = () => exists
-    ? supabase
-        .from("asset_packs")
-        .update({
+  const savePack = () =>
+    exists
+      ? supabase
+          .from("asset_packs")
+          .update({
+            ...(pack.background && { background: pack.background }),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", pack.block)
+      : supabase.from("asset_packs").insert({
+          id: pack.block,
+          name: packName(pack.name),
+          sort: packSort,
           ...(pack.background && { background: pack.background }),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", pack.block)
-    : supabase.from("asset_packs").insert({
-        id: pack.block,
-        name: pack.name,
-        sort: packSort,
-        ...(pack.background && { background: pack.background }),
-      });
+        });
   await request(`${pack.block}: couldn’t save the pack`, savePack);
   if (!exists) nextSort++;
   blockIds.add(pack.block);

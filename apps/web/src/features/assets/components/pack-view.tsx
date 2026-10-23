@@ -10,7 +10,7 @@ import { FormMessage } from "@pigxel/ui/components/field";
 import { SectionHeader, Text } from "@pigxel/ui/components/typography";
 import { cn } from "@pigxel/ui/lib/utils";
 import { madimiOne } from "@/lib/fonts/madimi";
-import { PremiumBadge } from "@/features/billing/components/premium-badge";
+import { PremiumCrown } from "@/features/billing/components/premium-crown";
 import { UpgradeDialog } from "@/features/billing/components/upgrade-dialog";
 import { loadPackAssets } from "../actions";
 import type { Asset } from "../assets";
@@ -143,7 +143,12 @@ export function PackView({
               />
             </span>
           ))}
-          {pack.premium && <PremiumBadge className="absolute top-3 left-3" />}
+          {pack.premium && (
+            <PremiumCrown
+              locked={locked}
+              className="absolute right-3 bottom-3"
+            />
+          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-3">
@@ -260,6 +265,7 @@ export function PackView({
                   }
                   favourite={favourites.packs.has(other.id)}
                   onFavourite={(on) => favourites.pack(other.id, on)}
+                  premiumAccess={premiumAccess}
                 />
               </li>
             ))}

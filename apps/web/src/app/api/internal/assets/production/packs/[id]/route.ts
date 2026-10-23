@@ -8,7 +8,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   const denied = guard(request);
   if (denied) return denied;
   try {
-    const { name, description, background, premium } = await request
+    const { name, description, background, premium, pinned } = await request
       .json()
       .catch(() => ({}));
     await updatePack((await params).id, {
@@ -16,6 +16,7 @@ export async function PATCH(request: NextRequest, { params }: Props) {
       description,
       background,
       premium,
+      pinned,
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
