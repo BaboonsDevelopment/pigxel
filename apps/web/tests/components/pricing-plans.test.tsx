@@ -1,8 +1,36 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { renderWithUser } from "@test/render";
 
-vi.mock("@/features/billing/actions", () => ({ startCheckout: vi.fn() }));
+const { previewPlanChange, changePlan } = vi.hoisted(() => ({
+  changePlan: vi.fn<(productId: string) => Promise<void>>(async () => {}),
+  previewPlanChange: vi.fn(async (productId: string) => ({
+    change: "upgrade" as const,
+    productId,
+  })),
+}));
+
+vi.mock("@/features/billing/actions", () => ({
+  startCheckout: vi.fn(),
+  previewPlanChange,
+  changePlan,
+}));
+
+// jsdom has no modal dialogs.
+HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+  this.open = true;
+};
+
+/** Clicks "Change plan" and returns the plan the dialog asked about. */
+async function changeTo(button: HTMLElement) {
+  previewPlanChange.mockClear();
+  fireEvent.click(button);
+  await waitFor(() => expect(previewPlanChange).toHaveBeenCalledTimes(1));
+  return previewPlanChange.mock.calls[0]![0];
+}
+
+const changeButtons = () =>
+  screen.getAllByRole("button", { name: "Change plan" });
 
 import { PricingPlans } from "@/features/billing/components/pricing-plans";
 import { ARTIST_PLAN, TIERS } from "@/features/billing/pricing";
@@ -23,7 +51,7 @@ describe("the AI plan's token picker", () => {
     ).toBeTruthy();
   });
 
-  it("uses live products for plan changes and enables Artist in live mode", () => {
+  it("uses live products for plan changes and enables Artist in live mode", async () => {
     renderWithUser(
       <PricingPlans
         heading={null}
@@ -34,18 +62,20 @@ describe("the AI plan's token picker", () => {
     );
     expect(screen.getByText("Your plan")).toBeTruthy();
     expect(screen.queryByText("Coming soon")).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "Change plan" }).getAttribute("href"),
-    ).toBe(`/settings/subscription?plan=${ARTIST_PLAN.liveProductId.month}`);
+    expect(await changeTo(changeButtons()[0]!)).toBe(
+      ARTIST_PLAN.liveProductId.month,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    expect(await changeTo(changeButtons()[1]!)).toBe(
+      advanced!.liveProductId.month,
+    );
     expect(
-      screen
-        .getAllByRole("link", { name: "Change plan" })
-        .map((link) => link.getAttribute("href")),
-    ).toContain(`/settings/subscription?plan=${advanced!.liveProductId.month}`);
+      await screen.findByText(/Switch to Advanced, billed monthly?/),
+    ).toBeTruthy();
   });
 
-  it("shows Artist subscribers their plan without selecting a Pro token level", () => {
+  it("shows Artist subscribers their plan without selecting a Pro token level", async () => {
     renderWithUser(
       <PricingPlans
         heading={null}
@@ -55,9 +85,7 @@ describe("the AI plan's token picker", () => {
       />,
     );
     expect(screen.getByText("Your plan")).toBeTruthy();
-    expect(
-      screen.getByRole("link", { name: "Change plan" }).getAttribute("href"),
-    ).toBe(`/settings/subscription?plan=${pro!.liveProductId.year}`);
+    expect(await changeTo(changeButtons()[0]!)).toBe(pro!.liveProductId.year);
   });
 
   it("prices and describes the amount people pick", () => {
@@ -69,7 +97,7 @@ describe("the AI plan's token picker", () => {
     expect(screen.getByText("$20")).toBeTruthy();
   });
 
-  it("offers subscribers a plan change to another amount", () => {
+  it("offers subscribers a plan change to another amount", async () => {
     renderWithUser(
       <PricingPlans
         heading={null}
@@ -79,11 +107,9 @@ describe("the AI plan's token picker", () => {
     );
     expect(screen.getByText("Your plan")).toBeTruthy();
     fireEvent.change(screen.getByRole("slider"), { target: { value: "0" } });
-    expect(
-      screen
-        .getAllByRole("link", { name: "Change plan" })
-        .map((link) => link.getAttribute("href")),
-    ).toContain(`/settings/subscription?plan=${starter!.productId.month}`);
+    expect(await changeTo(changeButtons().at(-1)!)).toBe(
+      starter!.productId.month,
+    );
   });
 
   it("opens on the subscriber's own amount and billing period", () => {
@@ -105,5 +131,24 @@ describe("the AI plan's token picker", () => {
     expect(screen.getAllByText("$75").length).toBeGreaterThan(0);
     expect(screen.getAllByText("$120").length).toBeGreaterThan(0);
     expect(screen.getAllByText("/ year").length).toBeGreaterThan(0);
+  });
+
+  it("confirms a plan change in place and charges the plan on file", async () => {
+    renderWithUser(
+      <PricingPlans
+        heading={null}
+        signedIn
+        currentProductId={pro!.productId.month}
+      />,
+    );
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "2" } });
+    await changeTo(changeButtons().at(-1)!);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Upgrade and pay" }),
+    );
+    await waitFor(() =>
+      expect(changePlan).toHaveBeenCalledWith(advanced!.productId.month),
+    );
+    expect(await screen.findByText("Plan changed")).toBeTruthy();
   });
 });

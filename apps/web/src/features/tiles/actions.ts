@@ -6,14 +6,13 @@ import type { CloudTileSummary } from "@/lib/pigxel-file/cloud";
 import {
   countedCloudTilesOnServer,
   listCloudTilesOnServer,
-  listRecentlyOpenedOnServer,
 } from "@/lib/pigxel-file/cloud-server";
 import { createClient } from "@/lib/supabase/server";
 import { removeTiles } from "./remove-tiles";
 import { requestReview } from "@/features/moderation/request";
 import { listSavedArts, type SavedArt } from "@/features/explore/server";
 import { cloudFilter, searchMatch, type ProjectQuery } from "./search";
-import { PAGE_SIZE, PROJECT_NAME_MAX, RECENT_SHOWN } from "./constants";
+import { PAGE_SIZE, PROJECT_NAME_MAX } from "./constants";
 import { FOLDER_NAME_MAX } from "./folders";
 import { LABEL_COLORS, LABEL_NAME_MAX, type Label } from "./labels";
 import { listLabels } from "./server";
@@ -353,11 +352,6 @@ export async function renameTile(
     return { error: "We couldn’t connect. Please try again." };
   }
   return {};
-}
-
-export async function loadRecentlyOpened(): Promise<CloudTileSummary[]> {
-  const user = await requireUser();
-  return listRecentlyOpenedOnServer(user.id, RECENT_SHOWN);
 }
 
 export async function loadLabels(): Promise<Label[]> {

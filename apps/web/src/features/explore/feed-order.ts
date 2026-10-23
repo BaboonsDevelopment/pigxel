@@ -2,7 +2,7 @@ import type { ExploreFilters } from "./constants";
 
 const KEY = "pigxel:explore-order";
 
-export type FeedOrder = {
+type FeedOrder = {
   ids: string[];
   filters: ExploreFilters;
   count: number;

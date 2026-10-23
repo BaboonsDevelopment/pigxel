@@ -58,11 +58,7 @@ export async function storeVersion(
     );
 }
 
-export async function removeVersions(
-  admin: Admin,
-  tileId: string,
-  ids: string[],
-) {
+async function removeVersions(admin: Admin, tileId: string, ids: string[]) {
   await admin.storage
     .from(VERSIONS_BUCKET)
     .remove(ids.map((id) => versionPath(tileId, id)));

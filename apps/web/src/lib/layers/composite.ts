@@ -78,7 +78,7 @@ export function masked(
   return out;
 }
 
-export function clipped(
+function clipped(
   pixels: Uint8ClampedArray,
   base: Uint8ClampedArray,
   fade: number,

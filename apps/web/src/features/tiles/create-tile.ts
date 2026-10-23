@@ -15,7 +15,7 @@ import { thumbnailDataUrl } from "@/lib/pigxel-file/thumbnail";
 import { createFrame } from "@/lib/sprite/frames";
 import { writeNewTileDefaults } from "./new-tile-defaults";
 
-export type NewTile = {
+type NewTile = {
   userId: string;
   name: string;
   width: number;

@@ -13,10 +13,6 @@ export function editorUrl(draftId: string) {
   return `/tiles/edit?id=${encodeURIComponent(draftId)}`;
 }
 
-export function newTileUrl(fromDraftId: string) {
-  return `/tiles/new?from=${encodeURIComponent(fromDraftId)}`;
-}
-
 export function guideUrl(draftId: string, slug: string) {
   return `${editorUrl(draftId)}&guide=${encodeURIComponent(slug)}`;
 }

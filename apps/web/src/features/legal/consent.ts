@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
  * optional category is embedded media (YouTube tutorial videos); everything
  * else Pigxel stores is strictly necessary.
  */
-export type CookieChoice = { media: boolean; at: string };
+type CookieChoice = { media: boolean; at: string };
 
 const KEY = "pigxel:consent:v1";
 const CHANGE = "pigxel:consent-change";

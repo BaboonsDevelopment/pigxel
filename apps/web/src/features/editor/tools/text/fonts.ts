@@ -23,7 +23,7 @@ export const fontExtension = (name: string) =>
 
 const uuidOf = (font: CustomFont) => font.slice("custom:".length);
 
-export async function listFonts(): Promise<SavedFont[]> {
+async function listFonts(): Promise<SavedFont[]> {
   const { data, error } = await createClient()
     .from("text_fonts")
     .select("id, name, px")

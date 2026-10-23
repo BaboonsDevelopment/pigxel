@@ -1,4 +1,4 @@
-export const AVATAR_SIDE = 256;
+const AVATAR_SIDE = 256;
 export const CROP_BOX = 280;
 export const MAX_ZOOM = 6;
 

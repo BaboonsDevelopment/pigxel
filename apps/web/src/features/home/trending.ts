@@ -5,7 +5,7 @@ import type { PublicTile } from "@/features/profile/profile";
 import { listPublicTiles } from "@/features/profile/server";
 
 /** Loaded for Home; wider screens show the fourth. */
-export const TRENDING = 4;
+const TRENDING = 4;
 
 /**
  * The top of Explore as it opens (Popular, this week). A quiet week falls

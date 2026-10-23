@@ -5,7 +5,6 @@ export const CHROMA_KEY_HEX = "#FF00FF";
 export const CHROMA_KEY_TOLERANCE = 120;
 export const FRINGE_MAGENTA = 40;
 export const FRINGE_PASSES = 2;
-export const EDGE_TRIM = 1;
 
 export const GRID_SAME_COLOR = 32;
 export const MIN_GRID_CELL = 4;

@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 
-export type SavedPalette = { id: string; name: string; colors: string[] };
+type SavedPalette = { id: string; name: string; colors: string[] };
 
 const KEY = ["saved-palettes"];
 const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/;
