@@ -1,0 +1,92 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { planEdit, redrawArea } from "@/features/ai/actions";
+import type { AiProvider, PlanReply } from "@/features/ai/types";
+
+vi.mock("@/lib/auth/session", () => ({
+  requireUser: async () => ({ id: "test-user" }),
+}));
+vi.mock("@/features/ai/credits", () => ({
+  creditBalance: async () => ({ limit: 1000, left: 1000 }),
+}));
+vi.mock("@/features/ai/moderation", () => ({ moderate: async () => {} }));
+vi.mock("@/features/ai/provider", () => ({ getAiProvider: () => provider }));
+
+const portrait = { x: 16, y: 0, w: 32, h: 64 };
+const tile = { x: 0, y: 0, w: 64, h: 64 };
+const reply: PlanReply = {
+  objects: [],
+  keep: [0],
+  target: portrait,
+  instruction: "Add a landscape behind the portrait",
+  summary: "Added background",
+  question: "",
+};
+const provider = {
+  plan: vi.fn(async () => reply),
+  redraw: vi.fn(async () => ({ mimeType: "image/png", base64: "YWJj" })),
+} as unknown as AiProvider;
+const args = {
+  request: "background should be like Mona Lisa",
+  tile: "data:image/png;base64,YWJj",
+  width: 64,
+  height: 64,
+  objects: [portrait],
+  layers: ["Portrait"],
+  drawn: portrait,
+  selection: null,
+};
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("scene edit canvas", () => {
+  it("uses the full tile instead of the character bounds and removes an all-scene keep mask", async () => {
+    const result = await planEdit({ ...args, composition: "scene" });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { source: tile, target: tile, keep: [] },
+    });
+    expect(provider.plan).toHaveBeenCalledWith(
+      expect.stringContaining("x 0, y 0, w 64, h 64"),
+      expect.any(Array),
+    );
+  });
+  it("honours an explicit selection for a scene edit", async () => {
+    const selection = { x: 0, y: 12, w: 64, h: 20 };
+    const result = await planEdit({ ...args, selection, composition: "scene" });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { source: selection, target: selection, keep: [] },
+    });
+  });
+  it("keeps object bounds and protection for ordinary sprite edits", async () => {
+    const result = await planEdit(args);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { source: portrait, target: portrait, keep: [portrait] },
+    });
+  });
+  it("passes canvas dimensions, aspect ratio and full-background instructions to the image model", async () => {
+    const result = await redrawArea(
+      args.request,
+      args.tile,
+      64,
+      64,
+      [],
+      "",
+      "scene",
+    );
+    expect(result.ok).toBe(true);
+    expect(provider.redraw).toHaveBeenCalledWith(
+      expect.stringContaining("fixed 64x64 canvas"),
+      expect.objectContaining({ mimeType: "image/png" }),
+      "1:1",
+      true,
+    );
+    expect(vi.mocked(provider.redraw).mock.calls[0]![0]).toContain(
+      "across the ENTIRE canvas",
+    );
+    expect(vi.mocked(provider.redraw).mock.calls[0]![0]).not.toContain(
+      "stay flat",
+    );
+  });
+});

@@ -50,6 +50,10 @@ message; earlier messages are context, so short follow-ups like "and a dog too",
 Set composition to "scene" for a complete picture, environment, landscape,
 background or a subject in a setting; "sprite" for isolated objects.
 Default to sprite with no background unless the user requests a setting or background.
+Adding, filling, extending or fixing the background of existing artwork is an
+edit with composition "scene", even when the foreground began as an isolated sprite.
+Complaints that the background is missing on the canvas are requests to repair
+that scene, not to preserve the current empty margins.
 Set style to the user's explicitly requested visual style, including a style
 established for the same artwork earlier in the conversation. Empty when unspecified.
 Words such as "very cute", "cozy", "scary", "cartoon" and "simple flat colours"

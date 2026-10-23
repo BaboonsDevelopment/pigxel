@@ -170,6 +170,7 @@ export async function redrawArea(
   height: number,
   references: string[] = [],
   original = "",
+  composition: "sprite" | "scene" = "sprite",
 ): Promise<AiResult<string>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(picture)?.[1];
@@ -180,7 +181,7 @@ export async function redrawArea(
   }
   return attempt("redrawArea", [request], async () => {
     const ai = getAiProvider();
-    const prompt = buildRedrawPrompt(request, width, height);
+    const prompt = buildRedrawPrompt(request, width, height, composition);
     const reference = { mimeType: "image/png", base64: png };
     const aspect = closestAspectRatio(width, height);
     const small = Math.max(width, height) <= SMALL_IMAGE_MAX_SIDE;
@@ -227,6 +228,7 @@ export async function planEdit(args: {
   selection: Rect | null;
   references?: string[];
   style?: string;
+  composition?: "sprite" | "scene";
 }): Promise<AiResult<EditPlan>> {
   await requireUser();
   const { request, width, height } = args;
@@ -259,11 +261,15 @@ export async function planEdit(args: {
         objects: args.objects,
         layers: args.layers,
         selection: args.selection,
+        composition: args.composition,
       }),
       [{ mimeType: "image/png", base64: png! }, ...references],
     );
+    const scene = args.composition === "scene";
+    const canvas = { x: 0, y: 0, w: width, h: height };
     const source = clampRect(
       args.selection ??
+        (scene ? canvas : null) ??
         unionOf(
           [...reply.objects, ...reply.keep].map((i) => args.objects[i]),
         ) ??
@@ -272,14 +278,16 @@ export async function planEdit(args: {
       height,
     );
     const placed = clampRect(reply.target, width, height);
-    const keep = reply.keep
+    // A connected component may already contain both the subject and its old
+    // background. Restoring that component would undo the requested scene edit.
+    const keep = (scene ? [] : reply.keep)
       .map((i) => args.objects[i])
       .filter((r): r is Rect => !!r);
     const objects = reply.objects.filter((i) => !!args.objects[i]);
     return {
       objects,
       source,
-      target: keep.length ? source : placed,
+      target: scene || keep.length ? source : placed,
       keep,
       instruction: `${reply.instruction}\nUser request (do not discard its constraints): ${request}${args.style?.trim() ? `\nRequested visual style: ${args.style}` : ""}`,
       summary: reply.summary,
@@ -463,6 +471,7 @@ export async function redrawFrames(args: {
   cellH: number;
   references?: string[];
   original?: string;
+  composition?: "sprite" | "scene";
 }): Promise<AiResult<{ image: string; layout: SheetLayout }>> {
   await requireUser();
   const png = PNG_DATA_URL.exec(args.sheet)?.[1];
@@ -489,6 +498,7 @@ export async function redrawFrames(args: {
       cellW: args.cellW,
       cellH: args.cellH,
       layout,
+      composition: args.composition,
     });
     const sheet = { mimeType: "image/png", base64: png! };
     const { mimeType, base64 } = extra!.length

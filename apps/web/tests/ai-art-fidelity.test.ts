@@ -199,6 +199,30 @@ describe("thin details and complete frames", () => {
     for (let y = 0; y < 8; y++)
       for (let x = 0; x < 8; x++) expect(alpha(result, x, y)).toBe(255);
   });
+  it("fits a portrait-shaped scene to the actual tile without clipping its edges or adding transparent sidebars", () => {
+    const image = bitmap(8, 16);
+    const colours = [
+      [40, 100, 180, 255],
+      [255, 0, 255, 255],
+      [40, 130, 50, 255],
+      [100, 70, 20, 255],
+    ];
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 8; x++)
+        put(image, x, y, colours[(y < 8 ? 0 : 2) + (x < 4 ? 0 : 1)]!);
+    const result = runSteps(image, { w: 8, h: 8 }, SCENE_PICTURE_STEPS);
+    for (const [i, [x, y]] of [
+      [0, 0],
+      [7, 0],
+      [0, 7],
+      [7, 7],
+    ].entries())
+      expect([
+        ...result.rgba.slice((y! * 8 + x!) * 4, (y! * 8 + x!) * 4 + 4),
+      ]).toEqual(colours[i]);
+    for (let i = 3; i < result.rgba.length; i += 4)
+      expect(result.rgba[i]).toBe(255);
+  });
   it("does not delete isolated intentional details during an edit", () => {
     const image = bitmap(8, 8);
     put(image, 2, 2, [255, 255, 255, 255]);

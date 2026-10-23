@@ -102,6 +102,7 @@ export function buildRedrawPrompt(
   instruction: string,
   width: number,
   height: number,
+  composition: "sprite" | "scene" = "sprite",
 ): string {
   return [
     `Edit the attached picture on its fixed ${width}x${height} canvas: ${instruction}.`,
@@ -111,7 +112,9 @@ export function buildRedrawPrompt(
     "The requested style takes priority over the original style. Otherwise preserve the original style exactly.",
     "If the request matches a user reference, its requested pose, viewing angle, proportions and rendering replace conflicting features of the old drawing. Do not average the two designs or keep an old front view against a three-quarter reference. Fit the complete requested silhouette inside the canvas.",
     "Retain small recognizable details and keep the result readable at the target resolution.",
-    `Keep existing scenery and background. Only areas already ${CHROMA_KEY_HEX} stay flat ${CHROMA_KEY_HEX}, unless the edit explicitly adds a background there. No watermark or border.`,
+    composition === "scene"
+      ? "This is a complete scene, not an isolated sprite. Paint the requested background across the ENTIRE canvas, edge to edge, including previously empty areas. Match the canvas aspect ratio; no transparent margins, letterboxing, chroma key or cropping. Preserve the foreground's placement and scale unless the request changes them. No watermark or border."
+      : `Keep existing scenery and background. Only areas already ${CHROMA_KEY_HEX} stay flat ${CHROMA_KEY_HEX}, unless the edit explicitly adds a background there. No watermark or border.`,
   ].join(" ");
 }
 
@@ -152,6 +155,7 @@ export function buildPlanPrompt(args: {
   objects: Rect[];
   layers: string[];
   selection: Rect | null;
+  composition?: "sprite" | "scene";
 }): string {
   const objects = objectList(args.objects, args.layers);
   const selection = args.selection
@@ -161,6 +165,9 @@ export function buildPlanPrompt(args: {
     `The picture is a ${args.width}x${args.height} pixel art tile, shown enlarged; light grey means empty.`,
     `OBJECTS (separate drawn things, in tile pixels):\n${objects}${selection}`,
     `REQUEST: ${args.request}`,
+    args.composition === "scene"
+      ? `SCENE EDIT: the editing canvas is ${box(args.selection ?? { x: 0, y: 0, w: args.width, h: args.height })}. Fill its background edge to edge, including currently empty space. Do not limit source or target to a character's bounding box. Preserve unrelated foreground details through the redraw instruction, not by protecting an entire connected scene object.`
+      : "",
     PLAN_RULES,
   ].join("\n\n");
 }
@@ -261,6 +268,7 @@ export function buildSheetRedrawPrompt(args: {
   cellW: number;
   cellH: number;
   layout: SheetLayout;
+  composition?: "sprite" | "scene";
 }): string {
   const { cols, rows } = args.layout;
   return [
@@ -275,7 +283,9 @@ export function buildSheetRedrawPrompt(args: {
     "Keep the grid exactly: every frame stays in its cell. Change nothing else the instruction does not ask for.",
     "No grid lines, no numbers, no labels.",
     "Preserve fine details at the target resolution.",
-    `Preserve existing background and scenery. Areas already flat ${CHROMA_KEY_HEX} stay that colour unless the request changes them.`,
+    args.composition === "scene"
+      ? "Each cell is a complete scene: paint the requested background across the entire cell, including previously empty space. Preserve the foreground's placement and scale. No chroma key, transparent margins, letterboxing or cropping."
+      : `Preserve existing background and scenery. Areas already flat ${CHROMA_KEY_HEX} stay that colour unless the request changes them.`,
   ]
     .filter(Boolean)
     .join(" ");
