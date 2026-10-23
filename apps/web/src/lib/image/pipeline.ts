@@ -1,6 +1,12 @@
 import type { Bitmap, Size } from "./bitmap";
+import { hasPurpleMaterial, removeKeyHue } from "./chroma-colours";
+import { lineArtKind } from "./line-art";
 import { cropToContent } from "./steps/crop-to-content";
-import { cutOutBackground } from "./steps/cut-out-background";
+import {
+  cutOutBackground,
+  hasChromaKeyBackdrop,
+} from "./steps/cut-out-background";
+import { cleanKeySpecks } from "./steps/clean-key-specks";
 import { recoverPixelGrid } from "./steps/recover-pixel-grid";
 import { shrinkToTile } from "./steps/shrink-to-tile";
 
@@ -21,6 +27,9 @@ export const GENERATED_PICTURE_STEPS: Step[] = [
   {
     rule: "Recover the model's own pixel grid, one colour per cell",
     apply: (image, target) => {
+      // Pen drawings have no enlarged pixel grid. Sampling cell centres can
+      // erase their strokes before the final resize has a chance to keep them.
+      if (lineArtKind(image)) return image;
       const recovered = recoverPixelGrid(image);
       return recovered.w < target.w || recovered.h < target.h
         ? image
@@ -46,5 +55,22 @@ export const SCENE_PICTURE_STEPS: Step[] = [
   },
 ];
 
-export const runSteps = (image: Bitmap, target: Size, steps: Step[]) =>
-  steps.reduce((current, step) => step.apply(current, target), image);
+export function runSteps(image: Bitmap, target: Size, steps: Step[]) {
+  const keyed =
+    steps.some((step) => step.apply === cutOutBackground) &&
+    hasChromaKeyBackdrop(image);
+  let result = image;
+  let purpleMaterial = false;
+  for (const step of steps) {
+    result = step.apply(result, target);
+    if (keyed && step.apply === cutOutBackground)
+      purpleMaterial = hasPurpleMaterial(result, target);
+  }
+  // The delivered tile is the final authority: cropping, grid recovery and
+  // palette reduction must not leave a reserved key colour on its edges.
+  if (keyed) {
+    if (purpleMaterial) cleanKeySpecks(result, target);
+    else removeKeyHue(result);
+  }
+  return result;
+}

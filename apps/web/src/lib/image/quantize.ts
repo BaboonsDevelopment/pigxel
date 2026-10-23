@@ -1,3 +1,5 @@
+import { lineArtKind, MIN_STROKE_CONTRAST } from "./line-art";
+
 export type RGB = { r: number; g: number; b: number };
 
 const MAX_COLORS = 62;
@@ -397,6 +399,10 @@ export function imageToSprite(
 
   const small = new Uint8ClampedArray(tw * th * 4);
   const counts = new Int32Array(palette.length);
+  const lineArt =
+    opts.preserveThinFeatures && (sw > tw || sh > th)
+      ? lineArtKind({ rgba: source, w: sw, h: sh })
+      : null;
 
   for (let y = 0; y < th; y++) {
     const y0 = Math.floor((y * sh) / th);
@@ -408,6 +414,8 @@ export function imageToSprite(
       counts.fill(0);
       let opaque = 0;
       let total = 0;
+      let ink = -1;
+      let inkContrast = 0;
       let minX = x1,
         maxX = -1,
         minY = y1,
@@ -427,18 +435,33 @@ export function imageToSprite(
             lut.get(BIN(px(source, p), px(source, p + 1), px(source, p + 2))) ??
             0;
           counts[bin]! += 1;
+          if (lineArt && lineArt !== "transparent") {
+            const tone = luma({
+              r: px(source, p),
+              g: px(source, p + 1),
+              b: px(source, p + 2),
+            });
+            const contrast = lineArt === "dark-on-light" ? 255 - tone : tone;
+            if (contrast >= MIN_STROKE_CONTRAST && contrast > inkContrast) {
+              ink = bin;
+              inkContrast = contrast;
+            }
+          }
         }
       }
 
       const thinFeature =
         opts.preserveThinFeatures &&
-        opaque >= 2 &&
-        (maxX - minX + 1 >= x1 - x0 || maxY - minY + 1 >= y1 - y0);
+        (lineArt === "transparent"
+          ? opaque > 0
+          : opaque >= 2 &&
+            (maxX - minX + 1 >= x1 - x0 || maxY - minY + 1 >= y1 - y0));
       if (total === 0 || (opaque / total < 0.4 && !thinFeature)) continue;
 
       let best = 0;
       for (let i = 1; i < counts.length; i++)
         if (counts[i]! > counts[best]!) best = i;
+      if (ink >= 0) best = ink;
 
       const c = palette[best]!;
       const di = (y * tw + x) * 4;

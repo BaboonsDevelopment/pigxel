@@ -5,10 +5,13 @@ import {
   EDIT_REVIEW_RULES,
   IMAGE_BACKGROUND_RULES,
   IMAGE_STYLE_RULES,
+  IMAGE_VIEW_RULES,
   MAX_FRAMES,
+  MAX_HISTORY,
   PLACEMENT_RULES,
   PLAN_RULES,
   REFERENCE_RULES,
+  SCENE_BACKGROUND_RULES,
 } from "./constants";
 import type {
   AnimationPlan,
@@ -32,6 +35,7 @@ export function buildImagePrompt(
         ? `A complete edge-to-edge picture with its requested foreground, environment and background: ${subject}.`
         : `One complete isolated subject: ${subject}.`,
       `Compose for a ${width}x${height} pixel canvas; preserve readable silhouettes and important thin features such as strings and wires.`,
+      IMAGE_VIEW_RULES,
       ...(style.trim()
         ? [
             `Requested visual style: ${style}. Follow this style throughout, including proportions, colours, outlines and shading.`,
@@ -43,9 +47,7 @@ export function buildImagePrompt(
           : IMAGE_STYLE_RULES.slice(0, 4)),
       ...(withReferences ? [REFERENCE_RULES] : []),
       ...(composition === "scene"
-        ? [
-            "Paint the requested background across the entire canvas. No chroma key, transparent margins or checkerboard. No watermark or border.",
-          ]
+        ? [SCENE_BACKGROUND_RULES]
         : IMAGE_BACKGROUND_RULES),
     ].join(" ");
   }
@@ -53,6 +55,7 @@ export function buildImagePrompt(
     `A single pixel art game sprite, like one frame of a sprite sheet: ${subject}.`,
     ...(withReferences ? [REFERENCE_RULES] : []),
     `It is a ${width}x${height} pixel sprite drawn with small crisp pixels, centred on the picture with empty space around it.`,
+    IMAGE_VIEW_RULES,
     ...IMAGE_STYLE_RULES,
   ].join(" ");
 }
@@ -102,12 +105,24 @@ export function buildRedrawPrompt(
   instruction: string,
   width: number,
   height: number,
+  composition: "sprite" | "scene" = "sprite",
 ): string {
+  if (composition === "scene") {
+    return [
+      `Edit the attached picture on its fixed ${width}x${height} canvas. USER EDIT: ${instruction}.`,
+      "The requested change takes priority over the old composition. The reference shows the starting scene, not a boundary the finished scene must fit inside.",
+      "When filling or extending a room, the old outer margins and plain backdrop must change. Continue the actual walls and floor beyond the old room outline into every requested area, all the way to the canvas edges and corners.",
+      "In particular, if the user asks to extend the floor, paint a continuation of that same floor into the lower outside corners. Do not retain a diamond-shaped floor or platform surrounded by a flat dark backdrop; replace that backdrop with a continuation of the actual scene. The environment may continue beyond the frame rather than fitting its entire outline inside it.",
+      "Keep the existing camera angle, furniture, characters and their design unless the user asks to change them. Extend the surroundings rather than zooming, cropping, shrinking or centering the whole room on another backdrop.",
+      "Follow the requested style; otherwise keep the reference style. Match the canvas aspect ratio and paint the background across the ENTIRE canvas without letterboxing.",
+      SCENE_BACKGROUND_RULES,
+    ].join(" ");
+  }
   return [
     `Edit the attached picture on its fixed ${width}x${height} canvas: ${instruction}.`,
     "Keep its design, colours, outline, proportions and pose exactly as they are",
     "unless the instruction changes them. Keep the original placement, scale and margins; do not zoom or reframe.",
-    "Apply material or skin recolouring to ALL requested areas, including their shadows and highlights. Preserve unrelated details, thin strings, weapons, face and background.",
+    "Apply material or skin recolouring to ALL requested areas, including their shadows and highlights. Preserve unrelated details, thin strings, weapons and faces. Preserve the background only where the request does not ask to change it.",
     "The requested style takes priority over the original style. Otherwise preserve the original style exactly.",
     "If the request matches a user reference, its requested pose, viewing angle, proportions and rendering replace conflicting features of the old drawing. Do not average the two designs or keep an old front view against a three-quarter reference. Fit the complete requested silhouette inside the canvas.",
     "Retain small recognizable details and keep the result readable at the target resolution.",
@@ -135,6 +150,27 @@ export function buildRedrawReferences(
 
 const box = (r: Rect) => `x ${r.x}, y ${r.y}, w ${r.w}, h ${r.h}`;
 
+/** Keep raw user constraints for follow-ups such as "there too", without images
+ * or an assistant's unverified claims that a previous edit was successful. */
+export function buildEditContext(recent: ChatMessage[] = []): string {
+  let start = -1;
+  for (let i = recent.length - 1; i >= 0; i--) {
+    if (recent[i]?.role === "user" && recent[i]?.action?.kind === "generate") {
+      start = i;
+      break;
+    }
+  }
+  return recent
+    .slice(start < 0 ? -MAX_HISTORY : start)
+    .filter(
+      (message) =>
+        message.role === "user" && typeof message.content === "string",
+    )
+    .slice(-MAX_HISTORY)
+    .map((message) => message.content.slice(0, 4000))
+    .join("\n");
+}
+
 function objectList(objects: Rect[], layers: string[]) {
   if (!objects.length) return "(nothing drawn)";
   return objects
@@ -152,6 +188,8 @@ export function buildPlanPrompt(args: {
   objects: Rect[];
   layers: string[];
   selection: Rect | null;
+  composition?: "sprite" | "scene";
+  context?: string;
 }): string {
   const objects = objectList(args.objects, args.layers);
   const selection = args.selection
@@ -161,6 +199,12 @@ export function buildPlanPrompt(args: {
     `The picture is a ${args.width}x${args.height} pixel art tile, shown enlarged; light grey means empty.`,
     `OBJECTS (separate drawn things, in tile pixels):\n${objects}${selection}`,
     `REQUEST: ${args.request}`,
+    args.context
+      ? `EARLIER USER INSTRUCTIONS FOR THIS ARTWORK (context for words like "there", "also", "still" and "fix it"; the latest request overrides conflicting older instructions):\n${args.context}`
+      : "",
+    args.composition === "scene"
+      ? `SCENE EDIT: the editing canvas is ${box(args.selection ?? { x: 0, y: 0, w: args.width, h: args.height })}. Fill its background edge to edge, including currently empty space. Do not limit source or target to a character's bounding box. Preserve unrelated foreground details through the redraw instruction, not by protecting an entire connected scene object. Keep the current camera/view unless the user asks to change it. A request to remove black outside areas means extending real scenery into them, not preserving an isolated diorama on a plain backdrop.`
+      : "",
     PLAN_RULES,
   ].join("\n\n");
 }
@@ -261,6 +305,7 @@ export function buildSheetRedrawPrompt(args: {
   cellW: number;
   cellH: number;
   layout: SheetLayout;
+  composition?: "sprite" | "scene";
 }): string {
   const { cols, rows } = args.layout;
   return [
@@ -275,7 +320,9 @@ export function buildSheetRedrawPrompt(args: {
     "Keep the grid exactly: every frame stays in its cell. Change nothing else the instruction does not ask for.",
     "No grid lines, no numbers, no labels.",
     "Preserve fine details at the target resolution.",
-    `Preserve existing background and scenery. Areas already flat ${CHROMA_KEY_HEX} stay that colour unless the request changes them.`,
+    args.composition === "scene"
+      ? "Each cell is a complete scene: paint the requested background across the entire cell, including previously empty space. Preserve the foreground's placement and scale. No chroma key, transparent margins, letterboxing or cropping."
+      : `Preserve existing background and scenery. Areas already flat ${CHROMA_KEY_HEX} stay that colour unless the request changes them.`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -299,6 +346,7 @@ export function buildSetPrompt(args: {
     `A pixel art sprite sheet of ${args.subjects.length} different game sprites on a grid of exactly ${cols} columns and ${rows} rows of equal cells, one sprite per cell, in reading order: the top row from left to right, then the next row.`,
     cells,
     `Each cell is a ${args.cellW}x${args.cellH} pixel sprite. Each sprite is whole, centred in its cell with empty space around it, and never touches or crosses into another cell.`,
+    IMAGE_VIEW_RULES,
     "All sprites share one style, palette, outline and light, as art of one game, and keep their real sizes relative to each other (a dog is bigger than an apple).",
     args.subjects.length < cols * rows
       ? "Leave the remaining cells at the end of the last row empty."
@@ -336,6 +384,9 @@ export function buildSheetPrompt(args: {
     args.fromReference
       ? `Every frame shows the subject of the attached picture (${args.subject}) with exactly its design, colours, outline and proportions.`
       : `Every frame shows the same subject: ${args.subject}.`,
+    args.fromReference
+      ? "Preserve the reference's camera angle unless the user requests a different one."
+      : IMAGE_VIEW_RULES,
     `Each cell is the same ${args.cellW}x${args.cellH} pixel scene seen by one fixed camera: the subject keeps its size, colours, design and place in every frame, and only what moves changes. Everything a frame shows stays inside its cell, never crossing into another cell.`,
     args.composition !== "scene"
       ? "Reserve a clear gutter on every side for the largest pose in the sequence, including raised ears and limbs. Keep one common scale and a stable body anchor for planted actions; no whole-body sliding or vertical bobbing unless the requested action requires it."
@@ -354,6 +405,7 @@ export function buildSheetPrompt(args: {
     ...(args.composition === "scene"
       ? [
           "Every cell is a complete scene with its requested background painted edge to edge. Keep that environment fixed throughout the action; no chroma key or transparent margins.",
+          SCENE_BACKGROUND_RULES,
         ]
       : IMAGE_BACKGROUND_RULES),
   ]

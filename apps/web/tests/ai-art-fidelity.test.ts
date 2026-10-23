@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildImagePrompt,
+  buildRedrawPrompt,
+  buildEditContext,
   buildRedrawReferences,
   buildSheetPrompt,
   buildSheetRedrawPrompt,
@@ -119,6 +121,81 @@ describe("requested composition and style", () => {
     expect(prompt).not.toContain(IMAGE_BACKGROUND_RULES[0]);
     expect(prompt).not.toContain("no scenery");
   });
+  it("uses a straight-on 2D default for a room without inventing a diorama camera or empty outside backdrop", () => {
+    const prompt = buildImagePrompt(
+      "a cozy bedroom filling the whole tile",
+      128,
+      128,
+      false,
+      "scene",
+    );
+    expect(prompt).toContain("neither specifies a camera angle");
+    expect(prompt).toContain("conventional straight-on 2D view");
+    expect(prompt).toContain("Do not invent an isometric");
+    expect(prompt).toContain("including all four corners");
+    expect(prompt).toContain("extend its walls, floor");
+  });
+  it("lets an explicit or referenced isometric view override the default", () => {
+    const prompt = buildImagePrompt(
+      "an isometric bedroom",
+      128,
+      128,
+      true,
+      "scene",
+      "isometric pixel art",
+    );
+    expect(prompt).toContain("Requested visual style: isometric pixel art");
+    expect(prompt).toContain(
+      "An explicitly requested or referenced view takes priority over this default",
+    );
+    expect(prompt).toContain("reference");
+  });
+  it("allows a scene edit to replace black outer margins while preserving the existing view and interior objects", () => {
+    const prompt = buildRedrawPrompt(
+      "remove black outside areas and fill the whole tile",
+      128,
+      128,
+      "scene",
+    );
+    expect(prompt).toContain(
+      "old outer margins and plain backdrop must change",
+    );
+    expect(prompt).toContain("continuation of the actual scene");
+    expect(prompt).toContain("Keep the existing camera angle");
+    expect(prompt).not.toContain(
+      "Keep the original placement, scale and margins",
+    );
+    expect(prompt).toContain(
+      "Preserve intentional dark objects, lighting and shadows",
+    );
+    expect(prompt).not.toContain("Fit the complete requested silhouette");
+    expect(prompt).toContain("floor into the lower outside corners");
+  });
+  it("keeps the actual user's floor-extension constraints for a short follow-up, without treating success captions as instructions", () => {
+    const context = buildEditContext([
+      { role: "user", content: "make an old unrelated scene black" },
+      {
+        role: "user",
+        content: "draw a cozy bedroom",
+        action: { kind: "generate", request: "bedroom" },
+      },
+      {
+        role: "user",
+        content: "fill the whole tile without black outside areas",
+      },
+      { role: "assistant", content: "All black borders were removed" },
+      {
+        role: "user",
+        content: "but why you dont fix that in a floor, make there also",
+      },
+    ]);
+    expect(context).toContain(
+      "fill the whole tile without black outside areas",
+    );
+    expect(context).toContain("make there also");
+    expect(context).not.toContain("All black borders were removed");
+    expect(context).not.toContain("old unrelated");
+  });
   it("keeps a complete scene together even if the router lists separate items", () => {
     const route = readRoute(
       JSON.stringify({
@@ -198,6 +275,30 @@ describe("thin details and complete frames", () => {
     );
     for (let y = 0; y < 8; y++)
       for (let x = 0; x < 8; x++) expect(alpha(result, x, y)).toBe(255);
+  });
+  it("fits a portrait-shaped scene to the actual tile without clipping its edges or adding transparent sidebars", () => {
+    const image = bitmap(8, 16);
+    const colours = [
+      [40, 100, 180, 255],
+      [255, 0, 255, 255],
+      [40, 130, 50, 255],
+      [100, 70, 20, 255],
+    ];
+    for (let y = 0; y < 16; y++)
+      for (let x = 0; x < 8; x++)
+        put(image, x, y, colours[(y < 8 ? 0 : 2) + (x < 4 ? 0 : 1)]!);
+    const result = runSteps(image, { w: 8, h: 8 }, SCENE_PICTURE_STEPS);
+    for (const [i, [x, y]] of [
+      [0, 0],
+      [7, 0],
+      [0, 7],
+      [7, 7],
+    ].entries())
+      expect([
+        ...result.rgba.slice((y! * 8 + x!) * 4, (y! * 8 + x!) * 4 + 4),
+      ]).toEqual(colours[i]);
+    for (let i = 3; i < result.rgba.length; i += 4)
+      expect(result.rgba[i]).toBe(255);
   });
   it("does not delete isolated intentional details during an edit", () => {
     const image = bitmap(8, 8);

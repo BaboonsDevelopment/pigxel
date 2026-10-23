@@ -9,6 +9,7 @@ type SavedMessage = {
   layer?: string;
   referencePictures?: string[];
   action?: TileAction;
+  composition?: "sprite" | "scene";
 };
 
 type SavedChat = { messages: SavedMessage[] };

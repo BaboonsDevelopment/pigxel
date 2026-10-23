@@ -7,7 +7,7 @@ const config: NextConfig = {
   poweredByHeader: false,
   experimental: {
     serverActions: {
-      // Redraws include the current picture, original, and up to three references.
+      // Include multipart overhead for the current picture, original and references.
       bodySizeLimit: "12mb",
     },
   },

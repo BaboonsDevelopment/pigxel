@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../../actions";
 import { toPictures } from "../../pictures";
-import { REFERENCES_NOTE } from "../../constants";
+import { MAX_HISTORY, REFERENCES_NOTE } from "../../constants";
 import { notifyAiSpent } from "../../spent-event";
 import { warnAboutTokens } from "../../token-warnings";
 import { loadChat, saveChat } from "../../chat/history";
@@ -91,6 +91,7 @@ export function ChatPanel({
               layer,
               referencePictures,
               action,
+              composition,
             }) => {
               const image = picture ? await findPicture(picture) : null;
               if (image && picture) kept.current.set(image, picture);
@@ -109,6 +110,7 @@ export function ChatPanel({
                 picture,
                 layer,
                 action,
+                composition,
                 references,
                 image: image ?? undefined,
               };
@@ -138,6 +140,7 @@ export function ChatPanel({
             layer,
             references,
             action,
+            composition,
           }) => {
             let id = picture ?? (image ? kept.current.get(image) : undefined);
             if (!id && image) {
@@ -160,6 +163,7 @@ export function ChatPanel({
               role,
               content,
               action,
+              composition,
               ...(id && { picture: id, layer }),
               ...(referencePictures.length && { referencePictures }),
             };
@@ -269,11 +273,14 @@ export function ChatPanel({
     setPending(true);
     const token = ++runs.current;
     running.current.add(token);
-    const visualContext = [...conversation]
+    // Bound the request here too. Trimming only inside the server action still
+    // sends the entire saved chat before Next can enforce its body limit.
+    const recent = conversation.slice(-MAX_HISTORY);
+    const visualContext = [...recent]
       .reverse()
       .find((message) => message.role === "user" && message.references?.length);
     const result = await sendMessage(
-      conversation.map((message) => ({
+      recent.map((message) => ({
         role: message.role,
         content: message.references?.length
           ? `${message.content} ${REFERENCES_NOTE}`
@@ -318,7 +325,12 @@ export function ChatPanel({
         );
       else await edit(chat, action);
     } catch (error) {
-      ignoreStop(error);
+      if (!(error instanceof Stopped)) {
+        console.error("[ai] request failed:", error);
+        chat.setError("Couldn’t finish this request. Try again.");
+      }
+    } finally {
+      chat.setPending(false);
     }
   };
 
@@ -391,18 +403,15 @@ export function ChatPanel({
         </div>
       )}
       <div className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 ? (
-          <ChatWelcome />
-        ) : (
-          <ChatMessages
-            messages={messages}
-            pending={pending}
-            error={error}
-            onChoose={choose}
-            onPress={press}
-            onHover={canvas.highlight}
-          />
-        )}
+        {messages.length === 0 && <ChatWelcome />}
+        <ChatMessages
+          messages={messages}
+          pending={pending}
+          error={error}
+          onChoose={choose}
+          onPress={press}
+          onHover={canvas.highlight}
+        />
       </div>
       <ChatComposer
         autoFocus={autoFocus}

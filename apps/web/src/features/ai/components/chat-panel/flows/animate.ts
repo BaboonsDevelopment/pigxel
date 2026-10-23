@@ -112,6 +112,7 @@ async function draw(
       role: "assistant",
       content: `${track.name}:`,
       image: drawn.image,
+      composition: track.composition ?? "sprite",
     });
     chat.say(
       `Done: "${plan.name}", ${plan.frameCount} frames. It is playing now.`,
