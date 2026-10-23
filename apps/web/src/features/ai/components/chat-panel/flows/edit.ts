@@ -141,6 +141,7 @@ export async function edit(chat: Chat, action: TileAction) {
             ? "Here is the redrawn scene."
             : plan.value.summary || "Done.") + many,
         image: made.image,
+        composition: action.composition ?? "sprite",
         ...(whole && steps.length === 1 && { layer: layerId }),
       });
       return true;

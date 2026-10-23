@@ -69,6 +69,7 @@ export async function drawOnNewLayer(
       role: "assistant",
       content: `Here is your picture: ${subject}${many}, on the layer "${name}".${hidden}`,
       image: result.value,
+      composition,
       layer,
     });
   } else {
@@ -259,6 +260,7 @@ async function drawSet(chat: Chat, items: SetItem[], style = "") {
     role: "assistant",
     content: `Here they are, each on a layer of its own: ${added.map((n) => `"${n}"`).join(", ")}.`,
     image,
+    composition: "sprite",
   });
   return true;
 }
